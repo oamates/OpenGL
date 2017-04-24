@@ -1,0 +1,16 @@
+newmtl spoon_mtl
+
+    Ns 32.000000
+    Ni 1.500000
+    d 1.000000
+    Tr 0.000000
+    Tf 1.000000 1.000000 1.000000 
+    illum 2
+    Ka 0.210 0.190 0.150
+    Kd 0.734 0.731 0.674
+    Ks 0.110 0.100 0.091
+    Ke 0.000 0.000 0.000
+    map_Ka original_diff.png
+    map_Kd original_diff.png
+    map_Ks spoon_spec.png
+    map_bump spoon_disp.png -bm 0.25

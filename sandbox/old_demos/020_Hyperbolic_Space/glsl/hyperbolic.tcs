@@ -1,0 +1,29 @@
+#version 430 core
+
+layout(vertices = 3) out;
+
+in vec4 position_ws[];
+out vec4 position_ws1[];
+
+// built-in variables
+// in int gl_PatchVerticesIn;
+// in int gl_PrimitiveID;
+// in int gl_InvocationID;
+
+void main()
+{
+    position_ws1[gl_InvocationID] = position_ws[gl_InvocationID];
+    if (gl_InvocationID == 0)
+    {
+        gl_TessLevelInner[0] = 2;
+        gl_TessLevelOuter[0] = 2;
+        gl_TessLevelOuter[1] = 2;
+        gl_TessLevelOuter[2] = 2;
+    };
+}
+
+
+
+
+
+

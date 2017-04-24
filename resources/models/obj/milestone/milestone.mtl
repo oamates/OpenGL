@@ -1,0 +1,16 @@
+# 
+# 
+
+newmtl stone
+
+Ns 96.078431
+Ka 0.34 0.34 0.34
+Kd 0.40 0.40 0.40
+Ks 0.1  0.1  0.1
+Ni 1.0
+d  1.0
+illum 1
+
+map_Ka textures\color.png
+map_Kd textures\color.png
+map_bump textures\normal.png

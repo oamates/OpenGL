@@ -1,0 +1,41 @@
+#version 420 core
+
+layout (vertices = 1) out;
+
+uniform float lattice_scale;
+uniform vec3 camera_ws;
+
+in vec2 lattice_point[];
+out vec2 shift[];
+
+vec2 delta[4] = vec2[4]
+(
+    vec2(-0.5, -0.5),
+    vec2( 0.5, -0.5),
+    vec2(-0.5,  0.5),
+    vec2( 0.5,  0.5)
+); 
+
+void main()
+{
+    float l[4];
+    
+    for (int i = 0; i < 4; ++i)
+    { 
+        vec2 corner_point = lattice_scale * (lattice_point[gl_InvocationID] + delta[i]);
+        l[i] = length(camera_ws.xy - corner_point);
+        l[i] = 2000.0f / (0.05f * l[i] + 1.0f);
+    }    
+
+    gl_TessLevelOuter[0] = 0.5f * (l[0] + l[2]);
+    gl_TessLevelOuter[1] = 0.5f * (l[0] + l[1]);
+    gl_TessLevelOuter[2] = 0.5f * (l[1] + l[3]);
+    gl_TessLevelOuter[3] = 0.5f * (l[2] + l[3]);
+
+    gl_TessLevelInner[0] = 0.5f * (gl_TessLevelOuter[1] + gl_TessLevelOuter[3]);
+    gl_TessLevelInner[1] = 0.5f * (gl_TessLevelOuter[0] + gl_TessLevelOuter[2]);
+
+
+
+    shift[gl_InvocationID] = lattice_point[gl_InvocationID];
+}

@@ -1,0 +1,42 @@
+newmtl default
+d 1
+Ns 20.0
+Ni 0
+Ka 0.22 0.22 0.22
+Kd 0.66 0.66 0.66
+Ks 0.02 0.02 0.02
+Km 0
+map_Ka /Maps/cty1.png
+map_Kd /Maps/cty1.png
+
+newmtl default_sidewalks
+d 1
+Ns 20.0
+Ni 0
+Ka 0.22 0.22 0.22
+Kd 0.66 0.66 0.66
+Ks 0.02 0.02 0.02
+Km 0
+map_Ka /Maps/ang1.png
+map_Kd /Maps/ang1.png
+
+newmtl default_bldgs2
+d 1
+Ns 20.0
+Ni 0
+Ka 0.22 0.22 0.22
+Kd 0.66 0.66 0.66
+Ks 0.02 0.02 0.02
+Km 0
+map_Ka /Maps/cty2x.png
+map_Kd /Maps/cty2x.png
+
+newmtl Default
+d 1
+Ns 20.0
+Ni 0
+Ka 0.258824 0.258824 0.258824
+Kd 0.258824 0.258824 0.258824
+Ks 0 0 0
+Km 0
+

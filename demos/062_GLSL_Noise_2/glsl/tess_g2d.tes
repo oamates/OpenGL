@@ -1,0 +1,71 @@
+#version 420 core
+
+layout (quads, equal_spacing, ccw) in;
+
+in vec2 shift[];
+
+uniform sampler2D value_texture;
+uniform mat4 projection_view_matrix;
+uniform float lattice_scale;
+uniform float time;
+
+const float TEXEL_SIZE = 1.0 / 256.0;
+const float HALF_TEXEL = 1.0 / 512.0;
+
+vec2  hermite5(vec2 x)    { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
+vec2  hermite5_d(vec2 x)  { vec2  q = x * (1.0 - x); return 30.0 * q * q; }
+
+float gnoise(in vec2 x, out vec2 dF)
+{
+    vec2 p = floor(x);
+    vec2 f = x - p;
+    vec2 blend = hermite5(f);                                                               
+    vec2 blend_d = hermite5_d(f);                                                           
+    vec2 uv = TEXEL_SIZE * p + HALF_TEXEL;
+    vec4 a = textureGather(value_texture, uv, 0) - 0.5;                                     
+    vec4 b = textureGather(value_texture, uv, 2) - 0.5;                                     
+    vec4 q = f.xxyy - vec4(0.0, 1.0, 0.0, 1.0);                                             
+    vec4 v = a * q.xyyx + b * q.wwzz;                                                       
+    vec2 blend_h = mix(v.wx, v.zy, blend.x);                                                
+    vec4 diff = v.zyxy - v.wxwz;                                                            
+    vec4 blend_c = mix(vec4(a.wx, b.wx), vec4(a.zy, b.zy), blend.x);                        
+    const float NORMALIZER = 2.807;
+    dF = NORMALIZER * (mix(diff.xz, diff.yw, blend.yx) * blend_d + mix(blend_c.xz, blend_c.yw, blend.y));
+    return NORMALIZER * mix(blend_h.x, blend_h.y, blend.y);                                 
+}
+
+float fract_gnoise(in vec2 x, out vec2 dF)
+{
+    const int level = 6;
+    float frequency = 1.0;
+    float amplitude = 0.5;
+    float v = amplitude * gnoise(x, dF);
+    for(int i = 0; i < level; ++i)
+    {
+        vec2 df;
+        frequency *= 2.0;
+        amplitude *= 0.5;    
+        v += amplitude * gnoise(frequency * x, df);
+        dF += df;
+    }
+    dF *= 0.5;
+    return v;
+}
+
+out vec2 uv;
+out float value;
+out vec3 normal;
+
+void main()
+{
+    uv = shift[0] + gl_TessCoord.xy - vec2(0.5);
+    vec2 dF;
+    value = 0.5 + 0.5 * fract_gnoise(uv * 0.05, dF);
+    normal = normalize(vec3(dF, -1.0));
+    vec3 position_ws = vec3(lattice_scale * uv, 8192.0f * value);
+    gl_Position = projection_view_matrix * vec4(position_ws, 1.0f);
+}
+
+
+
+

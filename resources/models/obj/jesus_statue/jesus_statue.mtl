@@ -1,0 +1,15 @@
+# 
+# 
+
+newmtl jesusstatue
+Ns 96.078431
+Ka 0.36 0.39 0.35
+Kd 0.67 0.69 0.64
+Ks 0.16 0.17 0.12
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd jesus_statue_d.png
+map_bump jesus_statue_n.png
+map_Ka jesus_statue_d.png
+map_Ka jesus_statue_s.png

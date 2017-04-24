@@ -1,0 +1,10 @@
+newmtl pedestal1_032mat
+Ns 14.0
+d 1.0
+illum 2
+Ka 0.237 0.264 0.257
+Kd 0.554 0.575 0.556
+Ks 0.015 0.037 0.025
+map_Kd pedestal1_diff.png
+map_Ka pedestal1_diff.png
+map_Ks pedestal1_diff.png

@@ -1,0 +1,29 @@
+# 
+# 
+newmtl statue
+Ns 96.078431
+Ka 0.34 0.34 0.34
+Kd 0.40 0.40 0.40
+Ks 0.1  0.1  0.1
+Ni 1.0
+d  1.0
+illum 1
+map_Ka statue_d.png
+map_Kd statue_d.png
+map_Ks statue_s.png
+map_bump statue_n.png -bm 0.05
+
+newmtl leafage
+Ns 96.078431
+Ka 0.34 0.34 0.34
+Kd 0.40 0.40 0.40
+Ks 0.1  0.1  0.1
+Ni 1.0
+d  1.0
+illum 1
+map_Ka statue_d.png
+map_Kd statue_d.png
+map_Ks statue_s.png
+map_bump statue_n.png -bm 0.005
+
+

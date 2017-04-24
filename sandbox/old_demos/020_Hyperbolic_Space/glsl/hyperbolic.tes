@@ -1,0 +1,34 @@
+#version 430 core
+
+layout(triangles, equal_spacing, ccw) in;
+
+in vec4 position_ws1[];
+
+// built-in variables
+//in vec3 gl_TessCoord;
+//in int gl_PatchVerticesIn;
+//in int gl_PrimitiveID;
+
+vec4 hyperbolic_normalize(vec4 v)
+{
+    float norm = v.x * v.x + v.y * v.y + v.z * v.z - v.w * v.w;
+    return v / sqrt(-norm);
+    return v;    
+};
+
+
+out vec4 position;
+out vec3 barycentric_coordinates;
+ 
+void main()
+{  
+    position = hyperbolic_normalize(position_ws1[0] * gl_TessCoord.x + position_ws1[1] * gl_TessCoord.y + position_ws1[2] * gl_TessCoord.z);    
+    barycentric_coordinates = gl_TessCoord;
+}
+
+
+
+
+
+
+

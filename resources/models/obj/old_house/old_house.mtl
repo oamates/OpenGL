@@ -1,0 +1,48 @@
+# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
+# File Created: 18.05.2016 20:36:55
+
+newmtl Standard_2
+    Ns 10.0000
+    Ni 1.5000
+    d 1.0000
+    Tr 0.0000
+    Tf 1.0000 1.0000 1.0000 
+    illum 2
+    Ka 0.5880 0.5880 0.5880
+    Kd 0.5880 0.5880 0.5880
+    Ks 0.0000 0.0000 0.0000
+    Ke 0.0000 0.0000 0.0000
+    map_Ka textures\plants2.png
+    map_Kd textures\plants2.png
+    map_d  textures\plants2_mask.png
+
+newmtl Standard_3
+    Ns 10.0000
+    Ni 1.5000
+    d 1.0000
+    Tr 0.0000
+    Tf 1.0000 1.0000 1.0000 
+    illum 2
+    Ka 0.5880 0.5880 0.5880
+    Kd 0.5880 0.5880 0.5880
+    Ks 0.0000 0.0000 0.0000
+    Ke 0.0000 0.0000 0.0000
+    map_Ka textures\plants1.png
+    map_Kd textures\plants1.png
+    map_d  textures\plants1_mask.png
+
+newmtl Standard_1
+    Ns 10.0000
+    Ni 1.5000
+    d 1.0000
+    Tr 0.0000
+    Tf 1.0000 1.0000 1.0000 
+    illum 2
+    Ka 0.5880 0.5880 0.5880
+    Kd 0.5880 0.5880 0.5880
+    Ks 0.0000 0.0000 0.0000
+    Ke 0.0000 0.0000 0.0000
+    map_Ka   textures\house_body.png
+    map_Kd   textures\house_body.png
+    map_bump textures\house_bump.png
+    bump     textures\house_bump.png

@@ -1,0 +1,15 @@
+#
+
+newmtl lizard_mtl
+
+    Ns 32
+    d 1
+    Tr 1
+    Tf 1 1 1
+    illum 2
+    Ka 0.093 0.061 0.084
+    Kd 0.898 0.864 0.843
+    Ks 0.192 0.253 0.157
+    map_Ka textures\diffuse.png
+    map_Kd textures\diffuse.png
+    map_bump textures\normal.png

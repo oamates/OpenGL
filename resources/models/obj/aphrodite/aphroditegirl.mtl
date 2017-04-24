@@ -1,0 +1,28 @@
+
+newmtl 01___Default
+d 1
+Ns 20.0
+Ni 0
+Ka 0.22 0.22 0.22
+Kd 0.66 0.66 0.66
+Ks 0.03 0.03 0.03
+Km 0
+map_Ka body_diffuse.png
+map_Kd body_diffuse.png
+map_Ks body_spec.png
+map_bump body_bump.png
+
+
+newmtl 02___Default
+d 1
+Ns 20.0
+Ni 0
+Ka 0.22 0.22 0.22
+Kd 0.66 0.66 0.66
+Ks 0.03 0.03 0.03
+Km 0
+map_Ka head_diffuse.png
+map_Kd head_diffuse.png
+map_Ks head_spec.png
+map_bump head_bump.png
+

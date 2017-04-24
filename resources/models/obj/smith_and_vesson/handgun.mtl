@@ -1,0 +1,25 @@
+# Blender MTL File: 'Handgun_Game_Blender Gamer Engine.blend'
+# Material Count: 2
+
+newmtl handgun
+Ns 36.078431
+Ka 0.170000 0.170000 0.170000
+Kd 0.640000 0.640000 0.640000
+Ks 1.000000 1.000000 1.000000
+d 1.000000
+map_Ka   textures\handgun_S.png
+map_Kd   textures\handgun_S.png
+map_bump textures\handgun_N.png
+map_Ks   textures\handgun_S.png
+
+newmtl handgun_handgun
+
+Ns 36.078431
+Ka 0.170000 0.170000 0.170000
+Kd 0.640000 0.640000 0.640000
+Ks 1.000000 1.000000 1.000000
+d 1.000000
+map_Ka   textures\handgun_C.png
+map_Kd   textures\handgun_C.png
+map_bump textures\handgun_N.png
+map_Ks   textures\handgun_S.png

@@ -1,0 +1,24 @@
+newmtl material_1
+Ns 14.0
+d 1.0
+Ka 0.237 0.264 0.257
+Kd 0.554 0.575 0.556
+Ks 0.015 0.037 0.025
+map_Kd textures/structure_mtl1_diffcol.png
+
+newmtl material_1_windows
+d 1
+Ns 14.0
+Ka 0.237 0.264 0.257
+Kd 0.554 0.575 0.556
+Ks 0.015 0.037 0.025
+Km 0
+map_Kd textures/windows_mtl1_diffcol.png
+
+newmtl material_1_floor
+d 1
+Ns 14.0
+Ka 0.237 0.264 0.257
+Kd 0.554 0.575 0.556
+Ks 0.015 0.037 0.025
+

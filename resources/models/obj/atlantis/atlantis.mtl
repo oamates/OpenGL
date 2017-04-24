@@ -1,0 +1,45 @@
+newmtl default
+d 1
+Ns 20.0
+Ni 0
+Ka 0.11 0.11 0.33
+Kd 0.66 0.66 0.99
+Ks 0.02 0.02 0.04
+Km 0
+
+map_Ka /Maps/asd2.png
+map_Kd /Maps/asd2.png
+
+newmtl default_platform
+d 1
+Ns 20.0
+Ni 0
+Ka 0.11 0.11 0.33
+Kd 0.66 0.66 0.99
+Ks 0.02 0.02 0.04
+Km 0
+map_Ka /Maps/olg1b.png
+map_Kd /Maps/olg1b.png
+
+newmtl default_floor
+d 1
+Ns 20.0
+Ni 0
+Ka 0.11 0.11 0.33
+Kd 0.66 0.66 0.99
+Ks 0.02 0.02 0.04
+Km 0
+map_Ka /Maps/gr1.png
+map_Kd /Maps/gr1.png
+
+newmtl default_platform_platform
+d 1
+Ns 20.0
+Ni 0
+Ka 0.11 0.11 0.33
+Kd 0.66 0.66 0.99
+Ks 0.02 0.02 0.04
+Km 0
+map_Ka /Maps/cda2b.png
+map_Kd /Maps/cda2b.png
+

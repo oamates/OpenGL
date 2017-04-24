@@ -1,0 +1,155 @@
+newmtl 4_Eyes
+d 1
+Ns 0
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.02
+map_Ka texture/SMPL_Eye_Color.png
+map_Kd texture/SMPL_Eye_Color.png
+map_Ks texture/SMPL_Eye_Specular.png
+
+newmtl 3_WingsTop
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Wings_Color.png
+map_Kd texture/SMPL_Wings_Color.png
+map_Ks texture/SMPL_Wings_Specular.png
+map_bump texture/SMPL_Wings_Bump.png -bm 0.01
+
+newmtl 3_WingsBottom
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Wings_Color.png
+map_Kd texture/SMPL_Wings_Color.png
+map_Ks texture/SMPL_Wings_Specular.png
+map_bump texture/SMPL_Wings_Bump.png -bm 0.01
+
+newmtl 2_Claws
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Body_Color.png
+map_Kd texture/SMPL_Body_Color.png
+map_Ks texture/SMPL_Body_Specular.png
+map_bump texture/SMPL_Body_Bump.png -bm 0.01
+
+newmtl 2_SkinBody
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Body_Color.png
+map_Kd texture/SMPL_Body_Color.png
+map_Ks texture/SMPL_Body_Specular.png
+map_bump texture/SMPL_Body_Bump.png -bm 0.01
+
+newmtl 2_SkinUnderbelly
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Body_Color.png
+map_Kd texture/SMPL_Body_Color.png
+map_Ks texture/SMPL_Body_Specular.png
+map_bump texture/SMPL_Body_Bump.png -bm 0.01
+
+newmtl 2_Teeth
+d 1
+Ns 0.5
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Body_Color.png
+map_Kd texture/SMPL_Body_Color.png
+map_Ks texture/SMPL_Body_Specular.png
+map_bump texture/SMPL_Body_Bump.png -bm 0.01
+
+newmtl 1_Horns
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Head_Color.png
+map_Kd texture/SMPL_Head_Color.png
+map_Ks texture/SMPL_Head_Specular.png
+map_bump texture/SMPL_Head_Bump.png -bm 0.01
+
+newmtl 1_Tongue
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.02
+map_Ka texture/SMPL_Head_Color.png
+map_Kd texture/SMPL_Head_Color.png
+map_Ks texture/SMPL_Head_Specular.png
+map_bump texture/SMPL_Head_Bump.png -bm 0.01
+
+newmtl 1_SkinJaw
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Head_Color.png
+map_Kd texture/SMPL_Head_Color.png
+map_Ks texture/SMPL_Head_Specular.png
+map_bump texture/SMPL_Head_Bump.png -bm 0.01
+
+newmtl 1_SkinFace
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.2
+map_Ka texture/SMPL_Head_Color.png
+map_Kd texture/SMPL_Head_Color.png
+map_Ks texture/SMPL_Head_Specular.png
+map_bump texture/SMPL_Head_Bump.png -bm 0.01
+
+newmtl 1_InnerMouth
+d 1
+Ns 0.75
+Ni 0
+Ka 0.1 0.1 0.1
+Kd 0.9 0.9 0.9
+Ks 1 1 1
+Km 0.02
+map_Ka texture/SMPL_Head_Color.png
+map_Kd texture/SMPL_Head_Color.png
+map_Ks texture/SMPL_Head_Specular.png
+map_bump texture/SMPL_Head_Bump.png -bm 0.01
+

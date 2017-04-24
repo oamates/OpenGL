@@ -1,0 +1,27 @@
+
+newmtl blinn1SG
+illum 4
+Kd 0.664 0.635 0.591
+Ka 0.229 0.217 0.195
+Tf 1.00 1.00 1.00
+Ni 1.00
+Ks 0.30 0.30 0.30
+
+newmtl lambert2SG
+illum 4
+Kd 0.77 0.77 0.77
+Ka 0.22 0.22 0.22
+Tf 1.00 1.00 1.00
+map_Ka converse.png
+map_Kd converse.png
+map_bump converse_bump.png -bm 0.295683
+Ni 1.00
+
+newmtl lambert3SG
+illum 4
+Kd 0.77 0.77 0.77
+Ka 0.22 0.22 0.22
+Tf 1.00 1.00 1.00
+map_Kd laces.png
+bump laces.png -bm 0.255396
+Ni 1.00
