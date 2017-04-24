@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Deferred Shading", 4, 3, 3, SCR_WIDTH, SCR_HEIGHT, true);
+    demo_window_t window("Deferred Shading", 4, 3, 3, SCR_WIDTH, SCR_HEIGHT, true, true);
 
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 	glEnable(GL_DEPTH_TEST);

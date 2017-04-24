@@ -275,7 +275,6 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
         textured = true;
         std::map<pnt_index, unsigned int> vcache;                           // vertex cache to reuse vertices that use the same attribute index triple
         std::vector<vertex_pnt2_t> vertices;
-//        std::vector<vertex_pn_t> vertices1;
 
         unsigned int vindex = 0;
         for (size_t i = 0; i < triangles.size(); ++i)                       
@@ -291,7 +290,6 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
                     exit_msg("Error :: textured model :: invalid index triple (%d, %d, %d)", v.p, v.n, v.t);
 
                 vertices.push_back(vertex_pnt2_t(positions[v.p], normals[v.n], uvs[v.t]));
-//                vertices1.push_back(vertex_pn_t(positions[v.p], normals[v.n]));
                 vcache[v] = vindex;
                 indices[i] = vindex;
                 vindex++;
@@ -300,13 +298,9 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
 
         vertex_array.init<vertex_pnt2_t, GLuint>(GL_TRIANGLES, vertices.data(), vertices.size(), indices.data(), indices.size());
 
-//        std::string vao_filename = filename + ".vao";
-//        debug_msg("Saving vao of PN type :: %s", vao_filename.c_str());
-//        vao_t::store<vertex_pn_t, GLuint>(vao_filename.c_str(), GL_TRIANGLES, vertices1.data(), vertices1.size(), indices.data(), indices.size());
-
-//        std::string vao_filename = filename + ".vao";
-//        debug_msg("Saving vao of PNT2 type :: %s", vao_filename.c_str());
-//        vao_t::store<vertex_pnt2_t, GLuint>(vao_filename.c_str(), GL_TRIANGLES, vertices.data(), vertices.size(), indices.data(), indices.size());
+        std::string vao_filename = filename + ".vao";
+        debug_msg("Saving vao of PNT2 type :: %s", vao_filename.c_str());
+        vao_t::store<vertex_pnt2_t, GLuint>(vao_filename.c_str(), GL_TRIANGLES, vertices.data(), vertices.size(), indices.data(), indices.size());
     }
     else
     {

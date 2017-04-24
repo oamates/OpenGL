@@ -38,7 +38,7 @@ void main()
     // Then calculate lighting as usual, hard-coded ambient component
     //==========================================================================================================================================================
     vec3 color = diffuse * 0.125;
-    vec3 view  = normalize(camera_ws - position_ws);
+    vec3 v = normalize(camera_ws - position_ws);
 
     for(int i = 0; i < NR_LIGHTS; ++i)
     {
@@ -78,13 +78,13 @@ void main()
     // Based on which of the 1-5 keys we pressed, show final result or intermediate g-buffer textures
     //==========================================================================================================================================================
     if(draw_mode == 0)
-        FragColor = vec4(color, 1.0);
+        FragmentColor = vec4(color, 1.0);
     else if(draw_mode == 1)
-        FragColor = vec4(abs(position_ws), 1.0);
+        FragmentColor = vec4(abs(position_ws), 1.0);
     else if(draw_mode == 2)
-        FragColor = vec4(abs(normal_ws), 1.0);
+        FragmentColor = vec4(abs(normal_ws), 1.0);
     else if(draw_mode == 3)
-        FragColor = vec4(diffuse, 1.0);
+        FragmentColor = vec4(diffuse, 1.0);
     else if(draw_mode == 4)
-        FragColor = vec4(vec3(specular_power), 1.0);
+        FragmentColor = vec4(vec3(specular_power), 1.0);
 }
