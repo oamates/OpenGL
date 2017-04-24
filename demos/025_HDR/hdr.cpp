@@ -153,9 +153,8 @@ struct demo_window_t : public glfw_window_t
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
-    // initialize GLFW library
-    // create GLFW window and initialize GLEW library
-    // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
+    // initialize GLFW library, create GLFW window and initialize GLEW library
+    // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
     //===================================================================================================================================================================================================================
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
@@ -240,7 +239,9 @@ int main(int argc, char *argv[])
         window.new_frame();
         glm::vec3 camera_ws = window.camera.position();
 
+        //===============================================================================================================================================================================================================
         // 1. Render scene into floating point framebuffer
+        //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_FRAMEBUFFER, hdrFBO);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glm::mat4 projection = window.camera.projection_matrix;
