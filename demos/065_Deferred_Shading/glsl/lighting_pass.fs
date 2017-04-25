@@ -1,4 +1,4 @@
-#version 330 core
+#version 420 core
 
 in vec2 uv;
 
@@ -6,17 +6,20 @@ uniform sampler2D position_tex;
 uniform sampler2D normal_tex;
 uniform sampler2D albedo_tex;
 
-struct Light
+struct light_t
 {
-    vec3 position;
-    vec3 color;    
-    float linear;
-    float quadratic;
-    float radius;
+    vec4 position;
+    vec4 color;    
 };
 
 const int NR_LIGHTS = 32;
-uniform Light lights[NR_LIGHTS];
+
+layout (std140) uniform lights_block
+{
+    light_t light[NR_LIGHTS];
+};
+
+
 uniform vec3 camera_ws;
 uniform int draw_mode;
 
@@ -45,28 +48,32 @@ void main()
         //======================================================================================================================================================
         // Calculate distance between light source and current fragment
         //======================================================================================================================================================
-        vec3 light = lights[i].position - position_ws;
-        float distance = length(light);
+        vec3 light_ws = light[i].position.xyz;
+        vec3 l = light_ws - position_ws;
+        float distance = length(l);
+        float radius = light[i].position.w;
 
-        if(distance < lights[i].radius)
+        if(distance < radius)
         {
+            vec3 light_color = light[i].color.rgb;
+            float light_spec_power = light[i].color.a;
             //==================================================================================================================================================
             // Diffuse
             //==================================================================================================================================================
-            vec3 l = light / distance;
-            vec3 diffuse_color = max(dot(normal_ws, l), 0.0) * diffuse * lights[i].color;
+            l /= distance;
+            vec3 diffuse_color = max(dot(normal_ws, l), 0.0) * diffuse * light_color;
 
             //==================================================================================================================================================
             // Specular
             //==================================================================================================================================================
             vec3 h = normalize(l + v);  
-            float specular_factor = pow(max(dot(normal_ws, h), 0.0), 16.0);
-            vec3 specular_color = lights[i].color * specular_factor * specular_power;
+            float specular_factor = pow(max(dot(normal_ws, h), 0.0), 80.0 * specular_power);
+            vec3 specular_color = light_color * specular_factor * light_spec_power;
 
             //==================================================================================================================================================
             // Attenuation
             //==================================================================================================================================================
-            float attenuation = 1.0f / (1.0f + lights[i].linear * distance + lights[i].quadratic * distance * distance);
+            float attenuation = 1.0f / (1.0f + 0.5 * distance * distance);
             diffuse_color *= attenuation;
             specular_color *= attenuation;
             color += diffuse_color;
@@ -75,12 +82,13 @@ void main()
     }    
     
     //==========================================================================================================================================================
-    // Based on which of the 1-5 keys we pressed, show final result or intermediate g-buffer textures
+    // Based on the draw mode, show final result or intermediate textures
     //==========================================================================================================================================================
+
     if(draw_mode == 0)
         FragmentColor = vec4(color, 1.0);
     else if(draw_mode == 1)
-        FragmentColor = vec4(abs(position_ws), 1.0);
+        FragmentColor = vec4(0.15 * abs(position_ws), 1.0);
     else if(draw_mode == 2)
         FragmentColor = vec4(abs(normal_ws), 1.0);
     else if(draw_mode == 3)

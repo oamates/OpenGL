@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -28,7 +29,7 @@ struct demo_window_t : public glfw_window_t
     bool wireframe = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -63,12 +64,18 @@ const GLuint SCR_WIDTH = 1920, SCR_HEIGHT = 1080;
 
 struct Light
 {
-    glm::vec3 position;
-    glm::vec3 color;    
-    float linear;
-    float quadratic;
-    float radius;
+    glm::vec4 position;             // 3d position + radius
+    glm::vec4 color;                // rgb color + specular power
 };
+
+
+glm::vec3 hsv2rgb(const glm::vec3 c)
+{
+    glm::vec3 K = glm::vec3(1.0f, 2.0f / 3.0f, 1.0f / 3.0f);
+    glm::vec3 p = glm::abs(6.0f * glm::fract(glm::vec3(c.x) + K) - glm::vec3(3.0f));
+    return c.z * glm::mix(glm::vec3(1.0f), glm::clamp(p - glm::vec3(1.0f), 0.0f, 1.0f), c.y);
+}
+
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -82,7 +89,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Deferred Shading", 4, 3, 3, SCR_WIDTH, SCR_HEIGHT, true);
+    demo_window_t window("Deferred Shading", 4, 4, 2, SCR_WIDTH, SCR_HEIGHT, true);
 
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 	glEnable(GL_DEPTH_TEST);
@@ -92,29 +99,25 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     const GLuint NR_LIGHTS = 32;
     Light lights[NR_LIGHTS];
-    srand(13);
     for (GLuint i = 0; i < NR_LIGHTS; i++)
     {
-        //===============================================================================================================================================================================================================
-        // Calculate slightly random offsets
-        //===============================================================================================================================================================================================================
-        GLfloat xPos = ((rand() % 100) / 100.0) * 6.0 - 3.0;
-        GLfloat yPos = ((rand() % 100) / 100.0) * 6.0 - 4.0;
-        GLfloat zPos = ((rand() % 100) / 100.0) * 6.0 - 3.0;
-        lights[i].position = glm::vec3(xPos, yPos, zPos);
+        lights[i].position = glm::vec4(glm::linearRand(-3.0f, 3.0f),
+                                       glm::linearRand(-4.0f, 4.0f),
+                                       glm::linearRand(-3.0f, 3.0f),
+                                       glm::linearRand(50.0f, 100.0f));
 
-        //===============================================================================================================================================================================================================
-        // Also calculate random color
-        //===============================================================================================================================================================================================================
-        GLfloat rColor = ((rand() % 100) / 200.0f) + 0.5;
-        GLfloat gColor = ((rand() % 100) / 200.0f) + 0.5;
-        GLfloat bColor = ((rand() % 100) / 200.0f) + 0.5;
-        lights[i].color = glm::vec3(rColor, gColor, bColor);
+        glm::vec3 hsv = glm::vec3(glm::linearRand(0.00f, 1.00f),              // hue
+                                  glm::linearRand(0.75f, 1.00f),              // saturation
+                                  glm::linearRand(0.60f, 0.90f));             // value
 
-        lights[i].linear = 0.7;
-        lights[i].quadratic = 1.8;
-        lights[i].radius = 5.5f;
+        lights[i].color = glm::vec4(hsv2rgb(hsv), glm::linearRand(0.00f, 1.25f));
     }
+
+    GLuint ubo_id;
+    glGenBuffers(1, &ubo_id);
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo_id);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(Light) * NR_LIGHTS, lights, GL_STATIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);    
 
     //===================================================================================================================================================================================================================
 	// Setup and compile our shaders
@@ -127,32 +130,33 @@ int main(int argc, char *argv[])
     geometry_pass["diffuse_tex"] = 3;
     geometry_pass["specular_tex"] = 4;
 
+
     glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lighting_pass.vs"), 
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lighting_pass.fs"));
     lighting_pass.enable();
     uniform_t uni_lp_camera_ws = lighting_pass["camera_ws"];
-    glUniform1fv(lighting_pass["lights"], sizeof(lights) / sizeof(GLfloat), (const GLfloat*) lights);
     uniform_t uni_lp_draw_mode = lighting_pass["draw_mode"];
     lighting_pass["position_tex"] = 0;
     lighting_pass["normal_tex"] = 1;
     lighting_pass["albedo_tex"] = 2;
+    uni_lp_draw_mode = 0;
+    lighting_pass.bind_ubo("lights_block", 0);
 
     glsl_program_t light_box(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/light_box.vs"), 
                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/light_box.fs"));
     light_box.enable();
-    uniform_t uni_lb_model_matrix = light_box["model_matrix"];
     uniform_t uni_lb_pv_matrix = light_box["projection_view_matrix"];
-    uniform_t uni_lb_light_color = light_box["light_color"];
+    light_box.bind_ubo("lights_block", 0);
 
     //===================================================================================================================================================================================================================
-	// Models
+	// models
     //===================================================================================================================================================================================================================
     vao_t cyborg;
 	cyborg.init("../../../resources/models/vao/pnt2/cyborg.vao");
     glActiveTexture(GL_TEXTURE3);
-    GLuint grass_tex = image::png::texture2d("../../../resources/models/vao/pnt2/cyborg_diffuse.png");
+    GLuint diffuse_tex = image::png::texture2d("../../../resources/models/vao/pnt2/cyborg_diffuse.png");
     glActiveTexture(GL_TEXTURE4);
-    GLuint dirt_tex  = image::png::texture2d("../../../resources/models/vao/pnt2/cyborg_specular.png");
+    GLuint specular_tex  = image::png::texture2d("../../../resources/models/vao/pnt2/cyborg_normal.png");
 
     const GLuint NR_OBJECTS = 9;
 	glm::vec3 objectPositions[NR_OBJECTS];
@@ -181,37 +185,46 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Position color buffer
     //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &gPosition);
     glBindTexture(GL_TEXTURE_2D, gPosition);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, 0);
+	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gPosition, 0);
 
     //===================================================================================================================================================================================================================
     // Normal color buffer
     //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE1);
     glGenTextures(1, &gNormal);
     glBindTexture(GL_TEXTURE_2D, gNormal);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, 0);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, SCR_WIDTH, SCR_HEIGHT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, gNormal, 0);
 
     //===================================================================================================================================================================================================================
     // Color + Specular color buffer
     //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE2);
     glGenTextures(1, &gAlbedoSpec);
     glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, SCR_WIDTH, SCR_HEIGHT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedoSpec, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, gAlbedoSpec, 0);
 
     //===================================================================================================================================================================================================================
     // Tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
     //===================================================================================================================================================================================================================
-    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3, attachments);
 
     //===================================================================================================================================================================================================================
@@ -256,6 +269,7 @@ int main(int argc, char *argv[])
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
             if (window.wireframe)
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 
 		    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -266,7 +280,7 @@ int main(int argc, char *argv[])
 		    {
 			    glm::mat4 model_matrix = glm::mat4(1.0f);
                 model_matrix = glm::translate(model_matrix, objectPositions[i]);
-                model_matrix = glm::scale(model_matrix, glm::vec3(0.25f));
+                model_matrix = glm::scale(model_matrix, glm::vec3(0.75f));
                 uni_gp_model_matrix = model_matrix;
                 cyborg.render();
 		    }
@@ -280,13 +294,6 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         lighting_pass.enable();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gPosition);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, gNormal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
-
         uni_lp_camera_ws = camera_ws;
         uni_lp_draw_mode = window.draw_mode;
         glBindVertexArray(vao_id);
@@ -305,16 +312,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         light_box.enable();
         uni_lb_pv_matrix = projection_view_matrix;
-
-        for (GLuint i = 0; i < NR_LIGHTS; i++)
-        {
-            glm::mat4 model_matrix = glm::mat4(1.0);
-            model_matrix = glm::translate(model_matrix, lights[i].position);
-            model_matrix = glm::scale(model_matrix, glm::vec3(0.25f));
-            uni_lb_model_matrix = model_matrix;
-            uni_lb_light_color = lights[i].color;
-            cube.render();
-        }
+        cube.instanced_render(NR_LIGHTS);
 
 		window.end_frame();
 	}
