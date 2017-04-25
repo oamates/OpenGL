@@ -1,6 +1,7 @@
 //========================================================================================================================================================================================================================
 // DEMO 066: Deferred shading
 //========================================================================================================================================================================================================================
+#define GLEW_STATIC
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
 
@@ -10,8 +11,8 @@
 
 #include "log.hpp"
 #include "constants.hpp"
-#include "gl_info.hpp"
 #include "glfw_window.hpp"
+#include "gl_info.hpp"
 #include "camera.hpp"
 #include "shader.hpp"
 #include "image.hpp"
@@ -81,7 +82,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Deferred Shading", 4, 3, 3, SCR_WIDTH, SCR_HEIGHT, true, true);
+    demo_window_t window("Deferred Shading", 4, 3, 3, SCR_WIDTH, SCR_HEIGHT, true);
 
 	glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 	glEnable(GL_DEPTH_TEST);

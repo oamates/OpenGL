@@ -1,6 +1,7 @@
 #ifndef _sphere_included_235872365354939851234963462099846368123698345924091252              
 #define _sphere_included_235872365354939851234963462099846368123698345924091252
 
+#define GLEW_STATIC
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 

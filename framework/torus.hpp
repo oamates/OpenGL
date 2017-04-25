@@ -1,6 +1,7 @@
 #ifndef __torus_included_019371234523712712947321224513980696703855102481925496          
 #define __torus_included_019371234523712712947321224513980696703855102481925496
 
+#define GLEW_STATIC
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 

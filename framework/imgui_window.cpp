@@ -2,7 +2,6 @@
 // GLFW + ImGui based application window structure
 //=======================================================================================================================================================================================================================
 #include <thread> 
-#include <GL/glew.h> 
 #include <glm/gtc/type_ptr.hpp>
 
 #include "glfw_window.hpp"

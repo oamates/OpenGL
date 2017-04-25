@@ -1,8 +1,10 @@
 #ifndef _glsl_noise_included_09676046823467347516537456016571651934563763187457
 #define _glsl_noise_included_09676046823467347516537456016571651934563763187457
 
-#include <GL/glew.h>
 #include <glm/glm.hpp>
+
+#define GLEW_STATIC
+#include <GL/glew.h>
 
 //=======================================================================================================================================================================================================================
 // Functions to generate permutation texture for fast texture-lookup based GLSL noise -- value, gradient and simplex
