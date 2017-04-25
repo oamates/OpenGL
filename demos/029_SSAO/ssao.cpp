@@ -19,17 +19,10 @@
 #include "image.hpp"
 #include "vao.hpp"
 
-
-GLuint draw_mode = 1;
-
-GLfloat lerp(GLfloat a, GLfloat b, GLfloat f)
-{
-    return a + f * (b - a);
-}
-
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
+    int draw_mode = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true /*, true */)
@@ -47,13 +40,9 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
-		
-		if (action != GLFW_RELEASE) return;
 
-        if (key = GLFW_KEY_1) draw_mode = 1;
-        if (key = GLFW_KEY_2) draw_mode = 2;
-        if (key = GLFW_KEY_3) draw_mode = 3;
-        if (key = GLFW_KEY_4) draw_mode = 4;
+        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
+            draw_mode = (draw_mode + 1) % 4;
 
     }
 
@@ -64,81 +53,6 @@ struct demo_window_t : public glfw_window_t
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
 };
-
-GLuint cubeVAO = 0;
-GLuint cubeVBO = 0;
-
-void RenderCube()
-{
-	// Initialize (if necessary)
-	if (cubeVAO == 0)
-	{
-		GLfloat vertices[] = 
-		{
-			// Back face
-			-0.5f, -0.5f, -0.5f,  0.0f,  0.0f,  -1.0f,  0.0f,  0.0f, // Bottom-left
-			 0.5f,  0.5f, -0.5f,  0.0f,  0.0f,  -1.0f,  1.0f,  1.0f, // top-right
-			 0.5f, -0.5f, -0.5f,  0.0f,  0.0f,  -1.0f,  1.0f,  0.0f, // bottom-right         
-			 0.5f,  0.5f, -0.5f,  0.0f,  0.0f,  -1.0f,  1.0f,  1.0f, // top-right
-			-0.5f, -0.5f, -0.5f,  0.0f,  0.0f,  -1.0f,  0.0f,  0.0f, // bottom-left
-			-0.5f,  0.5f, -0.5f,  0.0f,  0.0f,  -1.0f,  0.0f,  1.0f, // top-left
-			// Front face                                            
-			-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,   1.0f,  0.0f,  0.0f, // bottom-left
-			 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,   1.0f,  1.0f,  0.0f, // bottom-right
-			 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,   1.0f,  1.0f,  1.0f, // top-right
-			 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,   1.0f,  1.0f,  1.0f, // top-right
-			-0.5f,  0.5f,  0.5f,  0.0f,  0.0f,   1.0f,  0.0f,  1.0f, // top-left
-			-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,   1.0f,  0.0f,  0.0f, // bottom-left
-			// Left face                                       
-			-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,   0.0f,  1.0f,  0.0f, // top-right
-			-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,   0.0f,  1.0f,  1.0f, // top-left
-			-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,   0.0f,  0.0f,  1.0f, // bottom-left
-			-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,   0.0f,  0.0f,  1.0f, // bottom-left
-			-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,   0.0f,  0.0f,  0.0f, // bottom-right
-			-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,   0.0f,  1.0f,  0.0f, // top-right
-			// Right face                                      
-			 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,   0.0f,  1.0f,  0.0f, // top-left
-			 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,   0.0f,  0.0f,  1.0f, // bottom-right
-			 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,   0.0f,  1.0f,  1.0f, // top-right         
-			 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,   0.0f,  0.0f,  1.0f, // bottom-right
-			 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,   0.0f,  1.0f,  0.0f, // top-left
-			 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,   0.0f,  0.0f,  0.0f, // bottom-left     
-			// Bottom face                                     
-			-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,   0.0f,  0.0f,  1.0f, // top-right
-			 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,   0.0f,  1.0f,  1.0f, // top-left
-			 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,   0.0f,  1.0f,  0.0f, // bottom-left
-			 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,   0.0f,  1.0f,  0.0f, // bottom-left
-			-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,   0.0f,  0.0f,  0.0f, // bottom-right
-			-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,   0.0f,  0.0f,  1.0f, // top-right
-			// Top face
-			-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,   0.0f,  0.0f,  1.0f, // top-left
-			 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,   0.0f,  1.0f,  0.0f, // bottom-right
-			 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,   0.0f,  1.0f,  1.0f, // top-right     
-			 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,   0.0f,  1.0f,  0.0f, // bottom-right
-			-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,   0.0f,  0.0f,  1.0f, // top-left
-			-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,   0.0f,  0.0f,  0.0f  // bottom-left        
-		};
-		glGenVertexArrays(1, &cubeVAO);
-		glGenBuffers(1, &cubeVBO);
-		// Fill buffer
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-		// Link vertex attributes
-		glBindVertexArray(cubeVAO);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)0);
-		glEnableVertexAttribArray(1);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-		glEnableVertexAttribArray(2);
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(6 * sizeof(GLfloat)));
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindVertexArray(0);
-	}
-	// Render Cube
-	glBindVertexArray(cubeVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
-	glBindVertexArray(0);
-}
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -160,7 +74,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
     std::default_random_engine generator;
-    glm::vec3 ssaoKernel[64];
+    glm::vec3 ssao_kernel[64];
+
     for (GLuint i = 0; i < 64; ++i)
     {
         glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, randomFloats(generator));
@@ -168,40 +83,48 @@ int main(int argc, char *argv[])
         sample *= randomFloats(generator);
         GLfloat scale = GLfloat(i) / 64.0;
 
-		// Scale samples s.t. they're more aligned to center of kernel
-        scale = lerp(0.1f, 1.0f, scale * scale);
+        scale = 0.1f + 0.9f * scale * scale;
         sample *= scale;
-        ssaoKernel[i] = sample;
+        ssao_kernel[i] = sample;
     }
 
     //===================================================================================================================================================================================================================
     // compile shaders and load static uniforms
     //===================================================================================================================================================================================================================
-    glsl_program_t shaderGeometryPass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_geometry.vs"), 
-                                      glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_geometry.fs"));
-    shaderGeometryPass.enable();
-    shaderGeometryPass["projection_matrix"] = window.camera.projection_matrix;
+    glsl_program_t geometry_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_geometry.vs"), 
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_geometry.fs"));
+    geometry_pass.enable();
+    uniform_t uni_gp_pv_matrix = geometry_pass["projection_view_matrix"];
+    uniform_t uni_gp_model_matrix = geometry_pass["model_matrix"];
 
-    glsl_program_t shaderLightingPass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao.vs"), 
-                                      glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_lighting.fs"));
-    shaderLightingPass.enable();
-    shaderLightingPass["gPosition"] = 0;
-    shaderLightingPass["gNormal"] = 1;
-    shaderLightingPass["gAlbedo"] = 2; 
-    shaderLightingPass["ssao"] = 3; 
-    shaderLightingPass["light_color"] = glm::vec3(0.2, 0.2, 0.7);
 
-    glsl_program_t shaderSSAO(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao.vs"), 
-                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao.fs"));
-    shaderSSAO.enable();
-    shaderSSAO["gPosition"] = 0;
-    shaderSSAO["gNormal"] = 1;
-    shaderSSAO["texNoise"] = 2;
-    shaderSSAO["projection_matrix"] = window.camera.projection_matrix;
-    shaderSSAO["samples"] = ssaoKernel;
+    glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
+                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_compute.fs"));
+    ssao_compute.enable();
+    ssao_compute["position_tex"] = 0;
+    ssao_compute["normal_tex"] = 1;
+    ssao_compute["noise_tex"] = 2;
+    ssao_compute["samples"] = ssao_kernel;
+    uniform_t uni_sc_pv_matrix = ssao_compute["projection_view_matrix"];
 
-    glsl_program_t shaderSSAOBlur(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao.vs"), 
-                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_blur.fs"));
+
+    glsl_program_t ssao_blur(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
+                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_blur.fs"));
+    ssao_blur.enable();
+    ssao_blur["ssao_input"] = 3;
+
+
+    glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_lighting.fs"));
+    lighting_pass.enable();
+    lighting_pass["position_tex"] = 0;
+    lighting_pass["normal_tex"] = 1;
+    lighting_pass["ssao_blurred_tex"] = 4; 
+
+    uniform_t uni_lp_camera_ws = lighting_pass["camera_ws"];
+    uniform_t uni_lp_light_ws  = lighting_pass["light_ws"];
+    uniform_t uni_lp_draw_mode = lighting_pass["draw_mode"];
+
 
     // "../../../resources/models/vao/ashtray.vao";
     // "../../../resources/models/vao/azog.vao",
@@ -224,88 +147,44 @@ int main(int argc, char *argv[])
               model.vbo.size, model.vbo.layout, model.ibo.type, model.ibo.mode, model.ibo.size);
     debug_msg("Done ... \nGL_UNSIGNED_INT = %d.\nGL_TRIANGLES = %d", GL_UNSIGNED_INT, GL_TRIANGLES);
 
-    GLuint gBuffer;
-    glGenFramebuffers(1, &gBuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-    GLuint gPosition, gNormal, gAlbedo;
+    //===================================================================================================================================================================================================================
+    // framebuffer object and textures for geometry rendering step
+    //===================================================================================================================================================================================================================
+    GLuint geometry_fbo_id;
+    glGenFramebuffers(1, &geometry_fbo_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, geometry_fbo_id);
 
-    //===================================================================================================================================================================================================================
-    // position buffer
-    //===================================================================================================================================================================================================================
-    glGenTextures(1, &gPosition);
-    glBindTexture(GL_TEXTURE_2D, gPosition);
+    GLuint position_tex_id;
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &position_tex_id);
+    glBindTexture(GL_TEXTURE_2D, position_tex_id);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, window.res_x, window.res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, gPosition, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, position_tex_id, 0);
 
-    //===================================================================================================================================================================================================================
-    // normal color buffer
-    //===================================================================================================================================================================================================================
-    glGenTextures(1, &gNormal);
-    glBindTexture(GL_TEXTURE_2D, gNormal);
+    GLuint normal_tex_id;
+    glActiveTexture(GL_TEXTURE1);
+    glGenTextures(1, &normal_tex_id);
+    glBindTexture(GL_TEXTURE_2D, normal_tex_id);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, window.res_x, window.res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, gNormal, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, normal_tex_id, 0);
 
-    //===================================================================================================================================================================================================================
-    // albedo color buffer
-    //===================================================================================================================================================================================================================
-    glGenTextures(1, &gAlbedo);
-    glBindTexture(GL_TEXTURE_2D, gAlbedo);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, window.res_x, window.res_y);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, gAlbedo, 0);
+    GLuint attachments[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, attachments);
 
-    GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-    glDrawBuffers(3, attachments);
-
-    GLuint rboDepth;
-    glGenRenderbuffers(1, &rboDepth);
-    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    GLuint depth_rbo_id;
+    glGenRenderbuffers(1, &depth_rbo_id);
+    glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo_id);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, window.res_x, window.res_y);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rbo_id);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         exit_msg("GBuffer Framebuffer not complete!");
-    //
-    //===================================================================================================================================================================================================================
-    // framebuffer to hold SSAO processing stage 
-    //===================================================================================================================================================================================================================
-    GLuint ssaoFBO, ssaoBlurFBO;
-    glGenFramebuffers(1, &ssaoFBO);  glGenFramebuffers(1, &ssaoBlurFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-    GLuint ssaoColorBuffer, ssaoColorBufferBlur;
-
-    //===================================================================================================================================================================================================================
-    // SSAO color buffer
-    //===================================================================================================================================================================================================================
-    glGenTextures(1, &ssaoColorBuffer);
-    glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16F, window.res_x, window.res_y);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ssaoColorBuffer, 0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        exit_msg("SSAO Framebuffer not complete!");
-
-    //===================================================================================================================================================================================================================
-    // and blur stage
-    //===================================================================================================================================================================================================================
-    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-    glGenTextures(1, &ssaoColorBufferBlur);
-    glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16F, window.res_x, window.res_y);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ssaoColorBufferBlur, 0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        exit_msg("SSAO Blur Framebuffer not complete!");
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     //===================================================================================================================================================================================================================
     // noise texture
@@ -313,18 +192,56 @@ int main(int argc, char *argv[])
     glm::vec3 ssaoNoise[16];
     for (GLuint i = 0; i < 16; i++)
     {
-        glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f); // rotate around z-axis (in tangent space)
+        glm::vec3 noise(randomFloats(generator) * 2.0 - 1.0, randomFloats(generator) * 2.0 - 1.0, 0.0f);
         ssaoNoise[i] = noise;
     }
 
-    GLuint noiseTexture; 
-    glGenTextures(1, &noiseTexture);
-    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glActiveTexture(GL_TEXTURE2);
+    GLuint noise_tex_id; 
+    glGenTextures(1, &noise_tex_id);
+    glBindTexture(GL_TEXTURE_2D, noise_tex_id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+
+    //===================================================================================================================================================================================================================
+    // framebuffer object and texture for SSAO compute step
+    //===================================================================================================================================================================================================================
+    GLuint ssao_compute_fbo_id;
+    glGenFramebuffers(1, &ssao_compute_fbo_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssao_compute_fbo_id);
+
+    GLuint ssao_compute_tex_id;
+    glActiveTexture(GL_TEXTURE3);
+    glGenTextures(1, &ssao_compute_tex_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_compute_tex_id);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16F, window.res_x, window.res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ssao_compute_tex_id, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        exit_msg("SSAO Framebuffer not complete!");
+
+    //===================================================================================================================================================================================================================
+    // framebuffer object and texture for SSAO blur step
+    //===================================================================================================================================================================================================================
+    GLuint ssao_blur_fbo_id;
+    glGenFramebuffers(1, &ssao_blur_fbo_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssao_blur_fbo_id);
+
+    GLuint ssao_blur_tex_id;
+    glActiveTexture(GL_TEXTURE4);
+    glGenTextures(1, &ssao_blur_tex_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_blur_tex_id);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16F, window.res_x, window.res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ssao_blur_tex_id, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        exit_msg("SSAO Blur Framebuffer not complete!");
 
     glm::mat4 m0 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3( 10.0f,  0.0f,   0.0f)), glm::vec3( 1.0f, 20.0f, 20.0f));
     glm::mat4 m1 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(-10.0f,  0.0f,   0.0f)), glm::vec3( 1.0f, 20.0f, 20.0f));
@@ -333,13 +250,11 @@ int main(int argc, char *argv[])
     glm::mat4 m4 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(  0.0f, 10.0f,   0.0f)), glm::vec3(20.0f,  1.0f, 20.0f));
     glm::mat4 m5 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(  0.0f,-10.0f,   0.0f)), glm::vec3(20.0f,  1.0f, 20.0f));
 
-    glm::vec3 light_ws = glm::vec3(2.0, 4.0, -2.0);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    GLuint quad_vao_id;
-	glGenVertexArrays(1, &quad_vao_id);
+    GLuint vao_id;
+	glGenVertexArrays(1, &vao_id);
     glViewport(0, 0, window.res_x, window.res_y);
-    glEnable(GL_DEPTH_TEST);
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -347,65 +262,65 @@ int main(int argc, char *argv[])
     while (!window.should_close())
     {
         window.new_frame();
+
+        float time = window.frame_ts;
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+        glm::vec3 camera_ws = window.camera.position();
+        glm::vec3 light_ws = glm::vec3(2.0f * glm::cos(time), 4.0f, -2.0f * glm::sin(time));
+
         //===============================================================================================================================================================================================================
         // 1. Geometry Pass: render scene's geometry/color data into gbuffer
         //===============================================================================================================================================================================================================
-        glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, geometry_fbo_id);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glm::mat4 view_matrix = window.camera.view_matrix;
-        shaderGeometryPass.enable();
-        shaderGeometryPass["view_matrix"] = view_matrix;
+        glEnable(GL_DEPTH_TEST);
 
-        shaderGeometryPass["model_matrix"] = m0; RenderCube();
-        shaderGeometryPass["model_matrix"] = m1; RenderCube();
-        shaderGeometryPass["model_matrix"] = m2; RenderCube();
-        shaderGeometryPass["model_matrix"] = m3; RenderCube();
-        shaderGeometryPass["model_matrix"] = m4; RenderCube();
-        shaderGeometryPass["model_matrix"] = m5; RenderCube();
+        geometry_pass.enable();
+
+        uni_gp_pv_matrix = projection_view_matrix;
+        /*uni_gp_model_matrix = m0; RenderCube();
+        uni_gp_model_matrix = m1; RenderCube();
+        uni_gp_model_matrix = m2; RenderCube();
+        uni_gp_model_matrix = m3; RenderCube();
+        uni_gp_model_matrix = m4; RenderCube();
+        uni_gp_model_matrix = m5; RenderCube();*/
 
         glm::mat4 model_matrix(1.0f);
         model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 5.0));
-        model_matrix = glm::rotate(model_matrix, glm::radians(-90.0f), glm::vec3(1.0, 0.0, 0.0));
+        model_matrix = glm::rotate(model_matrix, -0.5f * constants::pi, glm::vec3(1.0, 0.0, 0.0));
         model_matrix = glm::scale(model_matrix, glm::vec3(0.5f));
-        shaderGeometryPass["model_matrix"] = model_matrix;
+        uni_gp_pv_matrix = model_matrix;
         model.render();
 
         //===============================================================================================================================================================================================================
         // 2. Create SSAO texture
         //===============================================================================================================================================================================================================
-	    glBindVertexArray(quad_vao_id);
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-        glClear(GL_COLOR_BUFFER_BIT);
-        shaderSSAO.enable();
-        glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, gPosition);
-        glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, gNormal);
-        glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, noiseTexture);
+	    glBindVertexArray(vao_id);
+        glDisable(GL_DEPTH_TEST);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, ssao_compute_fbo_id);
+        ssao_compute.enable();
+        uni_sc_pv_matrix = projection_view_matrix;
 	    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
         // 3. Blur SSAO texture to remove noise
         //===============================================================================================================================================================================================================
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
-        glClear(GL_COLOR_BUFFER_BIT);
-        shaderSSAOBlur.enable();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, ssao_blur_fbo_id);
+        ssao_blur.enable();
 	    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
-        // 4. Lighting Pass: traditional deferred Blinn-Phong lighting now with added screen-space ambient occlusion
+        // 4. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
         //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shaderLightingPass.enable();
-        glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, gPosition);
-        glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, gNormal);
-        glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, gAlbedo);
-        glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
 
-        glm::vec3 light_cs = window.camera.view_matrix * glm::vec4(light_ws, 1.0);
-        shaderLightingPass["light_cs"] = light_cs;
-        shaderLightingPass["draw_mode"] = (GLint) draw_mode;
+        lighting_pass.enable();
+
+        uni_lp_camera_ws = camera_ws;
+        uni_lp_light_ws = light_ws;
+        uni_lp_draw_mode = window.draw_mode;
 	    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         window.end_frame();

@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
     // Shader and uniform variables initialization
     //===================================================================================================================================================================================================================
     glsl_program_t ray_marcher(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ray_marcher.vs"),
-                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/mountain.fs"));
-//                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
+//                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/mountain.fs"));
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
     ray_marcher.enable();
     uniform_t uniform_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uniform_time = ray_marcher["time"];
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE0);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
     glActiveTexture(GL_TEXTURE1);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/lava.png");    
+    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/clay.png");    
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
