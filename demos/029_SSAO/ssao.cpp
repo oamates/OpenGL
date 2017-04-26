@@ -25,7 +25,7 @@ struct demo_window_t : public glfw_window_t
     int draw_mode = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -42,7 +42,7 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
         if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
-            draw_mode = (draw_mode + 1) % 4;
+            draw_mode = (draw_mode + 1) % 5;
 
     }
 
@@ -106,6 +106,7 @@ int main(int argc, char *argv[])
     ssao_compute["noise_tex"] = 2;
     ssao_compute["samples"] = ssao_kernel;
     uniform_t uni_sc_pv_matrix = ssao_compute["projection_view_matrix"];
+    uniform_t uni_sc_camera_ws = ssao_compute["camera_ws"];
 
 
     glsl_program_t ssao_blur(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
@@ -119,7 +120,9 @@ int main(int argc, char *argv[])
     lighting_pass.enable();
     lighting_pass["position_tex"] = 0;
     lighting_pass["normal_tex"] = 1;
-    lighting_pass["ssao_blurred_tex"] = 4; 
+    lighting_pass["ssao_blurred_tex"] = 4;
+    lighting_pass["tb_tex"] = 5;
+
 
     uniform_t uni_lp_camera_ws = lighting_pass["camera_ws"];
     uniform_t uni_lp_light_ws  = lighting_pass["light_ws"];
@@ -158,7 +161,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &position_tex_id);
     glBindTexture(GL_TEXTURE_2D, position_tex_id);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, window.res_x, window.res_y);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, window.res_x, window.res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -169,7 +172,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE1);
     glGenTextures(1, &normal_tex_id);
     glBindTexture(GL_TEXTURE_2D, normal_tex_id);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB16F, window.res_x, window.res_y);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB32F, window.res_x, window.res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, normal_tex_id, 0);
@@ -218,7 +221,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE3);
     glGenTextures(1, &ssao_compute_tex_id);
     glBindTexture(GL_TEXTURE_2D, ssao_compute_tex_id);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16F, window.res_x, window.res_y);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, window.res_x, window.res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ssao_compute_tex_id, 0);
@@ -236,24 +239,22 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE4);
     glGenTextures(1, &ssao_blur_tex_id);
     glBindTexture(GL_TEXTURE_2D, ssao_blur_tex_id);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R16F, window.res_x, window.res_y);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, window.res_x, window.res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, ssao_blur_tex_id, 0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         exit_msg("SSAO Blur Framebuffer not complete!");
 
-    glm::mat4 m0 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3( 10.0f,  0.0f,   0.0f)), glm::vec3( 1.0f, 20.0f, 20.0f));
-    glm::mat4 m1 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(-10.0f,  0.0f,   0.0f)), glm::vec3( 1.0f, 20.0f, 20.0f));
-    glm::mat4 m2 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(  0.0f,  0.0f,  10.0f)), glm::vec3(20.0f, 20.0f,  1.0f));
-    glm::mat4 m3 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(  0.0f,  0.0f, -10.0f)), glm::vec3(20.0f, 20.0f,  1.0f));
-    glm::mat4 m4 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(  0.0f, 10.0f,   0.0f)), glm::vec3(20.0f,  1.0f, 20.0f));
-    glm::mat4 m5 = glm::scale(glm::translate(glm::mat4(1.0f), glm::vec3(  0.0f,-10.0f,   0.0f)), glm::vec3(20.0f,  1.0f, 20.0f));
-
+    //===================================================================================================================================================================================================================
+    // load 2D texture for trilinear blending in lighting shader
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE5);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     GLuint vao_id;
-	glGenVertexArrays(1, &vao_id);
+    glGenVertexArrays(1, &vao_id);
     glViewport(0, 0, window.res_x, window.res_y);
 
     //===================================================================================================================================================================================================================
@@ -276,39 +277,28 @@ int main(int argc, char *argv[])
         glEnable(GL_DEPTH_TEST);
 
         geometry_pass.enable();
-
         uni_gp_pv_matrix = projection_view_matrix;
-        /*uni_gp_model_matrix = m0; RenderCube();
-        uni_gp_model_matrix = m1; RenderCube();
-        uni_gp_model_matrix = m2; RenderCube();
-        uni_gp_model_matrix = m3; RenderCube();
-        uni_gp_model_matrix = m4; RenderCube();
-        uni_gp_model_matrix = m5; RenderCube();*/
-
-        glm::mat4 model_matrix(1.0f);
-        model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 5.0));
-        model_matrix = glm::rotate(model_matrix, -0.5f * constants::pi, glm::vec3(1.0, 0.0, 0.0));
-        model_matrix = glm::scale(model_matrix, glm::vec3(0.5f));
-        uni_gp_pv_matrix = model_matrix;
+        uni_gp_model_matrix = glm::mat4(1.0f);
         model.render();
 
         //===============================================================================================================================================================================================================
         // 2. Create SSAO texture
         //===============================================================================================================================================================================================================
-	    glBindVertexArray(vao_id);
+        glBindVertexArray(vao_id);
         glDisable(GL_DEPTH_TEST);
 
         glBindFramebuffer(GL_FRAMEBUFFER, ssao_compute_fbo_id);
         ssao_compute.enable();
         uni_sc_pv_matrix = projection_view_matrix;
-	    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        uni_sc_camera_ws = camera_ws;
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
         // 3. Blur SSAO texture to remove noise
         //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_FRAMEBUFFER, ssao_blur_fbo_id);
         ssao_blur.enable();
-	    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
         // 4. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
@@ -321,7 +311,7 @@ int main(int argc, char *argv[])
         uni_lp_camera_ws = camera_ws;
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
-	    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         window.end_frame();
     }

@@ -8,9 +8,10 @@ uniform sampler2D noise_tex;
 
 const int kernelSize = 64;
 uniform vec3 samples[kernelSize];
+uniform vec3 camera_ws;
 
-float radius = 0.5;
-float bias = 0.025;
+float radius = 1.5;
+float bias = 0.25;
 
 const vec2 noiseScale = vec2(1920.0 / 4.0, 1080.0 / 4.0); 
 
@@ -42,24 +43,20 @@ void main()
     for(int i = 0; i < kernelSize; ++i)
     {
         //======================================================================================================================================================
-        // get sample position in world space
+        // get sample position in world space and in ndc
         //======================================================================================================================================================
         vec3 sample_ws = position_ws + radius * (TBN * samples[i]);
-        
-        //======================================================================================================================================================
-        // project sample position onto screen
-        //======================================================================================================================================================
         vec4 sample_scr = projection_view_matrix * vec4(sample_ws, 1.0f);
         vec2 sample_ndc = 0.5f + 0.5f * (sample_scr.xy / sample_scr.w);
+        vec3 actual_ws = texture(position_tex, sample_ndc).xyz;
+        float sample_dist = length(sample_ws - camera_ws);
+        float actual_dist = length(actual_ws - camera_ws);
 
         //======================================================================================================================================================
         // get sample z-value, range check & accumulate
         //======================================================================================================================================================
-        float sample_z = texture(position_tex, sample_ndc).z;
-
-        float range_factor = smoothstep(0.0, 1.0, radius / abs(position_ws.z - sample_z));
-        occlusion += (sample_z >= sample_z + bias ? 1.0 : 0.0) * range_factor;
+        occlusion += (actual_dist >= sample_dist + bias ? 1.0 : 0.0);
     }
     
-    FragmentOcclusion = 1.0f - (occlusion / kernelSize);
+    FragmentOcclusion = occlusion / kernelSize;
 }                                            
