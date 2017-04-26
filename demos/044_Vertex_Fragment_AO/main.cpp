@@ -449,7 +449,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Generate the surface
     //===================================================================================================================================================================================================================
-    vao_t deformed_icosahedron = generate_fractal_vbo<vertex_pno_t>(plato::icosahedron::vertices, plato::icosahedron::V, plato::icosahedron::triangles, plato::icosahedron::F, 8);
+    vao_t deformed_icosahedron = generate_fractal_vbo<vertex_pno_t>(plato::icosahedron::vertices, plato::icosahedron::V, plato::icosahedron::triangles, plato::icosahedron::F, 7);
 
     depth_map_t zbuffer_fbo(window.res_x, window.res_y, GL_TEXTURE0, GL_DEPTH_COMPONENT32F);
     color_map_t ssao_compute_fbo(window.res_x, window.res_y, GL_TEXTURE1, GL_R32F);
@@ -468,7 +468,7 @@ int main(int argc, char *argv[])
     // load 2D texture for trilinear blending in lighting shader
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE3);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -508,11 +508,11 @@ int main(int argc, char *argv[])
         ssao_compute.enable();
         uni_sc_pv_matrix = projection_view_matrix;
         uni_sc_camera_matrix = camera_matrix;
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         ssao_blur_fbo.bind();
         ssao_blur.enable();
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
         // lighting pass

@@ -58,7 +58,7 @@ void main()
     float specular_factor = pow(max(dot(n, h), 0.0), 18.0);
     vec3 specular = light_color * specular_factor;
 
-    float attenuation = 1.0 / (1.0f + 0.009f * distance);
+    float attenuation = 1.0;
     color = color + sqrt(sqrt(fragment_ao)) * attenuation * (diffuse + specular);                          // moderate influence of AO on diffuse + specular colors
 
     if(draw_mode == 0)

@@ -1,7 +1,6 @@
 #version 330 core
 
 in vec2 uv;
-in vec2 view_ray;
 
 uniform sampler2D depth_tex;
 uniform mat4 camera_matrix;
@@ -37,5 +36,5 @@ void main()
         if (abs(z - sample_z) < radius) AO += step(sample_z, position_ws.z);
     }
 
-    FragmentOcclusion = AO / 64.0f;
+    FragmentOcclusion = 0.5f; //AO / 64.0f;
 }
