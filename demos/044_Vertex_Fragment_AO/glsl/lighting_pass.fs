@@ -11,7 +11,7 @@ in vec3 normal_ws;
 in float occlusion;
 
 uniform mat4 view_matrix;
-
+uniform int draw_mode;
 
 out vec4 FragmentColor;
 
@@ -42,6 +42,8 @@ void main()
     vec3 l = light / distance;
 	vec3 v = normalize(view);
 	vec3 n = normalize(normal_ws);
+
+    vec2 uv = gl_FragCoord.xy / screen_dim;
 
     float fragment_ao = texture(ssao_blurred_tex, uv).r;
     float vertex_ao = occlusion;

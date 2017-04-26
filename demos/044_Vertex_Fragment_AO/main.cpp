@@ -417,7 +417,9 @@ int main(int argc, char *argv[])
     glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_compute.fs"));
     ssao_compute.enable();
-    ssao_compute["projection_matrix"] = window.camera.projection_matrix;
+    uniform_t uni_sc_camera_matrix = ssao_compute["camera_matrix"];
+    uniform_t uni_sc_pv_matrix = ssao_compute["projection_view_matrix"];
+    ssao_compute["depth_tex"] = 0;
     ssao_compute["ssao_kernel"] = ssao_kernel;
 
     //===================================================================================================================================================================================================================
@@ -425,6 +427,9 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glsl_program_t ssao_blur(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_blur.fs"));
+
+    ssao_blur.enable();
+    ssao_blur["ssao_input"] = 1;
 
     //===================================================================================================================================================================================================================
     // lighting shader program 
@@ -460,6 +465,12 @@ int main(int argc, char *argv[])
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
     //===================================================================================================================================================================================================================
+    // load 2D texture for trilinear blending in lighting shader
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE3);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+    //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
     while(!window.should_close())
@@ -469,6 +480,7 @@ int main(int argc, char *argv[])
         float time = window.frame_ts;
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::mat4 model_matrix = glm::mat4(1.0f);
+        glm::mat4 camera_matrix = window.camera.camera_matrix();
         glm::mat4 mvp_matrix = projection_view_matrix * model_matrix;
         glm::vec3 camera_ws = window.camera.position();
         glm::vec3 light_ws = glm::vec3(2.0f * glm::cos(time), 4.0f, -2.0f * glm::sin(time));
@@ -494,6 +506,8 @@ int main(int argc, char *argv[])
 
         ssao_compute_fbo.bind();
         ssao_compute.enable();
+        uni_sc_pv_matrix = projection_view_matrix;
+        uni_sc_camera_matrix = camera_matrix;
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
         ssao_blur_fbo.bind();

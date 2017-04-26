@@ -1,21 +1,24 @@
-#version 430 core
+#version 330 core
 
-in vec2 texture_coord;
+in vec2 uv;
 
-out vec4 ssao_blurred;
+uniform sampler2D ssao_input;
 
-layout(binding = 0) uniform sampler2D ssao_image;
-
-const float offset[] = {-1.5f, -0.5f, 0.5f, 1.5f};
+out float OcclusionBlurred;
 
 void main()
 {
-    vec3 average_color = vec3(0.0f);
-    vec2 texture_size = textureSize(ssao_image, 0);
+    vec2 texelSize = 1.0f / textureSize(ssao_input, 0).xy;
+    float occlusion = 0.0;
 
-    for (int i = 0 ; i < 4 ; i++)
-        for (int j = 0 ; j < 4 ; j++)
-            average_color += texture(ssao_image, texture_coord + vec2(offset[i], offset[j]) / texture_size).xyz;
+    for (int x = -2; x <= 2; ++x)
+    {
+        for (int y = -2; y <= 2; ++y) 
+        {
+            vec2 offset = vec2(float(x), float(y)) * texelSize;
+            occlusion += texture(ssao_input, uv + offset).r;
+        }
+    }
 
-    ssao_blurred = vec4(average_color / 16.0f, 1.0f);
-}
+    OcclusionBlurred = 0.04 * occlusion;
+}  

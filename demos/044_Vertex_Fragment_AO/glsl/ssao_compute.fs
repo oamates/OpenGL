@@ -1,41 +1,41 @@
-#version 430 core
+#version 330 core
 
-in vec2 texture_coord;
+in vec2 uv;
 in vec2 view_ray;
 
-layout(binding = 0) uniform sampler2D depth_map;
+uniform sampler2D depth_tex;
+uniform mat4 camera_matrix;
+uniform mat4 projection_view_matrix;
 
-const float sample_radius = 0.2f;
-uniform mat4 projection_matrix;
+const int KERNEL_SIZE = 64;
+uniform vec3 ssao_kernel[KERNEL_SIZE];
 
-const int MAX_KERNEL_SIZE = 512;
-uniform vec3 spherical_rand[MAX_KERNEL_SIZE];
+out float FragmentOcclusion;
 
-out vec4 FragmentOcclusion;
+const float radius = 0.75f;
 
 void main()
-{
+{  
+    float depth = texture(depth_tex, uv).x;
+    float z = 2.0f / (depth - 1.0f);
+    vec4 position_cs4 = vec4(z * vec3(2.0f * uv - 1.0f, 1.0f), 1.0f);
+    vec4 position_ws4 = camera_matrix * position_cs4;
 
-    float depth = texture(depth_map, texture_coord).x;
-    float linear_depth = 2.0f / (depth - 1.0f);
-    vec3 position = linear_depth * vec3(view_ray, 1.0f);
+    vec3 position_ws = position_ws4.xyz;
 
     float AO = 0.0f;
-
-    for (int i = 0 ; i < MAX_KERNEL_SIZE ; i++) 
+    for (int i = 0; i < KERNEL_SIZE; ++i) 
     {
-        vec3 sample_position = position + 0.1 * spherical_rand[i];
-        vec4 offset = projection_matrix * vec4(sample_position, 1.0f);
-        vec2 tc = (offset.xy / offset.w) * 0.5f + vec2(0.5f);
-            
-        float sample_depth = texture(depth_map, tc).x;
-        float sample_linear_depth = 2.0f / (sample_depth - 1.0f);
+        vec3 sample_ws = position_ws + radius * ssao_kernel[i];
 
-        if (abs(linear_depth - sample_linear_depth) < sample_radius) AO += step(sample_linear_depth, sample_position.z);
+        vec4 offset = projection_view_matrix * vec4(sample_ws, 1.0f);
+        vec2 sample_ndc = 0.5f + 0.5f * (offset.xy / offset.w);
+            
+        float sample_depth = texture(depth_tex, sample_ndc).x;
+        float sample_z = 2.0f / (sample_depth - 1.0f);
+
+        if (abs(z - sample_z) < radius) AO += step(sample_z, position_ws.z);
     }
 
-    AO /= 256.0f;
- 
-    FragmentOcclusion = vec4(AO);
-//    FragmentOcclusion = vec4(1.0f, 1.0f, 0.0f, 1.0f);
+    FragmentOcclusion = AO / 64.0f;
 }
