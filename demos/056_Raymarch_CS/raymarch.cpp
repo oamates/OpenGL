@@ -93,11 +93,13 @@ int main(int argc, char *argv[])
     glBindTexture(GL_TEXTURE_2D, output_image);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, windows.res_x, windows.res_y);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, window.res_x, window.res_y);
     glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
     glActiveTexture(GL_TEXTURE1);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png");
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+
 
     glActiveTexture(GL_TEXTURE2);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
@@ -117,12 +119,12 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        glm::mat4 camera_matrix = glm::inverse(window.camera.view_matrix);
+        glm::mat4 camera_matrix = window.camera.camera_matrix();
 
         ray_marcher.enable();
         uni_rm_camera_matrix = camera_matrix;
         uni_rm_hell = (int) window.hell;
-        glDispatchCompute(windows.res_x, windows.res_y, 1);
+        glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         quad_renderer.enable();

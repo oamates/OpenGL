@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE0);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
     glActiveTexture(GL_TEXTURE1);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/clay.png");    
+    GLuint stone_tex = = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup

@@ -1,6 +1,6 @@
 #version 430 core
 
-layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 //==============================================================================================================================================================
 // Every workgroup will work on 16 x 16 pixel area
@@ -36,17 +36,15 @@ mat2 rot2(float a)
     return mat2(v, -v.y, v.x);
 }
 
-// GPU Gems 3 - Ryan Geiss: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch01.html
-vec3 tex3D(sampler2D channel, vec3 p, vec3 n)
+vec3 tex3D(vec3 p, vec3 n)
 {
     p *= 0.75;
-    n = max(abs(n) - 0.2, 0.001);
+    n = max(abs(n) - 0.35f, 0.0f);
     n /= dot(n, vec3(1.0));
-    vec3 tx = texture(channel, p.zy).xyz;
-    vec3 ty = texture(channel, p.xz).xyz;
-    vec3 tz = texture(channel, p.xy).xyz;
-    n = vec3(0.37);
-    return (tx * tx * n.x + ty * ty * n.y + tz * tz * n.z);;
+    vec3 tx = texture(tb_tex, p.zy).xyz;
+    vec3 ty = texture(tb_tex, p.xz).xyz;
+    vec3 tz = texture(tb_tex, p.xy).xyz;
+    return tx * n.x + ty * n.y + tz * n.z;
 }
 
 vec3 tri(in vec3 x)
@@ -65,12 +63,12 @@ float map(vec3 p)
     return min(ground, canyon);
 }
 
-vec3 doBumpMap( sampler2D tx, in vec3 p, in vec3 n, float bf)
+vec3 doBumpMap(in vec3 p, in vec3 n, float bf)
 {
     const vec2 e = vec2(0.0025, 0);
-    mat3 m = mat3(tex3D(tx, p - e.xyy, n), tex3D(tx, p - e.yxy, n), tex3D(tx, p - e.yyx, n));
+    mat3 m = mat3(tex3D(p - e.xyy, n), tex3D(p - e.yxy, n), tex3D(p - e.yyx, n));
     vec3 g = vec3(0.299, 0.587, 0.114) * m;                             // Converting to greyscale.
-    g = (g - dot(tex3D(tx,  p , n), vec3(0.299, 0.587, 0.114))) / e.x;
+    g = (g - dot(tex3D(p , n), vec3(0.299, 0.587, 0.114))) / e.x;
     return normalize(n + g * bf);                                       // Bumped normal. "bf" - bump factor.
 }
 
@@ -175,14 +173,15 @@ float shadows(in vec3 ro, in vec3 rd, in float start, in float end, in float k)
 
 vec3 envMap(vec3 rd, vec3 n)
 {    
-    return tex3D(stone_texture, rd, n);
+    return tex3D(rd, n);
 }
 
 void main()
 {
-    uv = gl_FragCoord.xy / ivec2(gl_GlobalInvocationID.xy);
-    vec3 position = vec3(camera_matrix[3]);
-    vec3 view = vec3(camera_matrix * vec4(focal_scale * uv, -1.0f, 0.0f));
+    vec2 uv = ivec2(gl_GlobalInvocationID.xy) / vec2(1920.0f, 1080.0f);
+    vec3 camera_ws = vec3(camera_matrix[3]); 
+    vec3 position = camera_ws;
+    vec3 view = vec3(camera_matrix * vec4(focal_scale * (2.0 * uv - 1.0), -1.0f, 0.0f));
 
     vec3 lightPos = position - 140.0 * view;
     vec3 rd = normalize(view);
@@ -196,7 +195,7 @@ void main()
         vec3 snNoBump = sn;                                                             // Sometimes, it's necessary to save a copy of the unbumped normal.
         const float tSize0 = 0.5;
 
-        sn = doBumpMap(stone_texture, sp * tSize0, sn, 0.1);                            // Texture-based bump mapping.
+        sn = doBumpMap(sp * tSize0, sn, 0.1);                                           // Texture-based bump mapping.
         vec3 ld = lightPos - sp;                                                        // Light direction vectors.
         float lDist = max(length(ld), 0.001);                                           // Distance from respective lights to the surface point.
         ld /= lDist;                                                                    // Normalize the light direction vectors.
@@ -207,7 +206,7 @@ void main()
         float spec = pow(max(dot(reflect(-ld, sn), -rd), 0.0), 32.0);                   // Specular lighting.
         float fre = pow(clamp(dot(sn, rd) + 1.0, 0.0, 1.0), 1.0);                       // Fresnel term. Good for giving a surface a bit of a reflective glow.
         float ambience = 0.35 * ao + fre * fre * 0.25;                                  // Ambient light, due to light bouncing around the the canyon.
-        vec3 texCol = tex3D(stone_texture, sp * tSize0, sn);                            // Object texturing, coloring and shading.
+        vec3 texCol = tex3D(sp * tSize0, sn);                                           // Object texturing, coloring and shading.
 
       #ifdef MOSS
         texCol = texCol * mix(vec3(1.0), vec3(0.5, 1.5, 1.5), abs(snNoBump));           // Some quickly improvised moss.
@@ -254,5 +253,5 @@ void main()
 
     vec4 FragmentColor = vec4(sqrt(clamp(sceneCol, 0.0, 1.0)), 1.0);
 
-    imageStore(output_image, ivec2(gl_GlobalInvocationID.xy));
+    imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
 }

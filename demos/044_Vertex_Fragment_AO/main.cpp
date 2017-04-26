@@ -468,7 +468,7 @@ int main(int argc, char *argv[])
     // load 2D texture for trilinear blending in lighting shader
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE3);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/azure_dirt.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // main program loop
