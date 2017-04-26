@@ -337,7 +337,7 @@ template<typename vertex_t, typename index_t, GLenum mode> float* calculate_vert
 
             AB = BC;
         }
-        occlusions[v] = inv_two_pi_d * (angle_sum - constants::pi_d * double(degree - 2));
+        occlusions[v] = constants::inv_two_pi_d * (angle_sum - constants::pi_d * double(degree - 2));
         e += degree;
     }
 
@@ -469,7 +469,7 @@ template<typename vertex_t, typename index_t, GLenum mode> void calculate_vertex
 
             AB = BC;
         }
-        data.vertices[v].occlusion = 1.0 - inv_two_pi_d * external_angle_sum;
+        data.vertices[v].occlusion = 1.0 - constants::inv_two_pi_d * external_angle_sum;
         e += degree;
     }
 }
