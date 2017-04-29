@@ -1,38 +1,42 @@
 #version 330 core
-out vec4 FragColor;
-in vec3 WorldPos;
+
+in vec3 position_ws;
 
 uniform samplerCube environmentMap;
 
-const float PI = 3.14159265359f;
+out vec4 FragmentColor;
+
+
+const float half_pi = 3.14159265359f;
+const float pi = 3.14159265359f;
+const float two_pi = 3.14159265359f;
+
+const int Q = 40;                               // must be even
+const float delta = pi / Q;
+
 
 void main()
 {		
-    vec3 N = normalize(WorldPos);
-
-    vec3 irradiance = vec3(0.0);   
+    vec3 N = normalize(position_ws);
     
-    // tangent space calculation from origin point
-    vec3 up    = vec3(0.0, 1.0, 0.0);
-    vec3 right = cross(up, N);
-    up            = cross(N, right);
+    vec3 right = cross(vec3(0.0f, 1.0f, 0.0f), N);
+    vec3 up = cross(N, right);
        
-    float sampleDelta = 0.025f;
-    float nrSamples = 0.0f;
-    for(float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
-    {
-        for(float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta)
-        {
-            // spherical to cartesian (in tangent space)
-            vec3 tangentSample = vec3(sin(theta) * cos(phi),  sin(theta) * sin(phi), cos(theta));
-            // tangent space to world
-            vec3 sampleVec = tangentSample.x * right + tangentSample.y * up + tangentSample.z * N; 
+    vec3 irradiance = vec3(0.0f);
 
-            irradiance += texture(environmentMap, sampleVec).rgb * cos(theta) * sin(theta);
-            nrSamples++;
+    for(float phi = 0.0; phi < two_pi; phi += delta)
+    {
+        vec3 aux_axis = cos(phi) * right + sin(phi) * up;
+        for(float theta = 0.0; theta < half_pi; theta += delta)
+        {
+            float cos_theta = cos(theta);
+            float sin_theta = sin(theta);
+            vec3 sample_ws = sin_theta * aux_axis + cos_theta * N;
+            irradiance += texture(environmentMap, sample_ws).rgb * cos_theta * sin_theta;
         }
     }
-    irradiance = PI * irradiance * (1.0 / float(nrSamples));
+
+    irradiance = (pi / Q * Q) * irradiance;
     
-    FragColor = vec4(irradiance, 1.0);
+    FragmentColor = vec4(irradiance, 1.0);
 }

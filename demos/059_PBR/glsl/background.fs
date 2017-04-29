@@ -8,11 +8,13 @@ out vec4 FragmentColor;
 
 void main()
 {		
-    vec3 environment_color = textureLod(environmentMap, position_ws, 0.0f).rgb;
-    
+    vec3 e = textureLod(environmentMap, position_ws, 0.0f).rgb;
+
+    //==========================================================================================================================================================
     // HDR tonemap and gamma correct
-    environment_color = environment_color / (environment_color + vec3(1.0f));
-    environment_color = pow(environment_color, vec3(1.0f / 2.2f)); 
+    //==========================================================================================================================================================    
+    e = e / (e + vec3(1.0f));
+    e = pow(e, vec3(1.0f / 2.2f)); 
     
-    FragmentColor = vec4(environment_color, 1.0f);
+    FragmentColor = vec4(e, 1.0f);
 }
