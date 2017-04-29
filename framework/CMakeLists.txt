@@ -11,13 +11,19 @@ else()
     set(ADDITIONAL_LIBRARIES "")
 endif()
 
-target_link_libraries(framework ${GLFW_STATIC_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${PNG_STATIC_LIBRARIES} ${ZLIB_STATIC_LIBRARIES} ${PTHREAD} ${ADDITIONAL_LIBRARIES})
+target_link_libraries(framework ${GLFW_STATIC_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${PNG_STATIC_LIBRARIES} ${ZLIB_STATIC_LIBRARIES} ${PTHREAD} ${ADDITIONAL_LIBRARIES} image)
 target_include_directories (framework PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# image static library
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+add_library (image STATIC image/stb_image.cpp)
+target_link_libraries(image framework)
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # imgui static library
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-add_library (imgui STATIC imgui/imgui.cpp imgui/imgui_demo.cpp imgui/imgui_draw.cpp )
+add_library (imgui STATIC imgui/imgui.cpp imgui/imgui_demo.cpp imgui/imgui_draw.cpp)
 target_link_libraries(imgui framework)
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

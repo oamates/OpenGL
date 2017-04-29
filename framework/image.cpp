@@ -13,6 +13,47 @@
 #include "image.hpp"
 
 namespace image {
+
+namespace stbi {
+
+#include "image/stb_image.h"
+
+GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint min_filter, GLint wrap_mode)
+{
+    unsigned int texture_id;
+    glGenTextures(1, &texture_id);
+
+    int width, height, bpp; // bytes per pixel
+
+    unsigned char* data = stbi_load(file_name, &width, &height, &bpp, 0);
+
+    if (data == 0)
+    {
+        debug_msg("Invalid stbi file format : %s", file_name);
+        return 0;
+    }
+    
+    GLenum format = (bpp == 1) ? GL_RED :
+                    (bpp == 2) ? GL_RG : 
+                    (bpp == 3) ? GL_RGB : GL_RGBA;
+    if (channels) *channels = bpp;
+
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
+    return texture_id;
+}
+
+} // namespace stbi
+
 namespace tga {
 
 void write(const char * file_name, int width, int height, unsigned char* pixelbuffer) // RGBA assumed
