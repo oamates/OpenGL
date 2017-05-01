@@ -31,7 +31,7 @@ uniform vec3 camera_ws;
 out vec4 FragmentColor;
 
 
-const float pi = 3.14159265359;
+const float pi = 3.14159265359f;
 
 //==============================================================================================================================================================
 // Easy trick to get tangent-normals to world-space to keep PBR code simplified.
@@ -41,15 +41,15 @@ const float pi = 3.14159265359;
 //==============================================================================================================================================================
 vec3 getNormalFromMap()
 {
-    vec3 tangentNormal = texture(normalMap, uv).xyz * 2.0 - 1.0;
+    vec3 tangentNormal = texture(normalMap, uv).xyz * 2.0f - 1.0f;
 
     vec3 Q1  = dFdx(position_ws);
     vec3 Q2  = dFdy(position_ws);
     vec2 st1 = dFdx(uv);
     vec2 st2 = dFdy(uv);
 
-    vec3 N   = normalize(Normal);
-    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    vec3 N   = normalize(normal_ws);
+    vec3 T  = normalize(Q1 * st2.t - Q2 * st1.t);
     vec3 B  = -normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 
@@ -68,7 +68,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
     float nom   = a2;
     float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
-    denom = PI * denom * denom;
+    denom = pi * denom * denom;
 
     return nom / denom;
 }
@@ -123,17 +123,16 @@ void main()
     //==========================================================================================================================================================
     // material properties
     //==========================================================================================================================================================
-    vec3 albedo = pow(texture(albedoMap, TexCoords).rgb, vec3(2.2));
-    float metallic = texture(metallicMap, TexCoords).r;
-    float roughness = texture(roughnessMap, TexCoords).r;
-    float ao = texture(aoMap, TexCoords).r;
-    
+    vec3 albedo = pow(texture(albedoMap, uv).rgb, vec3(2.2));
+    float metallic = texture(metallicMap, uv).r;
+    float roughness = texture(roughnessMap, uv).r;
+    float ao = texture(aoMap, uv).r;
     
     //==========================================================================================================================================================
     // input lighting data
     //==========================================================================================================================================================
     vec3 N = getNormalFromMap();
-    vec3 V = normalize(camPos - WorldPos);
+    vec3 V = normalize(camera_ws - position_ws);
     vec3 R = reflect(-V, N); 
 
     //==========================================================================================================================================================
@@ -152,9 +151,9 @@ void main()
         //======================================================================================================================================================
         // calculate per-light radiance
         //======================================================================================================================================================
-        vec3 L = normalize(lightPositions[i] - WorldPos);
+        vec3 L = normalize(lightPositions[i] - position_ws);
         vec3 H = normalize(V + L);
-        float distance = length(lightPositions[i] - WorldPos);
+        float distance = length(lightPositions[i] - position_ws);
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance = lightColors[i] * attenuation;
 
@@ -162,8 +161,8 @@ void main()
         // Cook-Torrance BRDF
         //======================================================================================================================================================
         float NDF = DistributionGGX(N, H, roughness);   
-        float G   = GeometrySmith(N, V, L, roughness);    
-        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
+        float G = GeometrySmith(N, V, L, roughness);    
+        vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
         
         vec3 nominator    = NDF * G * F;
         float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001; // 0.001 to prevent divide by zero.

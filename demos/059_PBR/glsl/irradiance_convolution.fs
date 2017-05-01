@@ -7,9 +7,9 @@ uniform samplerCube environmentMap;
 out vec4 FragmentColor;
 
 
-const float half_pi = 3.14159265359f;
-const float pi = 3.14159265359f;
-const float two_pi = 3.14159265359f;
+const float half_pi = 1.57079632679f;
+const float pi      = 3.14159265359f;
+const float two_pi  = 6.28318530718f;
 
 const int Q = 40;                               // must be even
 const float delta = pi / Q;

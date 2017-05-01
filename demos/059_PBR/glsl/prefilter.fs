@@ -8,7 +8,6 @@ uniform float roughness;
 out vec4 FragColor;
 
 
-
 const float pi = 3.14159265359f;
 
 //==============================================================================================================================================================
@@ -54,7 +53,7 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 {
 	float a = roughness*roughness;
 	
-	float phi = 2.0 * PI * Xi.x;
+	float phi = 2.0 * pi * Xi.x;
 	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a*a - 1.0) * Xi.y));
 	float sinTheta = sqrt(1.0 - cosTheta*cosTheta);
 	
@@ -115,7 +114,7 @@ void main()
             //==================================================================================================================================================
             // resolution of source cubemap (per face)
             //==================================================================================================================================================
-            float saTexel  = 4.0 * PI / (6.0 * resolution * resolution);
+            float saTexel  = 4.0 * pi / (6.0 * resolution * resolution);
             float saSample = 1.0 / (float(SAMPLE_COUNT) * pdf + 0.0001);
             float mipLevel = (roughness == 0.0) ? 0.0 : 0.5 * log2(saSample / saTexel); 
             

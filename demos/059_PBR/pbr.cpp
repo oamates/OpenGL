@@ -52,8 +52,6 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-const GLuint SCR_WIDTH = 1280, SCR_HEIGHT = 720;
-
 void renderSphere();
 void renderCube();
 void RenderQuad();
@@ -77,11 +75,47 @@ int main(int argc, char *argv[])
     glDepthFunc(GL_LEQUAL);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
+    glm::mat4 projection_matrix = window.camera.projection_matrix;
+
+    //===================================================================================================================================================================================================================
+    // lights
+    //===================================================================================================================================================================================================================
+    const int NR_LIGHTS = 4;
+    glm::vec3 lightPositions[NR_LIGHTS] = {
+        glm::vec3(-10.0f,  10.0f, 10.0f),
+        glm::vec3( 10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3( 10.0f, -10.0f, 10.0f),
+    };
+    glm::vec3 lightColors[NR_LIGHTS] = {
+        glm::vec3(300.0f, 300.0f,   0.0f),
+        glm::vec3(300.0f,   0.0f, 300.0f),
+        glm::vec3(  0.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f,   0.0f)
+    };
+
     //===================================================================================================================================================================================================================
     // load and initialize shaders
     //===================================================================================================================================================================================================================
-    glsl_program_t pbrShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/pbr.vs"),
-                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/pbr.fs"));
+    glsl_program_t pbr_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/pbr.vs"),
+                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/pbr.fs"));
+    pbr_shader.enable();
+    pbr_shader["irradianceMap"] = 0;
+    pbr_shader["prefilterMap"]  = 1;
+    pbr_shader["brdfLUT"]       = 2;
+    pbr_shader["albedoMap"]     = 3;
+    pbr_shader["normalMap"]     = 4;
+    pbr_shader["metallicMap"]   = 5;
+    pbr_shader["roughnessMap"]  = 6;
+    pbr_shader["aoMap"]         = 7;
+
+    uniform_t uni_pbr_pv_matrix = pbr_shader["projection_view_matrix"];
+    uniform_t uni_pbr_model_matrix = pbr_shader["model_matrix"];
+    uniform_t uni_pbr_camera_ws = pbr_shader["camera_ws"];
+    uniform_t uni_pbr_lightPositions = pbr_shader["lightPositions"];
+    uniform_t uni_pbr_lightColors = pbr_shader["lightColors"];
+    uni_pbr_lightPositions = lightPositions;
+    uni_pbr_lightColors = lightColors;
 
     glsl_program_t equirectangularToCubemapShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/cubemap.vs"),
                                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/equirectangular_to_cubemap.fs"));
@@ -95,21 +129,12 @@ int main(int argc, char *argv[])
     glsl_program_t brdfShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/brdf.vs"),
                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/brdf.fs"));
 
-    glsl_program_t backgroundShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/background.vs"),
-                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/background.fs"));
-
-    pbrShader.enable();
-    pbrShader["irradianceMap"] = 0;
-    pbrShader["prefilterMap"]  = 1;
-    pbrShader["brdfLUT"]       = 2;
-    pbrShader["albedoMap"]     = 3;
-    pbrShader["normalMap"]     = 4;
-    pbrShader["metallicMap"]   = 5;
-    pbrShader["roughnessMap"]  = 6;
-    pbrShader["aoMap"]         = 7;
-
-    backgroundShader.enable();
-    backgroundShader["environmentMap"] = 0;
+    glsl_program_t background_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/background.vs"),
+                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/background.fs"));
+    background_shader.enable();
+    background_shader["environmentMap"] = 0;
+    background_shader["projection_matrix"] = projection_matrix;
+    uniform_t uni_bg_view_matrix = background_shader["view_matrix"];
 
     //===================================================================================================================================================================================================================
     // load PBR material textures
@@ -149,25 +174,6 @@ int main(int argc, char *argv[])
     GLuint wallMetallicMap     = image::png::texture2d("../../../resources/tex2d/pbr/wall/metallic.png");
     GLuint wallRoughnessMap    = image::png::texture2d("../../../resources/tex2d/pbr/wall/roughness.png");
     GLuint wallAOMap           = image::png::texture2d("../../../resources/tex2d/pbr/wall/ao.png");
-
-    //===================================================================================================================================================================================================================
-    // lights
-    //===================================================================================================================================================================================================================
-    glm::vec3 lightPositions[] = {
-        glm::vec3(-10.0f,  10.0f, 10.0f),
-        glm::vec3( 10.0f,  10.0f, 10.0f),
-        glm::vec3(-10.0f, -10.0f, 10.0f),
-        glm::vec3( 10.0f, -10.0f, 10.0f),
-    };
-    glm::vec3 lightColors[] = {
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f, 300.0f)
-    };
-    int nrRows    = 7;
-    int nrColumns = 7;
-    float spacing = 2.5;
 
     //===================================================================================================================================================================================================================
     // pbr: setup framebuffer
@@ -236,13 +242,13 @@ int main(int argc, char *argv[])
     equirectangularToCubemapShader["equirectangularMap"] = 0;
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
-    equirectangularToCubemapShader["projection"] = captureProjection;
+    equirectangularToCubemapShader["projection_matrix"] = captureProjection;
 
     glViewport(0, 0, 512, 512);
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     for (unsigned int i = 0; i < 6; ++i)
     {
-        equirectangularToCubemapShader["view"] = captureViews[i];
+        equirectangularToCubemapShader["view_matrix"] = captureViews[i];
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderCube();
@@ -262,7 +268,7 @@ int main(int argc, char *argv[])
     glGenTextures(1, &irradianceMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
     for (unsigned int i = 0; i < 6; ++i)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, 32, 32, 0, GL_RGB, GL_FLOAT, 0);
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -281,13 +287,13 @@ int main(int argc, char *argv[])
     irradianceShader["environmentMap"] = 0;
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    irradianceShader["projection"] = captureProjection;
+    irradianceShader["projection_matrix"] = captureProjection;
 
     glViewport(0, 0, 32, 32);
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     for (unsigned int i = 0; i < 6; ++i)
     {
-        irradianceShader["view"] = captureViews[i];
+        irradianceShader["view_matrix"] = captureViews[i];
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderCube();
@@ -317,7 +323,7 @@ int main(int argc, char *argv[])
     prefilterShader["environmentMap"] = 0;
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    prefilterShader["projection"] = captureProjection;
+    prefilterShader["projection_matrix"] = captureProjection;
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     GLuint maxMipLevels = 5;
@@ -333,7 +339,7 @@ int main(int argc, char *argv[])
         prefilterShader["roughness"] = roughness;
         for (unsigned int i = 0; i < 6; ++i)
         {
-            prefilterShader["view"] = captureViews[i];
+            prefilterShader["view_matrix"] = captureViews[i];
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -372,20 +378,10 @@ int main(int argc, char *argv[])
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-
-    //===================================================================================================================================================================================================================
-    // initialize static shader uniforms before rendering
-    //===================================================================================================================================================================================================================
-    glm::mat4 projection = window.camera.projection_matrix;
-    pbrShader.enable();
-    pbrShader["projection"] = projection;
-    backgroundShader.enable();
-    backgroundShader["projection"] = projection;
-
     //===================================================================================================================================================================================================================
     // then before rendering, configure the viewport to the actual screen dimensions
     //===================================================================================================================================================================================================================
-    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+    glViewport(0, 0, window.res_x, window.res_y);
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -394,11 +390,10 @@ int main(int argc, char *argv[])
     {
         window.new_frame();
 
-        //===============================================================================================================================================================================================================
-        // set frame time
-        //===============================================================================================================================================================================================================
-        GLfloat currentFrame = window.frame_ts;
-        GLfloat deltaTime = window.frame_dt;
+        GLfloat time = window.frame_ts;
+        glm::vec3 camera_ws = window.camera.position();
+        glm::mat4& view_matrix = window.camera.view_matrix;
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
         //===============================================================================================================================================================================================================
         // clear the colorbuffer
@@ -409,11 +404,11 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // render scene, supplying the convoluted irradiance map to the  final shader.
         //===============================================================================================================================================================================================================
-        pbrShader.enable();
+        pbr_shader.enable();
         glm::mat4 model;
         glm::mat4 view = window.camera.view_matrix;
-        pbrShader["view"] = view;
-        pbrShader["camPos"] = window.camera.position();
+        uni_pbr_pv_matrix = projection_view_matrix;
+        uni_pbr_camera_ws = camera_ws;
 
         //===============================================================================================================================================================================================================
         // bind pre-computed IBL data
@@ -438,10 +433,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, ironRoughnessMap);
         glActiveTexture(GL_TEXTURE7);
         glBindTexture(GL_TEXTURE_2D, ironAOMap);
-
-        model = glm::mat4();
-        model = glm::translate(model, glm::vec3(-5.0, 0.0, 2.0));
-        pbrShader["model"] = model;
+        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-5.0f, 0.0f, 2.0f));
         renderSphere();
 
         //===============================================================================================================================================================================================================
@@ -457,10 +449,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, goldRoughnessMap);
         glActiveTexture(GL_TEXTURE7);
         glBindTexture(GL_TEXTURE_2D, goldAOMap);
-
-        model = glm::mat4();
-        model = glm::translate(model, glm::vec3(-3.0, 0.0, 2.0));
-        pbrShader["model"] = model;
+        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-3.0f, 0.0f, 2.0f));
         renderSphere();
 
         //===============================================================================================================================================================================================================
@@ -476,10 +465,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, grassRoughnessMap);
         glActiveTexture(GL_TEXTURE7);
         glBindTexture(GL_TEXTURE_2D, grassAOMap);
-
-        model = glm::mat4();
-        model = glm::translate(model, glm::vec3(-1.0, 0.0, 2.0));
-        pbrShader["model"] = model;
+        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 2.0f));
         renderSphere();
 
         //===============================================================================================================================================================================================================
@@ -495,10 +481,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, plasticRoughnessMap);
         glActiveTexture(GL_TEXTURE7);
         glBindTexture(GL_TEXTURE_2D, plasticAOMap);
-
-        model = glm::mat4();
-        model = glm::translate(model, glm::vec3(1.0, 0.0, 2.0));
-        pbrShader["model"] = model;
+        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 2.0f));
         renderSphere();
 
         //===============================================================================================================================================================================================================
@@ -514,10 +497,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, wallRoughnessMap);
         glActiveTexture(GL_TEXTURE7);
         glBindTexture(GL_TEXTURE_2D, wallAOMap);
-
-        model = glm::mat4();
-        model = glm::translate(model, glm::vec3(3.0, 0.0, 2.0));
-        pbrShader["model"] = model;
+        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.0f, 2.0f));
         renderSphere();
  
         //===============================================================================================================================================================================================================
@@ -525,26 +505,20 @@ int main(int argc, char *argv[])
         // this looks a bit off as we use the same shader, but it'll make their positions obvious and 
         // keeps the codeprint small.
         //===============================================================================================================================================================================================================
-        for (GLuint i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); ++i)
+        for (GLuint i = 0; i < NR_LIGHTS; ++i)
         {
-            glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
-            newPos = lightPositions[i];
-            pbrShader["lightPositions"] = newPos; 
-            pbrShader["lightColors"] = lightColors[i];
-
-            model = glm::mat4();
-            model = glm::translate(model, newPos);
-            model = glm::scale(model, glm::vec3(0.5f));
-            pbrShader["model"] = model;
+            glm::vec3 newPos = lightPositions[i] + glm::vec3(5.0f * sin(0.5f * time), 0.0f, 0.0f);
+            lightPositions[i] = newPos;
+            uni_pbr_model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), newPos), glm::vec3(0.5f));
             renderSphere();
         }
+        uni_pbr_lightPositions = lightPositions;
 
         //===============================================================================================================================================================================================================
         // render skybox (render as last to prevent overdraw)
         //===============================================================================================================================================================================================================
-        backgroundShader.enable();
-
-        backgroundShader["view"] = view;
+        background_shader.enable();
+        uni_bg_view_matrix = view_matrix;
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
         //glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap); // display irradiance map
@@ -556,7 +530,6 @@ int main(int argc, char *argv[])
         // brdfShader.enable();
         // RenderQuad();
         //===============================================================================================================================================================================================================
-
         window.end_frame();
     }
 
