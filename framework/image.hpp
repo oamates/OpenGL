@@ -10,6 +10,7 @@ namespace image {
 namespace stbi {
 
 GLuint texture2d(const char* file_name, int* channels = 0, GLint mag_filter = GL_LINEAR, GLint min_filter = GL_LINEAR_MIPMAP_LINEAR, GLint wrap_mode = GL_REPEAT);
+GLuint hdr2d(const char* file_name, int* channels = 0, GLint mag_filter = GL_LINEAR, GLint min_filter = GL_LINEAR_MIPMAP_LINEAR, GLint wrap_mode = GL_REPEAT);
 
 } // namespace stbi
 

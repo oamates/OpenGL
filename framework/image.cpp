@@ -20,16 +20,15 @@ namespace stbi {
 
 GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint min_filter, GLint wrap_mode)
 {
-    unsigned int texture_id;
-    glGenTextures(1, &texture_id);
+    GLuint texture_id;
 
     int width, height, bpp; // bytes per pixel
 
     unsigned char* data = stbi_load(file_name, &width, &height, &bpp, 0);
 
-    if (data == 0)
+    if (!data)
     {
-        debug_msg("Invalid stbi file format : %s", file_name);
+        debug_msg("stbi :: failed to load image : %s", file_name);
         return 0;
     }
     
@@ -38,6 +37,7 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
                     (bpp == 3) ? GL_RGB : GL_RGBA;
     if (channels) *channels = bpp;
 
+    glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -46,6 +46,57 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) glGenerateMipmap(GL_TEXTURE_2D);
+
+    stbi_image_free(data);
+    return texture_id;
+}
+
+GLuint hdr2d(const char* file_name, int* channels, GLint mag_filter, GLint min_filter, GLint wrap_mode)
+{
+    GLuint texture_id;    
+    int width, height, bpp; // bytes per pixel
+
+    float *data = stbi_loadf(file_name, &width, &height, &bpp, 0);
+    if (!data)
+    {
+        debug_msg("stbi :: failed to load HDR image : %s", file_name);
+    }
+
+    GLint internal_format;
+    GLenum format;
+
+    if (bpp == 1)
+    {
+        internal_format = GL_R16F;
+        format = GL_RED;
+    }
+    else if (bpp == 2)
+    {
+        internal_format = GL_RG16F;
+        format = GL_RG;
+    }
+    else if (bpp == 3)
+    {
+        internal_format = GL_RGB16F;
+        format = GL_RGB;
+    }
+    else
+    {
+        internal_format = GL_RGBA16F;
+        format = GL_RGBA;
+    }
+
+    if (channels) *channels = bpp;
+
+    glGenTextures(1, &texture_id);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0, format, GL_FLOAT, data); // note how we specify the texture's data value to be float
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+
     if (min_filter == GL_LINEAR_MIPMAP_LINEAR) glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(data);
