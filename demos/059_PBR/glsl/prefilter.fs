@@ -5,7 +5,7 @@ in vec3 position_ws;
 uniform samplerCube environmentMap;
 uniform float roughness;
 
-out vec4 FragColor;
+out vec4 FragmentColor;
 
 
 const float pi = 3.14159265359f;
@@ -51,11 +51,11 @@ vec2 Hammersley(uint i, uint N)
 //==============================================================================================================================================================
 vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 {
-	float a = roughness*roughness;
+	float a = roughness * roughness;
 	
 	float phi = 2.0 * pi * Xi.x;
 	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a*a - 1.0) * Xi.y));
-	float sinTheta = sqrt(1.0 - cosTheta*cosTheta);
+	float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
 	
 	// from spherical coordinates to cartesian coordinates - halfway vector
 	vec3 H;
@@ -124,5 +124,5 @@ void main()
     }
 
     prefilteredColor = prefilteredColor / totalWeight;
-    FragColor = vec4(prefilteredColor, 1.0);
+    FragmentColor = vec4(prefilteredColor, 1.0);
 }

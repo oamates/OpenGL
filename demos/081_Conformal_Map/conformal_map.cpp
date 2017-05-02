@@ -71,16 +71,14 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // ray march compute shader
     //===================================================================================================================================================================================================================
-    glsl_program_t ray_marcher(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/conformal_map.cs"));
-    ray_marcher.enable();
-    ray_marcher["input_tex"] = 2;
-    uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
-    uniform_t uni_rm_hell = ray_marcher["hell"];
+    glsl_program_t conformal_map(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/conformal_map.cs"));
+    conformal_map.enable();
+    conformal_map["input_tex"] = 2;
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
-    quad_renderer["raymarch_tex"] = 0;
+    quad_renderer["conformal_tex"] = 0;
 
     //===================================================================================================================================================================================================================
     // create output textures, load texture for trilinear blend shading and generate noise texture
@@ -126,8 +124,6 @@ int main(int argc, char *argv[])
         glm::mat4 camera_matrix = window.camera.camera_matrix();
 
         ray_marcher.enable();
-        uni_rm_camera_matrix = camera_matrix;
-        uni_rm_hell = (int) window.hell;
         glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
