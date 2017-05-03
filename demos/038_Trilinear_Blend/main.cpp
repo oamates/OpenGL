@@ -88,14 +88,13 @@ struct model_data_t
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
-    // initialize GLFW library
-    // create GLFW window and initialize GLEW library
-    // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
+    // initialize GLFW library, create GLFW window and initialize GLEW library
+    // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
     //===================================================================================================================================================================================================================
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Trilinear Blend", 8, 3, 3, 1920, 1080, true);
+    demo_window_t window("Trilinear Blend", 4, 3, 3, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // Load trilinear blend shader which produces nice 3-dimensional material texture from arbitrary 2 dimensional input

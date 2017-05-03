@@ -151,10 +151,13 @@ void hyperbolic_camera_t::straight_right(double distance)
     { straight_left(-distance); };
 
 
-void hyperbolic_camera_t::rotateXY(double dx, double dy, double angle)
+void hyperbolic_camera_t::rotateXY(const glm::dvec2& direction, double dt)
 {
-    double cs = glm::cos(angle);
-    double sn = glm::sin(angle);
+    double theta = angular_speed * dt;
+    double dx = -direction.x;
+    double dy = direction.y;
+    double cs = glm::cos(theta);
+    double sn = glm::sin(theta);
     double _1mcs = 1.0 - cs;
     double sndx = sn * dx;
     double sndy = sn * dy;

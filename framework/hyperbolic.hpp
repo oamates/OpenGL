@@ -9,7 +9,7 @@
 #include <glm/glm.hpp>                                                                                                      
 #include <glm/glm.hpp>                                                                                                      
 #include <glm/gtx/transform.hpp>
-#include <glm/gtc/matrix_transform.hpp>										                                                
+#include <glm/gtc/matrix_transform.hpp>                                                                                     
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/ext.hpp>
 #include <glm/gtc/random.hpp>
@@ -32,18 +32,18 @@ namespace hyperbolic
     // of basic transformations. The number of fundamental domains within certain distance from a fixed one grows exponentially w.r.t to this 
     // distance, and so does the number of 'words' of certain length in a hyperbolic group.
     //===================================================================================================================================================================================================================
-																	                // r5 = root(5)
-    const double alpha = 1.2720196495140689642524224617375; 			            // root((r5 + 1) / 2)
-    const double beta  = 2.0581710272714922503219810475805; 			            // root(r5 + 2)
-    const double gamma = 2.6180339887498948482045868343656; 			            // (r5 + 3) / 2
-    const double phi   = 1.6180339887498948482045868343656;           	            // (r5 + 1) / 2
-    const double ksi   = 0.8994537199739336361306137918121;          	            // root(r5 + 1) / 2
-    const double tau   = 1.8512295868219161196009899292655;           	            // root(3r5 + 7) / 2
-    const double mu    = 1.4553466902253548081226618397097;            	            // root(2r5 + 4) / 2
-    const double nu    = 0.5558929702514211719920480478976;           	            // root(r5 - 1) / 2
+                                                                                    // r5 = root(5)
+    const double alpha = 1.2720196495140689642524224617375;                         // root((r5 + 1) / 2)
+    const double beta  = 2.0581710272714922503219810475805;                         // root(r5 + 2)
+    const double gamma = 2.6180339887498948482045868343656;                         // (r5 + 3) / 2
+    const double phi   = 1.6180339887498948482045868343656;                         // (r5 + 1) / 2
+    const double ksi   = 0.8994537199739336361306137918121;                         // root(r5 + 1) / 2
+    const double tau   = 1.8512295868219161196009899292655;                         // root(3r5 + 7) / 2
+    const double mu    = 1.4553466902253548081226618397097;                         // root(2r5 + 4) / 2
+    const double nu    = 0.5558929702514211719920480478976;                         // root(r5 - 1) / 2
     const double omega = 0.7071067811865475244008443621049;                         // 1 / root(2)
     const double sigma = 1.1441228056353685952001455671606;                         // root(r5 + 3) / 2
-    const double delta = 1.3449970239279146539201179377715;							// root(5 + r5) / 2
+    const double delta = 1.3449970239279146539201179377715;                         // root(5 + r5) / 2
     const double theta = 0.4728708045015879066508480599436;                         // 1 / root(2) / root(r5)
     const double zeta  = 0.7651210339710760130929425299861;                         // root((5 + 3r5) / 5) / 2
                                                                
@@ -55,26 +55,26 @@ namespace hyperbolic
                                                                                     
         const glm::dvec4 vertex[V] =                                                
         {                                                                           
-	        glm::dvec4 (-ksi, -ksi, -ksi, tau),                                    // time-like
+            glm::dvec4 (-ksi, -ksi, -ksi, tau),                                    // time-like
             glm::dvec4 ( ksi,  ksi,  ksi, tau),
-	        glm::dvec4 ( ksi, -ksi, -ksi, tau),
+            glm::dvec4 ( ksi, -ksi, -ksi, tau),
             glm::dvec4 (-ksi,  ksi,  ksi, tau),
-	        glm::dvec4 (-ksi,  ksi, -ksi, tau),
+            glm::dvec4 (-ksi,  ksi, -ksi, tau),
             glm::dvec4 ( ksi, -ksi,  ksi, tau),
-	        glm::dvec4 ( ksi,  ksi, -ksi, tau),
-	        glm::dvec4 (-ksi, -ksi,  ksi, tau),	        						    				                            																	
-	        glm::dvec4 ( -nu,  0.0,  -mu, tau),
+            glm::dvec4 ( ksi,  ksi, -ksi, tau),
+            glm::dvec4 (-ksi, -ksi,  ksi, tau),                                                                                                                                                     
+            glm::dvec4 ( -nu,  0.0,  -mu, tau),
             glm::dvec4 (  nu,  0.0,   mu, tau),
-	        glm::dvec4 (  nu,  0.0,  -mu, tau),
-	        glm::dvec4 ( -nu,  0.0,   mu, tau),                                                                                    
-	        glm::dvec4 ( -mu,  -nu,  0.0, tau),
+            glm::dvec4 (  nu,  0.0,  -mu, tau),
+            glm::dvec4 ( -nu,  0.0,   mu, tau),                                                                                    
+            glm::dvec4 ( -mu,  -nu,  0.0, tau),
             glm::dvec4 (  mu,   nu,  0.0, tau),
-	        glm::dvec4 ( -mu,   nu,  0.0, tau),
-	        glm::dvec4 (  mu,  -nu,  0.0, tau),                                                                                    
-	        glm::dvec4 ( 0.0,  -mu,  -nu, tau),
+            glm::dvec4 ( -mu,   nu,  0.0, tau),
+            glm::dvec4 (  mu,  -nu,  0.0, tau),                                                                                    
+            glm::dvec4 ( 0.0,  -mu,  -nu, tau),
             glm::dvec4 ( 0.0,   mu,   nu, tau),
-	        glm::dvec4 ( 0.0,  -mu,   nu, tau),
-	        glm::dvec4 ( 0.0,   mu,  -nu, tau)
+            glm::dvec4 ( 0.0,  -mu,   nu, tau),
+            glm::dvec4 ( 0.0,   mu,  -nu, tau)
         };
 
         const glm::dvec4 face_center[F] = 
@@ -699,7 +699,7 @@ namespace hyperbolic
             17,16,29,16,1,29,1,14,29,14,5,29,5,17,29,
             18,19,30,19,7,30,7,15,30,15,3,30,3,18,30,
             19,18,31,18,2,31,2,13,31,13,6,31,6,19,31
-        }
+        };
 
         GLuint vao()
         {

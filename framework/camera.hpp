@@ -39,10 +39,14 @@ struct camera_t
 
 struct hyperbolic_camera_t
 {
+    double linear_speed;
+    double angular_speed;
+
     glm::dmat4 view_matrix;
     glm::mat4 projection_matrix;
 
-    hyperbolic_camera_t(const glm::mat4 view_matrix = glm::mat4(1.0f)) : view_matrix(view_matrix) {};
+    hyperbolic_camera_t(const double linear_speed = 2.0, const double angular_speed = 0.125, const glm::mat4& view_matrix = glm::mat4(1.0f))
+        : linear_speed(linear_speed), angular_speed(angular_speed), view_matrix(view_matrix) {};
 
     void translate(const glm::dvec3& shift);
     void move_forward(double distance);
@@ -50,7 +54,7 @@ struct hyperbolic_camera_t
     void straight_right(double distance);
     void straight_left(double distance);
 
-    void rotateXY(double dx, double dy, double angle);
+    void rotateXY(const glm::dvec2& direction, double dt);
 
     void infinite_perspective(float view_angle, float aspect_ratio, float znear);
     glm::mat4 projection_view_matrix();
