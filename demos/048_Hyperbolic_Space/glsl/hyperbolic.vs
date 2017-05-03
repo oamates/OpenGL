@@ -1,8 +1,7 @@
 #version 430 core
 
 
-layout(location = 0) in vec4 position_ms;
-
+layout(location = 0) in vec4 position_in;
 
 layout (std430, binding = 0) buffer shader_data
 {
@@ -13,5 +12,5 @@ out vec4 position_ws;
 
 void main()
 {
-    position_ws = model_matrix[gl_InstanceID] * position_ms;
+    position_ws = model_matrix[gl_InstanceID] * position_in;
 }

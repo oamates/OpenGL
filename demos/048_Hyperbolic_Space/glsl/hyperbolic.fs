@@ -4,8 +4,7 @@ out vec4 FragmentColor;
 
 in vec3 texture_coordinates;
 
-
-uniform sampler2D pentagon_texture;
+uniform sampler2D pentagon_tex;
 
 const float cos2pi5 =  0.30901699437494742410; 
 const float sin2pi5 =  0.95105651629515357211; 
@@ -27,22 +26,22 @@ void main( void )
     float y = texture_coordinates.y;
     float z = texture_coordinates.z;
 
-    vec2 plane_coord0 = x * (vec2(0.5f) + 0.5f * pentagon[0]) + y * (vec2(0.5f) + 0.5f * pentagon[1]) + z * vec2(0.5f);
-    vec2 plane_coord1 = x * (vec2(0.5f) + 0.5f * pentagon[1]) + y * (vec2(0.5f) + 0.5f * pentagon[2]) + z * vec2(0.5f);
-    vec2 plane_coord2 = x * (vec2(0.5f) + 0.5f * pentagon[2]) + y * (vec2(0.5f) + 0.5f * pentagon[3]) + z * vec2(0.5f);
-    vec2 plane_coord3 = x * (vec2(0.5f) + 0.5f * pentagon[3]) + y * (vec2(0.5f) + 0.5f * pentagon[4]) + z * vec2(0.5f);
-    vec2 plane_coord4 = x * (vec2(0.5f) + 0.5f * pentagon[4]) + y * (vec2(0.5f) + 0.5f * pentagon[0]) + z * vec2(0.5f);
+    vec2 uv0 = x * (vec2(0.5f) + 0.5f * pentagon[0]) + y * (vec2(0.5f) + 0.5f * pentagon[1]) + z * vec2(0.5f);
+    vec2 uv1 = x * (vec2(0.5f) + 0.5f * pentagon[1]) + y * (vec2(0.5f) + 0.5f * pentagon[2]) + z * vec2(0.5f);
+    vec2 uv2 = x * (vec2(0.5f) + 0.5f * pentagon[2]) + y * (vec2(0.5f) + 0.5f * pentagon[3]) + z * vec2(0.5f);
+    vec2 uv3 = x * (vec2(0.5f) + 0.5f * pentagon[3]) + y * (vec2(0.5f) + 0.5f * pentagon[4]) + z * vec2(0.5f);
+    vec2 uv4 = x * (vec2(0.5f) + 0.5f * pentagon[4]) + y * (vec2(0.5f) + 0.5f * pentagon[0]) + z * vec2(0.5f);
 
 
-    vec4 texel = (texture2D(pentagon_texture, plane_coord0) + 
-                  texture2D(pentagon_texture, plane_coord1) + 
-                  texture2D(pentagon_texture, plane_coord2) + 
-                  texture2D(pentagon_texture, plane_coord3) + 
-                  texture2D(pentagon_texture, plane_coord4)) / 5.0;
+    vec4 texel = (texture(pentagon_tex, uv0) + 
+                  texture(pentagon_tex, uv1) + 
+                  texture(pentagon_tex, uv2) + 
+                  texture(pentagon_tex, uv3) + 
+                  texture(pentagon_tex, uv4)) / 5.0;
 
     texel = 3.0f * texel * texel; 
     
-    if (z*z > 0.05) discard;
+    if (z * z > 0.25) discard;
     texel.w =  0.5f;
     FragmentColor = texel;
 }

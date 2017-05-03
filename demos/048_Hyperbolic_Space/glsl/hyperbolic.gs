@@ -8,10 +8,10 @@ in vec3 barycentric_coordinates[3];
 
 out vec3 texture_coordinates;
 
-const mat4 projection_matrix = mat4(vec4(1.154701, 0.000000, 0.000000, 0.000000), 
-                                    vec4(0.000000, 1.732051, 0.000000, 0.000000), 
+const mat4 projection_matrix = mat4(vec4(1.154701, 0.000000,  0.000000,  0.000000), 
+                                    vec4(0.000000, 1.732051,  0.000000,  0.000000), 
                                     vec4(0.000000, 0.000000, -1.000000, -1.000000), 
-                                    vec4(0.000000, 0.000000, -0.200000, 0.000000));
+                                    vec4(0.000000, 0.000000, -0.200000,  0.000000));
 
 
 uniform mat4 view_matrix;

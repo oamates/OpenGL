@@ -13,8 +13,7 @@ vec4 hyperbolic_normalize(vec4 v)
 {
     float norm = v.x * v.x + v.y * v.y + v.z * v.z - v.w * v.w;
     return v / sqrt(-norm);
-    return v;    
-};
+}
 
 
 out vec4 position;

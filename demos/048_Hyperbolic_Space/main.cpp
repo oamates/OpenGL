@@ -27,7 +27,8 @@ struct demo_window_t : public glfw_window_t
     hyperbolic_camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
+          camera(0.0625, 0.125)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -74,7 +75,7 @@ int main(int argc, char *argv[])
 
     hyperbolic.enable();
     uniform_t uniform_view_matrix = hyperbolic["view_matrix"];
-    hyperbolic["pentagon_texture"] = 0;
+    hyperbolic["pentagon_tex"] = 0;
 
     //===================================================================================================================================================================================================================
     // Right-angled hyperbolic dodecahedron triangulation initialization
@@ -101,18 +102,18 @@ int main(int argc, char *argv[])
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
     //===================================================================================================================================================================================================================
-    // The main loop
+    // main program loop
     //===================================================================================================================================================================================================================
 
     while(!window.should_close())
     {
-        window.new_frame();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glm::mat4 view_matrix = glm::mat4(window.camera.view_matrix);                                                                    // clear the screen
+        window.new_frame();
+        glm::mat4 view_matrix = glm::mat4(window.camera.view_matrix);
         uniform_view_matrix = view_matrix;
         glDrawElementsInstanced(GL_PATCHES, 180, GL_UNSIGNED_BYTE, 0, 57741);
         window.end_frame();
-    }; 
+    }
     
     //===================================================================================================================================================================================================================
     // terminate the program and exit
