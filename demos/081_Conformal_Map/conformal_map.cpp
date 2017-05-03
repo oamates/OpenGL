@@ -1,5 +1,5 @@
 //========================================================================================================================================================================================================================
-// DEMO 056 : Ray Marching with Compute Shader
+// DEMO 081 : Conformal Map
 //========================================================================================================================================================================================================================
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
@@ -21,10 +21,8 @@ struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
 
-    bool hell = true;
-
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
@@ -39,9 +37,6 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
-
-        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
-            hell = !hell;
     }
 
     void on_mouse_move() override
@@ -66,44 +61,34 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Ray Marching with Compute Shader", 4, 4, 3, 1920, 1080, true);
+    demo_window_t window("Conformal Map", 4, 4, 3, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // ray march compute shader
     //===================================================================================================================================================================================================================
     glsl_program_t conformal_map(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/conformal_map.cs"));
-    conformal_map.enable();
-    conformal_map["input_tex"] = 2;
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
     quad_renderer["conformal_tex"] = 0;
+    quad_renderer["input_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // create output textures, load texture for trilinear blend shading and generate noise texture
     //===================================================================================================================================================================================================================
-    const int TEXTURE_SIZE = 8192;
+    const int TEXTURE_SIZE = 2048;
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint input_image;
-    glGenTextures(1, &input_image);
-    glBindTexture(GL_TEXTURE_2D, input_image);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, TEXTURE_SIZE, TEXTURE_SIZE);
-    glBindImageTexture(0, input_image, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-
-    glActiveTexture(GL_TEXTURE1);
     GLuint output_image;
     glGenTextures(1, &output_image);
     glBindTexture(GL_TEXTURE_2D, output_image);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, TEXTURE_SIZE, TEXTURE_SIZE);
-    glBindImageTexture(1, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE1);
     GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
 
@@ -112,6 +97,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
@@ -121,14 +107,11 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        glm::mat4 camera_matrix = window.camera.camera_matrix();
-
-        ray_marcher.enable();
-        glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
-
+        conformal_map.enable();
+        glDispatchCompute(TEXTURE_SIZE / 8, TEXTURE_SIZE / 8, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
         quad_renderer.enable();
-        glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         window.end_frame();
