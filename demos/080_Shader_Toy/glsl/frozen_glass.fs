@@ -42,18 +42,28 @@ float snoise(vec2 v)
     return 130.0 * dot(m, g);
 }
 
+float tri(float x)
+{
+    return abs(fract(x) - 0.5);
+}
+
 float fbm(vec2 uv)
 {
-    mat2 m = mat2(1.2, 1.6, -1.6, 1.2);
+    uv = vec2(7.0, -3.0) + 0.25 * uv;
+    const float half_sqrt3 = 1.73205080757;
+    mat2 m = mat2(vec2(       -1.0, half_sqrt3), 
+                  vec2(-half_sqrt3,       -1.0));
     float q = 0.0;
-    float amp = 0.47;
+    float amp = 1.97;
+
     for(int i = 0; i < 8; ++i)
     {
         float c = snoise(uv);
-        q += amp * abs(c * c - 0.875);
+        q += amp * pow(tri(c), 1.75);
         amp *= 0.57;
         uv = m * uv;
     }
+
     float l = 0.5 + 0.5 * sin(0.45 * time);
     return smoothstep(l, 1.0, q * q) - l;
 }
@@ -68,18 +78,7 @@ vec2 grad(vec2 uv)
 
 vec3 ambient(vec2 uv)
 {
-    mat2 m = mat2(1.2, 1.6, -1.6, 1.2);
-    vec3 q = vec3(0.0);
-    float a = 0.37;
-    for(int i = 0; i < 8; ++i)
-    {
-        vec3 c = 0.5 + 0.5 * vec3(snoise(uv - 0.47 * time)); // uncomment to animate background
-        //vec3 c = 0.5 + 0.5 * vec3(snoise(uv));
-        q += a * vec3(c.x, c.x * c.y, c.x * c.y * c.z);
-        a *= 0.67;
-        uv = m * uv;
-    }
-    return q;
+    return texture(iChannel3, uv).rgb;
 }
 
 void main()

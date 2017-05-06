@@ -4,8 +4,6 @@
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
 
-// checkout :: http://blog.hvidtfeldts.net/index.php/2011/06/distance-estimated-3d-fractals-part-i/
-
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -19,20 +17,38 @@
 struct demo_window_t : public glfw_window_t
 {
     glm::vec3 mouse_pos;
+    bool pause = false;
+    double pause_tt = 0.0;
+    double pause_ts;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
           mouse_pos(0.0f, 0.0f, -1.0f)
-        { gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO); }
+    {
+        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        pause_ts = frame_ts;
+    }
 
     //===================================================================================================================================================================================================================
-    // mouse handlers
+    // event handlers
     //===================================================================================================================================================================================================================
     void on_mouse_move() override
     {
         mouse_pos.x = mouse.x;
         mouse_pos.y = mouse.y;
     }
+
+    void on_key(int key, int scancode, int action, int mods) override
+    {
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+        {
+            pause = !pause;
+            if (pause)
+                pause_ts = frame_ts;
+            else
+                pause_tt += (frame_ts - pause_ts);
+        }
+    }    
 
     void on_mouse_button(int button, int action, int mods) override
     {
@@ -67,7 +83,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE2);
     GLuint clay_tex = image::png::texture2d("../../../resources/tex2d/clay.png");
     glActiveTexture(GL_TEXTURE3);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/rock0.png");
+    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/window_view.png");
 
     //===================================================================================================================================================================================================================
     // Shader and uniform variables initialization
@@ -77,7 +93,7 @@ int main(int argc, char *argv[])
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/flame.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/fractal.fs"));
-//                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/frozen_glass.fs"));
+                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/frozen_glass.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/galaxy.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/klein.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/klein2.fs"));
@@ -93,7 +109,7 @@ int main(int argc, char *argv[])
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sierpinski.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/spacelabyrinth.fs"));
 //                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/volcanic.fs"));
-                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/volumetric_fog.fs"));
+//                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/volumetric_fog.fs"));
 
 
     raymarch_renderer.enable();
@@ -132,11 +148,15 @@ int main(int argc, char *argv[])
     while(!window.should_close())
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        uniform_time = (float) glfw::time();
+        window.new_frame();
+
+        if (!window.pause)
+            uniform_time = (float) (window.frame_ts - window.pause_tt);
+
         uniform_mouse_pos = window.mouse_pos;
+
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        window.swap_buffers();
-        glfw::poll_events();
+        window.end_frame();
     }
 
     //===================================================================================================================================================================================================================
