@@ -17,10 +17,13 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout (rgba32f, binding = 0) uniform image2D scene_image;
 
-uniform mat4 camera_matrix;
+uniform mat3 camera_matrix;
+uniform vec3 camera_ws;
 uniform vec2 focal_scale;
 uniform sampler2D tb_tex;
+uniform vec3 light_ws;
 uniform int hell;
+
 
 const float pi = 3.14159265359;
 #define FAR 200.
@@ -179,11 +182,9 @@ vec3 envMap(vec3 rd, vec3 n)
 void main()
 {
     vec2 uv = ivec2(gl_GlobalInvocationID.xy) / vec2(1920.0f, 1080.0f);
-    vec3 camera_ws = vec3(camera_matrix[3]); 
     vec3 position = camera_ws;
-    vec3 view = vec3(camera_matrix * vec4(focal_scale * (2.0 * uv - 1.0), -1.0f, 0.0f));
+    vec3 view = camera_matrix * vec3(focal_scale * (2.0f * uv - 1.0f), -1.0f);
 
-    vec3 lightPos = position - 140.0 * view;
     vec3 rd = normalize(view);
     float t = trace(position, rd);   
     vec3 sceneCol = vec3(0.0);                                                          // Initialize the scene color.
@@ -196,7 +197,7 @@ void main()
         const float tSize0 = 0.5;
 
         sn = doBumpMap(sp * tSize0, sn, 0.1);                                           // Texture-based bump mapping.
-        vec3 ld = lightPos - sp;                                                        // Light direction vectors.
+        vec3 ld = light_ws - sp;                                                        // Light direction vectors.
         float lDist = max(length(ld), 0.001);                                           // Distance from respective lights to the surface point.
         ld /= lDist;                                                                    // Normalize the light direction vectors.
         float shading = shadows(sp + sn * 0.005, ld, 0.05, lDist, 8.0);                 // Shadows.

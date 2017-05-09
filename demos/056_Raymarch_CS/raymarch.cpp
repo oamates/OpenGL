@@ -11,20 +11,20 @@
 #include "log.hpp"
 #include "constants.hpp"
 #include "gl_info.hpp"
-#include "glfw_window.hpp"
+#include "imgui_window.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
 #include "glsl_noise.hpp"
 #include "image.hpp"
 
-struct demo_window_t : public glfw_window_t
+struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
 
     bool hell = true;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
@@ -74,20 +74,22 @@ int main(int argc, char *argv[])
     glsl_program_t ray_marcher(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ray_marcher.cs"));
     ray_marcher.enable();
     ray_marcher["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
-    ray_marcher["tb_tex"] = 1;
-    ray_marcher["noise_tex"] = 2;
+    ray_marcher["tb_tex"] = 2;
+    ray_marcher["noise_tex"] = 3;
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
+    uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
+    uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
     uniform_t uni_rm_hell = ray_marcher["hell"];
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
-    quad_renderer["raymarch_tex"] = 0;
+    quad_renderer["raymarch_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // create output textures, load texture for trilinear blend shading and generate noise texture
     //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE1);
     GLuint output_image;
     glGenTextures(1, &output_image);
     glBindTexture(GL_TEXTURE_2D, output_image);
@@ -96,14 +98,11 @@ int main(int argc, char *argv[])
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, window.res_x, window.res_y);
     glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-    glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE2);
     GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
-
-
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE3);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
-
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
@@ -119,11 +118,26 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        glm::mat4 camera_matrix = window.camera.camera_matrix();
+        float time = window.frame_ts;
+        glm::mat4 cmatrix4x4 = window.camera.camera_matrix();
+        glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
+        glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
+        glm::vec3 light_ws = glm::vec3(75.0f * glm::cos(0.25f * time), 100.0f, 75.0f * glm::sin(0.25f * time));
 
+        //===============================================================================================================================================================================================================
+        // Show FPS
+        //===============================================================================================================================================================================================================
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+        //===============================================================================================================================================================================================================
+        // Render scene
+        //===============================================================================================================================================================================================================
         ray_marcher.enable();
         uni_rm_camera_matrix = camera_matrix;
+        uni_rm_camera_ws = camera_ws;
+        uni_rm_light_ws = light_ws;
         uni_rm_hell = (int) window.hell;
+
         glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);

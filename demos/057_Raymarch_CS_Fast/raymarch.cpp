@@ -71,14 +71,15 @@ int main(int argc, char *argv[])
 
     //===================================================================================================================================================================================================================
     // ray march compute shader
-    //===================================================================================================================================================================================================================
+        //===================================================================================================================================================================================================================
     glsl_program_t ray_marcher(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ray_marcher.cs"));
     ray_marcher.enable();
     ray_marcher["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
     ray_marcher["tb_tex"] = 2;
     ray_marcher["noise_tex"] = 3;
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
-    uniform_t uni_rm_hell = ray_marcher["hell"];
+    uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
+    uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
@@ -118,6 +119,12 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
+        float time = window.frame_ts;
+        glm::mat4 cmatrix4x4 = window.camera.camera_matrix();
+        glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
+        glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
+        glm::vec3 light_ws = glm::vec3(75.0f * glm::cos(0.25f * time), 100.0f, 75.0f * glm::sin(0.25f * time));
+
         //===============================================================================================================================================================================================================
         // Show FPS
         //===============================================================================================================================================================================================================
@@ -126,12 +133,13 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // Render scene
         //===============================================================================================================================================================================================================
-        glm::mat4 camera_matrix = window.camera.camera_matrix();
-
         ray_marcher.enable();
+
         uni_rm_camera_matrix = camera_matrix;
-        uni_rm_hell = (int) window.hell;
-        glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
+        uni_rm_camera_ws = camera_ws;
+        uni_rm_light_ws = light_ws;
+
+        glDispatchCompute(window.res_x / 40, window.res_y / 40, 1);
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         quad_renderer.enable();

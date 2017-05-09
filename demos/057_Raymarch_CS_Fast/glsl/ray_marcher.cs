@@ -3,9 +3,7 @@
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 //==============================================================================================================================================================
-// Every workgroup will work on 16 x 16 pixel area
-// Filters that will be applied to the image will work with 5x5 surrounding window
-// hence we need to load image data of size 20 x 20
+// Every invocation will work on 5 x 5 pixel area
 //
 // Predefined compute shader inputs :: 
 //  const uvec3 gl_WorkGroupSize      = uvec3(local_size_x, local_size_y, local_size_z)
@@ -13,9 +11,6 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 //  in uvec3 gl_WorkGroupID           ----- the current work group for this shader invocation
 //  in uvec3 gl_LocalInvocationID     ----- the current invocation of the shader within the work group
 //  in uvec3 gl_GlobalInvocationID    ----- unique identifier of this invocation of the compute shader among all invocations of this compute dispatch call
-//
-//  1920 = 2 * 2 * 2 * 2 * 2 * 2 * 3 
-//  1080 = 2 * 2 * 2 * 3 * 3 * 3 * 5
 //
 //==============================================================================================================================================================
 
@@ -25,8 +20,9 @@ uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
 uniform vec2 focal_scale;
 uniform sampler2D tb_tex;
+uniform vec3 light_ws;
 
-const ivec2 size = ivec2(3, 3);
+const ivec2 size = ivec2(5, 5);
 const int group_size = size.x * size.y;
 
 ivec2 shift[group_size] = ivec2[group_size]
@@ -39,10 +35,30 @@ ivec2 shift[group_size] = ivec2[group_size]
     ivec2( 1,  1),
     ivec2(-1, -1),
     ivec2( 1, -1),
-    ivec2(-1,  1)
+    ivec2(-1,  1),
+
+    ivec2( 2,  1),
+    ivec2( 2,  0),
+    ivec2( 2, -1),
+    ivec2(-2,  1),
+    ivec2(-2,  0),
+    ivec2(-2, -1),
+
+    ivec2( 1,  2),
+    ivec2( 0,  2),
+    ivec2(-1,  2),
+    ivec2( 1, -2),
+    ivec2( 0, -2),
+    ivec2(-1, -2),
+
+    ivec2( 2,  2),
+    ivec2(-2, -2),
+    ivec2( 2, -2),
+    ivec2(-2,  2)
+
 );
 
-const int MAX_STEPS = 125;
+const int MAX_STEPS = 160;
 const float HORIZON = 200.0;
 const float pi = 3.14159265359;
 
@@ -61,7 +77,7 @@ float map(vec3 p)
     p += (op - 0.25) * 0.3;
     p = cos(p * 0.315 * 1.41 + sin(p.zxy * 0.875 * 1.27));
     float canyon = (length(p) - 1.05) * 0.95;
-    return min(ground, canyon);
+    return 1.05 * min(ground, canyon);
 }
 
 //==============================================================================================================================================================
@@ -172,12 +188,13 @@ vec3 envMap(vec3 rd, vec3 n)
     return tex3D(rd, n);
 }
 
+float accum = 0.0;
 
 vec3 scene_color(vec3 position, vec3 rd, float t)
 {
     vec3 sceneCol = vec3(0.0);                                                          // Initialize the scene color.
     
-    if(t < FAR)                                                                         // The ray has effectively hit the surface, so light it up.
+    if(t < HORIZON)                                                                     // The ray has effectively hit the surface, so light it up.
     {
         vec3 sp = position + rd * t;                                                    // Surface position and surface normal.
         vec3 sn = calcNormal(sp);                                                       // Voxel normal.
@@ -185,7 +202,7 @@ vec3 scene_color(vec3 position, vec3 rd, float t)
         const float tSize0 = 0.5;
 
         sn = doBumpMap(sp * tSize0, sn, 0.1);                                           // Texture-based bump mapping.
-        vec3 ld = lightPos - sp;                                                        // Light direction vectors.
+        vec3 ld = light_ws - sp;                                                        // Light direction vectors.
         float lDist = max(length(ld), 0.001);                                           // Distance from respective lights to the surface point.
         ld /= lDist;                                                                    // Normalize the light direction vectors.
         float shading = shadows(sp + sn * 0.005, ld, 0.05, lDist, 8.0);                 // Shadows.
@@ -197,16 +214,11 @@ vec3 scene_color(vec3 position, vec3 rd, float t)
         float ambience = 0.35 * ao + fre * fre * 0.25;                                  // Ambient light, due to light bouncing around the the canyon.
         vec3 texCol = tex3D(sp * tSize0, sn);                                           // Object texturing, coloring and shading.
 
-      #ifdef MOSS
-        texCol = texCol * mix(vec3(1.0), vec3(0.5, 1.5, 1.5), abs(snNoBump));           // Some quickly improvised moss.
-        texCol = texCol * mix(vec3(1.0), vec3(0.6, 1.0, 0.5), pow(abs(sn.y), 4.0));
-      #else
         // Adding in the white frost. A bit on the cheap side, but it's a subtle effect.
         // As you can see, it's improvised, but from a physical perspective, you want the frost to accumulate
         // on the flatter surfaces, hence the "sn.y" factor. There's some Fresnel thrown in as well to give
         // it a tiny bit of sparkle.
         texCol = mix(texCol, vec3(0.35, 0.55, 1.0) * (texCol * 0.5 + 0.5) * vec3(2.0), ((snNoBump.y * 0.5 + sn.y * 0.5) * 0.5 + 0.5) * pow(abs(sn.y), 4.0) * texCol.r * fre * 4.0);
-      #endif      
 
         sceneCol = texCol * (diff + spec + ambience);                                   // Final color. Pretty simple.
         sceneCol += texCol * ((sn.y) * 0.5 + 0.5) * min(vec3(1.0, 1.15, 1.5) * accum, 1.0);     // A bit of accumulated glow.  
@@ -222,27 +234,11 @@ vec3 scene_color(vec3 position, vec3 rd, float t)
 
     // Blend in a bit of light fog for atmospheric effect. I really wanted to put a colorful, gradient blend here, but my mind wasn't buying it, so dull, blueish grey it is. :)
     vec3 fog = vec3(0.6, 0.8, 1.2) * (rd.y * 0.5 + 0.5);
-  #ifdef MOSS
-    fog *= vec3(1.0, 1.25, 1.5);
-  #else
-    if (hell != 0) fog *= 4.0;
-  #endif
-    sceneCol = mix(sceneCol, fog, smoothstep(0., .95, t / FAR));
-    
-  #ifndef MOSS
-    if (hell != 0)
-    {
-        float gr = dot(sceneCol, vec3(0.299, 0.587, 0.114));
-        sceneCol = sceneCol * 0.1 + pow(min(vec3(1.5, 1.0, 1.0) * gr * 1.2, 1.0), vec3(1, 3, 16));
-    }
-  #endif
-    
-    vec2 uv_n = 0.5 + 0.5 * uv;
-    sceneCol = mix(vec3(0.0, 0.1, 1.0), sceneCol, pow(16.0 * uv_n.x * uv_n.y * (1.0 - uv_n.x) * (1.0 - uv_n.y), 0.125) * 0.15 + 0.85);
 
-    return sqrt(clamp(sceneCol, 0.0, 1.0);
+    sceneCol = mix(sceneCol, fog, smoothstep(0., .95, t / HORIZON));
+    
+    return sqrt(clamp(sceneCol, 0.0, 1.0));
 }
-
 
 //==============================================================================================================================================================
 // Shader entry point
@@ -278,7 +274,7 @@ void main()
         {
             distance[l] = distance[l - 1];
             ivec2 s = shift[l - 1]; shift[l - 1] = shift[l]; shift[l] = s;
-            vec3 w = view[l - 1]; view[l - 1] = view[l]; view[l] = s;
+            vec3 w = view[l - 1]; view[l - 1] = view[l]; view[l] = w;
             l--;
         }
     }
@@ -286,41 +282,42 @@ void main()
     //==========================================================================================================================================================
     // 3x3 group raymarching
     //==========================================================================================================================================================
-    vec3 ro = camera_ws;
-    vec3 rd = v;
-
     float t = map(camera_ws);
-
     int k = group_size - 1;
     int s = 0;
 
-    while((k != 0) && (s < MAX_STEPS))
+    while((k != -1) && (s < MAX_STEPS))
     {
-        h = map(camera_ws + v * t);
-        while ((t * distance[k] > h) && (k >= 0))
+        float h = map(camera_ws + v * t);
+        float hh = abs(h);    
+        t += h;
+
+
+        while ((hh < 0.001 + (0.00025 + distance[k]) * t) && (k >= 0))
         {
             //==================================================================================================================================================
             // finish raymarching of a single point of index k
             //==================================================================================================================================================
             float t0 = t;
-            vec3 rd = view[k];
+            vec3 v0 = view[k];
             int s0 = s;
             while(s0 < MAX_STEPS)
             {
-                float h0 = map(camera_ws + rd * t);
-                if(abs(h0) < 0.001 * (t0 * 0.25 + 1.0) || t0 > HORIZON) break;
+                float h0 = map(camera_ws + v0 * t0);
+                if(abs(h0) < (0.001 + 0.00025 * t0) || t0 > HORIZON) break;
                 t0 += h0;
                 ++s0;
             }
-            --k;
 
             //==================================================================================================================================================
             // color the fragment and store the result to texture
             //==================================================================================================================================================
-            vec3 color = scene_color(camera_ws, rd, t);
-            imageStore(scene_image, P + shift[k], ivec2(gl_GlobalInvocationID.xy), vec4(scene_color, 1.0));
+            vec3 color = scene_color(camera_ws, v0, t0);
+            imageStore(scene_image, P + shift[k], vec4(color, 1.0f));
+//            imageStore(scene_image, P + shift[k], vec4(vec3(float(s0) / MAX_STEPS), 1.0f));
+            --k;
         }
+
         ++s;
     }
-
 }
