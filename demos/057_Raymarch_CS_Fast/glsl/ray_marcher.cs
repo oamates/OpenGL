@@ -1,6 +1,6 @@
 #version 430 core
 
-layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout (local_size_x = 4, local_size_y = 4, local_size_z = 1) in;
 
 //==============================================================================================================================================================
 // Every invocation will work on 5 x 5 pixel area
@@ -14,7 +14,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 //
 //==============================================================================================================================================================
 
-layout (rgba32f, binding = 0) uniform image2D scene_image;
+layout (rgba16f, binding = 0) uniform image2D scene_image;
 
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
@@ -146,12 +146,10 @@ float calculateAO(in vec3 p, in vec3 n)
 }
 
 //==============================================================================================================================================================
-// Tetrahedral normal, to save a couple of "map" calls. Courtesy of IQ. In instances where there's no descernible 
-// aesthetic difference between it and the six tap version, it's worth using.
+// Tetrahedral normal
 //==============================================================================================================================================================
 vec3 calcNormal(in vec3 p)
 {
-    // Note the slightly increased sampling distance, to alleviate artifacts due to hit point inaccuracies.
     vec2 e = vec2(0.001, -0.001); 
     return normalize(e.xyy * map(p + e.xyy) + e.yyx * map(p + e.yyx) + e.yxy * map(p + e.yxy) + e.xxx * map(p + e.xxx));
 }
@@ -280,7 +278,7 @@ void main()
     }
 
     //==========================================================================================================================================================
-    // 3x3 group raymarching
+    // 5x5 group raymarching
     //==========================================================================================================================================================
     float t = map(camera_ws);
     int k = group_size - 1;

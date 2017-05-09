@@ -95,8 +95,8 @@ int main(int argc, char *argv[])
     glBindTexture(GL_TEXTURE_2D, output_image);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, window.res_x, window.res_y);
-    glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, window.res_x, window.res_y);
+    glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
     glActiveTexture(GL_TEXTURE2);
     GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
@@ -136,7 +136,6 @@ int main(int argc, char *argv[])
         uni_rm_camera_matrix = camera_matrix;
         uni_rm_camera_ws = camera_ws;
         uni_rm_light_ws = light_ws;
-        uni_rm_hell = (int) window.hell;
 
         glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
 

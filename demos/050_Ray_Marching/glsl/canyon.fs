@@ -1,243 +1,273 @@
-#version 400 core
+#version 330 core
 
 in vec2 uv;
 in vec3 view;
-flat in vec3 position;
-uniform vec2 focal_scale;
 
-uniform mat4 camera_matrix;
 uniform float time;
-uniform sampler2D value_texture;
-uniform sampler2D stone_texture;
+uniform vec3 camera_ws;
+uniform vec3 light_ws;
 
-uniform int hell;
+uniform sampler2D noise_tex;
+uniform sampler2D stone_tex;
+
 out vec4 FragmentColor;
 
 const float pi = 3.14159265359;
-#define FAR 200.
+const float HORIZON = 200.0;
+const vec3 rgb_power = vec3(0.299, 0.587, 0.114);
 
-// #define MOSS
+//==============================================================================================================================================================
+// 3D Value noise function
+//==============================================================================================================================================================
+#define TEXEL_SIZE 1.0 / 256.0
+#define HALF_TEXEL 1.0 / 512.0
 
-// Rotation matrix.
-const mat2 rM = mat2(0.7071, 0.7071, -0.7071, 0.7071); 
+vec3 hermite5(vec3 x)
+    { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
 
-mat2 rot2(float a)
+float vnoise(vec3 x)
 {
-    vec2 v = sin(vec2(0.5 * pi, 0.0) + a);
-    return mat2(v, -v.y, v.x);
+    vec3 p = floor(x);
+    vec3 f = x - p;
+    f = hermite5(f);
+    vec2 uv = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
+    vec2 rg = texture(noise_tex, TEXEL_SIZE * uv + HALF_TEXEL).rg;
+    return mix(rg.g, rg.r, f.z);
 }
 
-// GPU Gems 3 - Ryan Geiss: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch01.html
-vec3 tex3D(sampler2D channel, vec3 p, vec3 n)
+//==============================================================================================================================================================
+// nvidia trilinear-blend texture
+//==============================================================================================================================================================
+vec3 tex3D(vec3 p, vec3 n)
 {
     p *= 0.75;
-    n = max(abs(n) - 0.2, 0.001);
-    n /= dot(n, vec3(1.0));
-    vec3 tx = texture(channel, p.zy).xyz;
-    vec3 ty = texture(channel, p.xz).xyz;
-    vec3 tz = texture(channel, p.xy).xyz;
-    n = vec3(0.37);
-    return (tx * tx * n.x + ty * ty * n.y + tz * tz * n.z);;
+    n = max(abs(n) - 0.35f, 0.0f);
+    n /= dot(n, vec3(1.0f));
+    vec3 tx = texture(stone_tex, p.zy).xyz;
+    vec3 ty = texture(stone_tex, p.xz).xyz;
+    vec3 tz = texture(stone_tex, p.xy).xyz;
+    vec3 c = tx * tx * n.x + ty * ty * n.y + tz * tz * n.z;
+    return c;
 }
 
+//==============================================================================================================================================================
+// canyon distance function
+//==============================================================================================================================================================
 vec3 tri(in vec3 x)
-    { return abs(fract(x) - 0.5); }
+{
+    vec3 q = abs(fract(x) - 0.5f);
+    return q;
+}
 
-// A fake noise looking sinusoial field - flanked by a ground plane and some walls with
-// some triangular-based perturbation mixed in. Cheap, but reasonably effective.
 float map(vec3 p)
 {    
-    vec3 w = p;                                                         // Saving the position prior to mutation.
-    vec3 op = tri(p * 1.1 + tri(p.zxy * 1.1));                          // Triangle perturbation.
-    float ground = p.y + 3.5 + dot(op, vec3(0.222)) * 0.3;              // Ground plane, slightly perturbed.
-    p += (op - 0.25) * 0.3;                                             // Adding some triangular perturbation.
-    p = cos(p * 0.315 * 1.41 + sin(p.zxy * 0.875 * 1.27));              // Applying the sinusoidal field (the rocky bit).
+    vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
+    float ground = p.z + 3.5 + dot(op, vec3(0.067));
+    p += (op - 0.25) * 0.3;
+    p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
     return min(ground, canyon);
 }
 
-vec3 doBumpMap( sampler2D tx, in vec3 p, in vec3 n, float bf)
+//==============================================================================================================================================================
+// bumped normal calculation
+//==============================================================================================================================================================
+vec3 bump_normal(in vec3 p, in vec3 n, float bf)
 {
     const vec2 e = vec2(0.0025, 0);
-    mat3 m = mat3(tex3D(tx, p - e.xyy, n), tex3D(tx, p - e.yxy, n), tex3D(tx, p - e.yyx, n));
-    vec3 g = vec3(0.299, 0.587, 0.114) * m;                             // Converting to greyscale.
-    g = (g - dot(tex3D(tx,  p , n), vec3(0.299, 0.587, 0.114))) / e.x;
-    return normalize(n + g * bf);                                       // Bumped normal. "bf" - bump factor.
+    mat3 m = mat3(tex3D(p - e.xyy, n),
+                  tex3D(p - e.yxy, n),
+                  tex3D(p - e.yyx, n));
+    vec3 g = rgb_power * m;
+    g = (g - dot(tex3D(p, n), rgb_power)) / e.x;
+    return normalize(n + g * bf);
 }
 
-float accum;
-
-// Basic raymarcher.
-float trace(in vec3 ro, in vec3 rd)
+//==============================================================================================================================================================
+// basic raymarching loop
+//==============================================================================================================================================================
+float trace(in vec3 p, in vec3 v, out float accum)
 {    
     accum = 0.0;
-    float t = 0.0, h;
+    float t = 0.0;
     for(int i = 0; i < 160; i++)
     {    
-        h = map(ro + rd * t);
-        if(abs(h) < 0.001 * (t * 0.25 + 1.0) || t > FAR) break;
-        t += h;
-        if(abs(h) < 0.25) accum += (0.25 - abs(h)) / 24.0;
+        float d = map(p + t * v);
+        float d_abs = abs(d);
+        if(d_abs < (0.001 + 0.00025 * t) || t > HORIZON) break;
+        t += d;
+        if(d_abs < 0.25) accum += 0.0417 * (0.25 - d_abs);
     }
-    return min(t, FAR);
+    return min(t, HORIZON);
 }
 
-// Ambient occlusion, for that self shadowed look. Based on the original by XT95. I love this 
-// function, and in many cases, it gives really, really nice results. For a better version, and 
-// usage, refer to XT95's examples below:
-//
-// Hemispherical SDF AO - https://www.shadertoy.com/view/4sdGWN
-// Alien Cocoons - https://www.shadertoy.com/view/MsdGz2
-
-float calculateAO2(in vec3 p, in vec3 n)
-{
-    float ao = 0.0, l;
-    const float maxDist = 2.;
-    const float nbIte = 6.0;
-    for(float i = 1.0; i < nbIte + 0.5; i++)
-    {
-        l = (i * 0.75 + fract(cos(i) * 45758.5453) * 0.25) / nbIte * maxDist;        
-        ao += (l - map(p + n * l)) / (1.0 + l);
-    }
-    return clamp(1.0 - ao / nbIte, 0.0, 1.0);
-}
-
-
-// I keep a collection of occlusion routines... OK, that sounded really nerdy. :)
-// Anyway, I like this one. I'm assuming it's based on IQ's original.
-float calculateAO(in vec3 p, in vec3 n)
+//==============================================================================================================================================================
+// ambient occlusion, ver 1
+//==============================================================================================================================================================
+float calc_ao1(in vec3 p, in vec3 n)
 {    
-    float sca = 1., occ = 0.;
-    for(float i = 0.0; i < 5.0; i++)
+    const int NB_ITER = 8;
+
+    const float magnitude_factor = 0.71f;
+    const float hstep = 0.125f;
+
+    float magnitude = 1.41f * (1.0f - magnitude_factor);
+
+    float occlusion = 0.0f;
+    float h = 0.01;
+
+    for (int i = 0; i < NB_ITER; ++i)
     {
-        float hr = 0.01 + i * 0.5 / 4.0;        
-        float dd = map(n * hr + p);
-        occ += (hr - dd) * sca;
-        sca *= 0.7;
+        float d = map(p + h * n);
+        occlusion += magnitude * (h - d);
+        magnitude *= magnitude_factor;
+        h += hstep;
     }
-    return clamp(1.0 - occ, 0.0, 1.0);    
+
+    return clamp(1.0f - occlusion, 0.0f, 1.0f);    
 }
 
-// Tetrahedral normal, to save a couple of "map" calls. Courtesy of IQ. In instances where there's no descernible 
-// aesthetic difference between it and the six tap version, it's worth using.
-vec3 calcNormal(in vec3 p)
+//==============================================================================================================================================================
+// ambient occlusion, ver 2
+//==============================================================================================================================================================
+float calc_ao2(in vec3 p, in vec3 n)
 {
-    // Note the slightly increased sampling distance, to alleviate artifacts due to hit point inaccuracies.
-    vec2 e = vec2(0.001, -0.001); 
+    const int NB_ITER = 8;
+
+    const float max_h = 3.75f;
+    const float hstep = max_h / NB_ITER;
+
+    float occlusion = 0.0f;
+    float h = hstep;
+
+    for(int i = 0; i < NB_ITER; ++i)
+    {
+        occlusion += (h - map(p + h * n)) / (0.5f + 1.0f * h);
+        h += hstep;
+    }
+
+    occlusion /= NB_ITER;
+    return clamp(1.0f - occlusion, 0.0f, 1.0f);
+}
+
+//==============================================================================================================================================================
+// tetrahedral normal
+//==============================================================================================================================================================
+vec3 calc_normal(in vec3 p)
+{
+    vec2 e = vec2(0.0125, -0.0125);
     return normalize(e.xyy * map(p + e.xyy) + e.yyx * map(p + e.yyx) + e.yxy * map(p + e.yxy) + e.xxx * map(p + e.xxx));
 }
 
-/*
-// Standard normal function. 6 taps.
-//vec3 calcNormal(in vec3 p) {
-//    const vec2 e = vec2(0.002, 0);
-    return normalize(vec3(map(p + e.xyy) - map(p - e.xyy), map(p + e.yxy) - map(p - e.yxy), map(p + e.yyx) - map(p - e.yyx)));
-}
-*/
-
-// Shadows.
-float shadows(in vec3 ro, in vec3 rd, in float start, in float end, in float k)
+//==============================================================================================================================================================
+// shadows calculation
+//==============================================================================================================================================================
+float hard_shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
 {
-    float shade = 1.0;
-    const int shadIter = 24; 
-    float dist = start;
-    //float stepDist = end/float(shadIter);
-
-    for (int i = 0; i < shadIter; i++)
+    for(float t = mint; t < maxt;)
     {
-        float h = map(ro + rd*dist);
-        shade = min(shade, k * h / dist);
-        //shade = min(shade, smoothstep(0.0, 1.0, k*h/dist)); // Subtle difference. Thanks to IQ for this tidbit.
-
-        dist += clamp(h, 0.02, 0.2);
-        
-        // There's some accuracy loss involved, but early exits from accumulative distance function can help.
-        if ((h) < 0.001 || dist > end) break; 
-    }    
-    return min(max(shade, 0.0), 1.0); 
+        float h = map(p + v * t);
+        if (h < 0.001) return 0.0f;
+        t += h;
+    }
+    return 1.0f;
 }
 
-// Very basic pseudo environment mapping... and by that, I mean it's fake. :) However, it 
-// does give the impression that the surface is reflecting the surrounds in some way.
-//
-// Anyway, the idea is very simple. Obtain the reflected (or refracted) ray at the surface hit point, then index into 
-// a repeat texture in some way. It can be pretty convincing  (in an abstract way) and facilitates environment mapping 
-// without the need for a cube map or a reflective pass.
+float soft_shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
+{
+    const float k = 8.0;
+    float res = 1.0;
+    for(float t = mint; t < maxt;)
+    {
+        float h = map(p + t * v);
+        if (h < 0.001) return 0.0;
+        res = min(res, k * h / t);
+        t += h;
+    }
+    return res;
+}
 
+
+float shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
+{
+    const float k = 8.0;
+    const int NB_ITER = 24;
+
+    float inv_maxt = 1.0 / maxt;
+    float shadow = 1.0;
+    float t = mint;
+
+
+    while(t < maxt)
+    {
+        float d = map(p + t * v);
+        float q = (maxt * d) / (maxt - t);
+        shadow = min(shadow, q);
+        t += d;
+    }
+
+    return sqrt(sqrt(max(shadow, 0.0f)));
+}
+
+//==============================================================================================================================================================
+// pseudo environment mapping...
+//==============================================================================================================================================================
 vec3 envMap(vec3 rd, vec3 n)
 {    
-    return tex3D(stone_texture, rd, n);
+    return tex3D(rd, n);
 }
 
+//==============================================================================================================================================================
+// shader entry point
+//==============================================================================================================================================================
 void main()
 {
-    vec3 lightPos = position - 140.0 * view;
-    vec3 rd = normalize(view);
-    float t = trace(position, rd);   
-    vec3 sceneCol = vec3(0.0);                                                          // Initialize the scene color.
-    
-    if(t < FAR)                                                                         // The ray has effectively hit the surface, so light it up.
-    {
-        vec3 sp = position + rd * t;                                                    // Surface position and surface normal.
-        vec3 sn = calcNormal(sp);                                                       // Voxel normal.
-        vec3 snNoBump = sn;                                                             // Sometimes, it's necessary to save a copy of the unbumped normal.
-        const float tSize0 = 0.5;
+    vec3 v = normalize(view);
+    float accum;
+    float t = trace(camera_ws, v, accum);
+    vec3 sceneCol = vec3(0.0);
 
-        sn = doBumpMap(stone_texture, sp * tSize0, sn, 0.1);                            // Texture-based bump mapping.
-        vec3 ld = lightPos - sp;                                                        // Light direction vectors.
-        float lDist = max(length(ld), 0.001);                                           // Distance from respective lights to the surface point.
-        ld /= lDist;                                                                    // Normalize the light direction vectors.
-        float shading = shadows(sp + sn * 0.005, ld, 0.05, lDist, 8.0);                 // Shadows.
-        float ao = calculateAO(sp, sn);                                                 // Ambient occlusion.
-        float atten = 1.0 / (1.0 + lDist * 0.007);                                      // Light attenuation, based on the distances above.
-        float diff = max(dot(sn, ld), 0.0);                                             // Diffuse lighting.
-        float spec = pow(max(dot(reflect(-ld, sn), -rd), 0.0), 32.0);                   // Specular lighting.
-        float fre = pow(clamp(dot(sn, rd) + 1.0, 0.0, 1.0), 1.0);                       // Fresnel term. Good for giving a surface a bit of a reflective glow.
-        float ambience = 0.35 * ao + fre * fre * 0.25;                                  // Ambient light, due to light bouncing around the the canyon.
-        vec3 texCol = tex3D(stone_texture, sp * tSize0, sn);                            // Object texturing, coloring and shading.
+    vec3 p = camera_ws + v * t;                                                     // fragment position
+    vec3 n = calc_normal(p);                                                        // fragment normal
+    vec3 b = bump_normal(p, n, 0.1);                                                // bumped normal
+    vec3 l = light_ws - p;                                                          // light direction :: from fragment to light source
+    float d = max(length(l), 0.001);                                                // distance from fragment to light
+    l /= d;                                                                         // normalized light direction
+    float sf = shadow_factor(p, l, 0.05, d);                                        // calculate shadow factor
 
-      #ifdef MOSS
-        texCol = texCol * mix(vec3(1.0), vec3(0.5, 1.5, 1.5), abs(snNoBump));           // Some quickly improvised moss.
-        texCol = texCol * mix(vec3(1.0), vec3(0.6, 1.0, 0.5), pow(abs(sn.y), 4.0));
-      #else
-        // Adding in the white frost. A bit on the cheap side, but it's a subtle effect.
-        // As you can see, it's improvised, but from a physical perspective, you want the frost to accumulate
-        // on the flatter surfaces, hence the "sn.y" factor. There's some Fresnel thrown in as well to give
-        // it a tiny bit of sparkle.
-        texCol = mix(texCol, vec3(0.35, 0.55, 1.0) * (texCol * 0.5 + 0.5) * vec3(2.0), ((snNoBump.y * 0.5 + sn.y * 0.5) * 0.5 + 0.5) * pow(abs(sn.y), 4.0) * texCol.r * fre * 4.0);
-      #endif      
+//    float sf = hard_shadow_factor(p, l, 0.05, d);
+//    float sf = soft_shadow_factor(p, l, 0.05, d);
 
-        sceneCol = texCol * (diff + spec + ambience);                                   // Final color. Pretty simple.
-        sceneCol += texCol * ((sn.y) * 0.5 + 0.5) * min(vec3(1.0, 1.15, 1.5) * accum, 1.0);     // A bit of accumulated glow.  
-        sceneCol += texCol * vec3(0.8, 0.95, 1.0) * pow(fre, 4.0) * 0.5;                // Adding a touch of Fresnel for a bit of glow.
-        vec3 sn2 = snNoBump * 0.5 + sn * 0.5;                                           // Faux environmental mapping. Adds a bit more ambience.
-        vec3 ref = reflect(rd, sn2);
-        vec3 em = envMap(0.5 * ref, sn2);
-        ref = refract(rd, sn2, 1.0 / 1.31);
-        vec3 em2 = envMap(ref / 8.0, sn2);
-        sceneCol += sceneCol * 2.0 * (sn.y * 0.25 + 0.75) * mix(em2, em, pow(fre, 4.0));
-        sceneCol *= atten * min(shading + ao * 0.35, 1.0) * ao;                         // Shading. Adding some ambient occlusion to the shadow for some fake global lighting.    
-    }
+    float ao = calc_ao2(p, b);                                                      // calculate ambient occlusion factor
+    float atten = 1.0 / (1.0 + d * 0.007);                                          // light attenuation, based on the light distance
+    float diffuse = max(dot(b, l), 0.0);                                            // diffuse lighting factor
+    float specular = pow(max(dot(reflect(-l, b), -v), 0.0), 32.0);                      // specular lighting factor
+    float fresnel = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 1.0);                     // Fresnel term for reflective reflective glow
+    float ambience = 0.35 * ao + fresnel * fresnel * 0.25;                          // ambient light factor, based on occlusion and fresnel factors
+    vec3 texCol = tex3D(p, n);                                                      // trilinear blended color from input texture
 
-    // Blend in a bit of light fog for atmospheric effect. I really wanted to put a colorful, gradient blend here, but my mind wasn't buying it, so dull, blueish grey it is. :)
-    vec3 fog = vec3(0.6, 0.8, 1.2) * (rd.y * 0.5 + 0.5);
-  #ifdef MOSS
-    fog *= vec3(1.0, 1.25, 1.5);
-  #else
-    if (hell != 0) fog *= 4.0;
-  #endif
-    sceneCol = mix(sceneCol, fog, smoothstep(0., .95, t / FAR));
+    //==========================================================================================================================================================
+    // white frost
+    //==========================================================================================================================================================
+    texCol = mix(texCol, vec3(0.35, 0.55, 1.0) * (texCol * 0.5 + 0.5) * vec3(2.0), ((n.z * 0.5 + b.z * 0.5) * 0.5 + 0.5) * pow(abs(b.z), 4.0) * texCol.r * fresnel * 4.0);
+
+    sceneCol = texCol * (diffuse + specular + ambience);                                // Final color. Pretty simple.
+    sceneCol += texCol * (0.5 + 0.5f * b.z) * min(vec3(1.0, 1.15, 1.5) * accum, 1.0);     // accumulated glow
+    sceneCol += texCol * vec3(0.4, 0., 1.0) * pow(fresnel, 4.0) * 0.5;                // Adding a touch of Fresnel for a bit of glow.
+    vec3 nn = 0.5 * (n + b);                                                        // environmental mapping
+    vec3 ref = reflect(v, nn);
+    vec3 em1 = envMap(0.500 * ref, nn);
+    ref = refract(v, nn, 0.76);
+    vec3 em2 = envMap(0.125 * ref, nn);
+    sceneCol += sceneCol * (1.5 + 0.5 * b.z) * mix(em2, em1, pow(fresnel, 4.0));
+    sceneCol *= atten * min(sf + ao * 0.35, 1.0) * ao;                         // shading + some ambient occlusion
+
+    //==========================================================================================================================================================
+    // add a bit of light fog for atmospheric effect
+    //==========================================================================================================================================================
+    vec3 fog = vec3(0.6, 0.8, 1.2) * (v.z * 0.5 + 0.5);
+    sceneCol = mix(sceneCol, fog, smoothstep(0.0f, 0.95f, t / HORIZON));
     
-  #ifndef MOSS
-    if (hell != 0)
-    {
-        float gr = dot(sceneCol, vec3(0.299, 0.587, 0.114));
-        sceneCol = sceneCol * 0.1 + pow(min(vec3(1.5, 1.0, 1.0) * gr * 1.2, 1.0), vec3(1, 3, 16));
-    }
-  #endif
-    
-    vec2 uv_n = 0.5 + 0.5 * uv;
-    sceneCol = mix(vec3(0.0, 0.1, 1.0), sceneCol, pow(16.0 * uv_n.x * uv_n.y * (1.0 - uv_n.x) * (1.0 - uv_n.y), 0.125) * 0.15 + 0.85);
-    
-    FragmentColor = vec4(sqrt(clamp(sceneCol, 0.0, 1.0)), 1.0);
+//    FragmentColor = vec4(sqrt(clamp(sceneCol, 0.0, 1.0)), 1.0);
+    FragmentColor = vec4(vec3(sf), 1.0f);
 }

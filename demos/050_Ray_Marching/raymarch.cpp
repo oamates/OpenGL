@@ -11,22 +11,20 @@
 #include "log.hpp"
 #include "constants.hpp"
 #include "gl_info.hpp"
-#include "glfw_window.hpp"
+#include "imgui_window.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
 #include "glsl_noise.hpp"
 #include "image.hpp"
 
-struct demo_window_t : public glfw_window_t
+struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
 
-    glm::vec3 mouse_pos;
     bool hell = true;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
-          mouse_pos(0.0f, 0.0f, -1.0f)
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
@@ -48,16 +46,9 @@ struct demo_window_t : public glfw_window_t
 
     void on_mouse_move() override
     {
-        mouse_pos.x = mouse.x;
-        mouse_pos.y = mouse.y;
         double norm = glm::length(mouse_delta);
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
-    }
-
-    void on_mouse_button(int button, int action, int mods) override
-    {
-        mouse_pos.z = (action == GLFW_PRESS) ? 1.0f : -1.0f;
     }
 };
 
@@ -68,8 +59,7 @@ struct demo_window_t : public glfw_window_t
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
-    // initialize GLFW library
-    // create GLFW window and initialize GLEW library
+    // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080
     //===================================================================================================================================================================================================================
     if (!glfw::init())
@@ -85,38 +75,21 @@ int main(int argc, char *argv[])
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
     ray_marcher.enable();
     uniform_t uniform_camera_matrix = ray_marcher["camera_matrix"];
+    uniform_t uniform_camera_ws = ray_marcher["camera_ws"];
+    uniform_t uniform_light_ws = ray_marcher["light_ws"];
     uniform_t uniform_time = ray_marcher["time"];
-    uniform_t uniform_hell = ray_marcher["hell"];
 
     glm::vec2 focal_scale = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
     ray_marcher["focal_scale"] = focal_scale;
-    ray_marcher["value_texture"] = 0;
-    ray_marcher["stone_texture"] = 1;
+    ray_marcher["noise_tex"] = 1;
+    ray_marcher["stone_tex"] = 2;
 
     //===================================================================================================================================================================================================================
     // Load noise textures - for very fast 2d noise calculation
     //===================================================================================================================================================================================================================
-    //    GLint samples;
-    //    glGetIntegerv(GL_SAMPLES, &samples);
-    //    glm::vec2 sample_position;
-    
-    //    debug_msg("The number of samples per pixel :: %d", samples);
-    //
-    //    for(GLuint index = 0; index < samples; ++index)
-    //    {
-    //        glGetMultisamplefv(GL_SAMPLE_POSITION, index, glm::value_ptr(sample_position));
-    //        debug_msg("GL_SAMPLE_POSITION[%d] = %s", index, glm::to_string(sample_position).c_str());
-    //    }
-    //
-    //    glEnable(GL_SAMPLE_SHADING);
-    //    glMinSampleShading(1.0f);
-
-    //===================================================================================================================================================================================================================
-    // Load noise textures - for very fast 2d noise calculation
-    //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE0);
-    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
     glActiveTexture(GL_TEXTURE1);
+    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
+    glActiveTexture(GL_TEXTURE2);
     GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
@@ -134,10 +107,29 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        glm::mat4 camera_matrix = glm::inverse(window.camera.view_matrix);
-        uniform_time = (float) glfw::time();
+        float time = window.frame_ts;
+        glm::mat4 cmatrix4x4 = glm::inverse(window.camera.view_matrix);
+        glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
+        glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
+        float t = 0; //0.25f * time;
+        glm::vec3 light_ws = 5.0f * glm::vec3(glm::cos(t), 1.25f, glm::sin(t));
+
+        //===============================================================================================================================================================================================================
+        // Show FPS
+        //===============================================================================================================================================================================================================
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+        //===============================================================================================================================================================================================================
+        // render raymarch scene
+        //===============================================================================================================================================================================================================
+        ray_marcher.enable();
+
+        uniform_time = time;
         uniform_camera_matrix = camera_matrix;
-        uniform_hell = (int) window.hell;
+        uniform_camera_ws = camera_ws;
+        uniform_light_ws = light_ws;
+
+        glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         window.end_frame();
@@ -147,6 +139,7 @@ int main(int argc, char *argv[])
     // terminate the program and exit
     //===================================================================================================================================================================================================================
     glDeleteTextures(1, &noise_tex);
+    glDeleteTextures(1, &stone_tex);
     glDeleteVertexArrays(1, &vao_id);
 
     glfw::terminate();

@@ -25,7 +25,7 @@ struct demo_window_t : public imgui_window_t
     bool hell = true;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
@@ -75,8 +75,8 @@ int main(int argc, char *argv[])
     glsl_program_t ray_marcher(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ray_marcher.cs"));
     ray_marcher.enable();
     ray_marcher["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
-    ray_marcher["tb_tex"] = 2;
-    ray_marcher["noise_tex"] = 3;
+    ray_marcher["tb_tex"] = 1;
+    ray_marcher["noise_tex"] = 2;
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
     uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
@@ -84,25 +84,33 @@ int main(int argc, char *argv[])
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
-    quad_renderer["raymarch_tex"] = 1;
+    quad_renderer["raymarch_tex"] = 3;
+
+    //===================================================================================================================================================================================================================
+    // create/load noise and ambient output textures
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE1);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+    glActiveTexture(GL_TEXTURE2);
+    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 
     //===================================================================================================================================================================================================================
     // create output textures, load texture for trilinear blend shading and generate noise texture
     //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE1);
-    GLuint output_image;
-    glGenTextures(1, &output_image);
-    glBindTexture(GL_TEXTURE_2D, output_image);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, window.res_x, window.res_y);
-    glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-
-    glActiveTexture(GL_TEXTURE2);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-
+    const int BUFFER_SIZE = 3;
+    GLuint output_image[BUFFER_SIZE];
     glActiveTexture(GL_TEXTURE3);
-    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
+    glGenTextures(BUFFER_SIZE, output_image);
+
+    for (int i = 0; i < BUFFER_SIZE; ++i)
+    {
+        glBindTexture(GL_TEXTURE_2D, output_image[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, window.res_x, window.res_y);
+    }
+
 
 
     //===================================================================================================================================================================================================================
@@ -114,6 +122,10 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
     //===================================================================================================================================================================================================================
+
+    int compute_index = BUFFER_SIZE - 1;
+    int render_index = 0;
+
     while(!window.should_close())
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -134,19 +146,29 @@ int main(int argc, char *argv[])
         // Render scene
         //===============================================================================================================================================================================================================
         ray_marcher.enable();
+        glBindImageTexture(0, output_image[compute_index], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
         uni_rm_camera_matrix = camera_matrix;
         uni_rm_camera_ws = camera_ws;
         uni_rm_light_ws = light_ws;
 
-        glDispatchCompute(window.res_x / 40, window.res_y / 40, 1);
+        glDispatchCompute(window.res_x / 20, window.res_y / 20, 1);
 
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         quad_renderer.enable();
+
         glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, output_image[render_index]);
 
         window.end_frame();
+
+        compute_index++;
+        if (compute_index == BUFFER_SIZE)
+            compute_index = 0;
+        render_index++;
+        if (render_index == BUFFER_SIZE)
+            render_index = 0;
     }
 
     //===================================================================================================================================================================================================================
