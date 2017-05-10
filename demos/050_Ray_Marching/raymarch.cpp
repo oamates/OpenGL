@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/random.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -61,11 +62,40 @@ float potential(const glm::vec3& p)
 {    
     glm::vec3 q = p;
     glm::vec3 oq = tri(1.1f * q + tri(1.1f * glm::vec3(q.z, q.x, q.y)));
-    float ground = q.z + 3.5 + glm::dot(oq, glm::vec3(0.067));
-    q += (oq - 0.25) * 0.3;
+    float ground = q.z + 3.5f + glm::dot(oq, glm::vec3(0.067));
+    q += (oq - glm::vec3(0.25f)) * 0.3f;
     q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
     float canyon = 0.95f * (glm::length(p) - 1.05f);
-    return min(ground, canyon);
+    float sphere = 11.0f - glm::length(p);
+    return glm::min(glm::min(ground, canyon), sphere);
+}
+
+glm::vec3 gradient(const glm::vec3& p)
+{
+    const float delta = 0.075f;
+
+    const glm::vec3 dX = glm::vec3(delta, 0.0f, 0.0f);
+    const glm::vec3 dY = glm::vec3(0.0f, delta, 0.0f);
+    const glm::vec3 dZ = glm::vec3(0.0f, 0.0f, delta);
+
+    glm::vec3 dF = glm::vec3
+    (
+        potential(p + dX) - potential(p - dX),
+        potential(p + dY) - potential(p - dY),
+        potential(p + dZ) - potential(p - dZ)
+    );
+
+    return glm::normalize(dF);
+}
+
+glm::vec3 move(glm::vec3& position, glm::vec3& velocity, float dt)
+{
+    glm::vec3 v0 = gradient(position);
+    glm::vec3 v1 = velocity;
+
+    glm::vec3 v = glm::normalize(v1 + dt * v0);
+    velocity = v;
+    position = position + dt * v;
 }
 
 
@@ -116,6 +146,16 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
+    glm::vec3 light_ws = glm::sphericalRand(11.0f);
+    glm::vec3 light_velocity = glm::sphericalRand(1.0f);
+    float p = potential(light_ws);
+
+    while(p < 0.5f)
+    {
+        move(light_ws, light_velocity, 0.125f);
+        p = potential(light_ws);
+    }
+
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
     //===================================================================================================================================================================================================================
@@ -125,11 +165,11 @@ int main(int argc, char *argv[])
         window.new_frame();
 
         float time = window.frame_ts;
+        move(light_ws, light_velocity, window.frame_dt);
         glm::mat4 cmatrix4x4 = glm::inverse(window.camera.view_matrix);
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
         float t = 0.25f * time;
-        glm::vec3 light_ws = 3.0f * glm::vec3(glm::cos(t), glm::sin(t), 1.25f);
 
         //===============================================================================================================================================================================================================
         // Show FPS
