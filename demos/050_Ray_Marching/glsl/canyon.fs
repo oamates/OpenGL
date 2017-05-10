@@ -17,10 +17,13 @@ const float HORIZON = 200.0;
 const vec3 rgb_power = vec3(0.299, 0.587, 0.114);
 
 //==============================================================================================================================================================
-// 3D Value noise function
+// 3D value noise function
 //==============================================================================================================================================================
 #define TEXEL_SIZE 1.0 / 256.0
 #define HALF_TEXEL 1.0 / 512.0
+
+float hermite5(float x)
+    { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
 
 vec3 hermite5(vec3 x)
     { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
@@ -47,7 +50,7 @@ vec3 tex3D(vec3 p, vec3 n)
     vec3 ty = texture(stone_tex, p.xz).xyz;
     vec3 tz = texture(stone_tex, p.xy).xyz;
     vec3 c = tx * tx * n.x + ty * ty * n.y + tz * tz * n.z;
-    return c;
+    return pow(c, vec3(0.66));
 }
 
 //==============================================================================================================================================================
@@ -59,7 +62,7 @@ vec3 tri(in vec3 x)
     return q;
 }
 
-float map(vec3 p)
+float sdf(vec3 p)
 {    
     vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
     float ground = p.z + 3.5 + dot(op, vec3(0.067));
@@ -67,6 +70,15 @@ float map(vec3 p)
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
     return min(ground, canyon);
+}
+
+//==============================================================================================================================================================
+// sdf gradient :: tetrahedral evaluation
+//==============================================================================================================================================================
+vec3 calc_normal(in vec3 p)
+{
+    vec2 e = vec2(0.0125, -0.0125);
+    return normalize(e.xyy * sdf(p + e.xyy) + e.yyx * sdf(p + e.yyx) + e.yxy * sdf(p + e.yxy) + e.xxx * sdf(p + e.xxx));
 }
 
 //==============================================================================================================================================================
@@ -92,7 +104,7 @@ float trace(in vec3 p, in vec3 v, out float accum)
     float t = 0.0;
     for(int i = 0; i < 160; i++)
     {    
-        float d = map(p + t * v);
+        float d = sdf(p + t * v);
         float d_abs = abs(d);
         if(d_abs < (0.001 + 0.00025 * t) || t > HORIZON) break;
         t += d;
@@ -118,7 +130,7 @@ float calc_ao1(in vec3 p, in vec3 n)
 
     for (int i = 0; i < NB_ITER; ++i)
     {
-        float d = map(p + h * n);
+        float d = sdf(p + h * n);
         occlusion += magnitude * (h - d);
         magnitude *= magnitude_factor;
         h += hstep;
@@ -142,7 +154,7 @@ float calc_ao2(in vec3 p, in vec3 n)
 
     for(int i = 0; i < NB_ITER; ++i)
     {
-        occlusion += (h - map(p + h * n)) / (0.5f + 1.0f * h);
+        occlusion += (h - sdf(p + h * n)) / (0.5f + 1.0f * h);
         h += hstep;
     }
 
@@ -151,40 +163,37 @@ float calc_ao2(in vec3 p, in vec3 n)
 }
 
 //==============================================================================================================================================================
-// tetrahedral normal
-//==============================================================================================================================================================
-vec3 calc_normal(in vec3 p)
-{
-    vec2 e = vec2(0.0125, -0.0125);
-    return normalize(e.xyy * map(p + e.xyy) + e.yyx * map(p + e.yyx) + e.yxy * map(p + e.yxy) + e.xxx * map(p + e.xxx));
-}
-
-//==============================================================================================================================================================
 // shadows calculation
 //==============================================================================================================================================================
-float hard_shadow_factor(in vec3 p, in vec3 l, in float mint, in float maxt)
+float hard_shadow_factor(in vec3 p, in vec3 l, in float min_t, in float max_t)
 {
-    for(float t = mint; t < maxt;)
+    float t = max_t;
+    while (t > min_t)
     {
-        float h = map(p + t * l);
+        float h = sdf(p + t * l);
         if (h < 0.001) return 0.0f;
-        t += h;
+        t -= h;
     }
     return 1.0f;
 }
 
-float soft_shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
+float soft_shadow_factor(in vec3 p, in vec3 n, in vec3 l, in float min_t, in float max_t)
 {
-    const float k = 8.0;
-    float res = 1.0;
-    for(float t = mint; t < maxt;)
+    float dp = dot(n, l);
+    if (dp < 0.0f) return 0.0f;
+
+    const float k = 32.0;
+    float f = 1.0;
+    float t = max_t;
+
+    while (t > min_t)
     {
-        float h = map(p + t * v);
+        float h = sdf(p + t * l);
         if (h < 0.001) return 0.0;
-        res = min(res, k * h / t);
-        t += h;
+        f = min(f, k * h / t);
+        t -= h;
     }
-    return res;
+    return hermite5(dp) * f;
 }
 
 
@@ -200,7 +209,7 @@ float shadow_factor(in vec3 p, in vec3 l, in float mint, in float maxt)
     int i = 0;
     while ((t < maxt) && (i < NB_ITER))
     {
-        float d = map(p + t * l);
+        float d = sdf(p + t * l);
 
         if (d < 0.95 * t)
         {
@@ -237,12 +246,9 @@ void main()
     vec3 n = calc_normal(p);                                                        // fragment normal
     vec3 b = bump_normal(p, n, 0.1);                                                // bumped normal
     vec3 l = light_ws - p;                                                          // light direction :: from fragment to light source
-    float d = max(length(l), 0.001);                                                // distance from fragment to light
+    float d = length(l);                                                            // distance from fragment to light
     l /= d;                                                                         // normalized light direction
-//    float sf = shadow_factor(p, l, 0.05, d);                                        // calculate shadow factor
-
-    float sf = hard_shadow_factor(p, l, 0.05, d);
-//    float sf = soft_shadow_factor(p, l, 0.05, d);
+    float sf = soft_shadow_factor(p, b, l, 0.05, d);                                // calculate shadow factor
 
     float ao = calc_ao2(p, b);                                                      // calculate ambient occlusion factor
     float atten = 1.0 / (1.0 + d * 0.007);                                          // light attenuation, based on the light distance
