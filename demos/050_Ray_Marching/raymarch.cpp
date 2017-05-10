@@ -52,6 +52,23 @@ struct demo_window_t : public imgui_window_t
     }
 };
 
+glm::vec3 tri(const glm::vec3& x)
+{
+    return glm::abs(glm::fract(x) - glm::vec3(0.5f));
+}
+
+float potential(const glm::vec3& p)
+{    
+    glm::vec3 q = p;
+    glm::vec3 oq = tri(1.1f * q + tri(1.1f * glm::vec3(q.z, q.x, q.y)));
+    float ground = q.z + 3.5 + glm::dot(oq, glm::vec3(0.067));
+    q += (oq - 0.25) * 0.3;
+    q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
+    float canyon = 0.95f * (glm::length(p) - 1.05f);
+    return min(ground, canyon);
+}
+
+
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -111,8 +128,8 @@ int main(int argc, char *argv[])
         glm::mat4 cmatrix4x4 = glm::inverse(window.camera.view_matrix);
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
-        float t = 0; //0.25f * time;
-        glm::vec3 light_ws = 5.0f * glm::vec3(glm::cos(t), 1.25f, glm::sin(t));
+        float t = 0.25f * time;
+        glm::vec3 light_ws = 3.0f * glm::vec3(glm::cos(t), glm::sin(t), 1.25f);
 
         //===============================================================================================================================================================================================================
         // Show FPS

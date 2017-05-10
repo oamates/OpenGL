@@ -162,11 +162,11 @@ vec3 calc_normal(in vec3 p)
 //==============================================================================================================================================================
 // shadows calculation
 //==============================================================================================================================================================
-float hard_shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
+float hard_shadow_factor(in vec3 p, in vec3 l, in float mint, in float maxt)
 {
     for(float t = mint; t < maxt;)
     {
-        float h = map(p + v * t);
+        float h = map(p + t * l);
         if (h < 0.001) return 0.0f;
         t += h;
     }
@@ -188,7 +188,7 @@ float soft_shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
 }
 
 
-float shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
+float shadow_factor(in vec3 p, in vec3 l, in float mint, in float maxt)
 {
     const float k = 8.0;
     const int NB_ITER = 24;
@@ -197,16 +197,22 @@ float shadow_factor(in vec3 p, in vec3 v, in float mint, in float maxt)
     float shadow = 1.0;
     float t = mint;
 
-
-    while(t < maxt)
+    int i = 0;
+    while ((t < maxt) && (i < NB_ITER))
     {
-        float d = map(p + t * v);
-        float q = (maxt * d) / (maxt - t);
-        shadow = min(shadow, q);
+        float d = map(p + t * l);
+
+        if (d < 0.95 * t)
+        {
+            float q = (maxt * d) / (maxt - t);
+            shadow = min(shadow, q);
+
+        }
         t += d;
+        ++i;
     }
 
-    return sqrt(sqrt(max(shadow, 0.0f)));
+    return sqrt(max(shadow, 0.0f));
 }
 
 //==============================================================================================================================================================
@@ -233,15 +239,15 @@ void main()
     vec3 l = light_ws - p;                                                          // light direction :: from fragment to light source
     float d = max(length(l), 0.001);                                                // distance from fragment to light
     l /= d;                                                                         // normalized light direction
-    float sf = shadow_factor(p, l, 0.05, d);                                        // calculate shadow factor
+//    float sf = shadow_factor(p, l, 0.05, d);                                        // calculate shadow factor
 
-//    float sf = hard_shadow_factor(p, l, 0.05, d);
+    float sf = hard_shadow_factor(p, l, 0.05, d);
 //    float sf = soft_shadow_factor(p, l, 0.05, d);
 
     float ao = calc_ao2(p, b);                                                      // calculate ambient occlusion factor
     float atten = 1.0 / (1.0 + d * 0.007);                                          // light attenuation, based on the light distance
     float diffuse = max(dot(b, l), 0.0);                                            // diffuse lighting factor
-    float specular = pow(max(dot(reflect(-l, b), -v), 0.0), 32.0);                      // specular lighting factor
+    float specular = pow(max(dot(reflect(-l, b), -v), 0.0), 32.0);                  // specular lighting factor
     float fresnel = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 1.0);                     // Fresnel term for reflective reflective glow
     float ambience = 0.35 * ao + fresnel * fresnel * 0.25;                          // ambient light factor, based on occlusion and fresnel factors
     vec3 texCol = tex3D(p, n);                                                      // trilinear blended color from input texture
@@ -268,6 +274,6 @@ void main()
     vec3 fog = vec3(0.6, 0.8, 1.2) * (v.z * 0.5 + 0.5);
     sceneCol = mix(sceneCol, fog, smoothstep(0.0f, 0.95f, t / HORIZON));
     
-//    FragmentColor = vec4(sqrt(clamp(sceneCol, 0.0, 1.0)), 1.0);
-    FragmentColor = vec4(vec3(sf), 1.0f);
+    FragmentColor = vec4(sqrt(clamp(sceneCol, 0.0, 1.0)), 1.0);
+    //FragmentColor = vec4(vec3(sf), 1.0f);
 }
