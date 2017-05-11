@@ -22,7 +22,7 @@ struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
 
-    bool hell = true;
+    bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
@@ -41,8 +41,8 @@ struct demo_window_t : public imgui_window_t
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
-        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
-            hell = !hell;
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+            pause = !pause;
     }
 
     void on_mouse_move() override
@@ -93,7 +93,7 @@ glm::vec3 move(glm::vec3& position, glm::vec3& velocity, float dt)
     glm::vec3 v0 = gradient(position);
     glm::vec3 v1 = velocity;
 
-    glm::vec3 v = glm::normalize(v1 + dt * v0);
+    glm::vec3 v = glm::normalize(v1 + v0);
     velocity = v;
     position = position + dt * v;
 }
@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE1);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
     glActiveTexture(GL_TEXTURE2);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/stone_lava.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
@@ -165,7 +165,18 @@ int main(int argc, char *argv[])
         window.new_frame();
 
         float time = window.frame_ts;
-        move(light_ws, light_velocity, window.frame_dt);
+        if (!window.pause)
+        {
+            move(light_ws, light_velocity, window.frame_dt);
+            float p = potential(light_ws);
+
+            while(p < 0.5f)
+            {
+                move(light_ws, light_velocity, 0.125f);
+                p = potential(light_ws);
+            }
+        }
+        
         glm::mat4 cmatrix4x4 = glm::inverse(window.camera.view_matrix);
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
@@ -174,7 +185,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // Show FPS
         //===============================================================================================================================================================================================================
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::Text("Application average %.3f ms/frame (%.2f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
         //===============================================================================================================================================================================================================
         // render raymarch scene

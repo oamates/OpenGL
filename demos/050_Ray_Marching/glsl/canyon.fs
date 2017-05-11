@@ -28,6 +28,12 @@ float hermite5(float x)
 vec3 hermite5(vec3 x)
     { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
 
+float hermite5(float a, float b, float x)
+{
+    float y = clamp((x - a) / (b - a), 0.0, 1.0);
+    return y * y * y * (10.0 + y * (6.0 * y - 15.0));
+}
+
 float vnoise(vec3 x)
 {
     vec3 p = floor(x);
@@ -43,7 +49,7 @@ float vnoise(vec3 x)
 //==============================================================================================================================================================
 vec3 tex3D(vec3 p, vec3 n)
 {
-    p *= 0.75;
+    p *= 0.197;
     n = max(abs(n) - 0.35f, 0.0f);
     n /= dot(n, vec3(1.0f));
     vec3 tx = texture(stone_tex, p.zy).xyz;
@@ -123,7 +129,7 @@ float calc_ao1(in vec3 p, in vec3 n)
     const float magnitude_factor = 0.71f;
     const float hstep = 0.125f;
 
-    float magnitude = 1.41f * (1.0f - magnitude_factor);
+    float magnitude = 2.37f * (1.0f - magnitude_factor);
 
     float occlusion = 0.0f;
     float h = 0.01;
@@ -165,6 +171,12 @@ float calc_ao2(in vec3 p, in vec3 n)
 //==============================================================================================================================================================
 // shadows calculation
 //==============================================================================================================================================================
+float smin2(float a, float b, float k)
+{
+    float h = clamp(0.5f + 0.5f * (b - a) / k, 0.0f, 1.0f);
+    return mix(b, a, h) - k * h * (1.0f - h);
+}
+
 float hard_shadow_factor(in vec3 p, in vec3 l, in float min_t, in float max_t)
 {
     float t = max_t;
@@ -177,51 +189,23 @@ float hard_shadow_factor(in vec3 p, in vec3 l, in float min_t, in float max_t)
     return 1.0f;
 }
 
-float soft_shadow_factor(in vec3 p, in vec3 n, in vec3 l, in float min_t, in float max_t)
+float soft_shadow_factor(in vec3 p, in vec3 n, in vec3 l, in float d)
 {
     float dp = dot(n, l);
     if (dp < 0.0f) return 0.0f;
 
-    const float k = 32.0;
-    float f = 1.0;
-    float t = max_t;
+    float t = d;
+    float f = 1.0f;
 
-    while (t > min_t)
+    while (t > 0.05f)
     {
         float h = sdf(p + t * l);
-        if (h < 0.001) return 0.0;
-        f = min(f, k * h / t);
-        t -= h;
-    }
-    return hermite5(dp) * f;
-}
-
-
-float shadow_factor(in vec3 p, in vec3 l, in float mint, in float maxt)
-{
-    const float k = 8.0;
-    const int NB_ITER = 24;
-
-    float inv_maxt = 1.0 / maxt;
-    float shadow = 1.0;
-    float t = mint;
-
-    int i = 0;
-    while ((t < maxt) && (i < NB_ITER))
-    {
-        float d = sdf(p + t * l);
-
-        if (d < 0.95 * t)
-        {
-            float q = (maxt * d) / (maxt - t);
-            shadow = min(shadow, q);
-
-        }
-        t += d;
-        ++i;
+        if (h < 0.00125f) return 0.0f;
+        f = min(f, hermite5(4.0f * h / t));
+        t = t - clamp(0.0f, 0.7f, h);
     }
 
-    return sqrt(max(shadow, 0.0f));
+    return hermite5(dp) * f / (f + 0.125f);
 }
 
 //==============================================================================================================================================================
@@ -244,18 +228,18 @@ void main()
 
     vec3 p = camera_ws + v * t;                                                     // fragment position
     vec3 n = calc_normal(p);                                                        // fragment normal
-    vec3 b = bump_normal(p, n, 0.1);                                                // bumped normal
+    vec3 b = bump_normal(p, n, 0.0175);                                             // bumped normal
     vec3 l = light_ws - p;                                                          // light direction :: from fragment to light source
     float d = length(l);                                                            // distance from fragment to light
     l /= d;                                                                         // normalized light direction
-    float sf = soft_shadow_factor(p, b, l, 0.05, d);                                // calculate shadow factor
+    float sf = soft_shadow_factor(p, b, l, d);                                      // calculate shadow factor
 
-    float ao = calc_ao2(p, b);                                                      // calculate ambient occlusion factor
+    float ao = calc_ao1(p, b);                                                      // calculate ambient occlusion factor
     float atten = 1.0 / (1.0 + d * 0.007);                                          // light attenuation, based on the light distance
     float diffuse = max(dot(b, l), 0.0);                                            // diffuse lighting factor
     float specular = pow(max(dot(reflect(-l, b), -v), 0.0), 32.0);                  // specular lighting factor
-    float fresnel = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 1.0);                     // Fresnel term for reflective reflective glow
-    float ambience = 0.35 * ao + fresnel * fresnel * 0.25;                          // ambient light factor, based on occlusion and fresnel factors
+    float fresnel = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 1.0);                     // Fresnel term for reflective glow
+    float ambience = (0.35 * ao + fresnel * fresnel * 0.25);                          // ambient light factor, based on occlusion and fresnel factors
     vec3 texCol = tex3D(p, n);                                                      // trilinear blended color from input texture
 
     //==========================================================================================================================================================
@@ -263,16 +247,16 @@ void main()
     //==========================================================================================================================================================
     texCol = mix(texCol, vec3(0.35, 0.55, 1.0) * (texCol * 0.5 + 0.5) * vec3(2.0), ((n.z * 0.5 + b.z * 0.5) * 0.5 + 0.5) * pow(abs(b.z), 4.0) * texCol.r * fresnel * 4.0);
 
-    sceneCol = texCol * (diffuse + specular + ambience);                                // Final color. Pretty simple.
-    sceneCol += texCol * (0.5 + 0.5f * b.z) * min(vec3(1.0, 1.15, 1.5) * accum, 1.0);     // accumulated glow
-    sceneCol += texCol * vec3(0.4, 0., 1.0) * pow(fresnel, 4.0) * 0.5;                // Adding a touch of Fresnel for a bit of glow.
-    vec3 nn = 0.5 * (n + b);                                                        // environmental mapping
+    sceneCol = texCol * (diffuse + specular + ambience);                                    // final color
+    sceneCol += texCol * (0.5 + 0.5f * b.z) * min(vec3(1.0, 1.15, 1.5) * accum, 1.0);       // accumulated glow
+    sceneCol += texCol * vec3(0.4, 0., 1.0) * pow(fresnel, 4.0) * 0.5;                      // Fresnel glow
+    vec3 nn = 0.5 * (n + b);                                                                // environment mapping
     vec3 ref = reflect(v, nn);
     vec3 em1 = envMap(0.500 * ref, nn);
     ref = refract(v, nn, 0.76);
     vec3 em2 = envMap(0.125 * ref, nn);
     sceneCol += sceneCol * (1.5 + 0.5 * b.z) * mix(em2, em1, pow(fresnel, 4.0));
-    sceneCol *= atten * min(sf + ao * 0.35, 1.0) * ao;                         // shading + some ambient occlusion
+    sceneCol *= atten * min(sf + ao * 0.35, 1.0) * ao * (0.0625 + 0.9375 * sf);                              // shading + some ambient occlusion
 
     //==========================================================================================================================================================
     // add a bit of light fog for atmospheric effect
@@ -280,6 +264,6 @@ void main()
     vec3 fog = vec3(0.6, 0.8, 1.2) * (v.z * 0.5 + 0.5);
     sceneCol = mix(sceneCol, fog, smoothstep(0.0f, 0.95f, t / HORIZON));
     
-    FragmentColor = vec4(sqrt(clamp(sceneCol, 0.0, 1.0)), 1.0);
+    FragmentColor = vec4(pow(clamp(sceneCol, 0.0f, 1.0f), vec3(0.66f)), 1.0f);
     //FragmentColor = vec4(vec3(sf), 1.0f);
 }
