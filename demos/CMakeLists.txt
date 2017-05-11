@@ -80,21 +80,3 @@ ELSE()
     message("DEMO 098 :: x264 video encoder will not be built.")
     message("DEMO 099 :: Video player example will not be built.")
 ENDIF()
-
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# old stuff slowly moving up
-#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#add_subdirectory (009_Instanced_Draw)
-#add_subdirectory (010_Spherical_Triangles)
-#add_subdirectory (011_Quad_Tesselation)
-#add_subdirectory (020_Hyperbolic_Space)
-#add_subdirectory (021_Rendering_to_Texture)
-#add_subdirectory (029_Black_Holes)
-#add_subdirectory (035_Environment_Map_GL_TEXTURE_CUBE_MAP)
-#add_subdirectory (037_GL_TEXTURE_3D)
-#add_subdirectory (038_Transform_Feedback)
-#add_subdirectory (039_Cubemap_Shadows)
-#add_subdirectory (043_DDS_Texture_Loader)
-#add_subdirectory (044_OBJ_Transform)
-
-                               
