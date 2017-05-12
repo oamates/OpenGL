@@ -9,3 +9,4 @@ link_directories("${VULKAN_SDK}/lib")
 link_directories("${VULKAN_SDK}/etc/explicit_layer.d")
 
 add_subdirectory (001_Vulkan_Instance)
+add_subdirectory (002_VAO)

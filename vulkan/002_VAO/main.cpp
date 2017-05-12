@@ -15,6 +15,56 @@
 
 #include "log.hpp"
 
+//========================================================================================================================================================================================================================
+// Fixed-size harcoded vertex buffer
+//========================================================================================================================================================================================================================
+
+#include <glm/glm.hpp>
+
+struct vertex_t
+{
+    glm::vec2 pos;
+    glm::vec3 color;
+
+    static VkVertexInputBindingDescription getBindingDescription()
+    {
+
+        VkVertexInputBindingDescription bindingDescription = 
+        {
+            .binding = 0,
+            .stride = sizeof(vertex_t),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+        };
+
+        return bindingDescription;
+    }
+
+    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+    {
+        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+        return attributeDescriptions;
+    }
+};
+
+const vertex_t vertices[] = 
+{
+    {glm::vec2( 0.0f, -0.5f), glm::vec3(1.0f, 0.0f, 0.0f)},
+    {glm::vec2( 0.5f,  0.5f), glm::vec3(0.0f, 1.0f, 0.0f)},
+    {glm::vec2(-0.5f,  0.5f), glm::vec3(0.0f, 0.0f, 1.0f)}
+};
+
+
+
+
+
+
+
 const bool enableValidationLayers = false;
 
 const std::vector<const char*> validationLayers =
