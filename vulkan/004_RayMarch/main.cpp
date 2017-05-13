@@ -1,9 +1,17 @@
 //========================================================================================================================================================================================================================
-// VULKAN DEMO 001 : Rendering triangle
+// VULKAN DEMO 003 : UBO
 //========================================================================================================================================================================================================================
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#define GLM_FORCE_RADIANS 
+#define GLM_FORCE_NO_CTOR_INIT
+ 
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/random.hpp>
 
 #include <stdexcept>
 #include <functional>
@@ -13,102 +21,65 @@
 #include <cstring>
 #include <set>
 
+#include "constants.hpp"
+#include "camera.hpp"
 #include "log.hpp"
-
-//========================================================================================================================================================================================================================
-// Fixed-size harcoded vertex buffer
-//========================================================================================================================================================================================================================
-
-#include <glm/glm.hpp>
-
-struct vertex_t
-{
-    glm::vec2 pos;
-    glm::vec3 color;
-
-    static VkVertexInputBindingDescription getBindingDescription()
-    {
-
-        VkVertexInputBindingDescription bindingDescription = 
-        {
-            .binding = 0,
-            .stride = sizeof(vertex_t),
-            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
-        };
-
-        return bindingDescription;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
-    {
-        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
-
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(vertex_t, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(vertex_t, color);
-
-        return attributeDescriptions;
-    }
-};
-
-const vertex_t vertices[] = 
-{
-    {glm::vec2( 0.0f, -0.5f), glm::vec3(1.0f, 1.0f, 0.0f)},
-    {glm::vec2( 0.5f,  0.5f), glm::vec3(0.0f, 1.0f, 1.0f)},
-    {glm::vec2(-0.5f,  0.5f), glm::vec3(1.0f, 0.0f, 1.0f)}
-};
-
-
-
-
-
-
 
 const bool enableValidationLayers = false;
 
-const std::vector<const char*> validationLayers =
-{
-    "VK_LAYER_LUNARG_standard_validation"
-};
+//========================================================================================================================================================================================================================
+// camera variables and input handlers
+//========================================================================================================================================================================================================================
 
-const std::vector<const char*> deviceExtensions =
-{
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-};
+camera_t camera;
 
-VkResult CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
-{
-    PFN_vkCreateDebugReportCallbackEXT func = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-    return func ? func(instance, pCreateInfo, pAllocator, pCallback) : VK_ERROR_EXTENSION_NOT_PRESENT;
+double frame_ts, mouse_ts;
+double frame_dt = 0.0, mouse_dt = 0.0;
+
+glm::dvec2 mouse = glm::dvec2(0.0);
+glm::dvec2 mouse_delta = glm::dvec2(0.0);
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{   
+    if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
+    else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
+    else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
+    else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 }
 
-void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator)
+void mouse_move_callback(GLFWwindow* window, double x, double y)
 {
-    PFN_vkDestroyDebugReportCallbackEXT func = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-    if (func) func(instance, callback, pAllocator);
+    double t = glfwGetTime();
+    glm::dvec2 mouse_np = glm::dvec2(x, y);
+    mouse_delta = mouse_np - mouse;
+    mouse = mouse_np;
+    mouse_dt = t - mouse_ts;
+    mouse_ts = t;
+
+    double norm = glm::length(mouse_delta);
+    if (norm > 0.01)
+        camera.rotateXY(mouse_delta / norm, norm * frame_dt);
 }
+
+//========================================================================================================================================================================================================================
+// vulkan resource handling helper
+//========================================================================================================================================================================================================================
 
 template <typename T> struct VDeleter
 {
     T object{VK_NULL_HANDLE};
-    std::function<void(T)> deleter;
+    std::function<void(T)> delete_func;
 
     VDeleter() : VDeleter([](T, VkAllocationCallbacks*) {}) {}
 
-    VDeleter(std::function<void(T, VkAllocationCallbacks*)> deletef)
-        { this->deleter = [=](T obj) { deletef(obj, 0); }; }
+    VDeleter(std::function<void(T, VkAllocationCallbacks*)> func)
+        { delete_func = [=](T obj) { func(obj, 0); }; }
 
-    VDeleter(const VDeleter<VkInstance>& instance, std::function<void(VkInstance, T, VkAllocationCallbacks*)> deletef)
-        { this->deleter = [&instance, deletef](T obj) { deletef(instance, obj, 0); }; }
+    VDeleter(const VDeleter<VkInstance>& instance, std::function<void(VkInstance, T, VkAllocationCallbacks*)> func)
+        { delete_func = [&instance, func](T obj) { func(instance, obj, 0); }; }
 
-    VDeleter(const VDeleter<VkDevice>& device, std::function<void(VkDevice, T, VkAllocationCallbacks*)> deletef)
-        { this->deleter = [&device, deletef](T obj) { deletef(device, obj, 0); }; }
+    VDeleter(const VDeleter<VkDevice>& device, std::function<void(VkDevice, T, VkAllocationCallbacks*)> func)
+        { delete_func = [&device, func](T obj) { func(device, obj, 0); }; }
 
     ~VDeleter()
         { cleanup(); }
@@ -138,10 +109,48 @@ template <typename T> struct VDeleter
     void cleanup()
     {
         if (object == VK_NULL_HANDLE) return;
-        deleter(object);
+        delete_func(object);
         object = VK_NULL_HANDLE;
     }
 };
+
+
+
+//========================================================================================================================================================================================================================
+// uniform variables packed into a buffer object
+//========================================================================================================================================================================================================================
+
+struct UniformBufferObject
+{
+    glm::mat3 camera_matrix;
+    glm::vec3 camera_ws;
+    glm::vec3 light_ws;
+    glm::vec2 focal_scale;
+    float time;
+};
+
+
+const std::vector<const char*> validationLayers =
+{
+    "VK_LAYER_LUNARG_standard_validation"
+};
+
+const std::vector<const char*> deviceExtensions =
+{
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
+VkResult CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
+{
+    PFN_vkCreateDebugReportCallbackEXT func = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    return func ? func(instance, pCreateInfo, pAllocator, pCallback) : VK_ERROR_EXTENSION_NOT_PRESENT;
+}
+
+void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator)
+{
+    PFN_vkDestroyDebugReportCallbackEXT func = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    if (func) func(instance, callback, pAllocator);
+}
 
 struct QueueFamilyIndices
 {
@@ -186,6 +195,7 @@ struct GLFWVulkanApplication
     std::vector<VDeleter<VkFramebuffer>> swapChainFramebuffers;
     
     VDeleter<VkRenderPass> renderPass {device, vkDestroyRenderPass};
+    VDeleter<VkDescriptorSetLayout> descriptorSetLayout {device, vkDestroyDescriptorSetLayout};
     VDeleter<VkPipelineLayout> pipelineLayout {device, vkDestroyPipelineLayout};
     VDeleter<VkPipeline> graphicsPipeline {device, vkDestroyPipeline};
     
@@ -195,16 +205,26 @@ struct GLFWVulkanApplication
     VDeleter<VkSemaphore> imageAvailableSemaphore {device, vkDestroySemaphore};
     VDeleter<VkSemaphore> renderFinishedSemaphore {device, vkDestroySemaphore};
 
-    VDeleter<VkBuffer> vertexBuffer {device, vkDestroyBuffer};
-    VDeleter<VkDeviceMemory> vertexBufferMemory {device, vkFreeMemory};    
+    VDeleter<VkBuffer> uniformStagingBuffer {device, vkDestroyBuffer};
+    VDeleter<VkDeviceMemory> uniformStagingBufferMemory {device, vkFreeMemory};
+    VDeleter<VkBuffer> uniformBuffer {device, vkDestroyBuffer};
+    VDeleter<VkDeviceMemory> uniformBufferMemory {device, vkFreeMemory};
 
     void initWindow()
     {
+        int res_x = 1280;
+        int res_y = 1024;
+
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        window = glfwCreateWindow(1280, 1024, "Vulkan", 0, 0);
+        window = glfwCreateWindow(res_x, res_y, "Vulkan", 0, 0);
         glfwSetWindowUserPointer(window, this);
         glfwSetWindowSizeCallback(window, GLFWVulkanApplication::onWindowResized);
+        glfwSetKeyCallback(window, key_callback);
+        glfwSetCursorPosCallback(window, mouse_move_callback);
+
+        mouse_ts = frame_ts = glfwGetTime();
+        camera.infinite_perspective(constants::two_pi / 6.0f, float(res_x) / float(res_y), 0.5f);
     }
 
     void initVulkan()
@@ -217,12 +237,160 @@ struct GLFWVulkanApplication
         createSwapChain();
         createImageViews();
         createRenderPass();
+        createDescriptorSetLayout();
         createGraphicsPipeline();
         createFramebuffers();
+        createUniformBuffer();
         createCommandPool();
-        createVertexBuffer();
         createCommandBuffers();
         createSemaphores();
+    }
+
+    void updateUniformBuffer()
+    {
+        static glm::vec3 light_ws = glm::sphericalRand(14.0);
+        if (light_ws.z < 0) light_ws.z = -light_ws.z;
+
+
+        float time = glfwGetTime();
+        glm::mat4 cmatrix4x4 = glm::inverse(camera.view_matrix);
+        glm::vec2 focal_scale = glm::vec2(1.0f / camera.projection_matrix[0][0], 1.0f / camera.projection_matrix[1][1]);
+
+        UniformBufferObject ubo;
+        ubo.camera_matrix = glm::mat3(cmatrix4x4);
+        ubo.camera_ws = glm::vec3(cmatrix4x4[3]);
+        ubo.light_ws = light_ws,
+        ubo.focal_scale = focal_scale;
+        ubo.time = time;
+
+        void* data;
+        vkMapMemory(device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+        memcpy(data, &ubo, sizeof(ubo));
+        vkUnmapMemory(device, uniformStagingBufferMemory);
+
+        copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(ubo));        
+    };
+
+    void createDescriptorSetLayout()
+    {
+        VkDescriptorSetLayoutBinding uboLayoutBinding = 
+        {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = 0
+        };
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo =
+        {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext = 0,
+            .flags = 0,
+            .bindingCount = 1,
+            .pBindings = &uboLayoutBinding
+        };
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, 0, descriptorSetLayout.replace()) != VK_SUCCESS)
+            throw std::runtime_error("failed to create descriptor set layout!");
+    }
+
+    //====================================================================================================================================================================================================================
+    // buffer helper functions
+    //====================================================================================================================================================================================================================
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VDeleter<VkBuffer>& buffer, VDeleter<VkDeviceMemory>& bufferMemory)
+    {
+        VkBufferCreateInfo bufferInfo = 
+        {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .pNext = 0,
+            .flags = 0,
+            .size = size,
+            .usage = usage,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 0,
+            .pQueueFamilyIndices = 0
+        };
+
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, buffer.replace()) != VK_SUCCESS)
+            throw std::runtime_error("failed to create buffer!");
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo = 
+        {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = 0,
+            .allocationSize = memRequirements.size,
+            .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
+        };
+
+        if (vkAllocateMemory(device, &allocInfo, nullptr, bufferMemory.replace()) != VK_SUCCESS)
+            throw std::runtime_error("failed to allocate buffer memory!");
+
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
+
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+    {
+        VkCommandBufferAllocateInfo allocInfo = 
+        {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .pNext = 0,
+            .commandPool = commandPool,
+            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1
+        };
+
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+        VkCommandBufferBeginInfo beginInfo = 
+        {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .pNext = 0,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+            .pInheritanceInfo = 0
+        };
+
+        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+        VkBufferCopy copyRegion = 
+        {
+            .srcOffset = 0,
+            .dstOffset = 0,
+            .size = size
+        };
+        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo = 
+        {
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .pNext = 0,
+            .waitSemaphoreCount = 0, 
+            .pWaitSemaphores = 0,
+            .pWaitDstStageMask = 0,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffer,
+            .signalSemaphoreCount = 0,
+            .pSignalSemaphores = 0
+        };
+
+        vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(graphicsQueue);
+
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+    }
+
+    void createUniformBuffer()
+    {
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformStagingBuffer, uniformStagingBufferMemory);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uniformBuffer, uniformBufferMemory);
     }
 
     static void onWindowResized(GLFWwindow* window, int width, int height)
@@ -521,8 +689,8 @@ struct GLFWVulkanApplication
 
     void createGraphicsPipeline()
     {
-        std::vector<char> vertShaderCode = readFile("glsl/triangle.vs.spv");
-        std::vector<char> fragShaderCode = readFile("glsl/triangle.fs.spv");
+        std::vector<char> vertShaderCode = readFile("glsl/ray_marcher.vs.spv");
+        std::vector<char> fragShaderCode = readFile("glsl/canyon.fs.spv");
 
         VDeleter<VkShaderModule> vertShaderModule{device, vkDestroyShaderModule};
         VDeleter<VkShaderModule> fragShaderModule{device, vkDestroyShaderModule};
@@ -553,20 +721,15 @@ struct GLFWVulkanApplication
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-
-
-        VkVertexInputBindingDescription bindingDescription = vertex_t::getBindingDescription();
-        std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = vertex_t::getAttributeDescriptions();
-
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = 
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = 0,
             .flags = 0,
-            .vertexBindingDescriptionCount = 1,
-            .pVertexBindingDescriptions = &bindingDescription,
-            .vertexAttributeDescriptionCount = attributeDescriptions.size(),
-            .pVertexAttributeDescriptions = attributeDescriptions.data()
+            .vertexBindingDescriptionCount = 0,
+            .pVertexBindingDescriptions = 0,
+            .vertexAttributeDescriptionCount = 0,
+            .pVertexAttributeDescriptions = 0
         };
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = 
@@ -660,13 +823,15 @@ struct GLFWVulkanApplication
             .blendConstants = {0.0f, 0.0f, 0.0f, 0.0f}
         };
 
+        VkDescriptorSetLayout setLayouts[] = {descriptorSetLayout};
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = 
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = 0,
             .flags = 0,
-            .setLayoutCount = 0,
-            .pSetLayouts = 0,
+            .setLayoutCount = 1,
+            .pSetLayouts = setLayouts,
             .pushConstantRangeCount = 0,
             .pPushConstantRanges = 0
         };
@@ -759,46 +924,6 @@ struct GLFWVulkanApplication
         throw std::runtime_error("failed to find suitable memory type!");
     }
 
-    void createVertexBuffer()
-    {
-        VkBufferCreateInfo bufferInfo = 
-        {
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .pNext = 0,
-            .flags = 0,
-            .size = sizeof(vertices),
-            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 0,
-            .pQueueFamilyIndices = 0
-        };
-
-        if (vkCreateBuffer(device, &bufferInfo, 0, vertexBuffer.replace()) != VK_SUCCESS)
-            throw std::runtime_error("failed to create vertex buffer!");
-
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo = 
-        {
-            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-            .pNext = 0,
-            .allocationSize = memRequirements.size,
-            .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-        };
-
-        if (vkAllocateMemory(device, &allocInfo, 0, vertexBufferMemory.replace()) != VK_SUCCESS)
-            throw std::runtime_error("failed to allocate vertex buffer memory!");
-
-        vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
-
-        void* data;
-        vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
-        memcpy(data, vertices, sizeof(vertices));
-        vkUnmapMemory(device, vertexBufferMemory);
-
-    }    
-
     void createCommandBuffers()
     {
         if (commandBuffers.size() > 0)
@@ -852,12 +977,9 @@ struct GLFWVulkanApplication
             };
 
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-            VkBuffer vertexBuffers[] = {vertexBuffer};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-            vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);            
+            vkCmdDraw(commandBuffers[i], 4, 1, 0, 0);
+            vkCmdEndRenderPass(commandBuffers[i]);
 
             if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS)
                 throw std::runtime_error("failed to record command buffer!");
@@ -1167,6 +1289,7 @@ int main(int argc, char *argv[])
         while (!glfwWindowShouldClose(application.window))
         {
             glfwPollEvents();
+            application.updateUniformBuffer();
             application.drawFrame();
         }
 

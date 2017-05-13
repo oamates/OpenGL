@@ -8,5 +8,7 @@ include_directories("${VULKAN_SDK}/include")
 link_directories("${VULKAN_SDK}/lib") 
 link_directories("${VULKAN_SDK}/etc/explicit_layer.d")
 
-add_subdirectory (001_Vulkan_Instance)
+add_subdirectory (001_First_Triangle)
 add_subdirectory (002_VAO)
+add_subdirectory (003_UBO)
+add_subdirectory (004_RayMarch)
