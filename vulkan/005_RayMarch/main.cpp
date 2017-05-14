@@ -4,6 +4,7 @@
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include <iostream>
 #include <stdexcept>
@@ -17,7 +18,42 @@
 #include <set>
 
 #include "log.hpp"
+#include "constants.hpp"
+#include "camera.hpp"
 #include "image/stb_image.h"
+
+//========================================================================================================================================================================================================================
+// camera-related variables
+//========================================================================================================================================================================================================================
+
+camera_t camera;
+
+double frame_ts, mouse_ts;
+double frame_dt = 0.0f, mouse_dt = 0.0f;
+
+glm::dvec2 mouse = glm::dvec2(0.0);
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
+    else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
+    else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
+    else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);  
+}
+
+void mouse_move_callback(GLFWwindow* window, double x, double y)
+{
+    double t = glfwGetTime();
+    glm::dvec2 mouse_np = glm::dvec2(x, y);
+    glm::dvec2 mouse_delta = mouse_np - mouse;
+    mouse = mouse_np;
+    mouse_dt = t - mouse_ts;
+    mouse_ts = t;
+    mouse_delta.y = -mouse_delta.y;
+    double norm = glm::length(mouse_delta);
+    if (norm > 0.01)
+        camera.rotateXY(mouse_delta / norm, norm * frame_dt);
+}
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_LUNARG_standard_validation"
@@ -114,68 +150,11 @@ struct SwapChainSupportDetails
     std::vector<VkPresentModeKHR> presentModes;
 };
 
-struct vertex_t 
-{
-    glm::vec2 pos;
-    glm::vec3 color;
-    glm::vec2 uv;
-
-    static VkVertexInputBindingDescription getBindingDescription()
-    {
-        VkVertexInputBindingDescription bindingDescription = {};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(vertex_t);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions()
-    {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = 
-        {
-            VkVertexInputAttributeDescription
-            {
-                .location = 0,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = offsetof(vertex_t, pos)
-            },
-            VkVertexInputAttributeDescription
-            {
-                .location = 1,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = offsetof(vertex_t, color)
-            },
-            VkVertexInputAttributeDescription
-            {
-                .location = 2,
-                .binding = 0,
-                .format = VK_FORMAT_R32G32_SFLOAT,
-                .offset = offsetof(vertex_t, uv)
-            }
-        };
-
-        return attributeDescriptions;
-    }
-};
-
 struct UniformBufferObject 
 {
-    glm::mat3 camera_matrix;
-    glm::vec3 camera_ws;
-    glm::vec3 light_ws;
+    glm::mat4 camera_matrix;
+    glm::vec4 light_ws;
     glm::vec2 focal_scale;
-    float time;
-};
-
-const std::vector<vertex_t> vertices = 
-{
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{-0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-    {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}
 };
 
 struct GLFWVulkanApplication 
@@ -229,16 +208,25 @@ struct GLFWVulkanApplication
 
     void initWindow()
     {
-        const int res_x = 1280;
-        const int res_y = 1024;
+        const int res_x = 1920;
+        const int res_y = 1080;
 
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        window = glfwCreateWindow(res_x, res_y, "Vulkan Ray Marcher", 0, 0);
+        window = glfwCreateWindow(res_x, res_y, "Vulkan Ray Marcher", glfwGetPrimaryMonitor(), 0);
 
         glfwSetWindowUserPointer(window, this);
         glfwSetWindowSizeCallback(window, GLFWVulkanApplication::onWindowResized);
+
+        glfwSetCursorPos(window, 0.5 * res_x, 0.5 * res_y);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetCursorPosCallback(window, mouse_move_callback);
+        glfwSetKeyCallback(window, key_callback);
+
+        camera.infinite_perspective(constants::two_pi / 6.0f, float(res_x) / float(res_y), 0.5f);
+        mouse_ts = frame_ts = glfwGetTime();
+
     }
 
     void initVulkan()
@@ -258,7 +246,6 @@ struct GLFWVulkanApplication
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        createVertexBuffer();
         createUniformBuffer();
         createDescriptorPool();
         createDescriptorSet();
@@ -444,7 +431,7 @@ struct GLFWVulkanApplication
     void createTextureImage()
     {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load("../../../resources/tex2d/gold_tile.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load("../../../resources/tex2d/moss.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         if (!pixels)
             throw std::runtime_error("failed to load texture image!");
 
@@ -868,18 +855,15 @@ struct GLFWVulkanApplication
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-        VkVertexInputBindingDescription bindingDescription = vertex_t::getBindingDescription();
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = vertex_t::getAttributeDescriptions();
-
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = 
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = 0,
             .flags = 0,
-            .vertexBindingDescriptionCount = 1,
-            .pVertexBindingDescriptions = &bindingDescription,
-            .vertexAttributeDescriptionCount = attributeDescriptions.size(),
-            .pVertexAttributeDescriptions = attributeDescriptions.data()
+            .vertexBindingDescriptionCount = 0,
+            .pVertexBindingDescriptions = 0,
+            .vertexAttributeDescriptionCount = 0,
+            .pVertexAttributeDescriptions = 0
         };        
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = 
@@ -1056,23 +1040,6 @@ struct GLFWVulkanApplication
 
         if (vkCreateCommandPool(device, &poolInfo, 0, commandPool.replace()) != VK_SUCCESS)
             throw std::runtime_error("failed to create command pool!");
-    }
-
-    void createVertexBuffer() 
-    {
-        VkDeviceSize bufferSize = sizeof(vertex_t) * vertices.size();
-
-        VDeleter<VkBuffer> stagingBuffer{device, vkDestroyBuffer};
-        VDeleter<VkDeviceMemory> stagingBufferMemory{device, vkFreeMemory};
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
     }
 
     void createUniformBuffer()
@@ -1336,20 +1303,19 @@ struct GLFWVulkanApplication
 
     void updateUniformBuffer()
     {
-        UniformBufferObject ubo;
+        float time = glfwGetTime();
 
-        ubo.camera_matrix = glm::mat3(1.0f);
-        ubo.camera_ws = glm::vec3(0.0f);
-        ubo.light_ws = glm::vec3(0.0f);
-        ubo.focal_scale = glm::vec2(1.0f);
-        ubo.time = glfwGetTime();
+        UniformBufferObject ubo;
+        ubo.camera_matrix = glm::inverse(camera.view_matrix);
+        ubo.light_ws = glm::vec4(12.0f, 0.0f, 0.0f, time);
+        ubo.focal_scale = glm::vec2(1.0f / camera.projection_matrix[0][0], 1.0f / camera.projection_matrix[1][1]);
 
         void* data;
-        vkMapMemory(device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
-        memcpy(data, &ubo, sizeof(ubo));
+        vkMapMemory(device, uniformStagingBufferMemory, 0, sizeof(UniformBufferObject), 0, &data);
+        memcpy(data, &ubo, sizeof(UniformBufferObject));
         vkUnmapMemory(device, uniformStagingBufferMemory);
 
-        copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(ubo));
+        copyBuffer(uniformStagingBuffer, uniformBuffer, sizeof(UniformBufferObject));
     }
 
     void drawFrame()
@@ -1411,8 +1377,6 @@ struct GLFWVulkanApplication
         if (result != VK_SUCCESS)
             throw std::runtime_error("failed to present swap chain image!");
     }
-
-
 
     void createShaderModule(const std::vector<char>& code, VDeleter<VkShaderModule>& shaderModule)
     {
@@ -1640,6 +1604,10 @@ int main(int argc, char *argv[])
 
         while (!glfwWindowShouldClose(application.window))
         {
+            double t = glfwGetTime();
+            frame_dt = t - frame_ts;
+            frame_ts = t;
+
             glfwPollEvents();
             application.updateUniformBuffer();
             application.drawFrame();
