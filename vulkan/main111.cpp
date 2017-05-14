@@ -17,7 +17,38 @@
 #include <set>
 
 #include "log.hpp"
+#include "constants.hpp"
 #include "image/stb_image.h"
+#include "camera.hpp"
+
+camera_t camera;
+
+double frame_ts, mouse_ts;
+double frame_dt = 0.0f, mouse_dt = 0.0f;
+
+glm::dvec2 mouse = glm::dvec2(0.0);
+glm::dvec2 mouse_delta  = glm::dvec2(0.0);
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
+    else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
+    else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
+    else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);  
+}
+
+void mouse_move_callback(GLFWwindow* window, double x, double y)
+{
+    double t = glfwGetTime();
+    glm::dvec2 mouse_np = glm::dvec2(x, y);
+    mouse_delta = mouse_np - mouse;
+    mouse = mouse_np;
+    mouse_dt = t - mouse_ts;
+    mouse_ts = t;
+        double norm = glm::length(mouse_delta);
+        if (norm > 0.01)
+            camera.rotateXY(mouse_delta / norm, norm * frame_dt);
+}
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_LUNARG_standard_validation"
@@ -180,7 +211,7 @@ const std::vector<vertex_t> vertices =
 
 const std::vector<uint16_t> indices = 
 {
-    0, 2, 1, 3, 2, 0
+    0, 1, 2, 2, 3, 0
 };
 
 struct GLFWVulkanApplication 
@@ -236,16 +267,24 @@ struct GLFWVulkanApplication
 
     void initWindow()
     {
-        const int res_x = 1280;
-        const int res_y = 1024;
+        int res_x = 1280;
+        int res_y = 1024;
 
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
-        window = glfwCreateWindow(res_x, res_y, "Vulkan Ray Marcher", 0, 0);
+        window = glfwCreateWindow(res_x, res_y, "Vulkan", 0, 0);
 
         glfwSetWindowUserPointer(window, this);
         glfwSetWindowSizeCallback(window, GLFWVulkanApplication::onWindowResized);
+
+        glfwSetCursorPos(window, 0.5 * res_x, 0.5 * res_y);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        glfwSetCursorPosCallback(window, mouse_move_callback);
+        glfwSetKeyCallback(window, key_callback);
+
+        camera.infinite_perspective(constants::two_pi / 6.0f, float(res_x) / float(res_y), 0.5f);
+        mouse_ts = frame_ts = glfwGetTime();
     }
 
     void initVulkan()
@@ -1125,7 +1164,7 @@ struct GLFWVulkanApplication
             .pPoolSizes = &poolSize
         };
 
-        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, descriptorPool.replace()) != VK_SUCCESS)
+        if (vkCreateDescriptorPool(device, &poolInfo, 0, descriptorPool.replace()) != VK_SUCCESS)
             throw std::runtime_error("Failed to create descriptor pool!");
     }
 
@@ -1362,13 +1401,15 @@ struct GLFWVulkanApplication
 
     void updateUniformBuffer()
     {
-        UniformBufferObject ubo;
+        float time = glfwGetTime();
+        glm::mat4 cmatrix4x4 = glm::inverse(camera.view_matrix);
 
-        ubo.camera_matrix = glm::mat3(1.0f);
-        ubo.camera_ws = glm::vec3(0.0f);
-        ubo.light_ws = glm::vec3(0.0f);
-        ubo.focal_scale = glm::vec2(1.0f);
-        ubo.time = glfwGetTime();
+        UniformBufferObject ubo;
+        ubo.camera_matrix = glm::mat3(cmatrix4x4);
+        ubo.camera_ws = glm::vec3(cmatrix4x4[3]);
+        ubo.light_ws = glm::vec3(12.0f, 0.0f, 0.0f);
+        ubo.focal_scale = glm::vec2(1.0f / camera.projection_matrix[0][0], 1.0f / camera.projection_matrix[1][1]);
+        ubo.time = time;
 
         void* data;
         vkMapMemory(device, uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
@@ -1666,7 +1707,12 @@ int main(int argc, char *argv[])
 
         while (!glfwWindowShouldClose(application.window))
         {
+            double t = glfwGetTime();
+            frame_dt = t - frame_ts;
+            frame_ts = t;
+
             glfwPollEvents();
+
             application.updateUniformBuffer();
             application.drawFrame();
         }
