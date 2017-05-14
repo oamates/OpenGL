@@ -173,14 +173,9 @@ struct UniformBufferObject
 const std::vector<vertex_t> vertices = 
 {
     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+    {{-0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
     {{ 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f,  0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-};
-
-const std::vector<uint16_t> indices = 
-{
-    0, 2, 1, 3, 2, 0
+    {{ 0.5f,  0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}}
 };
 
 struct GLFWVulkanApplication 
@@ -218,8 +213,6 @@ struct GLFWVulkanApplication
     
     VDeleter<VkBuffer> vertexBuffer {device, vkDestroyBuffer};
     VDeleter<VkDeviceMemory> vertexBufferMemory {device, vkFreeMemory};
-    VDeleter<VkBuffer> indexBuffer {device, vkDestroyBuffer};
-    VDeleter<VkDeviceMemory> indexBufferMemory {device, vkFreeMemory};
 
     VDeleter<VkBuffer> uniformStagingBuffer {device, vkDestroyBuffer};
     VDeleter<VkDeviceMemory> uniformStagingBufferMemory {device, vkFreeMemory};
@@ -266,7 +259,6 @@ struct GLFWVulkanApplication
         createTextureImageView();
         createTextureSampler();
         createVertexBuffer();
-        createIndexBuffer();
         createUniformBuffer();
         createDescriptorPool();
         createDescriptorSet();
@@ -895,7 +887,7 @@ struct GLFWVulkanApplication
             .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
             .pNext = 0,
             .flags = 0,
-            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+            .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
             .primitiveRestartEnable = VK_FALSE
         };
 
@@ -1081,23 +1073,6 @@ struct GLFWVulkanApplication
 
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
         copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-    }
-
-    void createIndexBuffer() 
-    {
-        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-        VDeleter<VkBuffer> stagingBuffer{device, vkDestroyBuffer};
-        VDeleter<VkDeviceMemory> stagingBufferMemory{device, vkFreeMemory};
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, indices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
-
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-        copyBuffer(stagingBuffer, indexBuffer, bufferSize);
     }
 
     void createUniformBuffer()
@@ -1310,9 +1285,8 @@ struct GLFWVulkanApplication
             VkBuffer vertexBuffers[] = {vertexBuffer};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, 0);
-            vkCmdDrawIndexed(commandBuffers[i], indices.size(), 1, 0, 0, 0);
+            vkCmdDraw(commandBuffers[i], 4, 1, 0, 0);
             vkCmdEndRenderPass(commandBuffers[i]);
 
             if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS)
