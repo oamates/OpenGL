@@ -13,7 +13,7 @@ layout(binding = 0) uniform UniformBufferObject
     float time;
 } ubo;
 
-//uniform sampler2D stone_tex;
+layout(binding = 1) uniform sampler2D stone_tex;
 
 layout(location = 0) out vec4 FragmentColor;
 
@@ -41,7 +41,7 @@ float hermite5(float a, float b, float x)
 //==============================================================================================================================================================
 vec3 tex3D(vec3 p, vec3 n)
 {
-    /*
+    
     p *= 0.197;
     n = max(abs(n) - 0.35f, 0.0f);
     n /= dot(n, vec3(1.0f));
@@ -50,8 +50,6 @@ vec3 tex3D(vec3 p, vec3 n)
     vec3 tz = texture(stone_tex, p.xy).xyz;
     vec3 c = tx * tx * n.x + ty * ty * n.y + tz * tz * n.z;
     return pow(c, vec3(0.66));
-    */
-    return abs(n);
 }
 
 //==============================================================================================================================================================
