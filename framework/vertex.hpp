@@ -4,6 +4,7 @@
 #define GLEW_STATIC
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+
 //===================================================================================================================================================================================================================
 // Bitmask that encodes sizes of consecutive vertex attributes. 
 // Attribute sizes acceptable by OpenGL are 1, 2, 3 or 4, so each attribute size is stored to occupy 4 bits

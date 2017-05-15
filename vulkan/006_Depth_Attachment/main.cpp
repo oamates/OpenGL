@@ -1,3 +1,5 @@
+#define GLEW_STATIC
+#include <GL/glew.h> 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -21,6 +23,13 @@
 #include "constants.hpp"
 #include "camera.hpp"
 #include "image/stb_image.h"
+#include "vao.hpp"
+#include "vertex.hpp"
+
+
+const char* pnt2_model_file = "../../../resources/models/vao/pnt2/chalet/chalet.vao";
+const char* pnt2_texture_file = "../../../resources/models/vao/pnt2/chalet/chalet.jpg";
+
 
 //========================================================================================================================================================================================================================
 // camera-related variables
@@ -142,7 +151,6 @@ struct QueueFamilyIndices
     }
 };
 
-
 struct SwapChainSupportDetails
 {
     VkSurfaceCapabilitiesKHR capabilities;
@@ -152,9 +160,9 @@ struct SwapChainSupportDetails
 
 struct UniformBufferObject 
 {
-    glm::mat4 camera_matrix;
-    glm::vec4 light_ws;
-    glm::vec2 focal_scale;
+    glm::mat4 projection_view_matrix;
+    glm::vec4 camera_ws4;
+    glm::vec4 light_ws4;
 };
 
 struct GLFWVulkanApplication 
@@ -192,6 +200,8 @@ struct GLFWVulkanApplication
     
     VDeleter<VkBuffer> vertexBuffer {device, vkDestroyBuffer};
     VDeleter<VkDeviceMemory> vertexBufferMemory {device, vkFreeMemory};
+    VDeleter<VkBuffer> indexBuffer {device, vkDestroyBuffer};
+    VDeleter<VkDeviceMemory> indexBufferMemory {device, vkFreeMemory};
 
     VDeleter<VkBuffer> uniformStagingBuffer {device, vkDestroyBuffer};
     VDeleter<VkDeviceMemory> uniformStagingBufferMemory {device, vkFreeMemory};
@@ -209,6 +219,8 @@ struct GLFWVulkanApplication
     VDeleter<VkImage> depthImage{device, vkDestroyImage};
 	VDeleter<VkDeviceMemory> depthImageMemory{device, vkFreeMemory};
 	VDeleter<VkImageView> depthImageView{device, vkDestroyImageView};
+
+    uint32_t index_count;
 
     void initWindow()
     {
@@ -233,6 +245,62 @@ struct GLFWVulkanApplication
 
     }
 
+    void loadPNT2Model(const char* file_name)
+    {
+        debug_msg("Loading model :: %s", file_name);
+        //================================================================================================================================================================================================================
+        // read buffer params
+        //================================================================================================================================================================================================================
+        vao_t::header_t header;
+
+        FILE* f = fopen(file_name, "rb");
+        fread (&header, sizeof(vao_t::header_t), 1, f);
+
+        assert(header.layout == BUFFER_LAYOUT(3, 3, 2));
+        assert(header.mode == GL_TRIANGLES);
+        assert(header.type == GL_UNSIGNED_INT);
+
+        uint32_t stride = 8 * sizeof(float);
+        uint32_t index_size = sizeof(GLuint);
+        index_count = header.ibo_size;
+
+        //================================================================================================================================================================================================================
+        // create vertex buffer
+        //================================================================================================================================================================================================================
+        VkDeviceSize vbo_size = stride * header.vbo_size;
+
+        VDeleter<VkBuffer> stagingVertexBuffer{device, vkDestroyBuffer};
+        VDeleter<VkDeviceMemory> stagingVertexBufferMemory{device, vkFreeMemory};
+        createBuffer(vbo_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingVertexBuffer, stagingVertexBufferMemory);
+
+        void* buf_ptr;
+        vkMapMemory(device, stagingVertexBufferMemory, 0, vbo_size, 0, &buf_ptr);
+        fread(buf_ptr, stride, header.vbo_size, f);
+        vkUnmapMemory(device, stagingVertexBufferMemory);
+
+        createBuffer(vbo_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        copyBuffer(stagingVertexBuffer, vertexBuffer, vbo_size);
+
+        //================================================================================================================================================================================================================
+        // create index buffer
+        //================================================================================================================================================================================================================
+        VkDeviceSize ibo_size = index_size * header.ibo_size;
+
+        VDeleter<VkBuffer> stagingIndexBuffer{device, vkDestroyBuffer};
+        VDeleter<VkDeviceMemory> stagingIndexBufferMemory{device, vkFreeMemory};
+        createBuffer(ibo_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingIndexBuffer, stagingIndexBufferMemory);
+
+        vkMapMemory(device, stagingIndexBufferMemory, 0, ibo_size, 0, &buf_ptr);
+        fread(buf_ptr, index_size, header.ibo_size, f);
+        vkUnmapMemory(device, stagingIndexBufferMemory);
+
+        createBuffer(ibo_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+        copyBuffer(stagingIndexBuffer, indexBuffer, ibo_size);
+
+        fclose(f);
+        debug_msg("Loading done");
+    }
+
     void initVulkan()
     {
         createInstance();
@@ -245,9 +313,10 @@ struct GLFWVulkanApplication
         createRenderPass();
         createDescriptorSetLayout();
         createGraphicsPipeline();
+        createDepthBuffer();
         createFramebuffers();
         createCommandPool();
-        createDepthBuffer();
+        loadPNT2Model(pnt2_model_file);
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
@@ -296,7 +365,10 @@ struct GLFWVulkanApplication
 
     void createDepthBuffer()
     {
-		VkFormat depthFormat = findDepthFormat();
+        VkFormat depthFormat = findDepthFormat();
+        createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+        createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, depthImageView);
+        transitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     };
 
     void recreateSwapChain() 
@@ -306,6 +378,7 @@ struct GLFWVulkanApplication
         createImageViews();
         createRenderPass();
         createGraphicsPipeline();
+        createDepthBuffer();
         createFramebuffers();
         createCommandBuffers();
     }
@@ -470,7 +543,7 @@ struct GLFWVulkanApplication
     void createTextureImage()
     {
         int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load("../../../resources/tex2d/moss.png", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load(pnt2_texture_file, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         if (!pixels)
             throw std::runtime_error("failed to load texture image!");
 
@@ -525,7 +598,7 @@ struct GLFWVulkanApplication
         transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);        
     }
 
-    void createImageView(VkImage image, VkFormat format, VDeleter<VkImageView>& imageView)
+    void createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VDeleter<VkImageView>& imageView)
     {
         VkImageViewCreateInfo viewInfo = 
         {
@@ -544,7 +617,7 @@ struct GLFWVulkanApplication
             },
             .subresourceRange = VkImageSubresourceRange
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = aspectFlags,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -552,13 +625,13 @@ struct GLFWVulkanApplication
             }
         };
 
-        if (vkCreateImageView(device, &viewInfo, nullptr, imageView.replace()) != VK_SUCCESS)
+        if (vkCreateImageView(device, &viewInfo, 0, imageView.replace()) != VK_SUCCESS)
             throw std::runtime_error("failed to create texture image view!");
     }
 
     void createTextureImageView()
     {
-        createImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, textureImageView);
+        createImageView(textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, textureImageView);
     }
 
     void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
@@ -566,6 +639,14 @@ struct GLFWVulkanApplication
         VkCommandBuffer commandBuffer = beginSingleTimeCommands();
 
         VkAccessFlags srcAccessMask, dstAccessMask;
+        VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+        if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        {
+            aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+            if (hasStencilComponent(format))
+                aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
 
         if (oldLayout == VK_IMAGE_LAYOUT_PREINITIALIZED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
         {
@@ -581,6 +662,11 @@ struct GLFWVulkanApplication
         {
             srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        } 
+        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        {
+            srcAccessMask = 0;
+            dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
         }
         else
             throw std::invalid_argument("unsupported layout transition!");
@@ -598,7 +684,7 @@ struct GLFWVulkanApplication
             .image = image,
             .subresourceRange = VkImageSubresourceRange
             {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = aspectMask,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,
@@ -758,7 +844,7 @@ struct GLFWVulkanApplication
         swapChainImageViews.resize(swapChainImages.size(), VDeleter<VkImageView>{device, vkDestroyImageView});
 
         for (uint32_t i = 0; i < swapChainImages.size(); i++)
-            createImageView(swapChainImages[i], swapChainImageFormat, swapChainImageViews[i]);
+            createImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, swapChainImageViews[i]);
     }
 
     void createRenderPass()
@@ -776,10 +862,29 @@ struct GLFWVulkanApplication
             .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
         };
 
+        VkAttachmentDescription depthAttachment = 
+        {
+            .flags = 0,
+            .format = findDepthFormat(),
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        };
+
         VkAttachmentReference colorAttachmentRef = 
         {
             .attachment = 0,
             .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        };
+
+        VkAttachmentReference depthAttachmentRef = 
+        {
+            .attachment = 1,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         };
 
         VkSubpassDescription subpass = 
@@ -807,13 +912,15 @@ struct GLFWVulkanApplication
             .dependencyFlags = 0
         };
 
+        std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
+
         VkRenderPassCreateInfo renderPassInfo =
         {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
             .pNext = 0,
             .flags = 0,
-            .attachmentCount = 1,
-            .pAttachments = &colorAttachment,
+            .attachmentCount = attachments.size(),
+            .pAttachments = attachments.data(),
             .subpassCount = 1,
             .pSubpasses = &subpass,
             .dependencyCount = 1,
@@ -894,16 +1001,48 @@ struct GLFWVulkanApplication
 
         VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+        VkVertexInputBindingDescription bindingDescription = 
+        {
+            .binding = 0,
+            .stride = sizeof(vertex_pnt2_t),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+        };
+
+        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = 
+        {
+            VkVertexInputAttributeDescription
+            {
+                .location = 0,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(vertex_pnt2_t, position)
+            },
+            VkVertexInputAttributeDescription
+            {
+                .location = 1,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(vertex_pnt2_t, normal)
+            },
+            VkVertexInputAttributeDescription
+            {
+                .location = 2,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32_SFLOAT,
+                .offset = offsetof(vertex_pnt2_t, uv)
+            }
+        };
+
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = 
         {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = 0,
             .flags = 0,
-            .vertexBindingDescriptionCount = 0,
-            .pVertexBindingDescriptions = 0,
-            .vertexAttributeDescriptionCount = 0,
-            .pVertexAttributeDescriptions = 0
-        };        
+            .vertexBindingDescriptionCount = 1,
+            .pVertexBindingDescriptions = &bindingDescription,
+            .vertexAttributeDescriptionCount = attributeDescriptions.size(),
+            .pVertexAttributeDescriptions = attributeDescriptions.data()
+        }; 
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = 
         {
@@ -971,6 +1110,22 @@ struct GLFWVulkanApplication
             .alphaToOneEnable = 0
         };
 
+        VkPipelineDepthStencilStateCreateInfo depthStencil = 
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .pNext = 0,
+            .flags = 0,
+            .depthTestEnable = VK_TRUE,
+            .depthWriteEnable = VK_TRUE,
+            .depthCompareOp  = VK_COMPARE_OP_LESS,
+            .depthBoundsTestEnable = VK_FALSE,
+            .stencilTestEnable = VK_FALSE,
+            .front = {},
+            .back = {},
+            .minDepthBounds = 0.0f,
+            .maxDepthBounds = 1.0f
+        };
+
         VkPipelineColorBlendAttachmentState colorBlendAttachment = 
         {
             .blendEnable = VK_FALSE,
@@ -1025,7 +1180,7 @@ struct GLFWVulkanApplication
             .pViewportState = &viewportState,
             .pRasterizationState = &rasterizer,
             .pMultisampleState = &multisampling,
-            .pDepthStencilState = 0,
+            .pDepthStencilState = &depthStencil,
             .pColorBlendState = &colorBlending,
             .pDynamicState = 0,
             .layout = pipelineLayout,
@@ -1045,7 +1200,10 @@ struct GLFWVulkanApplication
 
         for (size_t i = 0; i < swapChainImageViews.size(); i++)
         {
-            VkImageView attachments[] = { swapChainImageViews[i] };
+            std::array<VkImageView, 2> attachments = {
+                swapChainImageViews[i],
+                depthImageView
+            };
 
             VkFramebufferCreateInfo framebufferInfo = 
             {
@@ -1053,8 +1211,8 @@ struct GLFWVulkanApplication
                 .pNext = 0,
                 .flags = 0,
                 .renderPass = renderPass,
-                .attachmentCount = 1,
-                .pAttachments = attachments,
+                .attachmentCount = attachments.size(),
+                .pAttachments = attachments.data(),
                 .width = swapChainExtent.width,
                 .height = swapChainExtent.height,
                 .layers = 1
@@ -1268,7 +1426,9 @@ struct GLFWVulkanApplication
 
             vkBeginCommandBuffer(commandBuffers[i], &beginInfo);
 
-            VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+            std::array<VkClearValue, 2> clearValues;
+            clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+            clearValues[1].depthStencil = {1.0f, 0};
 
             VkRenderPassBeginInfo renderPassInfo = 
             {
@@ -1281,18 +1441,18 @@ struct GLFWVulkanApplication
                     .offset = {0, 0},
                     .extent = swapChainExtent
                 },
-                .clearValueCount = 1,
-                .pClearValues = &clearColor
+                .clearValueCount = clearValues.size(),
+                .pClearValues = clearValues.data()
             };
-
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
             VkBuffer vertexBuffers[] = {vertexBuffer};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+            vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, 0);
-            vkCmdDraw(commandBuffers[i], 4, 1, 0, 0);
+            vkCmdDrawIndexed(commandBuffers[i], index_count, 1, 0, 0, 0);
             vkCmdEndRenderPass(commandBuffers[i]);
 
             if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS)
@@ -1345,9 +1505,9 @@ struct GLFWVulkanApplication
         float time = glfwGetTime();
 
         UniformBufferObject ubo;
-        ubo.camera_matrix = glm::inverse(camera.view_matrix);
-        ubo.light_ws = glm::vec4(12.0f, 0.0f, 0.0f, time);
-        ubo.focal_scale = glm::vec2(1.0f / camera.projection_matrix[0][0], 1.0f / camera.projection_matrix[1][1]);
+        ubo.projection_view_matrix = camera.projection_view_matrix();
+        ubo.camera_ws4 = glm::vec4(camera.position(), 0.0f);
+        ubo.light_ws4 = glm::vec4(12.0f, 0.0f, 0.0f, time);
 
         void* data;
         vkMapMemory(device, uniformStagingBufferMemory, 0, sizeof(UniformBufferObject), 0, &data);

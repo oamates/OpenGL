@@ -190,9 +190,6 @@ struct GLFWVulkanApplication
     VDeleter<VkImageView> textureImageView {device, vkDestroyImageView};
     VDeleter<VkSampler> textureSampler {device, vkDestroySampler};
     
-    VDeleter<VkBuffer> vertexBuffer {device, vkDestroyBuffer};
-    VDeleter<VkDeviceMemory> vertexBufferMemory {device, vkFreeMemory};
-
     VDeleter<VkBuffer> uniformStagingBuffer {device, vkDestroyBuffer};
     VDeleter<VkDeviceMemory> uniformStagingBufferMemory {device, vkFreeMemory};
     VDeleter<VkBuffer> uniformBuffer {device, vkDestroyBuffer};
@@ -1248,10 +1245,6 @@ struct GLFWVulkanApplication
 
             vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
             vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-            VkBuffer vertexBuffers[] = {vertexBuffer};
-            VkDeviceSize offsets[] = {0};
-            vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
             vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, 0);
             vkCmdDraw(commandBuffers[i], 4, 1, 0, 0);
             vkCmdEndRenderPass(commandBuffers[i]);

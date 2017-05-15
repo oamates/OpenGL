@@ -92,19 +92,19 @@ int main(int argc, char *argv[])
 
     const char* vao_list[] = 
     {
-        "../../../resources/models/vao/ashtray.vao",
-        "../../../resources/models/vao/azog.vao",
-        "../../../resources/models/vao/bust.vao",
-        "../../../resources/models/vao/chubby_girl.vao",
-        "../../../resources/models/vao/demon.vao",
-        "../../../resources/models/vao/dragon.vao",
-        "../../../resources/models/vao/female_01.vao",
-        "../../../resources/models/vao/female_02.vao",
-        "../../../resources/models/vao/female_03.vao",
-        "../../../resources/models/vao/king_kong.vao",
-        "../../../resources/models/vao/predator.vao",
-        "../../../resources/models/vao/skull.vao",
-          "../../../resources/models/vao/trefoil.vao"
+        "../../../resources/models/vao/pnt2/chalet/chalet.vao",
+//        "../../../resources/models/vao/azog.vao",
+//        "../../../resources/models/vao/bust.vao",
+//        "../../../resources/models/vao/chubby_girl.vao",
+//        "../../../resources/models/vao/demon.vao",
+//        "../../../resources/models/vao/dragon.vao",
+//        "../../../resources/models/vao/female_01.vao",
+//        "../../../resources/models/vao/female_02.vao",
+//        "../../../resources/models/vao/female_03.vao",
+//        "../../../resources/models/vao/king_kong.vao",
+//        "../../../resources/models/vao/predator.vao",
+//        "../../../resources/models/vao/skull.vao",
+//          "../../../resources/models/vao/trefoil.vao"
     };
 
     const int MODEL_COUNT = sizeof(vao_list) / sizeof(const char *);
