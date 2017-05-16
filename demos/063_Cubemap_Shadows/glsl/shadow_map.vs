@@ -1,4 +1,4 @@
-#version 430
+#version 330 core
 
 layout (location = 0) in vec3 position;
 
@@ -8,7 +8,7 @@ struct motion3d_t
     vec4 rotor;
 };
 
-layout (std430, binding = 0) buffer shader_data
+layout (std140, binding = 0) buffer shader_data
 {
     motion3d_t data[];
 };

@@ -142,8 +142,7 @@ struct demo_window_t : public glfw_window_t
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
-    // initialize GLFW library
-    // create GLFW window and initialize GLEW library
+    // initialize GLFW library, create GLFW window and initialize GLEW library
     // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
     //===================================================================================================================================================================================================================
     if (!glfw::init())
