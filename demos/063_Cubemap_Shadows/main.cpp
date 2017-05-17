@@ -69,6 +69,7 @@ struct fbo_depth_cubemap
         glBindFramebuffer(GL_FRAMEBUFFER, id);
 
         glGenTextures(1, &texture_id);
+        glActiveTexture (texture_unit);
         glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
         glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, texture_size, texture_size);
 
@@ -118,25 +119,25 @@ struct fbo_depth_cubemap
 //=======================================================================================================================================================================================================================
 vertex_pnt2_t torus3d_func (const glm::vec2& uv)
 {
-	vertex_pnt2_t vertex;
+    vertex_pnt2_t vertex;
 
-	const double R = 1.5;
-	const double r = 0.6;
-	double cos_2piu = glm::cos(constants::two_pi_d * uv.x);
-	double sin_2piu = glm::sin(constants::two_pi_d * uv.x);
-	double cos_2piv = glm::cos(constants::two_pi_d * uv.y);
-	double sin_2piv = glm::sin(constants::two_pi_d * uv.y);
+    const double R = 1.5;
+    const double r = 0.6;
+    double cos_2piu = glm::cos(constants::two_pi_d * uv.x);
+    double sin_2piu = glm::sin(constants::two_pi_d * uv.x);
+    double cos_2piv = glm::cos(constants::two_pi_d * uv.y);
+    double sin_2piv = glm::sin(constants::two_pi_d * uv.y);
 
-	vertex.position = glm::vec3((R + r * cos_2piv) * cos_2piu, (R + r * cos_2piv) * sin_2piu, r * sin_2piv);
-	vertex.normal = glm::vec3(cos_2piv * cos_2piu, cos_2piv * sin_2piu, sin_2piv);
-	vertex.uv = uv;
-	return vertex;
-};	
+    vertex.position = glm::vec3((R + r * cos_2piv) * cos_2piu, (R + r * cos_2piv) * sin_2piu, r * sin_2piv);
+    vertex.normal = glm::vec3(cos_2piv * cos_2piu, cos_2piv * sin_2piu, sin_2piv);
+    vertex.uv = uv;
+    return vertex;
+};  
 
 struct motion3d_t
 {
-	glm::vec4 shift;
-	glm::vec4 rotor;
+    glm::vec4 shift;
+    glm::vec4 rotor;
 };
 
 //=======================================================================================================================================================================================================================
@@ -144,14 +145,14 @@ struct motion3d_t
 //=======================================================================================================================================================================================================================
 void fill_shift_rotor_data(motion3d_t* data, const glm::vec3& group_shift, float cell_size, int N)
 {
-	float middle = 0.5f * float(N) - 0.5f;
+    float middle = 0.5f * float(N) - 0.5f;
     int index = 0;
-	for (int i = 0; i < N; ++i) for (int j = 0; j < N; ++j) for (int k = 0; k < N; ++k)
-	{
-		data[index].shift = glm::vec4(group_shift + cell_size * glm::vec3(float(i) - middle, float(j) - middle, float(k) - middle), 0.0f);
-		data[index].rotor = glm::vec4(glm::sphericalRand(1.0f), 4.0f * glm::gaussRand(0.0f, 1.0f));
+    for (int i = 0; i < N; ++i) for (int j = 0; j < N; ++j) for (int k = 0; k < N; ++k)
+    {
+        data[index].shift = glm::vec4(group_shift + cell_size * glm::vec3(float(i) - middle, float(j) - middle, float(k) - middle), 0.0f);
+        data[index].rotor = glm::vec4(glm::sphericalRand(1.0f), 0.75f * glm::gaussRand(0.0f, 1.0f));
         index++;
-	};
+    };
 };
 
 const GLenum DEPTH_CUBEMAP_TEXTURE_UNIT = GL_TEXTURE10;
@@ -171,45 +172,38 @@ int main(int argc, char *argv[])
 
     demo_window_t window("Physics-Based Rendering", 4, 3, 3, 1920, 1080);
 
-	//===================================================================================================================================================================================================================
-	// shadow map shader, renders to cube map distance-to-light texture
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // shadow map shader, renders to cube map distance-to-light texture
+    //===================================================================================================================================================================================================================
     glsl_program_t shadow_map(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/shadow_map.vs"),
-							  glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/shadow_map.gs"),
+                              glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/shadow_map.gs"),
                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/shadow_map.fs"));
 
-	shadow_map.enable();
+    shadow_map.enable();
 
-    uniform_t uni_sm_light_ws	 = shadow_map["light_ws"];
+    uniform_t uni_sm_light_ws    = shadow_map["light_ws"];
     uniform_t uni_sm_buffer_base = shadow_map["buffer_base"];
-    uniform_t uni_sm_time		 = shadow_map["time"];
+    uniform_t uni_sm_time        = shadow_map["time"];
 
-	//===================================================================================================================================================================================================================
-	// Phong lighting model shader initialization
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // Phong lighting model shader initialization
+    //===================================================================================================================================================================================================================
     glsl_program_t simple_light(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/simple_light.vs"),
                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/simple_light.fs"));
 
-	simple_light.enable();
+    simple_light.enable();
 
-	uniform_t uni_sl_projection_matrix = simple_light["projection_matrix"];
-    uniform_t uni_sl_light_ws          = simple_light["light_ws"];
-	uniform_t uni_sl_view_matrix       = simple_light["view_matrix"];
-    uniform_t uni_sl_base              = simple_light["buffer_base"];
-    uniform_t uni_sl_diffuse_texture   = simple_light["diffuse_texture"];
-    uniform_t uni_sl_normal_texture    = simple_light["normal_texture"];
-    uniform_t uni_sl_time			   = simple_light["time"];
+    uniform_t uni_sl_pv_matrix   = simple_light["projection_view_matrix"];
+    uniform_t uni_sl_camera_ws   = simple_light["camera_ws"];
+    uniform_t uni_sl_light_ws    = simple_light["light_ws"];
+    uniform_t uni_sl_diffuse_tex = simple_light["diffuse_tex"];
+    uniform_t uni_sl_normal_tex  = simple_light["normal_tex"];
+    uniform_t uni_sl_base        = simple_light["buffer_base"];
+    uniform_t uni_sl_time        = simple_light["time"];
 
-    uni_sl_projection_matrix = window.camera.projection_matrix;
-
-    const unsigned int size = 5; 
-	const float distance = 5.5f;
-	const float angular_rate = 0.01f;
-	const float group_unit = 60.0f;
-
-	//===================================================================================================================================================================================================================
-	// polyhedra + torus models initialization
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // polyhedra + torus models initialization
+    //===================================================================================================================================================================================================================
     polyhedron tetrahedron, cube, octahedron, dodecahedron, icosahedron;
 
     tetrahedron.regular_pft2_vao(4, 4, plato::tetrahedron::vertices, plato::tetrahedron::normals, plato::tetrahedron::faces);
@@ -230,19 +224,19 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE9); GLuint icosahedron_normal_texture_id   = image::png::texture2d("../../../resources/plato_tex2d/icosahedron_bump.png");
 
 
-    const int N = 16;
+    const int N = 4;
     const int group_size = N * N * N;
-	const float cell_size = 6.0f;
-	const float origin_distance = 1.25f * cell_size * N;
-	const GLsizeiptr chunk_size = group_size * sizeof(motion3d_t);	
+    const float cell_size = 2.25f;
+    const float origin_distance = 1.25f * cell_size * N;
+    const GLsizeiptr chunk_size = group_size * sizeof(motion3d_t);  
 
-	motion3d_t data[5 * group_size];
+    motion3d_t data[5 * group_size];
 
-	fill_shift_rotor_data(&data[0 * group_size], glm::vec3(0.0f,             0.0f,  origin_distance), cell_size, N);
-	fill_shift_rotor_data(&data[1 * group_size], glm::vec3(0.0f,             0.0f, -origin_distance), cell_size, N);
-	fill_shift_rotor_data(&data[2 * group_size], glm::vec3(0.0f,  origin_distance,             0.0f), cell_size, N);
-	fill_shift_rotor_data(&data[3 * group_size], glm::vec3(0.0f, -origin_distance,             0.0f), cell_size, N);
-	fill_shift_rotor_data(&data[4 * group_size], glm::vec3(0.0f,             0.0f,             0.0f), cell_size, N);
+    fill_shift_rotor_data(&data[0 * group_size], glm::vec3(0.0f,             0.0f,  origin_distance), cell_size, N);
+    fill_shift_rotor_data(&data[1 * group_size], glm::vec3(0.0f,             0.0f, -origin_distance), cell_size, N);
+    fill_shift_rotor_data(&data[2 * group_size], glm::vec3(0.0f,  origin_distance,             0.0f), cell_size, N);
+    fill_shift_rotor_data(&data[3 * group_size], glm::vec3(0.0f, -origin_distance,             0.0f), cell_size, N);
+    fill_shift_rotor_data(&data[4 * group_size], glm::vec3(0.0f,             0.0f,             0.0f), cell_size, N);
 
     GLuint ssbo_id;
     glGenBuffers(1, &ssbo_id);
@@ -250,85 +244,91 @@ int main(int argc, char *argv[])
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, ssbo_id, 0, sizeof(data));
 
+    fbo_depth_cubemap shadow_cubemap(DEPTH_CUBEMAP_TEXTURE_UNIT, DEPTH_CUBEMAP_TEXTURE_SIZE);
 
-
-	fbo_depth_cubemap shadow_cubemap(DEPTH_CUBEMAP_TEXTURE_UNIT, DEPTH_CUBEMAP_TEXTURE_SIZE);
-
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glm::vec3 light_ws = glm::vec3(0.0f, 0.0f, 0.0f);
-	
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    
     //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
     while (!window.should_close())
     {
         window.new_frame();
-    	float time = window.frame_ts;
+        float time = window.frame_ts;
 
-		//===============================================================================================================================================================================================================
-		// light variables
-		//===============================================================================================================================================================================================================
-		shadow_cubemap.bind();
+        glm::vec3 light_ws = 10.0f * glm::vec3(0.0f, glm::cos(0.35f * time), glm::sin(0.35f * time));
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+        glm::vec3 camera_ws = window.camera.position();
+
+        //===============================================================================================================================================================================================================
+        // light variables
+        //===============================================================================================================================================================================================================
+        glViewport(0, 0, DEPTH_CUBEMAP_TEXTURE_SIZE, DEPTH_CUBEMAP_TEXTURE_SIZE);
+
+        shadow_cubemap.bind();
         glClear(GL_DEPTH_BUFFER_BIT);
-		shadow_map.enable();
 
         glEnable(GL_CULL_FACE);
+        shadow_map.enable();
 
-	    uni_sm_light_ws = light_ws;
-	    uni_sm_time = time;
+        uni_sm_light_ws = light_ws;
+        uni_sm_time = time;
 
-		//===============================================================================================================================================================================================================
-		// render pass to get cubemap z-buffer filled w.r.t current light position
-		//===============================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
+        // render pass to get cubemap z-buffer filled w.r.t current light position
+        //===============================================================================================================================================================================================================
         uni_sm_buffer_base = 0 * group_size; tetrahedron.instanced_render(group_size);
         uni_sm_buffer_base = 1 * group_size; cube.instanced_render(group_size);
         uni_sm_buffer_base = 2 * group_size; octahedron.instanced_render(group_size);
         uni_sm_buffer_base = 3 * group_size; dodecahedron.instanced_render(group_size);
         uni_sm_buffer_base = 4 * group_size; icosahedron.instanced_render(group_size);
 
-		//===============================================================================================================================================================================================================
-		// on-screen render pass using created depth texture
-		//===============================================================================================================================================================================================================
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glEnable(GL_DEPTH_TEST);
-		shadow_cubemap.bind_texture(GL_TEXTURE10);
+        //===============================================================================================================================================================================================================
+        // on-screen render pass using created depth texture
+        //===============================================================================================================================================================================================================
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, window.res_x, window.res_y);
 
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        shadow_cubemap.bind_texture(GL_TEXTURE10);
 
-		simple_light.enable();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	    uni_sl_light_ws = light_ws;
-	    uni_sl_time = time;
-		uni_sl_view_matrix = window.camera.view_matrix;
+        simple_light.enable();
+
+        uni_sl_pv_matrix = projection_view_matrix;
+        uni_sl_camera_ws = camera_ws;
+        uni_sl_light_ws = light_ws;
+        uni_sl_time = time;
 
         uni_sl_base = 0 * group_size;
-        uni_sl_diffuse_texture = 0;
-        uni_sl_normal_texture = 1;
-		tetrahedron.instanced_render(group_size);
+        uni_sl_diffuse_tex = 0;
+        uni_sl_normal_tex = 1;
+        tetrahedron.instanced_render(group_size);
 
         uni_sl_base = 1 * group_size;
-        uni_sl_diffuse_texture = 2;
-        uni_sl_normal_texture = 3;
-		cube.instanced_render(group_size);
+        uni_sl_diffuse_tex = 2;
+        uni_sl_normal_tex = 3;
+        cube.instanced_render(group_size);
 
         uni_sl_base = 2 * group_size;
-        uni_sl_diffuse_texture = 4;
-        uni_sl_normal_texture = 5;
-		octahedron.instanced_render(group_size);
+        uni_sl_diffuse_tex = 4;
+        uni_sl_normal_tex = 5;
+        octahedron.instanced_render(group_size);
 
         uni_sl_base = 3 * group_size;
-        uni_sl_diffuse_texture = 6;
-        uni_sl_normal_texture = 7;
-		dodecahedron.instanced_render(group_size);
+        uni_sl_diffuse_tex = 6;
+        uni_sl_normal_tex = 7;
+        dodecahedron.instanced_render(group_size);
 
         uni_sl_base = 4 * group_size;
-        uni_sl_diffuse_texture = 8;
-        uni_sl_normal_texture = 9;
-		icosahedron.instanced_render(group_size);
+        uni_sl_diffuse_tex = 8;
+        uni_sl_normal_tex = 9;
+        icosahedron.instanced_render(group_size);
      
         window.end_frame();
     }
 
     glfw::terminate();
     return 0;
-}
+}                               

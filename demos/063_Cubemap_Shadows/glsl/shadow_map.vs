@@ -1,6 +1,6 @@
-#version 330 core
+#version 430 core
 
-layout (location = 0) in vec3 position;
+layout (location = 0) in vec3 position_in;
 
 struct motion3d_t
 {
@@ -8,7 +8,7 @@ struct motion3d_t
     vec4 rotor;
 };
 
-layout (std140, binding = 0) buffer shader_data
+layout (std430, binding = 0) buffer shader_data
 {
     motion3d_t data[];
 };
@@ -30,14 +30,14 @@ mat3 compute_rotation_matrix(vec3 axis, float angle)
                 axis_cs.z * axis + vec3( axis_sn.y, -axis_sn.x,         cs));
 }
 
-out vec4 position_ws;
+out vec3 position_ws;
                   
 void main()
 {
     int index = buffer_base + gl_InstanceID;
-    vec4 shift_vector = data[index].shift;
+    vec3 shift_vector = vec3(data[index].shift);
     vec3 rotation_axis = vec3(data[index].rotor);
     float angular_rate = data[index].rotor.w;
     mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, angular_rate * time);
-    position_ws = shift_vector + vec4(rotation_matrix * position, 1.0f);
+    position_ws = shift_vector + rotation_matrix * position_in;
 }
