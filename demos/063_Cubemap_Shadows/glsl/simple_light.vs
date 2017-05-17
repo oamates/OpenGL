@@ -46,7 +46,7 @@ void main()
     vec3 shift_vector = vec3(data[index].shift);
     vec3 rotation_axis = vec3(data[index].rotor);
     float angular_rate = data[index].rotor.w;
-    mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, angular_rate * time);
+    mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, /* angular_rate * time */ angular_rate * 1.5);
     position_ws = shift_vector + rotation_matrix * position_in;
 
     normal_ws    = rotation_matrix * normal_in;

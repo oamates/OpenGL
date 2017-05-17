@@ -13,9 +13,9 @@ layout (std430, binding = 0) buffer shader_data
     motion3d_t data[];
 };
 
+uniform vec3 light_ws;
 uniform int buffer_base;
 uniform float time;
-
 
 mat3 compute_rotation_matrix(vec3 axis, float angle)
 {
@@ -30,14 +30,15 @@ mat3 compute_rotation_matrix(vec3 axis, float angle)
                 axis_cs.z * axis + vec3( axis_sn.y, -axis_sn.x,         cs));
 }
 
-out vec3 position_ws;
+out vec3 position_ls;
                   
 void main()
 {
     int index = buffer_base + gl_InstanceID;
-    vec3 shift_vector = vec3(data[index].shift);
+    vec3 shift = vec3(data[index].shift);
     vec3 rotation_axis = vec3(data[index].rotor);
     float angular_rate = data[index].rotor.w;
-    mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, angular_rate * time);
-    position_ws = shift_vector + rotation_matrix * position_in;
+    mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, /* angular_rate * time */ angular_rate * 1.5);
+    vec3 position_ws = shift + rotation_matrix * position_in;
+    position_ls = position_ws - light_ws;
 }

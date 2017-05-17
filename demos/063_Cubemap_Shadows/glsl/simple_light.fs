@@ -16,6 +16,17 @@ in vec2 uv;
 
 out vec4 FragmentColor;
 
+float depth_factor(vec3 l)
+{
+    vec3 a = abs(l);
+    float z = max(a.x, max(a.y, a.z));
+
+    float q = 1.0f - (1.0f / z);
+
+    float shadow = texture(depth_tex, vec4(l, q));
+    return shadow;
+}
+
 void main()
 {
     vec3 light = light_ws - position_ws;
@@ -37,18 +48,14 @@ void main()
     vec4 material_ambient_color = 0.175f * material_diffuse_color;
     vec4 material_specular_color = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
-    vec3 a = abs(light);
-    float z1 = max(a.x, max(a.y, a.z));
+    vec2 dp = vec2(0.0125f, 0.0f);
 
-    float z2 = 1.0f - 2.0f / z1;
-    z2 = 0.5 + 0.5 * z2;
-
-    float shadow = texture(depth_tex, vec4(-light, z1));
-
+    float a0 = depth_factor(-light);
+    float shadow = a0;
 
     float dist_factor = 15.0 / (1.0f + distance);
 
     vec4 c = material_ambient_color + 
-                    dist_factor * cos_theta * (material_diffuse_color + material_specular_color * pow(cos_alpha, 40));
-    FragmentColor = c * shadow;
+                    shadow * dist_factor * cos_theta * (material_diffuse_color + material_specular_color * pow(cos_alpha, 40));
+    FragmentColor = c;
 }

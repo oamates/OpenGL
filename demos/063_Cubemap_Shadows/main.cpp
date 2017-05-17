@@ -12,6 +12,7 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/norm.hpp>
 #include <glm/gtc/random.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "constants.hpp"
 #include "glfw_window.hpp"
@@ -28,6 +29,7 @@
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
+    bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
@@ -45,6 +47,9 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            pause = !pause;
     }
 
     void on_mouse_move() override
@@ -74,8 +79,7 @@ struct fbo_depth_cubemap
         glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, texture_size, texture_size);
 
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_DEPTH_TEXTURE_MODE, GL_LUMINANCE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -83,8 +87,6 @@ struct fbo_depth_cubemap
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
         glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id, 0);
-
-        glViewport(0, 0, texture_size, texture_size);
 
         //================================================================================================================================================================================================================
         // check that the created framebuffer object is ok
@@ -163,6 +165,18 @@ const GLuint DEPTH_CUBEMAP_TEXTURE_SIZE = 2048;
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+    glm::mat4 m[6];
+
+    m[0] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0));
+    m[1] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0));
+    m[2] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0));
+    m[3] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0,-1.0, 0.0), glm::vec3(0.0, 0.0,-1.0));
+    m[4] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0, 0.0, 1.0), glm::vec3(0.0,-1.0, 0.0));
+    m[5] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0, 0.0,-1.0), glm::vec3(0.0,-1.0, 0.0));
+
+    for (int i = 0; i < 6; ++i)
+        debug_msg("m[%u] = %s", i, glm::to_string(m[i]).c_str());
+
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
@@ -223,8 +237,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE8); GLuint icosahedron_diffuse_texture_id  = image::png::texture2d("../../../resources/plato_tex2d/icosahedron.png");
     glActiveTexture(GL_TEXTURE9); GLuint icosahedron_normal_texture_id   = image::png::texture2d("../../../resources/plato_tex2d/icosahedron_bump.png");
 
-
-    const int N = 4;
+    const int N = 2;
     const int group_size = N * N * N;
     const float cell_size = 2.25f;
     const float origin_distance = 1.25f * cell_size * N;
@@ -256,12 +269,13 @@ int main(int argc, char *argv[])
         window.new_frame();
         float time = window.frame_ts;
 
-        glm::vec3 light_ws = 10.0f * glm::vec3(0.0f, glm::cos(0.35f * time), glm::sin(0.35f * time));
+        glm::vec3 light_ws = glm::vec3(0.0f, glm::cos(0.15f * time), glm::sin(0.15f * time));
+        //glm::vec3 light_ws = glm::vec3(5.0f, 5.0f * glm::cos(0.15f * time), 5.0f * glm::sin(0.15f * time));
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
 
         //===============================================================================================================================================================================================================
-        // light variables
+        // render pass to get cubemap z-buffer filled w.r.t current light position
         //===============================================================================================================================================================================================================
         glViewport(0, 0, DEPTH_CUBEMAP_TEXTURE_SIZE, DEPTH_CUBEMAP_TEXTURE_SIZE);
 
@@ -271,12 +285,9 @@ int main(int argc, char *argv[])
         glEnable(GL_CULL_FACE);
         shadow_map.enable();
 
-        uni_sm_light_ws = light_ws;
+        if(!window.pause)
+            uni_sm_light_ws = light_ws;
         uni_sm_time = time;
-
-        //===============================================================================================================================================================================================================
-        // render pass to get cubemap z-buffer filled w.r.t current light position
-        //===============================================================================================================================================================================================================
         uni_sm_buffer_base = 0 * group_size; tetrahedron.instanced_render(group_size);
         uni_sm_buffer_base = 1 * group_size; cube.instanced_render(group_size);
         uni_sm_buffer_base = 2 * group_size; octahedron.instanced_render(group_size);
@@ -298,7 +309,8 @@ int main(int argc, char *argv[])
 
         uni_sl_pv_matrix = projection_view_matrix;
         uni_sl_camera_ws = camera_ws;
-        uni_sl_light_ws = light_ws;
+        if(!window.pause)
+            uni_sl_light_ws = light_ws;
         uni_sl_time = time;
 
         uni_sl_base = 0 * group_size;
