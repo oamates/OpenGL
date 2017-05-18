@@ -30,6 +30,14 @@ float depth_factor(vec3 l, int layer)
     return shadow;
 }
 
+const vec3 light_color[4] = vec3[4]
+(
+    vec3(1.224, 0.254, 0.075),
+    vec3(1.074, 0.987, 0.043),
+    vec3(0.254, 1.311, 0.091),
+    vec3(0.107, 0.196, 1.283)
+);
+
 float smooth_depth_factor(vec3 l, int layer)
 {
     vec3 a = abs(l);
@@ -73,15 +81,15 @@ void main()
 {
     vec3 nc = texture(normal_tex, uv).rgb - vec3(0.5f, 0.5f, 0.0f);
     vec3 n = normalize(nc.x * tangent_x_ws + nc.y * tangent_y_ws + nc.z * normal_ws);
-    vec4 material_diffuse_color = texture(diffuse_tex, uv);
-    vec4 material_ambient_color = 0.175f * material_diffuse_color;
-    vec4 material_specular_color = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    vec3 diffuse_color = texture(diffuse_tex, uv).rgb;
     vec3 view = camera_ws - position_ws;
     vec3 v = normalize(view);
-    vec4 color = material_ambient_color;
+    vec3 color = 0.145f * diffuse_color;
 
     for (int i = 0; i < LIGHT_COUNT; ++i)
     {
+        vec3 diffuse = diffuse_color * light_color[i];
+        vec3 specular = light_color[i];
 
         vec3 light = light_ws[i] - position_ws;
         float distance = length(light);
@@ -93,8 +101,8 @@ void main()
         float cos_alpha = clamp(dot(v, r), 0.0f, 1.0f);                                                         
 
         float sf = smooth_depth_factor(-light, i);
-        color += sf * dist_factor * cos_theta * (material_diffuse_color + material_specular_color * pow(cos_alpha, 40));
+        color += sf * dist_factor * cos_theta * (diffuse + specular * pow(cos_alpha, 40));
     }
 
-    FragmentColor = color;
+    FragmentColor = vec4(color, 1.0f);
 }
