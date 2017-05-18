@@ -60,16 +60,16 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-struct fbo_depth_cubemap
+struct fbo_depth_cubemap_array
 {
     GLuint id;
     GLuint texture_id;
 
-    fbo_depth_cubemap() : id(0), texture_id(0) {};
+    fbo_depth_cubemap_array() : id(0), texture_id(0) {};
 
-    fbo_depth_cubemap(GLenum texture_unit, GLsizei texture_size, GLenum internal_format = GL_DEPTH_COMPONENT16)
+    fbo_depth_cubemap_array(GLenum texture_unit, GLsizei texture_size, GLuint depth, GLenum internal_format = GL_DEPTH_COMPONENT32)
     {
-        debug_msg("Creating depth only FBO with GL_TEXTURE_CUBE_MAP attachment.");
+        debug_msg("Creating depth only FBO with GL_TEXTURE_CUBE_MAP_ARRAY attachment.");
         glGenFramebuffers(1, &id);
         glBindFramebuffer(GL_FRAMEBUFFER, id);
 
@@ -78,7 +78,7 @@ struct fbo_depth_cubemap
         glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture_id);
         //glTexStorage2D(GL_TEXTURE_CUBE_MAP_ARRAY, 1, internal_format, texture_size, texture_size);
 
-        glTexStorage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 1, internal_format, texture_size, texture_size, 4);
+        glTexStorage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 1, internal_format, texture_size, texture_size, 6 * depth);
 
         glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
         glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
@@ -112,7 +112,7 @@ struct fbo_depth_cubemap
         glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
     }
 
-    ~fbo_depth_cubemap()
+    ~fbo_depth_cubemap_array()
     {
         glDeleteTextures(1, &texture_id);
         glDeleteFramebuffers(1, &id);       
@@ -163,6 +163,7 @@ void fill_shift_rotor_data(motion3d_t* data, const glm::vec3& group_shift, float
 
 const GLenum DEPTH_CUBEMAP_TEXTURE_UNIT = GL_TEXTURE10;
 const GLuint DEPTH_CUBEMAP_TEXTURE_SIZE = 2048;
+const int LIGHT_COUNT = 4;
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -249,7 +250,7 @@ int main(int argc, char *argv[])
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, ssbo_id, 0, sizeof(data));
 
-    fbo_depth_cubemap shadow_cubemap(DEPTH_CUBEMAP_TEXTURE_UNIT, DEPTH_CUBEMAP_TEXTURE_SIZE);
+    fbo_depth_cubemap_array shadow_cubemap(DEPTH_CUBEMAP_TEXTURE_UNIT, DEPTH_CUBEMAP_TEXTURE_SIZE, LIGHT_COUNT);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
@@ -266,7 +267,16 @@ int main(int argc, char *argv[])
         window.new_frame();
 
         float time = 0.25f * window.frame_ts;
-        glm::vec3 light_ws = glm::vec3(5.0f, 5.0f * glm::cos(0.15f * time), 5.0f * glm::sin(0.15f * time));
+        float radius = 5.0f;
+
+        glm::vec3 light_ws[4] = 
+        {
+            radius * glm::vec3(1.0f, glm::cos(0.15f * time), glm::sin(0.16f * time)),
+            radius * glm::vec3(glm::sin(0.13f * time), 1.0f, glm::cos(0.13f * time)),
+            radius * glm::vec3(glm::cos(0.17f * time), glm::sin(0.11f * time), 1.0f),
+            radius * glm::vec3(0.4f, glm::sin(0.14f * time), glm::sin(0.18f * time)),
+        };
+
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
 
