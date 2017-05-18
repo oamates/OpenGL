@@ -38,7 +38,7 @@ void main()
     vec3 shift = vec3(data[index].shift);
     vec3 rotation_axis = vec3(data[index].rotor);
     float angular_rate = data[index].rotor.w;
-    mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, /* angular_rate * time */ angular_rate * 1.5);
+    mat3 rotation_matrix = compute_rotation_matrix(rotation_axis, angular_rate * time);
     vec3 position_ws = shift + rotation_matrix * position_in;
     position_ls = position_ws - light_ws;
 }

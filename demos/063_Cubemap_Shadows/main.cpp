@@ -32,7 +32,7 @@ struct demo_window_t : public glfw_window_t
     bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -79,7 +79,7 @@ struct fbo_depth_cubemap
         glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, texture_size, texture_size);
 
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -165,18 +165,6 @@ const GLuint DEPTH_CUBEMAP_TEXTURE_SIZE = 2048;
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-    glm::mat4 m[6];
-
-    m[0] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0));
-    m[1] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0,-1.0, 0.0));
-    m[2] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0));
-    m[3] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0,-1.0, 0.0), glm::vec3(0.0, 0.0,-1.0));
-    m[4] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0, 0.0, 1.0), glm::vec3(0.0,-1.0, 0.0));
-    m[5] = glm::lookAt(glm::vec3(0.0, 0.0, 0.0), glm::vec3( 0.0, 0.0,-1.0), glm::vec3(0.0,-1.0, 0.0));
-
-    for (int i = 0; i < 6; ++i)
-        debug_msg("m[%u] = %s", i, glm::to_string(m[i]).c_str());
-
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
@@ -237,7 +225,7 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE8); GLuint icosahedron_diffuse_texture_id  = image::png::texture2d("../../../resources/plato_tex2d/icosahedron.png");
     glActiveTexture(GL_TEXTURE9); GLuint icosahedron_normal_texture_id   = image::png::texture2d("../../../resources/plato_tex2d/icosahedron_bump.png");
 
-    const int N = 2;
+    const int N = 3;
     const int group_size = N * N * N;
     const float cell_size = 2.25f;
     const float origin_distance = 1.25f * cell_size * N;
@@ -260,6 +248,11 @@ int main(int argc, char *argv[])
     fbo_depth_cubemap shadow_cubemap(DEPTH_CUBEMAP_TEXTURE_UNIT, DEPTH_CUBEMAP_TEXTURE_SIZE);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glClearDepth(1.0f);
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
     
     //===================================================================================================================================================================================================================
     // main program loop
@@ -267,10 +260,9 @@ int main(int argc, char *argv[])
     while (!window.should_close())
     {
         window.new_frame();
-        float time = window.frame_ts;
 
-        glm::vec3 light_ws = glm::vec3(0.0f, glm::cos(0.15f * time), glm::sin(0.15f * time));
-        //glm::vec3 light_ws = glm::vec3(5.0f, 5.0f * glm::cos(0.15f * time), 5.0f * glm::sin(0.15f * time));
+        float time = 0.25f * window.frame_ts;
+        glm::vec3 light_ws = glm::vec3(5.0f, 5.0f * glm::cos(0.15f * time), 5.0f * glm::sin(0.15f * time));
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
 
@@ -282,12 +274,15 @@ int main(int argc, char *argv[])
         shadow_cubemap.bind();
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        glEnable(GL_CULL_FACE);
         shadow_map.enable();
+        glCullFace(GL_FRONT);
 
-        if(!window.pause)
+        if (!window.pause)
+        {
             uni_sm_light_ws = light_ws;
-        uni_sm_time = time;
+            uni_sm_time = time;
+        }
+
         uni_sm_buffer_base = 0 * group_size; tetrahedron.instanced_render(group_size);
         uni_sm_buffer_base = 1 * group_size; cube.instanced_render(group_size);
         uni_sm_buffer_base = 2 * group_size; octahedron.instanced_render(group_size);
@@ -297,21 +292,23 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // on-screen render pass using created depth texture
         //===============================================================================================================================================================================================================
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, window.res_x, window.res_y);
-
-        glEnable(GL_DEPTH_TEST);
-        shadow_cubemap.bind_texture(GL_TEXTURE10);
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+        glCullFace(GL_BACK);
         simple_light.enable();
 
         uni_sl_pv_matrix = projection_view_matrix;
         uni_sl_camera_ws = camera_ws;
-        if(!window.pause)
+
+        if (!window.pause)
+        {
+            uni_sl_time = time;
             uni_sl_light_ws = light_ws;
-        uni_sl_time = time;
+        }
+    
+        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
 
         uni_sl_base = 0 * group_size;
         uni_sl_diffuse_tex = 0;
