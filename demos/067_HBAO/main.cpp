@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include <glm/gtc/random.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_access.hpp>
@@ -20,7 +21,6 @@
 #include "geometry.hpp"
 #include "obj1.hpp"
 #include "shader.hpp"
-#include "shader1.hpp"
 #include "surface1.hpp"
 #include "model1.hpp"
 #include "mtl.hpp"
@@ -28,22 +28,19 @@
 #include "mesh2geometry.hpp"
 #include "material2surface.hpp"
 
-#define WIDTH 1024
-#define HEIGHT 768
+const int WIDTH = 1920;
+const int HEIGHT = 1080;
+const int RES_RATIO = 2;
+const int AO_WIDTH = WIDTH / RES_RATIO;
+const int AO_HEIGHT = HEIGHT / RES_RATIO;
+const int AO_DIRS = 6;
+const int AO_SAMPLES = 3;
 
-#define RES_RATIO 2
-#define AO_WIDTH (WIDTH / RES_RATIO)
-#define AO_HEIGHT (HEIGHT / RES_RATIO)
-#define AO_RADIUS 0.3
-#define AO_DIRS 6
-#define AO_SAMPLES 3
-#define AO_STRENGTH 17.5;
-#define AO_MAX_RADIUS_PIXELS 50.0
+const float AO_RADIUS = 0.3f;
+const float AO_STRENGTH = 2.75;
+const float AO_MAX_RADIUS_PIXELS = 50.0;
 
 #define NOISE_RES 4
-
-#define MOVE_SPEED 1.5
-#define MOUSE_SPEED 1.5
 
 GLuint generateNoiseTexture(int width, int height)
 {
@@ -135,8 +132,6 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-#include <glm/gtx/string_cast.hpp>
-
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -156,12 +151,12 @@ int main(int argc, char *argv[])
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-    glfwSwapInterval(0);
     glActiveTexture(GL_TEXTURE0);
-    glClearColor(1.0, 1.0, 1.0, 0.0);
+    glClearColor(0.17f, 0.23f, 0.57f, 1.0f);
+    glClearDepth(1.0f);
 
     //===================================================================================================================================================================================================================
-    // data and shaders initialization
+    // data initialization
     //===================================================================================================================================================================================================================
 
     Surface::init();
@@ -197,21 +192,111 @@ int main(int argc, char *argv[])
     fsquad->addTriangle(glm::uvec3(0, 2, 3));
     fsquad->createStaticBuffers();
 
+    glm::mat4& projection_matrix = window.camera.projection_matrix;
 
-    //glsl_program_t geometryShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/geometry.vs"),
-    //                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/geometry.FS"));
+    glm::vec2 FocalLen = glm::vec2(projection_matrix[0][0], projection_matrix[1][1]);
+    glm::vec2 InvFocalLen = 1.0f / FocalLen;
+    glm::vec2 UVToViewA = -2.0f * InvFocalLen;
+    glm::vec2 UVToViewB = InvFocalLen;
+    glm::vec2 LinMAD = glm::vec2(1.0 / (projection_matrix[3][2]), projection_matrix[2][2] / (projection_matrix[3][2]));
 
-    //geometryShader.enable();
+
+    //===================================================================================================================================================================================================================
+    // shaders initialization
+    //===================================================================================================================================================================================================================
+
+    glsl_program_t geometryShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/geometry.vs"),
+                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/geometry.fs"));
+    geometryShader.enable();
+    geometryShader["projMatrix"] = projection_matrix;
+    uniform_t uni_gs_view_matrix = geometryShader["viewMatrix"];
 
 
-    Shader geometryShader("glsl/geometry.vs", "glsl/geometry.fs");
-    Shader hbaoHalfShader("glsl/fullscreen.vs", "glsl/hbao.fs");
-    Shader hbaoFullShader("glsl/fullscreen.vs", "glsl/hbao_full.fs");
-    Shader compositShader("glsl/fullscreen.vs", "glsl/composite.fs");
-    Shader blurXShader("glsl/fullscreen.vs", "glsl/blur_x.fs");
-    Shader blurYShader("glsl/fullscreen.vs", "glsl/blur_y.fs");
-    Shader downsampleShader("glsl/fullscreen.vs", "glsl/downsample_depth.fs");
-    Shader upsampleShader("glsl/fullscreen.vs", "glsl/upsample_aoz.fs");
+    glsl_program_t compositeShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/composite.fs"));
+    compositeShader.enable();
+    compositeShader["texture0"] = 0;
+    compositeShader["texture1"] = 1;
+    compositeShader["texture2"] = 2;
+    compositeShader["texture3"] = 3;
+
+
+    glsl_program_t blurXShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur_x.fs"));
+    blurXShader.enable();
+    blurXShader["texture0"] = 0;
+    blurXShader["FullRes"] = glm::vec2(window.res_x, window.res_y);
+    blurXShader["InvFullRes"] = 1.0f / glm::vec2(window.res_x, window.res_y);
+    blurXShader["LinMAD"] = LinMAD;
+
+
+    glsl_program_t blurYShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur_y.fs"));
+    blurYShader.enable();
+    blurYShader["texture0"] = 0;
+    blurYShader["FullRes"] = glm::vec2(window.res_x, window.res_y);
+    blurYShader["InvFullRes"] = 1.0f / glm::vec2(window.res_x, window.res_y);
+    blurYShader["LinMAD"] = LinMAD;
+
+
+    glsl_program_t downsampleShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/downsample_depth.fs"));
+    downsampleShader.enable();
+    downsampleShader["texture0"] = 0;
+    downsampleShader["LinMAD"] = LinMAD;
+    downsampleShader["ResRatio"] = RES_RATIO;
+
+
+    glsl_program_t upsampleShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/upsample_aoz.fs"));
+    upsampleShader.enable();
+    upsampleShader["texture0"] = 0;
+    upsampleShader["texture1"] = 1;
+    upsampleShader["LinMAD"] = LinMAD;
+
+
+    glsl_program_t hbaoHalfShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hbao.fs"));
+    hbaoHalfShader.enable();
+    hbaoHalfShader["texture0"] = 0;
+    hbaoHalfShader["texture1"] = 1;
+    hbaoHalfShader["FocalLen"] = FocalLen;
+    hbaoHalfShader["UVToViewA"] = UVToViewA;
+    hbaoHalfShader["UVToViewB"] = UVToViewB;
+    hbaoHalfShader["LinMAD"] = LinMAD;
+    hbaoHalfShader["AORes"] = glm::vec2(AO_WIDTH, AO_HEIGHT);
+    hbaoHalfShader["InvAORes"] = 1.0f / glm::vec2(AO_WIDTH, AO_HEIGHT);
+    hbaoHalfShader["R"] = AO_RADIUS;
+    hbaoHalfShader["R2"] = AO_RADIUS * AO_RADIUS;
+    hbaoHalfShader["NegInvR2"] = -1.0f / (AO_RADIUS * AO_RADIUS);
+    hbaoHalfShader["AOStrength"] = AO_STRENGTH;
+    hbaoHalfShader["MaxRadiusPixels"] = AO_MAX_RADIUS_PIXELS / (float) RES_RATIO;
+    hbaoHalfShader["NoiseScale"] = glm::vec2(AO_WIDTH, AO_HEIGHT) / NOISE_RES;
+    hbaoHalfShader["NumDirections"] = AO_DIRS;
+    hbaoHalfShader["NumSamples"] = AO_SAMPLES;
+
+
+    glsl_program_t hbaoFullShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
+                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hbao_full.fs"));
+    hbaoFullShader.enable();
+    hbaoFullShader["texture0"] = 0;
+    hbaoFullShader["texture1"] = 1;
+    hbaoFullShader["FocalLen"] = FocalLen;
+    hbaoFullShader["UVToViewA"] = UVToViewA;
+    hbaoFullShader["UVToViewB"] = UVToViewB;
+    hbaoFullShader["LinMAD"] = LinMAD;
+    hbaoFullShader["AORes"] = glm::vec2(WIDTH, HEIGHT);
+    hbaoFullShader["InvAORes"] = 1.0f / glm::vec2(WIDTH, HEIGHT);
+    hbaoFullShader["R"] = AO_RADIUS;
+    hbaoFullShader["R2"] = AO_RADIUS * AO_RADIUS;
+    hbaoFullShader["NegInvR2"] = -1.0f / (AO_RADIUS * AO_RADIUS);
+    hbaoFullShader["AOStrength"] = AO_STRENGTH;
+    hbaoFullShader["MaxRadiusPixels"] = (float) AO_MAX_RADIUS_PIXELS;
+    hbaoFullShader["NoiseScale"] = glm::vec2(WIDTH, HEIGHT) / NOISE_RES;
+    hbaoFullShader["NumDirections"] = AO_DIRS;
+    hbaoFullShader["NumSamples"] = AO_SAMPLES;
+
+
 
     // Full res deferred base
     fboFullRes = new Framebuffer2D(WIDTH, HEIGHT);
@@ -225,115 +310,7 @@ int main(int argc, char *argv[])
     fboHalfRes->attachBuffer(FBO_AUX0, GL_R32F, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
     fboHalfRes->attachBuffer(FBO_AUX1, GL_R8, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
 
-    glm::mat4& projection_matrix = window.camera.projection_matrix;
-
-    glm::vec2 FocalLen = glm::vec2(projection_matrix[0][0], projection_matrix[1][1]);
-    glm::vec2 InvFocalLen = 1.0f / FocalLen;
-    glm::vec2 UVToViewA = -2.0f * InvFocalLen;
-    glm::vec2 UVToViewB = InvFocalLen;
-    glm::vec2 LinMAD = glm::vec2(1.0 / (projection_matrix[3][2]), projection_matrix[2][2] / (projection_matrix[3][2]));
-
-
-    hbaoHalfShader.bind();
-    int pos;
-    pos = hbaoHalfShader.getUniformLocation("FocalLen");
-    glUniform2f(pos, FocalLen[0], FocalLen[1]);
-    pos = hbaoHalfShader.getUniformLocation("UVToViewA");
-    glUniform2f(pos, UVToViewA[0], UVToViewA[1]);
-    pos = hbaoHalfShader.getUniformLocation("UVToViewB");
-    glUniform2f(pos, UVToViewB[0], UVToViewB[1]);
-    pos = hbaoHalfShader.getUniformLocation("LinMAD");
-    glUniform2f(pos, LinMAD[0], LinMAD[1]);
-
-    pos = hbaoHalfShader.getUniformLocation("AORes");
-    glUniform2f(pos, (float)AO_WIDTH, (float)AO_HEIGHT);
-    pos = hbaoHalfShader.getUniformLocation("InvAORes");
-    glUniform2f(pos, 1.0f/(float)AO_WIDTH, 1.0f/(float)AO_HEIGHT);
-
-    pos = hbaoHalfShader.getUniformLocation("R");
-    glUniform1f(pos, AO_RADIUS);
-    pos = hbaoHalfShader.getUniformLocation("R2");
-    glUniform1f(pos, AO_RADIUS*AO_RADIUS);
-    pos = hbaoHalfShader.getUniformLocation("NegInvR2");
-    glUniform1f(pos, -1.0f / (AO_RADIUS*AO_RADIUS));
-    pos = hbaoHalfShader.getUniformLocation("MaxRadiusPixels");
-    glUniform1f(pos, AO_MAX_RADIUS_PIXELS / (float)RES_RATIO);
-
-    pos = hbaoHalfShader.getUniformLocation("NoiseScale");
-    glUniform2f(pos, (float)AO_WIDTH/(float)NOISE_RES, (float)AO_HEIGHT/(float)NOISE_RES);
-    pos = hbaoHalfShader.getUniformLocation("NumDirections");
-    glUniform1i(pos, AO_DIRS);
-    pos = hbaoHalfShader.getUniformLocation("NumSamples");
-    glUniform1i(pos, AO_SAMPLES);
-
-    hbaoFullShader.bind();
-    pos = hbaoFullShader.getUniformLocation("FocalLen");
-    glUniform2f(pos, FocalLen[0], FocalLen[1]);
-    pos = hbaoFullShader.getUniformLocation("UVToViewA");
-    glUniform2f(pos, UVToViewA[0], UVToViewA[1]);
-    pos = hbaoFullShader.getUniformLocation("UVToViewB");
-    glUniform2f(pos, UVToViewB[0], UVToViewB[1]);
-    pos = hbaoFullShader.getUniformLocation("LinMAD");
-    glUniform2f(pos, LinMAD[0], LinMAD[1]);
-
-    pos = hbaoFullShader.getUniformLocation("AORes");
-    glUniform2f(pos, (float)WIDTH, (float)HEIGHT);
-    pos = hbaoFullShader.getUniformLocation("InvAORes");
-    glUniform2f(pos, 1.0f/(float)WIDTH, 1.0f/(float)HEIGHT);
-
-    pos = hbaoFullShader.getUniformLocation("R");
-    glUniform1f(pos, AO_RADIUS);
-    pos = hbaoFullShader.getUniformLocation("R2");
-    glUniform1f(pos, AO_RADIUS*AO_RADIUS);
-    pos = hbaoFullShader.getUniformLocation("NegInvR2");
-    glUniform1f(pos, -1.0f / (AO_RADIUS*AO_RADIUS));
-    pos = hbaoFullShader.getUniformLocation("MaxRadiusPixels");
-    glUniform1f(pos, AO_MAX_RADIUS_PIXELS);
-
-    pos = hbaoFullShader.getUniformLocation("NoiseScale");
-    glUniform2f(pos, (float)WIDTH/(float)NOISE_RES, (float)HEIGHT/(float)NOISE_RES);
-    pos = hbaoFullShader.getUniformLocation("NumDirections");
-    glUniform1i(pos, AO_DIRS);
-    pos = hbaoFullShader.getUniformLocation("NumSamples");
-    glUniform1i(pos, AO_SAMPLES);
-
-    blurXShader.bind();
-    pos = blurXShader.getUniformLocation("AORes");
-    glUniform2f(pos, AO_WIDTH, AO_HEIGHT);
-    pos = blurXShader.getUniformLocation("InvAORes");
-    glUniform2f(pos, 1.0f/AO_WIDTH, 1.0f/AO_HEIGHT);
-    pos = blurXShader.getUniformLocation("FullRes");
-    glUniform2f(pos, WIDTH, HEIGHT);
-    pos = blurXShader.getUniformLocation("InvFullRes");
-    glUniform2f(pos, 1.0f/WIDTH, 1.0f/HEIGHT);
-    pos = blurXShader.getUniformLocation("LinMAD");
-    glUniform2f(pos, LinMAD[0], LinMAD[1]);
-
-    blurYShader.bind();
-    pos = blurYShader.getUniformLocation("AORes");
-    glUniform2f(pos, AO_WIDTH, AO_HEIGHT);
-    pos = blurYShader.getUniformLocation("InvAORes");
-    glUniform2f(pos, 1.0f/AO_WIDTH, 1.0f/AO_HEIGHT);
-    pos = blurYShader.getUniformLocation("FullRes");
-    glUniform2f(pos, WIDTH, HEIGHT);
-    pos = blurYShader.getUniformLocation("InvFullRes");
-    glUniform2f(pos, 1.0f/WIDTH, 1.0f/HEIGHT);
-    pos = blurYShader.getUniformLocation("LinMAD");
-    glUniform2f(pos, LinMAD[0], LinMAD[1]);
-
-    downsampleShader.bind();
-    pos = downsampleShader.getUniformLocation("LinMAD");
-    glUniform2f(pos, LinMAD[0], LinMAD[1]);
-    pos = downsampleShader.getUniformLocation("ResRatio");
-    glUniform1i(pos, RES_RATIO);
-
-    upsampleShader.bind();
-    pos = upsampleShader.getUniformLocation("LinMAD");
-    glUniform2f(pos, LinMAD[0], LinMAD[1]);
-
     GLuint noiseTexture = generateNoiseTexture(NOISE_RES, NOISE_RES);
-
-    float dt;
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -345,44 +322,23 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // calculate FPS
         //===============================================================================================================================================================================================================
+        GLuint64 timeStamp[7];
 
-        static float t0 = 0.0;
-        static float t1 = 0.0;
+        for(int i = 0; i < 7; ++i)
+            glGetQueryObjectui64v(queryID[i], GL_QUERY_RESULT, &timeStamp[i]);
+
+        double geom = (timeStamp[1] - timeStamp[0]) / 1000000.0;
+        double down = (timeStamp[2] - timeStamp[1]) / 1000000.0;
+        double ao   = (timeStamp[3] - timeStamp[2]) / 1000000.0;
+        double up   = (timeStamp[4] - timeStamp[3]) / 1000000.0;
+        double blur = (timeStamp[5] - timeStamp[4]) / 1000000.0;
+        double comp = (timeStamp[6] - timeStamp[5]) / 1000000.0;
+        double tot  = (timeStamp[6] - timeStamp[0]) / 1000000.0;
+
         static char title[256];
-        static int frames = 0;
-
-        float t = (float)glfwGetTime();
-
-        dt = t - t0;
-        t0 = t;
-        t1 += dt;
-
-        if(t1 > 0.25)
-        {
-            float fps = (float)frames / t1;
-
-            GLuint64 timeStamp[7];
-
-            for(int i = 0; i < 7; ++i)
-                glGetQueryObjectui64v(queryID[i], GL_QUERY_RESULT, &timeStamp[i]);
-
-            double geom = (timeStamp[1] - timeStamp[0]) / 1000000.0;
-            double down = (timeStamp[2] - timeStamp[1]) / 1000000.0;
-            double ao   = (timeStamp[3] - timeStamp[2]) / 1000000.0;
-            double up   = (timeStamp[4] - timeStamp[3]) / 1000000.0;
-            double blur = (timeStamp[5] - timeStamp[4]) / 1000000.0;
-            double comp = (timeStamp[6] - timeStamp[5]) / 1000000.0;
-            double tot  = (timeStamp[6] - timeStamp[0]) / 1000000.0;
-
-            sprintf(title, "Fullres: %i, FPS: %2.1f, time(ms): geom %2.2f, down %2.2f, ao %2.2f, up %2.2f, blur %2.2f, comp %2.2f tot %2.2f",
-                (int)window.fullres, fps, geom, down, ao, up, blur, comp, tot);
-
-            window.set_title(title);
-            t1 = 0.0;
-            frames = 0;
-        }
-
-        ++frames;        
+        sprintf(title, "%s, FPS: %2.1f, time(ms): geom %2.2f, down %2.2f, ao %2.2f, up %2.2f, blur %2.2f, comp %2.2f tot %2.2f",
+            window.fullres ? "FullRes" : "HalfRes", window.fps(), geom, down, ao, up, blur, comp, tot);
+        window.set_title(title);
 
         glGenQueries(7, queryID);
         glQueryCounter(queryID[0], GL_TIMESTAMP);
@@ -393,14 +349,10 @@ int main(int argc, char *argv[])
         glEnable(GL_DEPTH_TEST);
 
         fboFullRes->bind();
-        glClearColor(0.2, 0.3, 0.5, 1.0);
-        glClearDepth(1.0);
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
-        geometryShader.bind();
-
-        glUniformMatrix4fv(geometryShader.getViewMatrixLocation(), 1, false, glm::value_ptr(window.camera.view_matrix));
-        glUniformMatrix4fv(geometryShader.getProjMatrixLocation(), 1, false, glm::value_ptr(projection_matrix));
+        geometryShader.enable();
+        uni_gs_view_matrix = window.camera.view_matrix;
 
         mdl->draw();
 
@@ -414,7 +366,7 @@ int main(int argc, char *argv[])
             glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
             fboHalfRes->bind();                                                       // Downsample depth
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
-            downsampleShader.bind();
+            downsampleShader.enable();
             fsquad->draw();
         }
     
@@ -431,13 +383,13 @@ int main(int argc, char *argv[])
         {
             glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX0));
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
-            hbaoHalfShader.bind();
+            hbaoHalfShader.enable();
         }
         else
         {
             glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
-            hbaoFullShader.bind();
+            hbaoFullShader.enable();
         }
         fsquad->draw();
     
@@ -454,7 +406,7 @@ int main(int argc, char *argv[])
             glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX1));
             fboFullRes->bind();
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
-            upsampleShader.bind();
+            upsampleShader.enable();
             fsquad->draw();
         }
     
@@ -469,23 +421,22 @@ int main(int argc, char *argv[])
             glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
     
             glDrawBuffer(GL_COLOR_ATTACHMENT2);
-            blurXShader.bind();
+            blurXShader.enable();
             fsquad->draw();
     
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
-            blurYShader.bind();
+            blurYShader.enable();
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX2));
             fsquad->draw();
         }
     
         glQueryCounter(queryID[5], GL_TIMESTAMP);    
-        fboFullRes->unbind();
     
         //===============================================================================================================================================================================================================
         // RENDER TO SCREEN PASS
         //===============================================================================================================================================================================================================
-    
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX0));    
         glActiveTexture(GL_TEXTURE1);
@@ -493,7 +444,7 @@ int main(int argc, char *argv[])
     
         glViewport(0, 0, WIDTH, HEIGHT);
     
-        compositShader.bind();
+        compositeShader.enable();
         fsquad->draw();
         
         glQueryCounter(queryID[6], GL_TIMESTAMP);

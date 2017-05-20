@@ -226,7 +226,7 @@ glfw_window_t::glfw_window_t(const char* title, int glfw_samples, int version_ma
     //===================================================================================================================================================================================================================
     // time and mouse state variables
     //===================================================================================================================================================================================================================
-    mouse_ts = frame_ts = glfw::time();
+    initial_ts = mouse_ts = frame_ts = glfw::time();
     mouse_delta = mouse = glm::dvec2(0.0);
     frame_dt = mouse_dt = 0.0;
 }
@@ -282,8 +282,12 @@ glm::dvec2 glfw_window_t::cursor_position()
     return pos;
 }
 
+double glfw_window_t::fps()
+    { return double(frame) / (frame_ts - initial_ts); };
+
 glfw_window_t::~glfw_window_t()
     { glfwDestroyWindow(window); }
+
 
 
 

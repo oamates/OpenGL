@@ -42,6 +42,7 @@ struct glfw_window_t
     int res_x, res_y;
     GLFWwindow* window;
 
+    double initial_ts;
     double frame_ts, mouse_ts;
     double frame_dt, mouse_dt;
 
@@ -84,7 +85,7 @@ struct glfw_window_t
     int key_state(int key);
 
     glm::dvec2 cursor_position();
-
+    double fps();
 };
 
 #endif // _glfw_window_included_4283678947635786273465286034868743624563575676554
