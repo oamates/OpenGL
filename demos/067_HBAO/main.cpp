@@ -16,6 +16,7 @@
 #include "gl_info.hpp"
 #include "constants.hpp"
 #include "glfw_window.hpp"
+#include "camera.hpp"
 #include "geometry.hpp"
 #include "obj1.hpp"
 #include "shader1.hpp"
@@ -42,116 +43,6 @@
 
 #define MOVE_SPEED 1.5
 #define MOUSE_SPEED 1.5
-
-
-#define CAMERA_PLANE_LEFT   0
-#define CAMERA_PLANE_RIGHT  1
-#define CAMERA_PLANE_BOTTOM 2
-#define CAMERA_PLANE_TOP    3
-#define CAMERA_PLANE_NEAR   4
-#define CAMERA_PLANE_FAR    5
-
-struct Camera
-{
-    glm::vec2 nearfar;
-    glm::ivec2 screensize;
-    float fov;
-
-    glm::vec3 position;
-    glm::vec3 orientation;
-    glm::mat4 viewMat, projMat;
-    glm::mat4 invViewMat, invProjMat;
-    glm::vec4 plane[6];
-    glm::vec3 *lookat;
-
-    Camera()
-        : nearfar(glm::vec2(0.1f, 100.0f)), screensize(glm::ivec2(1024, 768)), fov(glm::radians(60.0f)), lookat(0)
-        {}
-
-    void setup()
-    {
-        GLFWwindow* window = glfwGetCurrentContext();
-        glfwGetWindowSize(window, &screensize.x, &screensize.y);
-        if(screensize.y <= 0) screensize.y = 1;
-
-        glViewport(0, 0, screensize.x, screensize.y);
-
-        float ratio = (float) screensize.x / screensize.y;
-
-        projMat = glm::perspective(fov, ratio, nearfar.x, nearfar.y);
-
-        invProjMat = glm::inverse(projMat);
-
-        if (lookat)
-            viewMat = glm::lookAt(position, *lookat, glm::vec3(0.0f, 1.0f, 0.0f));
-        else
-        {
-            viewMat = glm::rotate(glm::mat4(1.0f), -orientation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-            viewMat = glm::rotate(viewMat, -orientation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-            viewMat = glm::rotate(viewMat, -orientation.z, glm::vec3(0.0f, 0.0f, 1.0f));
-            viewMat = glm::translate(viewMat, -position);
-        }
-
-        invViewMat = glm::inverse(viewMat);
-
-        glm::mat4 m = projMat * viewMat;
-
-        plane[CAMERA_PLANE_LEFT]    = glm::row(m, 3) + glm::row(m, 0);
-        plane[CAMERA_PLANE_RIGHT]   = glm::row(m, 3) - glm::row(m, 0);
-        plane[CAMERA_PLANE_BOTTOM]  = glm::row(m, 3) + glm::row(m, 1);
-        plane[CAMERA_PLANE_TOP]     = glm::row(m, 3) - glm::row(m, 1);
-        plane[CAMERA_PLANE_NEAR]    = glm::row(m, 3) + glm::row(m, 2);
-        plane[CAMERA_PLANE_FAR]     = glm::row(m, 3) - glm::row(m, 2);
-
-        plane[CAMERA_PLANE_LEFT]    /= glm::length(glm::vec3(plane[CAMERA_PLANE_LEFT]));
-        plane[CAMERA_PLANE_RIGHT]   /= glm::length(glm::vec3(plane[CAMERA_PLANE_RIGHT]));
-        plane[CAMERA_PLANE_BOTTOM]  /= glm::length(glm::vec3(plane[CAMERA_PLANE_BOTTOM]));
-        plane[CAMERA_PLANE_TOP]     /= glm::length(glm::vec3(plane[CAMERA_PLANE_TOP]));
-        plane[CAMERA_PLANE_NEAR]    /= glm::length(glm::vec3(plane[CAMERA_PLANE_NEAR]));
-        plane[CAMERA_PLANE_FAR]     /= glm::length(glm::vec3(plane[CAMERA_PLANE_FAR]));
-
-    }
-
-    void setPosition(const glm::vec3& pos)
-        { position = pos; }
-    void setPosition(float x, float y, float z)
-        { position = glm::vec3(x,y,z);}
-    void setOrientation(const glm::vec3& ori) 
-        { orientation = ori; }
-    void setOrientation(float x, float y, float z) 
-        { orientation = glm::vec3(x, y, z); }
-
-    void lookAt(glm::vec3 *pos)
-        { lookat = pos; }
-    void move(const glm::vec3& vec)
-    {
-        glm::mat4 rotmat = glm::yawPitchRoll(glm::radians(orientation.y), glm::radians(orientation.x), glm::radians(orientation.z));
-        position += glm::vec3(rotmat * glm::vec4(vec, 0.0));
-    }
-    void translate(const glm::vec3& vec)
-        { position += vec; }
-
-    const glm::vec3 &getPosition()
-        { return position; }
-    const glm::vec3 &getOrientation() 
-        { return orientation; }
-
-    float getFov()
-        { return fov; }
-    float getNear()
-        { return nearfar.x; }
-    float getFar()
-        { return nearfar.y; }
-
-    const glm::mat4 &getProjMatrix()
-        { return projMat; }
-    const glm::mat4 &getViewMatrix()
-        { return viewMat; }
-    const glm::mat4 &getInverseViewMatrix() 
-        { return invViewMat; }
-    const glm::mat4 &getInverseProjMatrix()
-        { return invProjMat; }
-};
 
 GLuint generateNoiseTexture(int width, int height)
 {
@@ -189,10 +80,9 @@ GLuint generateNoiseTexture(int width, int height)
     return noiseTexture;
 }
 
-Model * mdl;
+Model* mdl;
 Geometry* model;
 Geometry* fsquad;
-Camera * cam;
 
 Shader* geometryShader;
 Shader* geometryBackShader;
@@ -217,7 +107,8 @@ std::vector<Geometry> models;
 
 struct demo_window_t : public glfw_window_t
 {
-    bool running = true;
+    camera_t camera;
+
     bool blur = false;
     bool fullres = true;
 
@@ -225,6 +116,7 @@ struct demo_window_t : public glfw_window_t
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
     }
 
     //===================================================================================================================================================================================================================
@@ -232,20 +124,27 @@ struct demo_window_t : public glfw_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if(key == GLFW_KEY_ESCAPE)
-            running = false;
-        else if(key == GLFW_KEY_B && action == GLFW_PRESS)
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
+        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+
+        if((key == GLFW_KEY_B) && (action == GLFW_RELEASE))
             blur = !blur;
-        else if(key == GLFW_KEY_F && action == GLFW_PRESS)
+        else if ((key == GLFW_KEY_F) && (action == GLFW_RELEASE))
             fullres = !fullres;
 
     }
 
     void on_mouse_move() override
     {
+        double norm = glm::length(mouse_delta);
+        if (norm > 0.01)
+            camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
 };
 
+#include <glm/gtx/string_cast.hpp>
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -275,7 +174,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     Surface::init();
-    cam = new Camera();
     mdl = new Model();
 
     Mesh mesh = loadMeshFromObj("../../../resources/models/obj/dragon_low_poly.obj", 0.1);
@@ -288,7 +186,6 @@ int main(int argc, char *argv[])
 
     std::vector<Mesh> meshes = loadMeshesFromObj("../../../resources/models/obj/crytek-sponza/sponza.obj", 0.01f);
     std::vector<Geometry> geometries = createGeometryFromMesh(meshes);
-
     std::vector<Material> materials = loadMaterialsFromMtl("../../../resources/models/obj/crytek-sponza/sponza.mtl");
     surfaces = createSurfaceFromMaterial(materials, "../../../resources/models/obj/crytek-sponza/");
 
@@ -300,10 +197,10 @@ int main(int argc, char *argv[])
     fsquad = new Geometry();
 
     Geometry::sVertex v;
-    v.position = glm::vec3(-1,-1, 0); v.texCoord = glm::vec2(0,0); fsquad->addVertex(v);
-    v.position = glm::vec3( 1,-1, 0); v.texCoord = glm::vec2(1,0); fsquad->addVertex(v);
-    v.position = glm::vec3( 1, 1, 0); v.texCoord = glm::vec2(1,1); fsquad->addVertex(v);
-    v.position = glm::vec3(-1, 1, 0); v.texCoord = glm::vec2(0,1); fsquad->addVertex(v);
+    v.position = glm::vec3(-1.0f, -1.0f, 0.0f); v.texCoord = glm::vec2(0.0f, 0.0f); fsquad->addVertex(v);
+    v.position = glm::vec3( 1.0f, -1.0f, 0.0f); v.texCoord = glm::vec2(1.0f, 0.0f); fsquad->addVertex(v);
+    v.position = glm::vec3( 1.0f,  1.0f, 0.0f); v.texCoord = glm::vec2(1.0f, 1.0f); fsquad->addVertex(v);
+    v.position = glm::vec3(-1.0f,  1.0f, 0.0f); v.texCoord = glm::vec2(0.0f, 1.0f); fsquad->addVertex(v);
 
     fsquad->addTriangle(glm::uvec3(0, 1, 2));
     fsquad->addTriangle(glm::uvec3(0, 2, 3));
@@ -332,24 +229,14 @@ int main(int argc, char *argv[])
     fboHalfRes->attachBuffer(FBO_AUX0, GL_R32F, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
     fboHalfRes->attachBuffer(FBO_AUX1, GL_R8, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
 
+    glm::mat4& projection_matrix = window.camera.projection_matrix;
 
-    float fovRad = cam->getFov();
+    glm::vec2 FocalLen = glm::vec2(projection_matrix[0][0], projection_matrix[1][1]);
+    glm::vec2 InvFocalLen = 1.0f / FocalLen;
+    glm::vec2 UVToViewA = -2.0f * InvFocalLen;
+    glm::vec2 UVToViewB = InvFocalLen;
+    glm::vec2 LinMAD = glm::vec2(1.0 / (projection_matrix[3][2]), projection_matrix[2][2] / (projection_matrix[3][2]));
 
-    glm::vec2 FocalLen, InvFocalLen, UVToViewA, UVToViewB, LinMAD;
-
-    FocalLen[0]      = 1.0f / tanf(fovRad * 0.5f) * ((float)AO_HEIGHT / (float)AO_WIDTH);
-    FocalLen[1]      = 1.0f / tanf(fovRad * 0.5f);
-    InvFocalLen[0]   = 1.0f / FocalLen[0];
-    InvFocalLen[1]   = 1.0f / FocalLen[1];
-
-    UVToViewA[0] = -2.0f * InvFocalLen[0];
-    UVToViewA[1] = -2.0f * InvFocalLen[1];
-    UVToViewB[0] =  1.0f * InvFocalLen[0];
-    UVToViewB[1] =  1.0f * InvFocalLen[1];
-
-    float near = cam->getNear(), far = cam->getFar();
-    LinMAD[0] = (near-far)/(2.0f * near * far);
-    LinMAD[1] = (near+far)/(2.0f * near * far);
 
     hbaoHalfShader->bind();
     int pos;
@@ -505,37 +392,6 @@ int main(int argc, char *argv[])
         glQueryCounter(queryID[0], GL_TIMESTAMP);
 
         //===============================================================================================================================================================================================================
-        // camera setup
-        //===============================================================================================================================================================================================================
-
-        double x, y;
-
-        glfwGetCursorPos(window.window, &x, &y);
-
-        glm::vec3 camrot = cam->getOrientation();
-
-        camrot.x -= (float)(y - HEIGHT / 2) * MOUSE_SPEED * dt;
-        camrot.y -= (float)(x - WIDTH / 2)  * MOUSE_SPEED * dt;
-    
-        if(camrot.x > 90.0f) camrot.x = 90.0f;
-        if(camrot.x < -90.0f) camrot.x = -90.0f;
-        if(camrot.y > 360.0f) camrot.y -= 360.0f;
-        if(camrot.y < -360.0f) camrot.y += 360.0f;
-    
-        cam->setOrientation(camrot);
-        glfwSetCursorPos(window.window, WIDTH / 2, HEIGHT / 2);
-
-        glm::vec3 movevec = glm::vec3(0.0f);
-
-        if (glfwGetKey(window.window, GLFW_KEY_W)) movevec.z += MOVE_SPEED;
-        if (glfwGetKey(window.window, GLFW_KEY_S)) movevec.z -= MOVE_SPEED;
-        if (glfwGetKey(window.window, GLFW_KEY_A)) movevec.x -= MOVE_SPEED;
-        if (glfwGetKey(window.window, GLFW_KEY_D)) movevec.x += MOVE_SPEED;
-
-        cam->move(movevec * dt);
-        cam->setup();
-
-        //===============================================================================================================================================================================================================
         // RENDER GEOMETRY PASS
         //===============================================================================================================================================================================================================
         glEnable(GL_DEPTH_TEST);
@@ -547,8 +403,8 @@ int main(int argc, char *argv[])
 
         geometryShader->bind();
 
-        glUniformMatrix4fv(geometryShader->getViewMatrixLocation(), 1, false, glm::value_ptr(cam->getViewMatrix()));
-        glUniformMatrix4fv(geometryShader->getProjMatrixLocation(), 1, false, glm::value_ptr(cam->getProjMatrix()));
+        glUniformMatrix4fv(geometryShader->getViewMatrixLocation(), 1, false, glm::value_ptr(window.camera.view_matrix));
+        glUniformMatrix4fv(geometryShader->getProjMatrixLocation(), 1, false, glm::value_ptr(projection_matrix));
 
         mdl->draw();
 
@@ -665,7 +521,6 @@ int main(int argc, char *argv[])
     delete model;
     delete fsquad;
     delete surface0;
-    delete cam;
     delete geometryShader;
     delete hbaoHalfShader;
     delete hbaoFullShader;
