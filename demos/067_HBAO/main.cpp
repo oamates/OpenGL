@@ -8,19 +8,23 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/random.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_access.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include "log.hpp"
+#include "gl_info.hpp"
+#include "constants.hpp"
+#include "glfw_window.hpp"
 #include "geometry.hpp"
 #include "obj1.hpp"
 #include "shader1.hpp"
-#include "camera1.hpp"
 #include "surface1.hpp"
 #include "model1.hpp"
 #include "mtl.hpp"
 #include "fbo2d.hpp"
 #include "mesh2geometry.hpp"
 #include "material2surface.hpp"
-#include "gl_info.hpp"
 
 #define WIDTH 1280
 #define HEIGHT 720
@@ -39,21 +43,151 @@
 #define MOVE_SPEED 1.5
 #define MOUSE_SPEED 1.5
 
-void setupGL();
-void calcFPS(float &dt);
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-void init();
-void cleanUp();
+#define CAMERA_PLANE_LEFT   0
+#define CAMERA_PLANE_RIGHT  1
+#define CAMERA_PLANE_BOTTOM 2
+#define CAMERA_PLANE_TOP    3
+#define CAMERA_PLANE_NEAR   4
+#define CAMERA_PLANE_FAR    5
 
-void modifyCamera(float dt);
-void generateNoiseTexture(int width, int height);
+struct Camera
+{
+    glm::vec2 nearfar;
+    glm::ivec2 screensize;
+    float fov;
 
-bool running = true;
-bool blur = false;
-bool fullres = true;
+    glm::vec3 position;
+    glm::vec3 orientation;
+    glm::mat4 viewMat, projMat;
+    glm::mat4 invViewMat, invProjMat;
+    glm::vec4 plane[6];
+    glm::vec3 *lookat;
 
-GLFWwindow* window;
+    Camera()
+        : nearfar(glm::vec2(0.1f, 100.0f)), screensize(glm::ivec2(1024, 768)), fov(glm::radians(60.0f)), lookat(0)
+        {}
+
+    void setup()
+    {
+        GLFWwindow* window = glfwGetCurrentContext();
+        glfwGetWindowSize(window, &screensize.x, &screensize.y);
+        if(screensize.y <= 0) screensize.y = 1;
+
+        glViewport(0, 0, screensize.x, screensize.y);
+
+        float ratio = (float) screensize.x / screensize.y;
+
+        projMat = glm::perspective(fov, ratio, nearfar.x, nearfar.y);
+
+        invProjMat = glm::inverse(projMat);
+
+        if (lookat)
+            viewMat = glm::lookAt(position, *lookat, glm::vec3(0.0f, 1.0f, 0.0f));
+        else
+        {
+            viewMat = glm::rotate(glm::mat4(1.0f), -orientation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+            viewMat = glm::rotate(viewMat, -orientation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+            viewMat = glm::rotate(viewMat, -orientation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+            viewMat = glm::translate(viewMat, -position);
+        }
+
+        invViewMat = glm::inverse(viewMat);
+
+        glm::mat4 m = projMat * viewMat;
+
+        plane[CAMERA_PLANE_LEFT]    = glm::row(m, 3) + glm::row(m, 0);
+        plane[CAMERA_PLANE_RIGHT]   = glm::row(m, 3) - glm::row(m, 0);
+        plane[CAMERA_PLANE_BOTTOM]  = glm::row(m, 3) + glm::row(m, 1);
+        plane[CAMERA_PLANE_TOP]     = glm::row(m, 3) - glm::row(m, 1);
+        plane[CAMERA_PLANE_NEAR]    = glm::row(m, 3) + glm::row(m, 2);
+        plane[CAMERA_PLANE_FAR]     = glm::row(m, 3) - glm::row(m, 2);
+
+        plane[CAMERA_PLANE_LEFT]    /= glm::length(glm::vec3(plane[CAMERA_PLANE_LEFT]));
+        plane[CAMERA_PLANE_RIGHT]   /= glm::length(glm::vec3(plane[CAMERA_PLANE_RIGHT]));
+        plane[CAMERA_PLANE_BOTTOM]  /= glm::length(glm::vec3(plane[CAMERA_PLANE_BOTTOM]));
+        plane[CAMERA_PLANE_TOP]     /= glm::length(glm::vec3(plane[CAMERA_PLANE_TOP]));
+        plane[CAMERA_PLANE_NEAR]    /= glm::length(glm::vec3(plane[CAMERA_PLANE_NEAR]));
+        plane[CAMERA_PLANE_FAR]     /= glm::length(glm::vec3(plane[CAMERA_PLANE_FAR]));
+
+    }
+
+    void setPosition(const glm::vec3& pos)
+        { position = pos; }
+    void setPosition(float x, float y, float z)
+        { position = glm::vec3(x,y,z);}
+    void setOrientation(const glm::vec3& ori) 
+        { orientation = ori; }
+    void setOrientation(float x, float y, float z) 
+        { orientation = glm::vec3(x, y, z); }
+
+    void lookAt(glm::vec3 *pos)
+        { lookat = pos; }
+    void move(const glm::vec3& vec)
+    {
+        glm::mat4 rotmat = glm::yawPitchRoll(glm::radians(orientation.y), glm::radians(orientation.x), glm::radians(orientation.z));
+        position += glm::vec3(rotmat * glm::vec4(vec, 0.0));
+    }
+    void translate(const glm::vec3& vec)
+        { position += vec; }
+
+    const glm::vec3 &getPosition()
+        { return position; }
+    const glm::vec3 &getOrientation() 
+        { return orientation; }
+
+    float getFov()
+        { return fov; }
+    float getNear()
+        { return nearfar.x; }
+    float getFar()
+        { return nearfar.y; }
+
+    const glm::mat4 &getProjMatrix()
+        { return projMat; }
+    const glm::mat4 &getViewMatrix()
+        { return viewMat; }
+    const glm::mat4 &getInverseViewMatrix() 
+        { return invViewMat; }
+    const glm::mat4 &getInverseProjMatrix()
+        { return invProjMat; }
+};
+
+GLuint generateNoiseTexture(int width, int height)
+{
+    GLuint noiseTexture;
+    glGenTextures(1, &noiseTexture);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+
+    float *noise = new float[width * height * 4];
+    for(int y = 0; y < height; ++y)
+    {
+        for(int x = 0; x < width; ++x)
+        {
+            glm::vec2 xy = glm::circularRand(1.0f);
+            float z = glm::linearRand(0.0f, 1.0f);
+            float w = glm::linearRand(0.0f, 1.0f);
+
+            int offset = 4 * (y * width + x);
+            noise[offset + 0] = xy[0];
+            noise[offset + 1] = xy[1];
+            noise[offset + 2] = z;
+            noise[offset + 3] = w;
+        }
+    }
+
+    GLint internalFormat = GL_RGBA16F;
+    GLint format = GL_RGBA;
+    GLint type = GL_FLOAT;
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, noise);
+    return noiseTexture;
+}
 
 Model * mdl;
 Geometry* model;
@@ -69,10 +203,9 @@ Shader* blurXShader;
 Shader* blurYShader;
 Shader* downsampleShader;
 Shader* upsampleShader;
-//Shader* ssaoShader;
 
-Framebuffer2D * fboFullRes;
-Framebuffer2D * fboHalfRes;
+Framebuffer2D* fboFullRes;
+Framebuffer2D* fboHalfRes;
 
 double timeStamps[7];
 unsigned int queryID[7];
@@ -82,179 +215,68 @@ Surface * surface0;
 std::map<std::string, Surface*> surfaces;
 std::vector<Geometry> models;
 
-GLuint noiseTexture;
+struct demo_window_t : public glfw_window_t
+{
+    bool running = true;
+    bool blur = false;
+    bool fullres = true;
+
+    demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+    {
+        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+    }
+
+    //===================================================================================================================================================================================================================
+    // event handlers
+    //===================================================================================================================================================================================================================
+    void on_key(int key, int scancode, int action, int mods) override
+    {
+        if(key == GLFW_KEY_ESCAPE)
+            running = false;
+        else if(key == GLFW_KEY_B && action == GLFW_PRESS)
+            blur = !blur;
+        else if(key == GLFW_KEY_F && action == GLFW_PRESS)
+            fullres = !fullres;
+
+    }
+
+    void on_mouse_move() override
+    {
+    }
+};
+
 
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-	init();
-    GLenum buffer[1];
-    float dt;
+    //===================================================================================================================================================================================================================
+    // initialize GLFW library, create GLFW window and initialize GLEW library
+    // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
+    //===================================================================================================================================================================================================================
+    if (!glfw::init())
+        exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    cam->translate(glm::vec3(0, 0, 2));
+    demo_window_t window("HBAO", 4, 3, 3, WIDTH, HEIGHT, false);
 
-	while(running)
-	{
-        calcFPS(dt);
+    gl_error_msg();
 
-        glGenQueries(7, queryID);
-        glQueryCounter(queryID[0], GL_TIMESTAMP);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glfwSwapInterval(0);
+    glActiveTexture(GL_TEXTURE0);
+    glClearColor(1.0, 1.0, 1.0, 0.0);
 
-		modifyCamera(dt);
-        cam->setup();
+    //===================================================================================================================================================================================================================
+    // data and shaders initialization
+    //===================================================================================================================================================================================================================
 
-        // RENDER GEOMETRY PASS
-        glEnable(GL_DEPTH_TEST);
-
-        fboFullRes->bind();
-        glClearColor(0.2, 0.3, 0.5, 1.0);
-        glClearDepth(1.0);
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-        geometryShader->bind();
-
-        glUniformMatrix4fv(geometryShader->getViewMatrixLocation(), 1, false, glm::value_ptr(cam->getViewMatrix()));
-        glUniformMatrix4fv(geometryShader->getProjMatrixLocation(), 1, false, glm::value_ptr(cam->getProjMatrix()));
-
-        mdl->draw();
-
-        glQueryCounter(queryID[1], GL_TIMESTAMP);
-
-        glDisable(GL_DEPTH_TEST);
-
-        if(!fullres)
-        {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
-            fboHalfRes->bind();                                                       // Downsample depth
-            buffer[0] = GL_COLOR_ATTACHMENT0;
-            glDrawBuffers(1, buffer);
-            downsampleShader->bind();
-            fsquad->draw();
-        }
-    
-        glQueryCounter(queryID[2], GL_TIMESTAMP);
-    
-        // AO pass    
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    
-        if(!fullres)
-        {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX0));
-            buffer[0] = GL_COLOR_ATTACHMENT1;
-            glDrawBuffers(1, buffer);
-            hbaoHalfShader->bind();
-            //ssaoShader->bind();
-            fsquad->draw();
-        }
-        else
-        {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
-            buffer[0] = GL_COLOR_ATTACHMENT1;
-            glDrawBuffers(1, buffer);
-            hbaoFullShader->bind();
-            fsquad->draw();
-        }
-    
-        glQueryCounter(queryID[3], GL_TIMESTAMP);
-    
-        // Upsample
-    
-        if(!fullres)
-        {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX1));
-            fboFullRes->bind();
-            buffer[0] = GL_COLOR_ATTACHMENT1;
-            glDrawBuffers(1, buffer);
-            upsampleShader->bind();
-            fsquad->draw();
-        }
-    
-        glQueryCounter(queryID[4], GL_TIMESTAMP);
-    
-        if(blur)
-        {
-            // BLUR 
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
-    
-            // X
-            buffer[0] = GL_COLOR_ATTACHMENT2;
-            glDrawBuffers(1, buffer);
-            blurXShader->bind();
-            fsquad->draw();
-    
-            // Y
-            buffer[0] = GL_COLOR_ATTACHMENT1;
-            glDrawBuffers(1, buffer);
-            blurYShader->bind();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX2));
-            fsquad->draw();
-        }
-    
-        //timeStamps[5] = glfwGetTime();
-        glQueryCounter(queryID[5], GL_TIMESTAMP);
-    
-        fboFullRes->unbind();
-    
-        // RENDER TO SCREEN PASS
-    
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX0));
-    
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
-    
-        //glClearColor(1.0, 1.0, 1.0, 0.0);
-        //glClear(GL_COLOR_BUFFER_BIT);
-        glViewport(0, 0, WIDTH, HEIGHT);
-    
-        compositShader->bind();
-        fsquad->draw();
-		glfwSwapBuffers(window);
-        glfwPollEvents();
-        
-        if (glfwWindowShouldClose(window))
-			running = false;
-
-        glQueryCounter(queryID[6], GL_TIMESTAMP);
-
-        GLint stopTimerAvailable = 0;
-        bool stop = false;
-
-        while (!stop)
-        {
-            stop = true;
-            for(int i = 0; i < 7; ++i)
-            {
-                glGetQueryObjectiv(queryID[1], GL_QUERY_RESULT_AVAILABLE, &stopTimerAvailable);
-                if(!stopTimerAvailable) stop = false;
-            }
-        }
-	}
-
-	cleanUp();
-	return 0;
-}
-
-void init()
-{
-	setupGL();
     Surface::init();
-
-	cam = new Camera();
+    cam = new Camera();
     mdl = new Model();
-
-    
 
     Mesh mesh = loadMeshFromObj("../../../resources/models/obj/dragon_low_poly.obj", 0.1);
     Geometry dragon = createGeometryFromMesh(mesh);
@@ -270,10 +292,8 @@ void init()
     std::vector<Material> materials = loadMaterialsFromMtl("../../../resources/models/obj/crytek-sponza/sponza.mtl");
     surfaces = createSurfaceFromMaterial(materials, "../../../resources/models/obj/crytek-sponza/");
 
-    for(unsigned int i=0; i<geometries.size(); ++i)
-    {
+    for(unsigned int i = 0; i < geometries.size(); ++i)
         mdl->addGeometryAndSurface(&geometries[i], surfaces[geometries[i].material]);
-    }
 
     mdl->prepare();
 
@@ -289,12 +309,12 @@ void init()
     fsquad->addTriangle(glm::uvec3(0, 2, 3));
     fsquad->createStaticBuffers();
 
-	geometryShader = new Shader("glsl/geometry.vs", "glsl/geometry.fs");
+    geometryShader = new Shader("glsl/geometry.vs", "glsl/geometry.fs");
     geometryBackShader = new Shader("glsl/geometry.vs", "glsl/geometry_back.fs");
 
     hbaoHalfShader = new Shader("glsl/fullscreen.vs", "glsl/hbao.fs");
     hbaoFullShader = new Shader("glsl/fullscreen.vs", "glsl/hbao_full.fs");
-	compositShader = new Shader("glsl/fullscreen.vs", "glsl/composite.fs");
+    compositShader = new Shader("glsl/fullscreen.vs", "glsl/composite.fs");
     blurXShader = new Shader("glsl/fullscreen.vs", "glsl/blur_x.fs");
     blurYShader = new Shader("glsl/fullscreen.vs", "glsl/blur_y.fs");
     downsampleShader = new Shader("glsl/fullscreen.vs", "glsl/downsample_depth.fs");
@@ -328,8 +348,8 @@ void init()
     UVToViewB[1] =  1.0f * InvFocalLen[1];
 
     float near = cam->getNear(), far = cam->getFar();
-    LinMAD[0] = (near-far)/(2.0f*near*far);
-    LinMAD[1] = (near+far)/(2.0f*near*far);
+    LinMAD[0] = (near-far)/(2.0f * near * far);
+    LinMAD[1] = (near+far)/(2.0f * near * far);
 
     hbaoHalfShader->bind();
     int pos;
@@ -428,19 +448,226 @@ void init()
     pos = upsampleShader->getUniformLocation("LinMAD");
     glUniform2f(pos, LinMAD[0], LinMAD[1]);
 
-    glGenTextures(1, &noiseTexture);
-    glBindTexture(GL_TEXTURE_2D, noiseTexture);
-    generateNoiseTexture(NOISE_RES, NOISE_RES);
-}
+    GLuint noiseTexture = generateNoiseTexture(NOISE_RES, NOISE_RES);
 
-void cleanUp()
-{
-	delete model;
+    float dt;
+
+    //===================================================================================================================================================================================================================
+    // main program loop
+    //===================================================================================================================================================================================================================
+    while (!window.should_close())
+    {
+        window.new_frame();
+
+        //===============================================================================================================================================================================================================
+        // calculate FPS
+        //===============================================================================================================================================================================================================
+
+        static float t0 = 0.0;
+        static float t1 = 0.0;
+        static char title[256];
+        static int frames = 0;
+
+        float t = (float)glfwGetTime();
+
+        dt = t - t0;
+        t0 = t;
+        t1 += dt;
+
+        if(t1 > 0.25)
+        {
+            float fps = (float)frames / t1;
+
+            GLuint64 timeStamp[7];
+
+            for(int i = 0; i < 7; ++i)
+                glGetQueryObjectui64v(queryID[i], GL_QUERY_RESULT, &timeStamp[i]);
+
+            double geom = (timeStamp[1] - timeStamp[0]) / 1000000.0;
+            double down = (timeStamp[2] - timeStamp[1]) / 1000000.0;
+            double ao   = (timeStamp[3] - timeStamp[2]) / 1000000.0;
+            double up   = (timeStamp[4] - timeStamp[3]) / 1000000.0;
+            double blur = (timeStamp[5] - timeStamp[4]) / 1000000.0;
+            double comp = (timeStamp[6] - timeStamp[5]) / 1000000.0;
+            double tot  = (timeStamp[6] - timeStamp[0]) / 1000000.0;
+
+            sprintf(title, "Fullres: %i, FPS: %2.1f, time(ms): geom %2.2f, down %2.2f, ao %2.2f, up %2.2f, blur %2.2f, comp %2.2f tot %2.2f",
+                (int)window.fullres, fps, geom, down, ao, up, blur, comp, tot);
+
+            window.set_title(title);
+            t1 = 0.0;
+            frames = 0;
+        }
+
+        ++frames;        
+
+        glGenQueries(7, queryID);
+        glQueryCounter(queryID[0], GL_TIMESTAMP);
+
+        //===============================================================================================================================================================================================================
+        // camera setup
+        //===============================================================================================================================================================================================================
+
+        double x, y;
+
+        glfwGetCursorPos(window.window, &x, &y);
+
+        glm::vec3 camrot = cam->getOrientation();
+
+        camrot.x -= (float)(y - HEIGHT / 2) * MOUSE_SPEED * dt;
+        camrot.y -= (float)(x - WIDTH / 2)  * MOUSE_SPEED * dt;
+    
+        if(camrot.x > 90.0f) camrot.x = 90.0f;
+        if(camrot.x < -90.0f) camrot.x = -90.0f;
+        if(camrot.y > 360.0f) camrot.y -= 360.0f;
+        if(camrot.y < -360.0f) camrot.y += 360.0f;
+    
+        cam->setOrientation(camrot);
+        glfwSetCursorPos(window.window, WIDTH / 2, HEIGHT / 2);
+
+        glm::vec3 movevec = glm::vec3(0.0f);
+
+        if (glfwGetKey(window.window, GLFW_KEY_W)) movevec.z += MOVE_SPEED;
+        if (glfwGetKey(window.window, GLFW_KEY_S)) movevec.z -= MOVE_SPEED;
+        if (glfwGetKey(window.window, GLFW_KEY_A)) movevec.x -= MOVE_SPEED;
+        if (glfwGetKey(window.window, GLFW_KEY_D)) movevec.x += MOVE_SPEED;
+
+        cam->move(movevec * dt);
+        cam->setup();
+
+        //===============================================================================================================================================================================================================
+        // RENDER GEOMETRY PASS
+        //===============================================================================================================================================================================================================
+        glEnable(GL_DEPTH_TEST);
+
+        fboFullRes->bind();
+        glClearColor(0.2, 0.3, 0.5, 1.0);
+        glClearDepth(1.0);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+        geometryShader->bind();
+
+        glUniformMatrix4fv(geometryShader->getViewMatrixLocation(), 1, false, glm::value_ptr(cam->getViewMatrix()));
+        glUniformMatrix4fv(geometryShader->getProjMatrixLocation(), 1, false, glm::value_ptr(cam->getProjMatrix()));
+
+        mdl->draw();
+
+        glQueryCounter(queryID[1], GL_TIMESTAMP);
+
+        glDisable(GL_DEPTH_TEST);
+
+        if(!window.fullres)
+        {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
+            fboHalfRes->bind();                                                       // Downsample depth
+            glDrawBuffer(GL_COLOR_ATTACHMENT0);
+            downsampleShader->bind();
+            fsquad->draw();
+        }
+    
+        glQueryCounter(queryID[2], GL_TIMESTAMP);
+    
+        //===============================================================================================================================================================================================================
+        // AO pass
+        //===============================================================================================================================================================================================================
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, noiseTexture);
+        glActiveTexture(GL_TEXTURE0);
+
+        if(!window.fullres)
+        {
+            glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX0));
+            glDrawBuffer(GL_COLOR_ATTACHMENT1);
+            hbaoHalfShader->bind();
+        }
+        else
+        {
+            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
+            glDrawBuffer(GL_COLOR_ATTACHMENT1);
+            hbaoFullShader->bind();
+        }
+        fsquad->draw();
+    
+        glQueryCounter(queryID[3], GL_TIMESTAMP);
+    
+        //===============================================================================================================================================================================================================
+        // Upsample
+        //===============================================================================================================================================================================================================    
+        if(!window.fullres)
+        {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX1));
+            fboFullRes->bind();
+            glDrawBuffer(GL_COLOR_ATTACHMENT1);
+            upsampleShader->bind();
+            fsquad->draw();
+        }
+    
+        glQueryCounter(queryID[4], GL_TIMESTAMP);
+    
+        //===============================================================================================================================================================================================================
+        // Blur pass
+        //===============================================================================================================================================================================================================    
+        if(window.blur)
+        {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
+    
+            glDrawBuffer(GL_COLOR_ATTACHMENT2);
+            blurXShader->bind();
+            fsquad->draw();
+    
+            glDrawBuffer(GL_COLOR_ATTACHMENT1);
+            blurYShader->bind();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX2));
+            fsquad->draw();
+        }
+    
+        glQueryCounter(queryID[5], GL_TIMESTAMP);    
+        fboFullRes->unbind();
+    
+        //===============================================================================================================================================================================================================
+        // RENDER TO SCREEN PASS
+        //===============================================================================================================================================================================================================
+    
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX0));    
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
+    
+        glViewport(0, 0, WIDTH, HEIGHT);
+    
+        compositShader->bind();
+        fsquad->draw();
+        
+        glQueryCounter(queryID[6], GL_TIMESTAMP);
+
+        GLint stopTimerAvailable = 0;
+        bool stop = false;
+
+        while (!stop)
+        {
+            stop = true;
+            for(int i = 0; i < 7; ++i)
+            {
+                glGetQueryObjectiv(queryID[1], GL_QUERY_RESULT_AVAILABLE, &stopTimerAvailable);
+                if(!stopTimerAvailable) stop = false;
+            }
+        }
+
+        window.end_frame();
+    }
+
+    delete model;
     delete fsquad;
     delete surface0;
-	delete cam;
-	delete geometryShader;
-	delete hbaoHalfShader;
+    delete cam;
+    delete geometryShader;
+    delete hbaoHalfShader;
     delete hbaoFullShader;
     delete compositShader;
     delete blurXShader;
@@ -454,159 +681,7 @@ void cleanUp()
 
     glDeleteTextures(1, &noiseTexture);
     Surface::cleanUp();
-}
 
-void setupGL()
-{
-    glfwInit();
-
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GL_TRUE);
-
-    window = glfwCreateWindow(WIDTH, HEIGHT, "HBAO", 0, 0);
-    if (!window) 
-    {
-        glfwTerminate();
-        exit_msg("Failed to create window");
-    }
-
-    // Make the window's context current
-    glfwMakeContextCurrent(window);
-
-	gl_error_msg();
-
-	glewExperimental = GL_TRUE;
-	if (GLEW_OK != glewInit())
-    {
-        glfwTerminate();
-        exit_msg("GLEW init error");
-    }
-
-	gl_error_msg();
-
-    gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-	glfwSwapInterval(0);
-    glActiveTexture(GL_TEXTURE0);
-    glClearColor(1.0, 1.0, 1.0, 0.0);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    glfwSetKeyCallback(window, keyCallback);
-}
-
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if(key == GLFW_KEY_ESCAPE)
-        running = false;
-    else if(key == GLFW_KEY_B && action == GLFW_PRESS)
-        blur = !blur;
-    else if(key == GLFW_KEY_F && action == GLFW_PRESS)
-        fullres = !fullres;
-}
-
-void calcFPS(float &dt)
-{
-    static float t0 = 0.0;
-    static float t1 = 0.0;
-    static char title[256];
-    static int frames = 0;
-
-    float t = (float)glfwGetTime();
-
-    dt = t - t0;
-    t0 = t;
-
-    t1 += dt;
-
-    if(t1 > 0.25)
-    {
-        float fps = (float)frames / t1;
-
-        GLuint64 timeStamp[7];
-
-        for(int i = 0; i < 7; ++i)
-            glGetQueryObjectui64v(queryID[i], GL_QUERY_RESULT, &timeStamp[i]);
-
-        double geom = (timeStamp[1] - timeStamp[0]) / 1000000.0;
-        double down = (timeStamp[2] - timeStamp[1]) / 1000000.0;
-        double ao   = (timeStamp[3] - timeStamp[2]) / 1000000.0;
-        double up   = (timeStamp[4] - timeStamp[3]) / 1000000.0;
-        double blur = (timeStamp[5] - timeStamp[4]) / 1000000.0;
-        double comp = (timeStamp[6] - timeStamp[5]) / 1000000.0;
-        double tot  = (timeStamp[6] - timeStamp[0]) / 1000000.0;
-
-        sprintf(title, "Fullres: %i, FPS: %2.1f, time(ms): geom %2.2f, down %2.2f, ao %2.2f, up %2.2f, blur %2.2f, comp %2.2f tot %2.2f",
-            (int)fullres, fps, geom, down, ao, up, blur, comp, tot);
-
-        glfwSetWindowTitle(window, title);
-        t1 = 0.0;
-        frames = 0;
-    }
-    ++frames;
-}
-
-void modifyCamera(float dt)
-{
-    double x,y;
-
-    glfwGetCursorPos(window, &x, &y);
-
-    glm::vec3 camrot = cam->getOrientation();
-
-    camrot.x -= (float)(y - HEIGHT / 2) * MOUSE_SPEED * dt;
-    camrot.y -= (float)(x - WIDTH / 2)  * MOUSE_SPEED * dt;
-    
-    if(camrot.x > 90.0f) camrot.x = 90.0f;
-    if(camrot.x < -90.0f) camrot.x = -90.0f;
-    if(camrot.y > 360.0f) camrot.y -= 360.0f;
-    if(camrot.y < -360.0f) camrot.y += 360.0f;
-    
-    cam->setOrientation(camrot);
-    glfwSetCursorPos(window, WIDTH / 2, HEIGHT / 2);
-
-    glm::vec3 movevec = glm::vec3(0.0f);
-
-    if (glfwGetKey(window, GLFW_KEY_W)) movevec.z += MOVE_SPEED;
-    if (glfwGetKey(window, GLFW_KEY_S)) movevec.z -= MOVE_SPEED;
-    if (glfwGetKey(window, GLFW_KEY_A)) movevec.x -= MOVE_SPEED;
-    if (glfwGetKey(window, GLFW_KEY_D)) movevec.x += MOVE_SPEED;
-
-    cam->move(movevec * dt);
-}
-
-void generateNoiseTexture(int width, int height)
-{
-    float *noise = new float[width * height * 4];
-    for(int y = 0; y < height; ++y)
-    {
-        for(int x = 0; x < width; ++x)
-        {
-            glm::vec2 xy = glm::circularRand(1.0f);
-            float z = glm::linearRand(0.0f, 1.0f);
-            float w = glm::linearRand(0.0f, 1.0f);
-
-            int offset = 4 * (y * width + x);
-            noise[offset + 0] = xy[0];
-            noise[offset + 1] = xy[1];
-            noise[offset + 2] = z;
-            noise[offset + 3] = w;
-        }
-    }
-
-    GLint internalFormat = GL_RGBA16F;
-    GLint format = GL_RGBA;
-    GLint type = GL_FLOAT;
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, noise);
+    glfw::terminate();
+    return 0;
 }

@@ -208,13 +208,8 @@ bool Geometry::createStaticBuffers(GLint posLoc, GLint normLoc, GLint tangLoc, G
     glGenBuffers(1, &vbo_vertex);
     glGenBuffers(1, &vbo_triangle);
 
-    // bind buffer for vertices and copy data into buffer
     glBindBuffer(GL_ARRAY_BUFFER, vbo_vertex);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(sVertex), &vertices[0].position[0], GL_STATIC_DRAW);
-
-    // Enable specific pointer for Vertex, for compability-mode and attributepointer for shader
-    //glEnableClientState(GL_VERTEX_ARRAY);
-    //glVertexPointer(3, GL_FLOAT, sizeof(sVertex), (char*)NULL);
 
     if(posLoc > -1)
     {

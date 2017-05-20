@@ -251,6 +251,9 @@ void glfw_window_t::end_frame()
 void glfw_window_t::swap_buffers()
     { glfwSwapBuffers(window); }
 
+void glfw_window_t::set_title(const char* title)
+    { glfwSetWindowTitle(window, title); }
+
 void glfw_window_t::set_should_close(int value)
     { glfwSetWindowShouldClose(window, value); }
 
@@ -262,7 +265,6 @@ double glfw_window_t::aspect()
 
 double glfw_window_t::inv_aspect()
     { return double(res_y) / double(res_x); }
-
 
 void glfw_window_t::disable_cursor()
     { glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); }

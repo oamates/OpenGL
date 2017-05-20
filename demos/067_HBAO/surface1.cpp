@@ -23,12 +23,7 @@ GLuint createTexture(bool mipmap, GLint internalFormat, GLenum format, GLenum ty
 
 	GLuint texID;
 	glGenTextures(1, &texID);
-
 	glBindTexture(GL_TEXTURE_2D, texID);
-
-	//glTexStorage2D(GL_TEXTURE_2D, mipmap ? 4 : 1, internalFormat, width, height);
-	//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, format, type, data);
-
 	glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, data);
 
 	if(mipmap)
