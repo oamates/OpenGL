@@ -1,7 +1,8 @@
+#define GLEW_STATIC
+#include <GL/glew.h>
 
 #include "surface1.hpp"
 #include "log.hpp"
-#include <cstdio>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "image/stb_image.h"
@@ -18,7 +19,7 @@ GLuint createTexture(bool mipmap, GLint internalFormat, GLenum format, GLenum ty
 						GLint width, GLint height, unsigned char *data)
 {
 	if(width == 0 || height == 0)
-		printf("Texture width or height is zero\n");
+		debug_msg("Texture width or height is zero\n");
 
 	GLuint texID;
 	glGenTextures(1, &texID);
@@ -47,7 +48,6 @@ GLuint createTexture(bool mipmap, GLint internalFormat, GLenum format, GLenum ty
 
 void updateTextureRGBA(Target target, unsigned char *data)
 {
-	//printf("is target RGB? %i\n",(int)(target==RGB));
 	int width, height;
 	unsigned char *texData;
 	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
@@ -75,7 +75,6 @@ void updateTextureRGBA(Target target, unsigned char *data)
 		}
 	}
 
-	//glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, texData);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, texData);
 	glGenerateMipmap(GL_TEXTURE_2D);
 
@@ -108,7 +107,7 @@ void Surface::init()
 	defaultDiffuseTexture.handle = createTexture(false, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, width, height, diffData);
 	defaultNormalTexture.handle  = createTexture(false, GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, width, height, normData);
 
-	printf("Handle of diffuse default %i \n", defaultDiffuseTexture.handle);
+	debug_msg("Handle of diffuse default %d", defaultDiffuseTexture.handle);
 }
 
 void Surface::cleanUp()

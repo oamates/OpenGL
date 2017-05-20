@@ -1,6 +1,15 @@
+//========================================================================================================================================================================================================================
+// DEMO 067 : HBAO
+//========================================================================================================================================================================================================================
+#define GLEW_STATIC
+#include <GL/glew.h> 
+#include <GLFW/glfw3.h>
 
-#include "types.hpp"
-#include "log1.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/random.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#include "log.hpp"
 #include "geometry.hpp"
 #include "obj1.hpp"
 #include "shader1.hpp"
@@ -22,7 +31,7 @@
 #define AO_RADIUS 0.3
 #define AO_DIRS 6
 #define AO_SAMPLES 3
-#define AO_STRENGTH 2.5;
+#define AO_STRENGTH 17.5;
 #define AO_MAX_RADIUS_PIXELS 50.0
 
 #define NOISE_RES 4
@@ -75,13 +84,16 @@ std::vector<Geometry> models;
 
 GLuint noiseTexture;
 
-int main()
+//=======================================================================================================================================================================================================================
+// program entry point
+//=======================================================================================================================================================================================================================
+int main(int argc, char *argv[])
 {
 	init();
     GLenum buffer[1];
     float dt;
 
-    cam->translate(vec3(0, 0, 2));
+    cam->translate(glm::vec3(0, 0, 2));
 
 	while(running)
 	{
@@ -107,14 +119,10 @@ int main()
         glUniformMatrix4fv(geometryShader->getProjMatrixLocation(), 1, false, glm::value_ptr(cam->getProjMatrix()));
 
         mdl->draw();
-        //model->draw();
 
         glQueryCounter(queryID[1], GL_TIMESTAMP);
 
         glDisable(GL_DEPTH_TEST);
-
-    //glColorMask(1, 0, 0, 0);
-    //glDepthFunc(GL_ALWAYS);
 
         if(!fullres)
         {
@@ -246,39 +254,21 @@ void init()
 	cam = new Camera();
     mdl = new Model();
 
-    Mesh mesh = loadMeshFromObj("mesh/dragon.obj", 0.1);
+    
+
+    Mesh mesh = loadMeshFromObj("../../../resources/models/obj/dragon_low_poly.obj", 0.1);
     Geometry dragon = createGeometryFromMesh(mesh);
 
     Surface *surface = new Surface();
-    //surface->loadDiffuseTexture("resources/meshes/textures/sponza_floor_a_spec.tga");
-    surfaces.insert(std::pair<std::string, Surface*> (std::string("default"), surface) );
+    surfaces.insert(std::pair<std::string, Surface*> (std::string("default"), surface));
 
     mdl->addGeometryAndSurface(&dragon, surface);
 
-    // Geometry floor;
-
-    // Geometry::sVertex v;
-    // v.position = vec3(-1, 0,-1); v.texCoord = vec2(0,0); floor.addVertex(v);
-    // v.position = vec3( 1, 0,-1); v.texCoord = vec2(1,0); floor.addVertex(v);
-    // v.position = vec3( 1, 0, 1); v.texCoord = vec2(1,1); floor.addVertex(v);
-    // v.position = vec3(-1, 0, 1); v.texCoord = vec2(0,1); floor.addVertex(v);
-
-    // floor.addTriangle(uvec3(0,2,1));
-    // floor.addTriangle(uvec3(0,3,2));
-
-    // mdl->addGeometryAndSurface(&floor, surface);
-
-    model = new Geometry();
-
-    mesh = loadMeshFromObj("mesh/sponza.obj", 0.01f);
-    *model = createGeometryFromMesh(mesh);
-    model->createStaticBuffers();
-
-    std::vector<Mesh> meshes = loadMeshesFromObj("mesh/sponza.obj", 0.01f);
+    std::vector<Mesh> meshes = loadMeshesFromObj("../../../resources/models/obj/crytek-sponza/sponza.obj", 0.01f);
     std::vector<Geometry> geometries = createGeometryFromMesh(meshes);
 
-    std::vector<Material> materials = loadMaterialsFromMtl("mesh/sponza.mtl");
-    surfaces = createSurfaceFromMaterial(materials, "mesh/");
+    std::vector<Material> materials = loadMaterialsFromMtl("../../../resources/models/obj/crytek-sponza/sponza.mtl");
+    surfaces = createSurfaceFromMaterial(materials, "../../../resources/models/obj/crytek-sponza/");
 
     for(unsigned int i=0; i<geometries.size(); ++i)
     {
@@ -290,13 +280,13 @@ void init()
     fsquad = new Geometry();
 
     Geometry::sVertex v;
-    v.position = vec3(-1,-1, 0); v.texCoord = vec2(0,0); fsquad->addVertex(v);
-    v.position = vec3( 1,-1, 0); v.texCoord = vec2(1,0); fsquad->addVertex(v);
-    v.position = vec3( 1, 1, 0); v.texCoord = vec2(1,1); fsquad->addVertex(v);
-    v.position = vec3(-1, 1, 0); v.texCoord = vec2(0,1); fsquad->addVertex(v);
+    v.position = glm::vec3(-1,-1, 0); v.texCoord = glm::vec2(0,0); fsquad->addVertex(v);
+    v.position = glm::vec3( 1,-1, 0); v.texCoord = glm::vec2(1,0); fsquad->addVertex(v);
+    v.position = glm::vec3( 1, 1, 0); v.texCoord = glm::vec2(1,1); fsquad->addVertex(v);
+    v.position = glm::vec3(-1, 1, 0); v.texCoord = glm::vec2(0,1); fsquad->addVertex(v);
 
-    fsquad->addTriangle(uvec3(0, 1, 2));
-    fsquad->addTriangle(uvec3(0, 2, 3));
+    fsquad->addTriangle(glm::uvec3(0, 1, 2));
+    fsquad->addTriangle(glm::uvec3(0, 2, 3));
     fsquad->createStaticBuffers();
 
 	geometryShader = new Shader("glsl/geometry.vs", "glsl/geometry.fs");
@@ -316,18 +306,16 @@ void init()
     fboFullRes->attachBuffer(FBO_AUX0, GL_RGBA8, GL_RGBA, GL_FLOAT);
     fboFullRes->attachBuffer(FBO_AUX1, GL_RG16F, GL_RG, GL_FLOAT, GL_LINEAR, GL_LINEAR);
     fboFullRes->attachBuffer(FBO_AUX2, GL_RG16F, GL_RG, GL_FLOAT, GL_LINEAR, GL_LINEAR);
-    //fboFullRes->attachBuffer(FBO_AUX3, GL_R8, GL_RED, GL_FLOAT);
 
     // Half res buffer for AO
     fboHalfRes = new Framebuffer2D(AO_WIDTH, AO_HEIGHT);
-    //fboHalfRes->attachBuffer(FBO_DEPTH, GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_FLOAT);
     fboHalfRes->attachBuffer(FBO_AUX0, GL_R32F, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
     fboHalfRes->attachBuffer(FBO_AUX1, GL_R8, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
 
 
     float fovRad = cam->getFov();
 
-    vec2 FocalLen, InvFocalLen, UVToViewA, UVToViewB, LinMAD;
+    glm::vec2 FocalLen, InvFocalLen, UVToViewA, UVToViewB, LinMAD;
 
     FocalLen[0]      = 1.0f / tanf(fovRad * 0.5f) * ((float)AO_HEIGHT / (float)AO_WIDTH);
     FocalLen[1]      = 1.0f / tanf(fovRad * 0.5f);
@@ -488,7 +476,7 @@ void setupGL()
     // Make the window's context current
     glfwMakeContextCurrent(window);
 
-	logErrorsGL();
+	gl_error_msg();
 
 	glewExperimental = GL_TRUE;
 	if (GLEW_OK != glewInit())
@@ -497,7 +485,7 @@ void setupGL()
         exit_msg("GLEW init error");
     }
 
-	logErrorsGL();
+	gl_error_msg();
 
     gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
 
@@ -569,7 +557,7 @@ void modifyCamera(float dt)
 
     glfwGetCursorPos(window, &x, &y);
 
-    vec3 camrot = cam->getOrientation();
+    glm::vec3 camrot = cam->getOrientation();
 
     camrot.x -= (float)(y - HEIGHT / 2) * MOUSE_SPEED * dt;
     camrot.y -= (float)(x - WIDTH / 2)  * MOUSE_SPEED * dt;
@@ -599,7 +587,7 @@ void generateNoiseTexture(int width, int height)
     {
         for(int x = 0; x < width; ++x)
         {
-            vec2 xy = glm::circularRand(1.0f);
+            glm::vec2 xy = glm::circularRand(1.0f);
             float z = glm::linearRand(0.0f, 1.0f);
             float w = glm::linearRand(0.0f, 1.0f);
 

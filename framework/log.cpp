@@ -1,3 +1,6 @@
+#define GLEW_STATIC
+#include <GL/glew.h> 
+
 #include <cstdio>
 #include <cstdarg>
 #include <atomic>
@@ -81,7 +84,7 @@ void impl_debug_msg(const char* format, ...)
     va_list args;
     va_start(args, format);
 
-    unsigned int output_slot = logger.reserve_slot();
+    uint32_t output_slot = logger.reserve_slot();
 
     std::thread::id this_thread_id = std::this_thread::get_id();
     uint32_t thread_id_hash = static_cast<uint32_t> (hasher(this_thread_id));
@@ -90,7 +93,7 @@ void impl_debug_msg(const char* format, ...)
     char* chunk_ptr = output_chunk;
 
     *(chunk_ptr++) = '[';
-    for(unsigned int i = 0; i < 8; ++i)
+    for(uint32_t i = 0; i < 8; ++i)
     {
         uint32_t hex_digit = thread_id_hash >> 28;
         *(chunk_ptr++) = (hex_digit < 0xA) ? '0' + hex_digit : 'A' + hex_digit - 0xA;
@@ -105,6 +108,56 @@ void impl_debug_msg(const char* format, ...)
     vsprintf(chunk_ptr, format, args);
     logger.release_slot(output_slot);
     va_end(args);
+}
+
+void impl_gl_error_msg(const char* file_name, const char* function_name, int line)
+{
+    uint32_t output_slot = logger.reserve_slot();
+
+    std::thread::id this_thread_id = std::this_thread::get_id();
+    uint32_t thread_id_hash = static_cast<uint32_t> (hasher(this_thread_id));
+
+    char* output_chunk = logger.buffer_chunk(output_slot);
+    char* chunk_ptr = output_chunk;
+
+    *(chunk_ptr++) = '[';
+    for(uint32_t i = 0; i < 8; ++i)
+    {
+        uint32_t hex_digit = thread_id_hash >> 28;
+        *(chunk_ptr++) = (hex_digit < 0xA) ? '0' + hex_digit : 'A' + hex_digit - 0xA;
+        thread_id_hash <<= 4;
+    }
+
+    *(chunk_ptr++) = ']';
+    *(chunk_ptr++) = ' ';
+    *(chunk_ptr++) = ':';
+    *(chunk_ptr++) = ' ';
+
+    chunk_ptr += sprintf(chunk_ptr, "%s : %s : %d : OpenGL error test", file_name, function_name, line);
+
+    GLenum glErr = glGetError();
+    const char* msg = "GL_NO_ERROR";
+    while (glErr != GL_NO_ERROR)
+    {
+        switch(glErr)
+        {
+        
+            case GL_INVALID_ENUM:                  msg = "GL_INVALID_ENUM"; break;
+            case GL_INVALID_VALUE:                 msg = "GL_INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION:             msg = "GL_INVALID_OPERATION"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: msg = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
+            case GL_OUT_OF_MEMORY:                 msg = "GL_OUT_OF_MEMORY"; break;
+            case GL_STACK_UNDERFLOW:               msg = "GL_STACK_UNDERFLOW"; break;
+            case GL_STACK_OVERFLOW:                msg = "GL_STACK_OVERFLOW"; break;
+            default:
+                msg = "Unknown OpenGL error."; break;
+        }
+        chunk_ptr += sprintf(chunk_ptr, " : %s", msg);
+        glErr = glGetError();
+    }
+    sprintf(chunk_ptr, " : %s\n", msg);
+
+    logger.release_slot(output_slot);
 }
 
 void impl_put_msg(const char* msg)

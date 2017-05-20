@@ -1,6 +1,7 @@
 #pragma once
-#include "types.hpp"
 #include <string>
+
+#include <glm/glm.hpp>
 
 struct Surface
 {
@@ -12,8 +13,8 @@ struct Surface
 	}sTexture;
 
 	std::string name;
-	vec3 diffuseColor;
-	vec4 specularColor;
+	glm::vec3 diffuseColor;
+	glm::vec4 specularColor;
 
 	sTexture diffuseTexture;
 	sTexture specularTexture;
@@ -37,12 +38,13 @@ struct Surface
 			glDeleteTextures(1, &normalTexture.handle);
 	}
 
-	void loadDiffuseTexture(const char *filename);
-	void loadMaskTexture(const char *filename);
-	void loadSpecularTexture(const char *filename);
-	void loadNormalTexture(const char *filename);
+	void loadDiffuseTexture(const char* filename);
+	void loadMaskTexture(const char* filename);
+	void loadSpecularTexture(const char* filename);
+	void loadNormalTexture(const char* filename);
 
-	inline void setDiffuseColor(const vec3 &diffuse) { diffuseColor = diffuse; }
+	inline void setDiffuseColor(const glm::vec3& diffuse)
+		{ diffuseColor = diffuse; }
 
 	void bind();
 	void unbind();

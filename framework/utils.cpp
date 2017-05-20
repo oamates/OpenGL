@@ -45,6 +45,48 @@ char* file_read(const char* file_name)
     return content;
 }
 
+#define GLEW_STATIC
+#include <GL/glew.h> 
+
+void printErrorsGL(const char *func, int line)
+{
+    GLenum glErr = glGetError();
+    while (glErr != GL_NO_ERROR)
+    {
+        printf("%s:%i :\n",func,line);
+        switch(glErr)
+        {
+        
+            case GL_INVALID_ENUM: debug_msg("glError: GL_INVALID_OPERATION \n"); break;
+            case GL_INVALID_VALUE: printf("glError: GL_INVALID_VALUE\n"); break;
+            case GL_INVALID_OPERATION: printf("glError: Invalid operation \n"); break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION:
+                printf("glError: Invalid framebuffer operation \n");
+                break;
+
+            case GL_OUT_OF_MEMORY:
+                printf("glError: Out of memory \n");
+                break;
+
+            #ifdef GL_STACK_UNDERFLOW
+            case GL_STACK_UNDERFLOW:
+                printf("glError: Stack underflow \n");
+                break;
+            #endif
+
+            #ifdef GL_STACK_OVERFLOW
+            case GL_STACK_OVERFLOW:
+                printf("glError: Stack underflow \n");
+                break;
+            #endif
+
+            default:
+                printf("glError: unrecognized error \n");
+        }
+        glErr = glGetError();
+    }
+}
+
 namespace timer {
 
 #if defined(__linux)

@@ -1,7 +1,8 @@
 #ifndef FRAMEBUFFER2D_H
 #define FRAMEBUFFER2D_H
 
-#include "types.hpp"
+#define GLEW_STATIC
+#include <GL/glew.h> 
 
 struct Framebuffer2D
 {
@@ -9,14 +10,14 @@ struct Framebuffer2D
 	~Framebuffer2D();
 
 	bool attachBuffer(unsigned char buffer,
-					  GLint internalFormat = 	GL_RGBA,
-					  GLint format = 			GL_RGBA,
-					  GLint type = 				GL_UNSIGNED_INT,
-					  GLint textureMinFilter = 	GL_NEAREST,
-					  GLint textureMagFilter = 	GL_NEAREST,
-					  GLint textureWrapS = 		GL_CLAMP_TO_EDGE,
-					  GLint textureWrapT = 		GL_CLAMP_TO_EDGE,
-					  GLboolean mipMap =		GL_FALSE);
+					  int32_t internalFormat = GL_RGBA,
+					  int32_t format = GL_RGBA,
+					  int32_t type = GL_UNSIGNED_INT,
+					  int32_t textureMinFilter = GL_NEAREST,
+					  int32_t textureMagFilter = GL_NEAREST,
+					  int32_t textureWrapS = GL_CLAMP_TO_EDGE,
+					  int32_t textureWrapT = GL_CLAMP_TO_EDGE,
+					  GLboolean mipMap = GL_FALSE);
 
 	void destroyBuffers(unsigned char bufferBit);
 
@@ -41,11 +42,8 @@ struct Framebuffer2D
 
 	GLenum *auxBuffers;
 	unsigned char numAuxBuffers;
-
 	unsigned int bufferHandle[5];
-
 	unsigned int renderBufferDepthHandle;
-
 	unsigned int fboHandle;
 };
 

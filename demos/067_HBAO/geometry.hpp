@@ -1,49 +1,52 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
-#include "types.hpp"
 #include <vector>
 #include <cassert>
 #include <string>
+
+#include <glm/glm.hpp>
+#include <GL/glew.h>
 
 struct Geometry
 {
     typedef struct
     {
-        vec3 position;
-        vec3 normal;
-        vec3 tangent;
-        vec2 texCoord;
+        glm::vec3 position;
+        glm::vec3 normal;
+        glm::vec3 tangent;
+        glm::vec2 texCoord;
     }sVertex;
 
     Geometry();
     ~Geometry();
 
-    u32 getVertexSize();
-    u32 getTriangleSize();
+    uint32_t getVertexSize();
+    uint32_t getTriangleSize();
 
-    const vec3 &getVertexPosition(const u32 &vertexIndex) const;
-    const vec3 &getVertexNormal(const u32 &vertexIndex) const;
-    const vec2 &getVertexTextCoord(const u32 &vertexIndex) const;
+    const glm::vec3& getVertexPosition(const uint32_t& vertexIndex) const;
+    const glm::vec3& getVertexNormal(const uint32_t& vertexIndex) const;
+    const glm::vec2& getVertexTextCoord(const uint32_t& vertexIndex) const;
 
-    const uvec3 &getTriangleIndices(const u32 &triangleIndex) const;
-    const vec3 &getTrianglePoint(const u32 &triangleIndex, const i32 &point) const;
+    const glm::uvec3 &getTriangleIndices(const uint32_t &triangleIndex) const;
+    const glm::vec3 &getTrianglePoint(const uint32_t &triangleIndex, const int32_t& point) const;
 
-    const f32 *getVertexData();
-    const u32 *getTriangleData();
+    const float* getVertexData();
+    const uint32_t* getTriangleData();
 
-    /** Functions **/
-    void addVertex(const sVertex &vertex);
-    void addTriangle(const uvec3 &triangle);
-    const Geometry& addGeometry(const Geometry &geometry);
+    void addVertex(const sVertex& vertex);
+    void addTriangle(const glm::uvec3& triangle);
+    const Geometry& addGeometry(const Geometry& geometry);
 
-    void translate(const vec3 &translation);
-    void rotate(const vec3 &rotation);
+    void translate(const glm::vec3 &translation);
+    void rotate(const glm::vec3 &rotation);
     void scale(float scale);
 
-    bool createStaticBuffers(GLint posLoc=0, GLint normLoc=1, GLint tangLoc=2, GLint texLoc=3);
+    bool createStaticBuffers(int32_t posLoc = 0, int32_t normLoc = 1, int32_t tangLoc = 2, int32_t texLoc = 3);
     bool createDynamicBuffers();
-    inline bool existOnGpu() { return (bool)glIsVertexArray(vao); }
+
+    inline bool existOnGpu()
+        { return (bool) glIsVertexArray(vao); }
     bool updateBuffers();
 
     void destroyBuffers();
@@ -58,12 +61,12 @@ struct Geometry
 
     std::string material;
 
-    u32 vao;
-    u32 vbo_vertex;
-    u32 vbo_triangle;
+    uint32_t vao;
+    uint32_t vbo_vertex;
+    uint32_t vbo_triangle;
 
     std::vector<sVertex> vertices;
-    std::vector<uvec3> triangles;
+    std::vector<glm::uvec3> triangles;
 };
     
 #endif

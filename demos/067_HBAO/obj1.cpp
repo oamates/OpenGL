@@ -1,25 +1,4 @@
-/**
-Copyright (C) 2012-2014 Robin Skånberg
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
+#include "log.hpp"
 #include "obj1.hpp"
 
 #include <iostream>
@@ -42,12 +21,12 @@ typedef struct
 
 typedef struct
 {
-	float x,y,z;
+	float x, y, z;
 }sVec3;
 
 typedef struct
 {
-	float x,y;
+	float x, y;
 }sVec2;
 
 bool equal(const sVertexIndex &lhs, const sVertexIndex &rhs);
@@ -88,14 +67,14 @@ void fillMesh(		Mesh &mesh,
 
 Mesh loadMeshFromObj(const char *filename, float scale)
 {
-	printf("Attempting to load mesh->from %s\n", filename);
+	debug_msg("Attempting to load mesh from %s ...", filename);
 
 	std::ifstream filehandle;
 	filehandle.open(filename, std::ios::in);
 
 	if(filehandle.fail())
 	{
-		printf("Could not open file.\n");
+		debug_msg("Could not open file.");
 		return Mesh();
 	}
 
@@ -112,12 +91,9 @@ Mesh loadMeshFromObj(const char *filename, float scale)
 	std::string name(filename);
 	int sg = 0;
 
-	clock_t start, end;
-	start = clock();
+	debug_msg("Reading data... ");
 
-	printf("Reading data... ");
-
-	while( filehandle.good() && !filehandle.eof() )
+	while(filehandle.good() && !filehandle.eof())
 	{
 		std::getline(filehandle, line);
 		if(line[0] == 'v')
@@ -139,21 +115,13 @@ Mesh loadMeshFromObj(const char *filename, float scale)
 	fillMesh(	m, name, vertexTable, faceTable,
 				positionTable, normalTable, texcoordTable);
 
-	printf("done!\n");
-
-	printf("total vertex count %i\n", vertexTable.size());
-	printf("total face count %i\n", faceTable.size());
-
-    end = clock();
-    double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time taken %3.3fs \n", cpu_time_used);
-
+	debug_msg("Done! Total vertex count = %d. Total face count = %d.", (int) vertexTable.size(), (int) faceTable.size());
 	return m;
 }
 
 std::vector<Mesh> loadMeshesFromObj(const char *filename, float scale)
 {
-	printf("Attempting to load mesh->from %s\n", filename);
+	debug_msg("Attempting to load meshes from %s ...", filename);
 
 	std::ifstream filehandle;
 	filehandle.open(filename, std::ios::in);
@@ -162,7 +130,7 @@ std::vector<Mesh> loadMeshesFromObj(const char *filename, float scale)
 
 	if(filehandle.fail())
 	{
-		printf("Could not open file.\n");
+		debug_msg("Could not open file.");
 		return meshes;
 	}
 
@@ -181,10 +149,7 @@ std::vector<Mesh> loadMeshesFromObj(const char *filename, float scale)
 	int sg = 0;
 	int count = 0;
 
-	clock_t start, end;
-	start = clock();
-
-	printf("Reading data... ");
+	debug_msg("Reading data... ");
 
 	while( filehandle.good() && !filehandle.eof() )
 	{
@@ -234,21 +199,11 @@ std::vector<Mesh> loadMeshesFromObj(const char *filename, float scale)
 	if(count > 0)
 	{
 		meshes.push_back(Mesh());
-		fillMesh(	meshes[count-1], name, vertexTable, faceTable,
-					positionTable, normalTable, texcoordTable);
+		fillMesh(meshes[count-1], name, vertexTable, faceTable, positionTable, normalTable, texcoordTable);
 		meshes[count-1].material = material;
 	}
 
-	printf("done!\n");
-
-	//printf("total vertex count %i\n", vertexTable.size());
-	//printf("total face count %i\n", faceTable.size());
-
-    end = clock();
-    double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-    printf("Time taken %3.3fs \n", cpu_time_used);
-
-    //printf("meshes.size() = %i\n", meshes.size());
+	debug_msg("Done! %d meshes loaded.", (int) meshes.size());
 
 	return meshes;
 }
@@ -265,24 +220,18 @@ unsigned int insertVertexIndex(	sVertexIndex vertex,
 								std::vector<sVertexIndex> &table,
 								std::vector<std::list<sVertexIndex> > &existingTable)
 {
-	if(	vertex.position == -1 )
+	if(vertex.position == -1)
 	{
-		printf("Bad vertex given: v %i %i %i \n",
-			vertex.position, vertex.normal, vertex.texcoord);
-
+		debug_msg("Bad vertex given: v %i %i %i \n", vertex.position, vertex.normal, vertex.texcoord);
 		return 0;
 	}
 
 	vertex.index = table.size();
 
-	// Check against existing vertices,
-	// Uses a hashtable approach with vertexIndex as the
-	// hashfunction, and variations of this vertexIndex is
-	// stored as a linked list in this slot.
-
-	// Is the 'hashindex' greater than the size of the table,
-	// then expand the table.
-	if( vertex.position >= (int)existingTable.size() )
+	// Check against existing vertices, uses a hashtable approach with vertexIndex as the
+	// hashfunction, and variations of this vertexIndex is stored as a linked list in this slot.
+	// If the 'hashindex' is greater than the size of the table, then expand the table.
+	if(vertex.position >= (int)existingTable.size())
 	{
 		existingTable.resize(vertex.position+1, std::list<sVertexIndex>());
 		existingTable[vertex.position].push_back(vertex);
@@ -300,27 +249,14 @@ unsigned int insertVertexIndex(	sVertexIndex vertex,
 		existingTable[vertex.position].push_back(vertex);
 	}
 
-/*	
-	// Brute force solution to check for duplicates 
-	for(unsigned int i=0; i<table.size(); ++i)
-	{
-		if(equal(vertex, table[i]))
-			return i;
-	}
-*/
-
 	// No vertex was found, insert and return the index.
 	table.push_back(vertex);
 	return vertex.index;
 }
 
-void readPosition(	const std::string &line,
-					std::vector<sVec3> &table,
-					float scale )
+void readPosition(const std::string &line, std::vector<sVec3> &table, float scale)
 {
 	sVec3 pos;
-
-	// v 1.0 2.0 3.0
 	sscanf(line.c_str(), "%*s %f %f %f", &pos.x, &pos.y, &pos.z);
 	pos.x *= scale;
 	pos.y *= scale;
@@ -328,22 +264,16 @@ void readPosition(	const std::string &line,
 	table.push_back(pos);
 }
 
-void readNormal(const std::string &line,
-				std::vector<sVec3> &table )
+void readNormal(const std::string &line, std::vector<sVec3> &table)
 {
 	sVec3 norm;
-
-	// vn 1.0 2.0 3.0
 	sscanf(line.c_str(), "%*s %f %f %f", &norm.x, &norm.y, &norm.z);
 	table.push_back(norm);
 }
 
-void readTexcoord(	const std::string &line,
-					std::vector<sVec2> &table )
+void readTexcoord(const std::string &line, std::vector<sVec2> &table)
 {
 	sVec2 texcoord;
-
-	// vt 1.0 2.0
 	sscanf(line.c_str(), "%*s %f %f", &texcoord.x, &texcoord.y);
 	table.push_back(texcoord);
 }
@@ -371,7 +301,7 @@ void readFace(	const std::string &line,
 
 	count = sscanf(line.c_str(), "%*s %s %s %s %s", c[0], c[1], c[2], c[3]);
 
-	for(int i=0; i<count; ++i)
+	for(int i = 0; i < count; ++i)
 	{
 		int p = sscanf(c[i], "%i/%i/%i", &params[0], &params[1], &params[2]);
 		position[i] = (p > 0 && params[0] > 0) ? params[0]-1 : -1;
@@ -381,14 +311,13 @@ void readFace(	const std::string &line,
 
 	delete[] buffer;
 
-	// Triangle or Quad
 	if(count == 3 || count == 4)
 	{
 		sVertexIndex vertex;
 		Mesh::sFace face;
 		unsigned int indices[4] = {0,0,0,0};
 
-		for(int i=0; i<count; ++i)
+		for(int i = 0; i < count; ++i)
 		{
 			vertex.position = position[i];
 			vertex.normal 	= normal[i];
@@ -412,22 +341,16 @@ void readFace(	const std::string &line,
 	}
 }
 
-void readSG(const std::string &line,
-			int &sg )
+void readSG(const std::string& line, int& sg)
 {
-	// s 1
 	sscanf(line.c_str(), "%*s %i", &sg);
 }
 
-void readG(	const std::string &line,
-			std::string &name)
+void readG(const std::string &line, std::string &name)
 {
 	char *str = new char[128];
 	int count = sscanf(line.c_str(), "%*s %s", str);
-
-	if(count > 0)
-		name = std::string(str);
-
+	if(count > 0) name = std::string(str);
 	delete[] str;
 }
 
@@ -458,7 +381,6 @@ void fillMesh(	Mesh &mesh,
 		}
 		else
 		{
-			printf("pos out of bounds: %i and size is %i \n", pos, (int)positionTable.size());
 			mesh.vertices[i].x = 0.0f;
 			mesh.vertices[i].y = 0.0f;
 			mesh.vertices[i].z = 0.0f;
@@ -472,7 +394,6 @@ void fillMesh(	Mesh &mesh,
 		}
 		else
 		{
-			//printf("norm out of bounds: %i and size is %i \n", norm, (int)normalTable.size());
 			mesh.vertices[i].nx = 0.0f;
 			mesh.vertices[i].ny = 0.0f;
 			mesh.vertices[i].nz = 0.0f;
@@ -485,7 +406,6 @@ void fillMesh(	Mesh &mesh,
 		}
 		else
 		{
-			//printf("tc out of bounds: %i and size is %i \n", tc, (int)texcoordTable.size());
 			mesh.vertices[i].u = 0.0f;
 			mesh.vertices[i].v = 0.0f;
 		}

@@ -1,5 +1,5 @@
 
-#include "log1.hpp"
+#include "log.hpp"
 #include "fbo2d.hpp"
 
 #define MAX_AUX_BUFFERS 4
@@ -14,10 +14,8 @@ Framebuffer2D::Framebuffer2D(int width, int height)
     numAuxBuffers = 0;
     auxBuffers = 0;
 
-    logErrorsGL();
+    gl_error_msg();
 
-    // Allocate a RenderBuffer depth buffer, to enable depth comparision.
-    // Will be removed when user attaches a FrameBuffer depth buffer.
     glGenRenderbuffers(1, &renderBufferDepthHandle);
     glBindRenderbuffer(GL_RENDERBUFFER, renderBufferDepthHandle);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
@@ -77,7 +75,7 @@ bool Framebuffer2D::attachBuffer(unsigned char buffer, GLint internalFormat, GLi
         return true;
     }
 
-    logError("passed buffer was not valid");
+    debug_msg("passed buffer was not valid");
     return false;
 }
 

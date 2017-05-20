@@ -26,14 +26,12 @@ std::map<std::string, Surface*> createSurfaceFromMaterial(const std::vector<Mate
 		if(mat[i].maskMap != "")
 		{
 			std::string p = path + mat[i].maskMap;
-//			debug_msg("Loading mask :: %s", p.c_str());
 			s->loadMaskTexture(p.c_str());
 		}
 
 		if(mat[i].normalMap != "")
 		{
 			std::string p = path + mat[i].normalMap;
-//			debug_msg("Loading normal map :: %s", p.c_str());
 			s->loadNormalTexture(p.c_str());
 		}
 

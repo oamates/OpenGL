@@ -3,43 +3,13 @@
 #include <cstdio>
 #include <cstring>
 #include "shader1.hpp"
-#include "log1.hpp"
+#include "log.hpp"
+#include "utils.hpp"
 
 #define BUFFER_SIZE 2048
 
-Shader *Shader::boundShader = NULL;
+Shader *Shader::boundShader = 0;
 
-/**
- * readTextFile - reads a simple textfile specified by filename,
- * if everything is ok, a pointer to a null-terminated string is returned,
- * otherwise NULL is returned.
- */
-
-char* readTextFile(const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if(file == NULL)
-    {
-      logError("Cannot open file %s", filename);
-      return 0;
-    }
-
-    fseek(file, 0, SEEK_END);
-
-    char *buffer = NULL;
-    int bytesinfile = ftell(file);
-    rewind(file);
-
-    if(bytesinfile > 0)
-    {
-        buffer = (char*)malloc(bytesinfile+1);
-        int bytesread = fread( buffer, 1, bytesinfile, file);
-        buffer[bytesread] = '\0'; // Terminate the string with a null character
-    }
-
-    fclose(file);
-
-    return buffer;
-}
 
 Shader::Shader()
 {
@@ -55,11 +25,11 @@ Shader::Shader()
     viewMatrixLoc   = -1;
     projMatrixLoc   = -1;
 
-    vertexFile      = NULL;
-    fragmentFile    = NULL;
+    vertexFile      = 0;
+    fragmentFile    = 0;
 }
 
-Shader::Shader( const char *vertFile, const char *fragFile )
+Shader::Shader(const char *vertFile, const char *fragFile)
 {
     vertexShader    = 0;
     fragmentShader  = 0;
@@ -73,8 +43,8 @@ Shader::Shader( const char *vertFile, const char *fragFile )
     viewMatrixLoc   = -1;
     projMatrixLoc   = -1;
 
-    vertexFile      = NULL;
-    fragmentFile    = NULL; 
+    vertexFile      = 0;
+    fragmentFile    = 0; 
 
     setVertexFile(vertFile);
     setFragmentFile(fragFile);
@@ -83,25 +53,22 @@ Shader::Shader( const char *vertFile, const char *fragFile )
 
 Shader::~Shader()
 {
-    if(vertexFile)
-        delete vertexFile;
+    if(vertexFile) delete vertexFile;
+    if(fragmentFile) delete fragmentFile;
 
-    if(fragmentFile)
-        delete fragmentFile;
+    glDetachShader(program, fragmentShader);
+    glDetachShader(program, vertexShader);
 
-    glDetachShader(program, fragmentShader); // Detach the fragment shader
-    glDetachShader(program, vertexShader); // Detach the vertex shader
-
-    glDeleteShader(fragmentShader); // Delete the fragment shader
-    glDeleteShader(vertexShader); // Delete the vertex shader
-    glDeleteProgram(program); // Delete the shader program
+    glDeleteShader(fragmentShader);
+    glDeleteShader(vertexShader);
+    glDeleteProgram(program);
 }
 
-void Shader::setVertexFile(const char *vertFile)
+void Shader::setVertexFile(const char* vertFile)
 {
     if(!vertFile)
     {
-        logError("A null-pointer was passed");
+        debug_msg("A null-pointer was passed");
         return;
     }
 
@@ -115,11 +82,11 @@ void Shader::setVertexFile(const char *vertFile)
     vertexFile[len] = '\0';
 }
 
-void Shader::setFragmentFile(const char *fragFile)
+void Shader::setFragmentFile(const char* fragFile)
 {
     if(!fragFile)
     {
-        logError("A null-pointer was passed");
+        debug_msg("A null-pointer was passed");
         return;
     }
 
@@ -162,27 +129,21 @@ void printProgramInfoLog(GLuint obj)
     {
         infoLog = (char *)malloc(infologLength);
         glGetProgramInfoLog(obj, infologLength, &charsWritten, infoLog);
-        printf("%s\n",infoLog);
+        printf("%s\n", infoLog);
         free(infoLog);
     }
 }
 
-/*
- * loadAndCompile - create, load, compile and link a shader object.
- */
 bool Shader::loadAndCompile()
 {
     vertexShader = glCreateShader(GL_VERTEX_SHADER);
     fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
  
-    char *vs = readTextFile(vertexFile);
-    char *fs = readTextFile(fragmentFile);
+    char* vs = utils::file_read(vertexFile);
+    char* fs = utils::file_read(fragmentFile);
  
-    const char * vv = vs;
-    const char * ff = fs;
- 
-    glShaderSource(vertexShader, 1, &vv, NULL);
-    glShaderSource(fragmentShader, 1, &ff, NULL);
+    glShaderSource(vertexShader, 1, &vs, 0);
+    glShaderSource(fragmentShader, 1, &fs, 0);
  
     free(vs);
     free(fs);
@@ -215,7 +176,7 @@ bool Shader::loadAndCompile()
     tangentLoc = glGetAttribLocation(program, "in_tangent");
     texCoordLoc = glGetAttribLocation(program, "in_texCoord");
 
-    logNote("programId: %i, posLoc %i, normLoc %i, tangLoc %i, texLoc %i", program, positionLoc, normalLoc, tangentLoc, texCoordLoc);
+    debug_msg("programId: %i, posLoc %i, normLoc %i, tangLoc %i, texLoc %i", program, positionLoc, normalLoc, tangentLoc, texCoordLoc);
  
     projMatrixLoc = glGetUniformLocation(program, "projMatrix");
     viewMatrixLoc = glGetUniformLocation(program, "viewMatrix");
@@ -224,7 +185,7 @@ bool Shader::loadAndCompile()
     glUseProgram(program);
 
     char str[10];
-    for(int i=0; i<8; ++i)
+    for(int i = 0; i < 8; ++i)
     {
         sprintf(str, "texture%i",i);
         int textureLoc = glGetUniformLocation(program, str);
@@ -252,9 +213,7 @@ GLint Shader::getUniformLocation(const char *uni)
 
 void Shader::bind()
 {
-    if(!compiled)
-        return;
-
+    if(!compiled) return;
     glUseProgram(program);
     boundShader = this;
 }
@@ -262,5 +221,5 @@ void Shader::bind()
 void Shader::unbind()
 {
     glUseProgram(0);
-    boundShader = NULL;
+    boundShader = 0;
 }

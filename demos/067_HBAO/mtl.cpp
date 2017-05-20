@@ -77,7 +77,7 @@ std::vector<Material> loadMaterialsFromMtl(const char *filename)
 	if(count > 0)
 		materials.push_back(mat);
 
-	debug_msg("done!\ntotal material count %d\n", (int) materials.size());
+	debug_msg("Done! Total material count = %d", (int) materials.size());
 
 	return materials;
 }

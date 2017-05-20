@@ -1,8 +1,6 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
-#include "types.hpp"
-
 #define CAMERA_PLANE_LEFT   0
 #define CAMERA_PLANE_RIGHT  1
 #define CAMERA_PLANE_BOTTOM 2
@@ -10,46 +8,61 @@
 #define CAMERA_PLANE_NEAR   4
 #define CAMERA_PLANE_FAR    5
 
-class Camera
+struct Camera
 {
-private:
-    vec2 nearfar;
-    ivec2 screensize;
-    f32 fov;
+    glm::vec2 nearfar;
+    glm::ivec2 screensize;
+    float fov;
 
-    vec3 position;
-    vec3 orientation;
-    mat4 viewMat, projMat;
-    mat4 invViewMat, invProjMat;
+    glm::vec3 position;
+    glm::vec3 orientation;
+    glm::mat4 viewMat, projMat;
+    glm::mat4 invViewMat, invProjMat;
+    glm::vec4 plane[6];
+    glm::vec3 *lookat;
 
-    vec4 plane[6];
+    Camera()
+        : nearfar(glm::vec2(0.1f, 100.0f)), screensize(glm::ivec2(1024, 768)), fov(glm::radians(60.0f)), lookat(0)
+        {}
 
-    vec3 *lookat;
-
-public:
     void setup();
     void draw();
-    Camera() : nearfar(vec2(0.1f,100.0f)), screensize(ivec2(1024,768)), fov(glm::radians(60.f)), lookat(NULL) {}
-    void setPosition(const vec3 &pos) { position = pos; }
-    void setPosition(f32 x, f32 y, f32 z) { position = vec3(x,y,z);}
-    void setOrientation(const vec3 &ori) { orientation = ori; }
-    void setOrientation(f32 x, f32 y, f32 z) { orientation = vec3(x,y,z); }
 
-    void lookAt(vec3 *pos){ lookat = pos; }
-    void move(const vec3 &vec);
-    void translate(const vec3 &vec) { position+=vec; }
+    void setPosition(const glm::vec3& pos)
+        { position = pos; }
+    void setPosition(float x, float y, float z)
+        { position = glm::vec3(x,y,z);}
+    void setOrientation(const glm::vec3& ori) 
+        { orientation = ori; }
+    void setOrientation(float x, float y, float z) 
+        { orientation = glm::vec3(x, y, z); }
 
-    const vec3 &getPosition() { return position; }
-    const vec3 &getOrientation() { return orientation; }
+    void lookAt(glm::vec3 *pos)
+        { lookat = pos; }
+    void move(const glm::vec3& vec);
+    void translate(const glm::vec3& vec)
+        { position += vec; }
 
-    float getFov() { return fov; }
-    float getNear() { return nearfar.x; }
-    float getFar() { return nearfar.y; }
+    const glm::vec3 &getPosition()
+        { return position; }
+    const glm::vec3 &getOrientation() 
+        { return orientation; }
 
-    const mat4 &getProjMatrix() { return projMat; }
-    const mat4 &getViewMatrix() { return viewMat; }
-    const mat4 &getInverseViewMatrix() { return invViewMat; }
-    const mat4 &getInverseProjMatrix() { return invProjMat; }
+    float getFov()
+        { return fov; }
+    float getNear()
+        { return nearfar.x; }
+    float getFar()
+        { return nearfar.y; }
+
+    const glm::mat4 &getProjMatrix()
+        { return projMat; }
+    const glm::mat4 &getViewMatrix()
+        { return viewMat; }
+    const glm::mat4 &getInverseViewMatrix() 
+        { return invViewMat; }
+    const glm::mat4 &getInverseProjMatrix()
+        { return invProjMat; }
 };
 
 #endif
