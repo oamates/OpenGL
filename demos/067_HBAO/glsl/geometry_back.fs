@@ -1,6 +1,6 @@
 #version 330 core
 
-out float out_frag0;
+layout (location = 0) out float out_frag0;
 
 in float Depth;
 

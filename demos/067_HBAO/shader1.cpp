@@ -6,29 +6,6 @@
 #include "log.hpp"
 #include "utils.hpp"
 
-#define BUFFER_SIZE 2048
-
-Shader *Shader::boundShader = 0;
-
-
-Shader::Shader()
-{
-    vertexShader    = 0;
-    fragmentShader  = 0;
-    program         = 0;
-    compiled        = 0;
-
-    positionLoc     = -1;
-    normalLoc       = -1;
-    tangentLoc      = -1;
-    texCoordLoc     = -1;
-    viewMatrixLoc   = -1;
-    projMatrixLoc   = -1;
-
-    vertexFile      = 0;
-    fragmentFile    = 0;
-}
-
 Shader::Shader(const char *vertFile, const char *fragFile)
 {
     vertexShader    = 0;
@@ -36,10 +13,6 @@ Shader::Shader(const char *vertFile, const char *fragFile)
     program         = 0;
     compiled        = 0;
 
-    positionLoc     = -1;
-    normalLoc       = -1;
-    tangentLoc      = -1;
-    texCoordLoc     = -1;
     viewMatrixLoc   = -1;
     projMatrixLoc   = -1;
 
@@ -95,7 +68,7 @@ void Shader::setFragmentFile(const char* fragFile)
 
     int len = (int)strlen(fragFile);
 
-    fragmentFile = new char[len+1];
+    fragmentFile = new char[len + 1];
     strcpy(fragmentFile, fragFile);
     fragmentFile[len] = '\0';
 }
@@ -155,28 +128,11 @@ bool Shader::loadAndCompile()
     printShaderInfoLog(fragmentShader);
 
     program = glCreateProgram();
-    glAttachShader(program,vertexShader);
-    glAttachShader(program,fragmentShader);
- 
-    glBindAttribLocation(program, 0, "in_position");
-    glBindAttribLocation(program, 1, "in_normal");
-    glBindAttribLocation(program, 2, "in_tangent");
-    glBindAttribLocation(program, 3, "in_texCoord");
-
-    glBindFragDataLocation(program, 0, "out_frag0");
-    glBindFragDataLocation(program, 1, "out_frag1");
-    glBindFragDataLocation(program, 2, "out_frag2");
-    glBindFragDataLocation(program, 3, "out_frag3");
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
 
     glLinkProgram(program);
     printProgramInfoLog(program);
- 
-    positionLoc = glGetAttribLocation(program,"in_position");
-    normalLoc = glGetAttribLocation(program, "in_normal");
-    tangentLoc = glGetAttribLocation(program, "in_tangent");
-    texCoordLoc = glGetAttribLocation(program, "in_texCoord");
-
-    debug_msg("programId: %i, posLoc %i, normLoc %i, tangLoc %i, texLoc %i", program, positionLoc, normalLoc, tangentLoc, texCoordLoc);
  
     projMatrixLoc = glGetUniformLocation(program, "projMatrix");
     viewMatrixLoc = glGetUniformLocation(program, "viewMatrix");
@@ -195,8 +151,7 @@ bool Shader::loadAndCompile()
 
     glUseProgram(0);
 
-    compiled = true;
- 
+    compiled = true; 
     return true;
 }
 
@@ -215,11 +170,9 @@ void Shader::bind()
 {
     if(!compiled) return;
     glUseProgram(program);
-    boundShader = this;
 }
 
 void Shader::unbind()
 {
     glUseProgram(0);
-    boundShader = 0;
 }

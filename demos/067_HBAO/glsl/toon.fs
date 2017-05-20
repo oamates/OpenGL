@@ -3,7 +3,7 @@
 in vec3 Normal;
 in vec3 LightDir;
 
-out vec3 out_frag0;
+layout (location = 0) out vec3 out_frag0;
 
 void main(void)
 {

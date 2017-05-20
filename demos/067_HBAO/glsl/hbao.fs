@@ -31,7 +31,7 @@ uniform int NumSamples = 4;
 in vec2 TexCoord;
 in vec2 Position;
 
-out float out_frag0;
+layout (location = 0) out float out_frag0;
 
 float ViewSpaceZFromDepth(float d)
 {

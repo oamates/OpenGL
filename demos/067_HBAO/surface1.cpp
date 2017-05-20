@@ -116,14 +116,14 @@ void Surface::cleanUp()
 
 void Surface::loadDiffuseTexture(const char *filename)
 {
-	debug_msg("loading diffuse texture from [%s]... ", filename);
+	//debug_msg("loading diffuse texture from [%s]... ", filename);
 
     stbi_set_flip_vertically_on_load(1);
 
     int x, y, c;
     unsigned char* data = stbi_load(filename, &x, &y, &c, 4);
 
-    debug_msg("x = %u, y = %u, c = %u, data = %p", x, y, c, data);
+    //debug_msg("x = %u, y = %u, c = %u, data = %p", x, y, c, data);
 
     if (!glIsTexture(diffuseTexture.handle))
     {

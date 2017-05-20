@@ -13,7 +13,7 @@ uniform vec2 LinMAD;
 
 #define KERNEL_RADIUS 8.0
 
-out vec2 out_frag0;
+layout (location = 0) out vec2 out_frag0;
 
 in vec2 TexCoord;
 

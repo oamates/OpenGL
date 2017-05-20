@@ -77,7 +77,7 @@ newmtl 16___Default
     Ke 0.0000 0.0000 0.0000
     map_Ka textures/gi_flag.png
     map_Kd textures/gi_flag.png
-
+    
 newmtl bricks
     Ns 10.0000
     Ni 1.5000

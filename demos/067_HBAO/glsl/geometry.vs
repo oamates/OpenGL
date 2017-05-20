@@ -3,12 +3,11 @@
 uniform mat4 viewMatrix;
 uniform mat4 projMatrix;
  
-in vec3 in_position;
-in vec2 in_texCoord;
+layout (location = 0) in vec3 in_position;
+layout (location = 3) in vec2 in_texCoord;
 
 out float Depth;
 out float Z;
-
 out vec2 TexCoord;
  
 void main(void)

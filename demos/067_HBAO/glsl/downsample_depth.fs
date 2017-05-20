@@ -4,7 +4,7 @@ uniform sampler2D texture0;
 uniform vec2 LinMAD;
 uniform int ResRatio;
 
-out float out_frag0;
+layout (location = 0) out float out_frag0;
 
 in vec2 TexCoord;
 

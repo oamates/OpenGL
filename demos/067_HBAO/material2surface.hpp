@@ -19,7 +19,7 @@ std::map<std::string, Surface*> createSurfaceFromMaterial(const std::vector<Mate
 		if(mat[i].diffuseMap != "")
 		{
 			std::string p = path + mat[i].diffuseMap;
-			debug_msg("Loading diffuse :: %s", p.c_str());
+			//debug_msg("Loading diffuse :: %s", p.c_str());
 			s->loadDiffuseTexture(p.c_str());
 		}
 
@@ -35,7 +35,7 @@ std::map<std::string, Surface*> createSurfaceFromMaterial(const std::vector<Mate
 			s->loadNormalTexture(p.c_str());
 		}
 
-		surf.insert( std::pair<std::string, Surface*> (mat[i].name, s) );
+		surf.insert( std::pair<std::string, Surface*> (mat[i].name, s) );	
 	}
 
 	return surf;

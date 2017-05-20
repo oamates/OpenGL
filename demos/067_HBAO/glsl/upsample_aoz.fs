@@ -5,7 +5,7 @@ uniform sampler2D texture1;
 
 uniform vec2 LinMAD;
 
-out vec2 out_frag0;
+layout (location = 0) out vec2 out_frag0;
 
 in vec2 TexCoord;
 

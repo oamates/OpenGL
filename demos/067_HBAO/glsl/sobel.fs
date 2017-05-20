@@ -4,7 +4,7 @@ uniform sampler2D texture0;
 
 in vec2 TexCoord;
 
-out vec2 out_frag0;
+layout (location = 0) out vec2 out_frag0;
 
 const vec2 texelSize = vec2(1.0/1024.0, 1.0/768.0);
 

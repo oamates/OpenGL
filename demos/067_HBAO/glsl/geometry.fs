@@ -3,7 +3,7 @@
 uniform sampler2D texture0;
 uniform sampler2D texture1;
 
-out vec4 out_frag0;
+layout (location = 0) out vec4 out_frag0;
 
 in float Depth;
 

@@ -7,7 +7,7 @@ uniform sampler2D texture3;
 
 in vec2 TexCoord;
 
-out vec4 out_frag0;
+layout (location = 0) out vec4 out_frag0;
 
 void main(void)
 {

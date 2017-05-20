@@ -29,7 +29,7 @@ std::vector<Material> loadMaterialsFromMtl(const char *filename)
 	int count = 0;
 
 	std::string line;
-	char str [1024];
+	char str [2048];
 
 	debug_msg("Reading data... ");
 
@@ -94,7 +94,11 @@ void readColor(const std::string &line, Material::sColor &val)
 
 void readString(const std::string &line, std::string &val)
 {
-	char str [1024];
-	int success = sscanf(line.c_str(), "%*s %s", str);
+	char str [10000];
+	int success = sscanf(line.c_str(), "%*s %1024s", str);
 	val = success ? std::string(str) : std::string();
+	if (!success) {
+		printf("Failure parsing :: %s", line.c_str());
+
+	}
 }
