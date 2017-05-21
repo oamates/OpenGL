@@ -11,32 +11,24 @@ uniform vec2 UVToViewB;
 
 uniform vec2 LinMAD;
 
-uniform vec2 AORes = vec2(1024.0, 768.0);
-uniform vec2 InvAORes = vec2(1.0/1024.0, 1.0/768.0);
-uniform vec2 NoiseScale = vec2(1024.0, 768.0) / 4.0;
+uniform vec2 AORes;
+uniform vec2 InvAORes;
+uniform vec2 NoiseScale;
 
-uniform float AOStrength = 1.9;
-uniform float R = 0.3;
-uniform float R2 = 0.3*0.3;
-uniform float NegInvR2 = - 1.0 / (0.3*0.3);
+uniform float AOStrength;
+uniform float R;
+uniform float R2;
+uniform float NegInvR2;
+uniform float MaxRadiusPixels;
+
 uniform float TanBias = tan(30.0 * PI / 180.0);
-uniform float MaxRadiusPixels = 50.0;
 
-uniform int NumDirections = 6;
-uniform int NumSamples = 4;
+uniform int NumDirections;
+uniform int NumSamples;
 
 in vec2 TexCoord;
 
-layout (location = 0) out float out_frag0;
-
-float ViewSpaceZFromDepth(float d)
-{
-	// [0,1] -> [-1,1] clip space
-	d = d * 2.0 - 1.0;
-
-	// Get view space Z
-	return -1.0 / (LinMAD.x * d + LinMAD.y);
-}
+layout (location = 0) out float Occlusion;
 
 vec3 UVToViewSpace(vec2 uv, float z)
 {
@@ -46,47 +38,27 @@ vec3 UVToViewSpace(vec2 uv, float z)
 
 vec3 GetViewPos(vec2 uv)
 {
-	//float z = ViewSpaceZFromDepth(texture(texture0, uv).r);
-	float z = texture(texture0, uv).r;
-	return UVToViewSpace(uv, z);
-}
-
-vec3 GetViewPosPoint(ivec2 uv)
-{
-	ivec2 coord = ivec2(gl_FragCoord.xy) + uv;
-	float z = texelFetch(texture0, coord, 0).r;
+	float z = texture(texture0, uv).r;								// camera-space z-value
 	return UVToViewSpace(uv, z);
 }
 
 float TanToSin(float x)
-{
-	return x * inversesqrt(x*x + 1.0);
-}
+	{ return x * inversesqrt(x * x + 1.0f); }
 
 float InvLength(vec2 V)
-{
-	return inversesqrt(dot(V,V));
-}
+	{ return inversesqrt(dot(V, V)); }
 
 float Tangent(vec3 V)
-{
-	return V.z * InvLength(V.xy);
-}
+	{ return V.z * InvLength(V.xy); }
 
 float BiasedTangent(vec3 V)
-{
-	return V.z * InvLength(V.xy) + TanBias;
-}
+	{ return V.z * InvLength(V.xy) + TanBias; }
 
 float Tangent(vec3 P, vec3 S)
-{
-    return -(P.z - S.z) * InvLength(S.xy - P.xy);
-}
+	{ return -(P.z - S.z) * InvLength(S.xy - P.xy); }
 
 float Length2(vec3 V)
-{
-	return dot(V,V);
-}
+	{ return dot(V, V); }
 
 vec3 MinDiff(vec3 P, vec3 Pr, vec3 Pl)
 {
@@ -96,21 +68,12 @@ vec3 MinDiff(vec3 P, vec3 Pr, vec3 Pl)
 }
 
 vec2 SnapUVOffset(vec2 uv)
-{
-    return round(uv * AORes) * InvAORes;
-}
+	{ return round(uv * AORes) * InvAORes; }
 
 float Falloff(float d2)
-{
-	return d2 * NegInvR2 + 1.0f;
-}
+	{ return d2 * NegInvR2 + 1.0f; }
 
-float HorizonOcclusion(	vec2 deltaUV,
-						vec3 P,
-						vec3 dPdu,
-						vec3 dPdv,
-						float randstep,
-						float numSamples)
+float HorizonOcclusion(vec2 deltaUV, vec3 P, vec3 dPdu, vec3 dPdv, float randstep, float numSamples)
 {
 	float ao = 0;
 
@@ -240,5 +203,5 @@ void main(void)
 		ao = 1.0 - ao / numDirections * AOStrength;
 	}
 
-	out_frag0 = ao;
+	Occlusion = ao;
 }

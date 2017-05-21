@@ -10,11 +10,8 @@ in vec2 TexCoord;
 
 float ViewSpaceZFromDepth(float d)
 {
-	// [0,1] -> [-1,1] clip space
-	d = d * 2.0 - 1.0;
-
-	// Get view space Z
-	return -1.0 / (LinMAD.x * d + LinMAD.y);
+	d = d * 2.0 - 1.0;								// [0,1] -> [-1,1] clip space
+	return -1.0 / (LinMAD.x * d + LinMAD.y);		// Get view space Z
 }
 
 void main(void)

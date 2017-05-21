@@ -190,8 +190,8 @@ int main(int argc, char *argv[])
     glsl_program_t geometryShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/geometry.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/geometry.fs"));
     geometryShader.enable();
-    geometryShader["projMatrix"] = projection_matrix;
-    uniform_t uni_gs_view_matrix = geometryShader["viewMatrix"];
+    geometryShader["projection_matrix"] = projection_matrix;
+    uniform_t uni_gs_view_matrix = geometryShader["view_matrix"];
 
 
     glsl_shader_t quad_vs(GL_VERTEX_SHADER, "glsl/fullscreen.vs");
