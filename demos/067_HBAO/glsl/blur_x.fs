@@ -4,7 +4,6 @@ uniform sampler2D texture0;
 
 uniform vec2 FullRes = vec2(1024.0, 768.0);
 uniform vec2 InvFullRes = 1.0 / vec2(1024.0, 768.0);
-
 uniform vec2 LinMAD;
 
 #define KERNEL_RADIUS 8.0

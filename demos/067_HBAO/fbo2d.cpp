@@ -7,14 +7,10 @@
 #define clamp(x, min, max) (x < min) ? min : ((x > max) ? max : x)
 
 Framebuffer2D::Framebuffer2D(int width, int height)
+    : width(width), height(height)
 {
-    this->width = width;
-    this->height = height;
-
     numAuxBuffers = 0;
     auxBuffers = 0;
-
-    gl_error_msg();
 
     glGenRenderbuffers(1, &renderBufferDepthHandle);
     glBindRenderbuffer(GL_RENDERBUFFER, renderBufferDepthHandle);
@@ -29,9 +25,7 @@ Framebuffer2D::Framebuffer2D(int width, int height)
 
 Framebuffer2D::~Framebuffer2D()
 {
-    if(glIsFramebuffer(fboHandle))
-        glDeleteFramebuffers(1, &fboHandle);
-
+    glDeleteFramebuffers(1, &fboHandle);
     destroyBuffers(FBO_AUX0_BIT | FBO_AUX1_BIT | FBO_AUX2_BIT | FBO_AUX3_BIT | FBO_DEPTH_BIT);
 }
 
@@ -114,11 +108,6 @@ void Framebuffer2D::bind()
 
     if(numAuxBuffers > 0)
         glDrawBuffers(numAuxBuffers, auxBuffers);
-}
-
-void Framebuffer2D::unbind()
-{
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Framebuffer2D::updateAuxBuffers()

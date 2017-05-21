@@ -26,7 +26,6 @@ uniform int NumDirections = 6;
 uniform int NumSamples = 4;
 
 in vec2 TexCoord;
-in vec2 Position;
 
 layout (location = 0) out float out_frag0;
 

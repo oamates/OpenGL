@@ -27,7 +27,6 @@ struct Framebuffer2D
 	inline int getHeight() { return height; }
 
 	void bind();
-	void unbind();
 
 	inline unsigned int getBufferHandle(unsigned char buffer) { return *getTextureHandle(buffer); }
 

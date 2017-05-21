@@ -80,10 +80,6 @@ GLuint generateNoiseTexture(int width, int height)
 
 Model* mdl;
 Geometry* model;
-Geometry* fsquad;
-
-Framebuffer2D* fboFullRes;
-Framebuffer2D* fboHalfRes;
 
 double timeStamps[7];
 unsigned int queryID[7];
@@ -180,26 +176,12 @@ int main(int argc, char *argv[])
 
     mdl->prepare();
 
-    fsquad = new Geometry();
-
-    Geometry::sVertex v;
-    v.position = glm::vec3(-1.0f, -1.0f, 0.0f); v.texCoord = glm::vec2(0.0f, 0.0f); fsquad->addVertex(v);
-    v.position = glm::vec3( 1.0f, -1.0f, 0.0f); v.texCoord = glm::vec2(1.0f, 0.0f); fsquad->addVertex(v);
-    v.position = glm::vec3( 1.0f,  1.0f, 0.0f); v.texCoord = glm::vec2(1.0f, 1.0f); fsquad->addVertex(v);
-    v.position = glm::vec3(-1.0f,  1.0f, 0.0f); v.texCoord = glm::vec2(0.0f, 1.0f); fsquad->addVertex(v);
-
-    fsquad->addTriangle(glm::uvec3(0, 1, 2));
-    fsquad->addTriangle(glm::uvec3(0, 2, 3));
-    fsquad->createStaticBuffers();
-
     glm::mat4& projection_matrix = window.camera.projection_matrix;
-
     glm::vec2 FocalLen = glm::vec2(projection_matrix[0][0], projection_matrix[1][1]);
     glm::vec2 InvFocalLen = 1.0f / FocalLen;
     glm::vec2 UVToViewA = -2.0f * InvFocalLen;
     glm::vec2 UVToViewB = InvFocalLen;
     glm::vec2 LinMAD = glm::vec2(1.0 / (projection_matrix[3][2]), projection_matrix[2][2] / (projection_matrix[3][2]));
-
 
     //===================================================================================================================================================================================================================
     // shaders initialization
@@ -212,8 +194,9 @@ int main(int argc, char *argv[])
     uniform_t uni_gs_view_matrix = geometryShader["viewMatrix"];
 
 
-    glsl_program_t compositeShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/composite.fs"));
+    glsl_shader_t quad_vs(GL_VERTEX_SHADER, "glsl/fullscreen.vs");
+
+    glsl_program_t compositeShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/composite.fs"));
     compositeShader.enable();
     compositeShader["texture0"] = 0;
     compositeShader["texture1"] = 1;
@@ -221,8 +204,7 @@ int main(int argc, char *argv[])
     compositeShader["texture3"] = 3;
 
 
-    glsl_program_t blurXShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur_x.fs"));
+    glsl_program_t blurXShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur_x.fs"));
     blurXShader.enable();
     blurXShader["texture0"] = 0;
     blurXShader["FullRes"] = glm::vec2(window.res_x, window.res_y);
@@ -230,8 +212,7 @@ int main(int argc, char *argv[])
     blurXShader["LinMAD"] = LinMAD;
 
 
-    glsl_program_t blurYShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur_y.fs"));
+    glsl_program_t blurYShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur_y.fs"));
     blurYShader.enable();
     blurYShader["texture0"] = 0;
     blurYShader["FullRes"] = glm::vec2(window.res_x, window.res_y);
@@ -239,24 +220,21 @@ int main(int argc, char *argv[])
     blurYShader["LinMAD"] = LinMAD;
 
 
-    glsl_program_t downsampleShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/downsample_depth.fs"));
+    glsl_program_t downsampleShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/downsample_depth.fs"));
     downsampleShader.enable();
     downsampleShader["texture0"] = 0;
     downsampleShader["LinMAD"] = LinMAD;
     downsampleShader["ResRatio"] = RES_RATIO;
 
 
-    glsl_program_t upsampleShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/upsample_aoz.fs"));
+    glsl_program_t upsampleShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/upsample_aoz.fs"));
     upsampleShader.enable();
     upsampleShader["texture0"] = 0;
     upsampleShader["texture1"] = 1;
     upsampleShader["LinMAD"] = LinMAD;
 
 
-    glsl_program_t hbaoHalfShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hbao.fs"));
+    glsl_program_t hbaoHalfShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hbao.fs"));
     hbaoHalfShader.enable();
     hbaoHalfShader["texture0"] = 0;
     hbaoHalfShader["texture1"] = 1;
@@ -276,8 +254,7 @@ int main(int argc, char *argv[])
     hbaoHalfShader["NumSamples"] = AO_SAMPLES;
 
 
-    glsl_program_t hbaoFullShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/fullscreen.vs"),
-                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hbao_full.fs"));
+    glsl_program_t hbaoFullShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hbao_full.fs"));
     hbaoFullShader.enable();
     hbaoFullShader["texture0"] = 0;
     hbaoFullShader["texture1"] = 1;
@@ -297,31 +274,30 @@ int main(int argc, char *argv[])
     hbaoFullShader["NumSamples"] = AO_SAMPLES;
 
 
+    Framebuffer2D fboFullRes(WIDTH, HEIGHT);
+    fboFullRes.attachBuffer(FBO_DEPTH, GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_FLOAT, GL_LINEAR, GL_LINEAR);
+    fboFullRes.attachBuffer(FBO_AUX0, GL_RGBA8, GL_RGBA, GL_FLOAT);
+    fboFullRes.attachBuffer(FBO_AUX1, GL_RG16F, GL_RG, GL_FLOAT, GL_LINEAR, GL_LINEAR);
+    fboFullRes.attachBuffer(FBO_AUX2, GL_RG16F, GL_RG, GL_FLOAT, GL_LINEAR, GL_LINEAR);
 
-    // Full res deferred base
-    fboFullRes = new Framebuffer2D(WIDTH, HEIGHT);
-    fboFullRes->attachBuffer(FBO_DEPTH, GL_DEPTH_COMPONENT32, GL_DEPTH_COMPONENT, GL_FLOAT, GL_LINEAR, GL_LINEAR);
-    fboFullRes->attachBuffer(FBO_AUX0, GL_RGBA8, GL_RGBA, GL_FLOAT);
-    fboFullRes->attachBuffer(FBO_AUX1, GL_RG16F, GL_RG, GL_FLOAT, GL_LINEAR, GL_LINEAR);
-    fboFullRes->attachBuffer(FBO_AUX2, GL_RG16F, GL_RG, GL_FLOAT, GL_LINEAR, GL_LINEAR);
-
-    // Half res buffer for AO
-    fboHalfRes = new Framebuffer2D(AO_WIDTH, AO_HEIGHT);
-    fboHalfRes->attachBuffer(FBO_AUX0, GL_R32F, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
-    fboHalfRes->attachBuffer(FBO_AUX1, GL_R8, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
+    Framebuffer2D fboHalfRes(AO_WIDTH, AO_HEIGHT);
+    fboHalfRes.attachBuffer(FBO_AUX0, GL_R32F, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
+    fboHalfRes.attachBuffer(FBO_AUX1, GL_R8, GL_RED, GL_FLOAT, GL_LINEAR, GL_LINEAR);
 
     GLuint noiseTexture = generateNoiseTexture(NOISE_RES, NOISE_RES);
+
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
 
     //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
     while (!window.should_close())
     {
-        window.new_frame();
-
         //===============================================================================================================================================================================================================
         // calculate FPS
         //===============================================================================================================================================================================================================
+        window.new_frame();
         GLuint64 timeStamp[7];
 
         for(int i = 0; i < 7; ++i)
@@ -347,27 +323,27 @@ int main(int argc, char *argv[])
         // RENDER GEOMETRY PASS
         //===============================================================================================================================================================================================================
         glEnable(GL_DEPTH_TEST);
-
-        fboFullRes->bind();
+        fboFullRes.bind();
 		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
         geometryShader.enable();
         uni_gs_view_matrix = window.camera.view_matrix;
-
         mdl->draw();
-
         glQueryCounter(queryID[1], GL_TIMESTAMP);
 
+        //===============================================================================================================================================================================================================
+        // Enable fullscreen quad fake vao and downsample depth id necessary
+        //===============================================================================================================================================================================================================
         glDisable(GL_DEPTH_TEST);
+        glBindVertexArray(vao_id);
 
         if(!window.fullres)
         {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
-            fboHalfRes->bind();                                                       // Downsample depth
+            glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_DEPTH));
+            fboHalfRes.bind();                                                       // Downsample depth
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
             downsampleShader.enable();
-            fsquad->draw();
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
     
         glQueryCounter(queryID[2], GL_TIMESTAMP);
@@ -381,18 +357,17 @@ int main(int argc, char *argv[])
 
         if(!window.fullres)
         {
-            glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX0));
+            glBindTexture(GL_TEXTURE_2D, fboHalfRes.getBufferHandle(FBO_AUX0));
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
             hbaoHalfShader.enable();
         }
         else
         {
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
+            glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_DEPTH));
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
             hbaoFullShader.enable();
         }
-        fsquad->draw();
-    
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);    
         glQueryCounter(queryID[3], GL_TIMESTAMP);
     
         //===============================================================================================================================================================================================================
@@ -401,15 +376,14 @@ int main(int argc, char *argv[])
         if(!window.fullres)
         {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_DEPTH));
+            glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_DEPTH));
             glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, fboHalfRes->getBufferHandle(FBO_AUX1));
-            fboFullRes->bind();
+            glBindTexture(GL_TEXTURE_2D, fboHalfRes.getBufferHandle(FBO_AUX1));
+            fboFullRes.bind();
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
             upsampleShader.enable();
-            fsquad->draw();
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
-    
         glQueryCounter(queryID[4], GL_TIMESTAMP);
     
         //===============================================================================================================================================================================================================
@@ -418,19 +392,18 @@ int main(int argc, char *argv[])
         if(window.blur)
         {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
+            glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_AUX1));
     
             glDrawBuffer(GL_COLOR_ATTACHMENT2);
             blurXShader.enable();
-            fsquad->draw();
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     
             glDrawBuffer(GL_COLOR_ATTACHMENT1);
             blurYShader.enable();
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX2));
-            fsquad->draw();
+            glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_AUX2));
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
-    
         glQueryCounter(queryID[5], GL_TIMESTAMP);    
     
         //===============================================================================================================================================================================================================
@@ -438,15 +411,12 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX0));    
+        glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_AUX0));    
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, fboFullRes->getBufferHandle(FBO_AUX1));
-    
+        glBindTexture(GL_TEXTURE_2D, fboFullRes.getBufferHandle(FBO_AUX1));
         glViewport(0, 0, WIDTH, HEIGHT);
-    
         compositeShader.enable();
-        fsquad->draw();
-        
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         glQueryCounter(queryID[6], GL_TIMESTAMP);
 
         GLint stopTimerAvailable = 0;
@@ -466,10 +436,7 @@ int main(int argc, char *argv[])
     }
 
     delete model;
-    delete fsquad;
     delete surface0;
-    delete fboFullRes;
-    delete fboHalfRes;
 
     for(std::map<std::string, Surface*>::iterator it = surfaces.begin(); it != surfaces.end(); ++it)
         delete it->second;
