@@ -28,8 +28,8 @@
 #include "mesh2geometry.hpp"
 #include "material2surface.hpp"
 
-const int WIDTH = 1920;
-const int HEIGHT = 1080;
+const int WIDTH = 1280;
+const int HEIGHT = 1024;
 const int RES_RATIO = 2;
 const int AO_WIDTH = WIDTH / RES_RATIO;
 const int AO_HEIGHT = HEIGHT / RES_RATIO;
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         glEnable(GL_DEPTH_TEST);
         fboFullRes.bind();
-		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
         geometryShader.enable();
         uni_gs_view_matrix = window.camera.view_matrix;
         mdl->draw();

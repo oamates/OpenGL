@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("SSAO Effect Shader", 4, 3, 3, 1920, 1080, true);
+    demo_window_t window("SSAO Effect Shader", 4, 3, 3, 1280, 1024, false);
 
     //===================================================================================================================================================================================================================
     // generate SSAO sample kernel points
@@ -148,7 +148,6 @@ int main(int argc, char *argv[])
     model.init("../../../resources/models/vao/demon.vao");
     debug_msg("VAO Loaded :: \n\tvertex_count = %d. \n\tvertex_layout = %d. \n\tindex_type = %d. \n\tprimitive_mode = %d. \n\tindex_count = %d\n\n\n", 
               model.vbo.size, model.vbo.layout, model.ibo.type, model.ibo.mode, model.ibo.size);
-    debug_msg("Done ... \nGL_UNSIGNED_INT = %d.\nGL_TRIANGLES = %d", GL_UNSIGNED_INT, GL_TRIANGLES);
 
     //===================================================================================================================================================================================================================
     // framebuffer object and textures for geometry rendering step
@@ -268,6 +267,10 @@ int main(int argc, char *argv[])
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
         glm::vec3 light_ws = glm::vec3(2.0f * glm::cos(time), 4.0f, -2.0f * glm::sin(time));
+
+        static char title[32];
+        sprintf(title, "FPS: %2.1f", window.fps());
+        window.set_title(title);
 
         //===============================================================================================================================================================================================================
         // 1. Geometry Pass: render scene's geometry/color data into gbuffer

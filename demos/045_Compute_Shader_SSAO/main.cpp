@@ -59,8 +59,7 @@ const unsigned int TEXTURE_SIZE = 1024;
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
-    // initialize GLFW library
-    // create GLFW window and initialize GLEW library
+    // initialize GLFW library, create GLFW window and initialize GLEW library
     // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
     //===================================================================================================================================================================================================================
     if (!glfw::init())
@@ -71,11 +70,10 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Loading models
     //===================================================================================================================================================================================================================
-    model demon;
-    demon.load_vi("res/demon.obj");
-
-    model pedestal;
-    pedestal.load_vnti("res/pedestal/pedestal1.obj");
+    vao_t model;
+    model.init("../../../resources/models/vao/demon.vao");
+    debug_msg("VAO Loaded :: \n\tvertex_count = %d. \n\tvertex_layout = %d. \n\tindex_type = %d. \n\tprimitive_mode = %d. \n\tindex_count = %d\n\n\n", 
+              model.vbo.size, model.vbo.layout, model.ibo.type, model.ibo.mode, model.ibo.size);
 
     // ==================================================================================================================================================================================================================
     // Set up camera and projection matrix
