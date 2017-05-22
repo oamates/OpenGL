@@ -1,6 +1,6 @@
 #version 330 core
 
-const vec2 uvs[4] = vec2[4] 
+const vec2 ndcs[4] = vec2[4] 
 (
     vec2(-1.0f,  1.0f),
     vec2(-1.0f, -1.0f),
@@ -15,7 +15,8 @@ out vec3 view;
 
 void main()
 {
-    uv = uvs[gl_VertexID];
-    view = vec3(focal_scale * uv, -1.0f);
-    gl_Position = vec4(uv, 0.0f, 1.0f);
+    vec2 ndc = ndcs[gl_VertexID];
+    view = vec3(focal_scale * ndc, -1.0f);
+    uv = 0.5f + 0.5f * ndc;
+    gl_Position = vec4(ndc, 0.0f, 1.0f);
 }

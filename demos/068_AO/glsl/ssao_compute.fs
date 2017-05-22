@@ -3,13 +3,13 @@
 in vec2 uv;
 in vec3 view;
 
-const int kernelSize = 32;
+const int kernel_size = 32;
 
 uniform sampler2D noise_tex;
 uniform sampler2D normal_cs_tex;
 
-uniform mat4 projection_matrix;
-uniform vec3 samples[kernelSize];
+uniform vec2 inv_focal_scale;
+uniform vec3 samples[kernel_size];
 uniform float radius;
 uniform float bias;
 
@@ -23,7 +23,7 @@ void main()
     vec4 data_in = texture(normal_cs_tex, uv);
     vec3 N_cs = normalize(data_in.xyz);
     float Z_cs = data_in.w; 
-    vec3 position_cs = Z_cs * view;
+    vec3 position_cs = -Z_cs * view;
     
     //==========================================================================================================================================================
     // Get random vector tangent vector and compute local tangent and bitangent
@@ -38,23 +38,24 @@ void main()
     //==========================================================================================================================================================
     float occlusion = 0.0;
 
-    for(int i = 0; i < kernelSize; ++i)
+    for(int i = 0; i < kernel_size; ++i)
     {
         //======================================================================================================================================================
         // get sample position in camera space and in ndc
         //======================================================================================================================================================
         vec3 sample_cs = position_cs + radius * (tangent_frame * samples[i]);
+        float sample_Z_cs = sample_cs.z;
 
-        vec4 sample_scr = projection_matrix * vec4(sample_cs, 1.0f);
-        vec2 sample_ndc = 0.5f + 0.5f * (sample_scr.xy / sample_scr.w);
+        vec2 ndc = inv_focal_scale * sample_cs.xy / (-sample_Z_cs);
+        vec2 uv = 0.5f + 0.5f * ndc;
 
-        float actual_Z_cs = texture(normal_cs_tex, sample_ndc).w;
+        float actual_Z_cs = texture(normal_cs_tex, uv).w;
 
         //======================================================================================================================================================
         // get sample z-value, range check & accumulate
         //======================================================================================================================================================
-        occlusion += (actual_Z_cs >= sample_cs.z + bias ? 1.0 : 0.0);
+        occlusion += (sample_Z_cs > actual_Z_cs + 0.05) ? 1.0 : 0.0;
     }
     
-    FragmentOcclusion = occlusion / kernelSize;
+    FragmentOcclusion = occlusion / kernel_size;
 }                                            

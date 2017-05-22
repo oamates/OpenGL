@@ -10,6 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -236,8 +237,7 @@ int main(int argc, char *argv[])
     for (GLuint i = 0; i < 32; ++i)
     {
         glm::vec3 v = glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator));
-        v = glm::normalize(v);
-        v *= gaussRand(generator);
+        v = gaussRand(generator) * glm::normalize(v);
         ssao_kernel[i] = v;
     }
 
@@ -245,8 +245,11 @@ int main(int argc, char *argv[])
     // matrices
     //===================================================================================================================================================================================================================
     glm::mat4& projection_matrix = window.camera.projection_matrix;
-    glm::vec2 focal_scale = glm::vec2(1.0f / projection_matrix[0][0], 1.0f / projection_matrix[1][1]);
+    glm::vec2 inv_focal_scale = glm::vec2(projection_matrix[0][0], projection_matrix[1][1]);
+    glm::vec2 focal_scale = 1.0f / inv_focal_scale;
     glm::mat4 model_matrix = glm::mat4(1.0f);
+
+    debug_msg("Focal Scale = %s", glm::to_string(focal_scale).c_str());
 
     //===================================================================================================================================================================================================================
     // compile shaders and load static uniforms
@@ -257,7 +260,7 @@ int main(int argc, char *argv[])
 
     uniform_t uni_gp_vm_matrix        = geometry_pass["view_model_matrix"];
     uniform_t uni_gp_normal_vm_matrix = geometry_pass["normal_vm_matrix"];
-    geometry_pass["projection_matrix"] = window.camera.projection_matrix;
+    geometry_pass["projection_matrix"] = projection_matrix;
 
 
     glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_compute.vs"), 
@@ -265,9 +268,9 @@ int main(int argc, char *argv[])
     ssao_compute.enable();
     ssao_compute["noise_tex"] = 0;
     ssao_compute["normal_cs_tex"] = 1;
-    ssao_compute["projection_matrix"] = window.camera.projection_matrix;
     ssao_compute["samples"] = ssao_kernel;
     ssao_compute["focal_scale"] = focal_scale;
+    ssao_compute["inv_focal_scale"] = inv_focal_scale;
     ssao_compute["radius"] = 1.5f;
     ssao_compute["bias"] = 0.25f;
 
@@ -322,12 +325,16 @@ int main(int argc, char *argv[])
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glViewport(0, 0, window.res_x, window.res_y);
 
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
     while (!window.should_close())
     {
         window.new_frame();
+        
 
         float time = window.frame_ts;
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
@@ -342,7 +349,7 @@ int main(int argc, char *argv[])
         window.set_title(title);
 
         //===============================================================================================================================================================================================================
-        // 1. Geometry Pass: render scene's geometry / color data into gbuffer
+        // Geometry Pass: render scene's geometry / color data into gbuffer
         //===============================================================================================================================================================================================================
         geometry_fbo.bind();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -356,7 +363,7 @@ int main(int argc, char *argv[])
         model.render();
 
         //===============================================================================================================================================================================================================
-        // 2. Create SSAO texture
+        // SSAO pass: compute occlusion
         //===============================================================================================================================================================================================================
         glBindVertexArray(vao_id);
         glDisable(GL_DEPTH_TEST);
@@ -366,7 +373,7 @@ int main(int argc, char *argv[])
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
-        // 3. Blur SSAO texture to remove noise
+        // Blur pass: removing noise
         //===============================================================================================================================================================================================================
         ssao_blur_fbo.bind();
         ssao_blur.enable();
@@ -375,6 +382,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // 4. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
         //===============================================================================================================================================================================================================
+        glEnable(GL_DEPTH_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
