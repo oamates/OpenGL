@@ -10,12 +10,6 @@
 #include "log.hpp"
 #include "image.hpp"
 
-static int g_ShaderHandle = 0, g_VertHandle = 0, g_FragHandle = 0;
-static int g_AttribLocationTex = 0, g_AttribLocationProjMtx = 0;
-static GLuint vbo_id = 0, vao_id = 0, ibo_id = 0;
-static GLuint font_texture_id = 0;
-
-
 #ifdef _WIN32
 #undef APIENTRY
 #define GLFW_EXPOSE_NATIVE_WIN32
@@ -216,46 +210,19 @@ static void RenderDrawLists(ImDrawData* draw_data)
     int fb_height = (int)(io.DisplaySize.y * io.DisplayFramebufferScale.y);
     if (fb_width == 0 || fb_height == 0) return;
     draw_data->ScaleClipRects(io.DisplayFramebufferScale);
-    
+
+    // glActiveTexture(GL_TEXTURE0);
+        
     //===================================================================================================================================================================================================================
-    // Backup viewport 
-    //===================================================================================================================================================================================================================
-    GLint viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    
-    //===================================================================================================================================================================================================================
-    // Setup render state :: alpha-blending enabled, no face culling, no depth testing, scissor enabled :: we do not care restoring these settings 
-    //===================================================================================================================================================================================================================
-    glEnable(GL_BLEND);
-    glBlendEquation(GL_FUNC_ADD);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_SCISSOR_TEST);
-    glActiveTexture(GL_TEXTURE0);
-    
-    //===================================================================================================================================================================================================================
-    // Setup viewport, orthographic projection matrix
+    // Setup viewport
     //===================================================================================================================================================================================================================
     glViewport(0, 0, (GLsizei)fb_width, (GLsizei)fb_height);
-
-    glm::mat4 projection_matrix = glm::mat4(
-        glm::vec4( 2.0f / io.DisplaySize.x, 0.0f,                     0.0f, 0.0f),
-        glm::vec4( 0.0f,                    2.0f / -io.DisplaySize.y, 0.0f, 0.0f),
-        glm::vec4( 0.0f,                    0.0f,                    -1.0f, 0.0f),
-        glm::vec4(-1.0f,                    1.0f,                     0.0f, 1.0f)
-    );
-
-    glUseProgram(g_ShaderHandle);
-    glUniform1i(g_AttribLocationTex, 0);
-    glUniformMatrix4fv(g_AttribLocationProjMtx, 1, GL_FALSE, glm::value_ptr(projection_matrix));
-    glBindVertexArray(vao_id);
     
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
         const ImDrawList* cmd_list = draw_data->CmdLists[n];
         const ImDrawIdx* idx_buffer_offset = 0;
-    
+
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)cmd_list->VtxBuffer.Size * sizeof(ImDrawVert), (const GLvoid*)cmd_list->VtxBuffer.Data, GL_STREAM_DRAW);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx), (const GLvoid*)cmd_list->IdxBuffer.Data, GL_STREAM_DRAW);
     
@@ -268,19 +235,13 @@ static void RenderDrawLists(ImDrawData* draw_data)
             }
             else
             {
-                glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
+                // glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
                 glScissor((int)pcmd->ClipRect.x, (int)(fb_height - pcmd->ClipRect.w), (int)(pcmd->ClipRect.z - pcmd->ClipRect.x), (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
                 glDrawElements(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, idx_buffer_offset);
             }
             idx_buffer_offset += pcmd->ElemCount;
         }
-    }
-    
-    //===================================================================================================================================================================================================================
-    // Restore viewport and disable scissor
-    //===================================================================================================================================================================================================================
-    glViewport(viewport[0], viewport[1], (GLsizei) viewport[2], (GLsizei) viewport[3]);
-    glDisable(GL_SCISSOR_TEST);
+    }    
 }
 
 } // namespace glfw
@@ -366,7 +327,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     // time and mouse state variables
     //===================================================================================================================================================================================================================
     mouse_pressed[0] = mouse_pressed[1] = mouse_pressed[2] = false;
-    mouse_ts = frame_ts = glfw::time();
+    initial_ts = mouse_ts = frame_ts = glfw::time();
     mouse_delta = mouse = glm::dvec2(0.0);
     frame_dt = mouse_dt = 0.0;
 
@@ -433,36 +394,36 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     
     const GLchar* fs_source =
         "#version 330 core\n"
-        "uniform sampler2D Texture;\n"
+        "uniform sampler2D font_tex;\n"
         "in vec2 uv;\n"
         "in vec4 color;\n"
         "out vec4 FragmentColor;\n"
         "void main()\n"
         "{\n"
-        "	FragmentColor = color * texture(Texture, uv);\n"
+        "	FragmentColor = color * texture(font_tex, uv);\n"
         "}\n";
     
-    g_ShaderHandle = glCreateProgram();
-    g_VertHandle = glCreateShader(GL_VERTEX_SHADER);
-    g_FragHandle = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(g_VertHandle, 1, &vs_source, 0);
-    glShaderSource(g_FragHandle, 1, &fs_source, 0);
-    glCompileShader(g_VertHandle);
-    glCompileShader(g_FragHandle);
-    glAttachShader(g_ShaderHandle, g_VertHandle);
-    glAttachShader(g_ShaderHandle, g_FragHandle);
-    glLinkProgram(g_ShaderHandle);
+    ui_program_id = glCreateProgram();
+    ui_vs_id = glCreateShader(GL_VERTEX_SHADER);
+    ui_fs_id = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(ui_vs_id, 1, &vs_source, 0);
+    glShaderSource(ui_fs_id, 1, &fs_source, 0);
+    glCompileShader(ui_vs_id);
+    glCompileShader(ui_fs_id);
+    glAttachShader(ui_program_id, ui_vs_id);
+    glAttachShader(ui_program_id, ui_fs_id);
+    glLinkProgram(ui_program_id);
     
-    g_AttribLocationTex = glGetUniformLocation(g_ShaderHandle, "Texture");
-    g_AttribLocationProjMtx = glGetUniformLocation(g_ShaderHandle, "projection_matrix");
+    glUseProgram(ui_program_id);
+    glUniform1i(glGetUniformLocation(ui_program_id, "font_tex"), 0);
+    uni_projection_matrix_id = glGetUniformLocation(ui_program_id, "projection_matrix");
     
-    
-    glGenVertexArrays(1, &vao_id);
-    glBindVertexArray(vao_id);
-    glGenBuffers(1, &vbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glGenBuffers(1, &ibo_id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
+    glGenVertexArrays(1, &ui_vao_id);
+    glBindVertexArray(ui_vao_id);
+    glGenBuffers(1, &ui_vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, ui_vbo_id);
+    glGenBuffers(1, &ui_ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ui_ibo_id);
     
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
@@ -470,29 +431,31 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (const GLvoid*) offsetof(ImDrawVert, pos));
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(ImDrawVert), (const GLvoid*) offsetof(ImDrawVert, uv));
     glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (const GLvoid*) offsetof(ImDrawVert, col));
-    
+
     //===================================================================================================================================================================================================================
     // create font texture and build texture atlas
     //===================================================================================================================================================================================================================
     unsigned char* pixels;
     int width, height;
 
+    //===================================================================================================================================================================================================================
     // Load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders.
     // If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
+    //===================================================================================================================================================================================================================
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   
     
-    // Upload texture to graphics system
-    glGenTextures(1, &font_texture_id);
-    glBindTexture(GL_TEXTURE_2D, font_texture_id);
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &ui_font_tex_id);
+    glBindTexture(GL_TEXTURE_2D, ui_font_tex_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     
-    // Store our identifier
-    io.Fonts->TexID = (void*)(intptr_t)font_texture_id;
-
+    io.Fonts->TexID = (void*)(intptr_t)ui_font_tex_id;
     imgui_active = false;
+
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
 }
 
 void imgui_window_t::new_frame()
@@ -535,16 +498,51 @@ void imgui_window_t::new_frame()
     io.MouseWheel = mouse_wheel;
     mouse_wheel = 0.0;
     
-    ImGui::NewFrame();                                                                                                      // Start the frame
+    ImGui::NewFrame();
 }
 
 void imgui_window_t::end_frame()
 {
     if (imgui_active)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        //===============================================================================================================================================================================================================
+        // Setup render state :: alpha-blending enabled, no face culling, no depth testing, scissor enabled :: we do not care restoring these settings 
+        //===============================================================================================================================================================================================================
+        glEnable(GL_BLEND);
+        glBlendEquation(GL_FUNC_ADD);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_SCISSOR_TEST);
+
+        //===============================================================================================================================================================================================================
+        // Bind vertex and index buffers as ImGui::Render() is going to modify their data
+        //===============================================================================================================================================================================================================
+        glBindVertexArray(ui_vao_id);
+        glBindBuffer(GL_ARRAY_BUFFER, ui_vbo_id);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ui_ibo_id);
+
+        glm::mat4 projection_matrix = glm::mat4(
+            glm::vec4( 2.0f / io.DisplaySize.x, 0.0f,                     0.0f, 0.0f),
+            glm::vec4( 0.0f,                    2.0f / -io.DisplaySize.y, 0.0f, 0.0f),
+            glm::vec4( 0.0f,                    0.0f,                    -1.0f, 0.0f),
+            glm::vec4(-1.0f,                    1.0f,                     0.0f, 1.0f)
+        );
+    
+        glUseProgram(ui_program_id);
+        glUniformMatrix4fv(uni_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
+
         ImGui::Render();
+    }
+
     frame++;
     glfwSwapBuffers(window);
 }
+
+void imgui_window_t::set_title(const char* title)
+    { glfwSetWindowTitle(window, title); }
 
 void imgui_window_t::set_should_close(int value)
     { glfwSetWindowShouldClose(window, value); }
@@ -568,6 +566,9 @@ void imgui_window_t::enable_cursor()
 int imgui_window_t::key_state(int key)
     { return glfwGetKey(window, key); }
 
+double imgui_window_t::fps()
+    { return double(frame) / (frame_ts - initial_ts); };
+
 glm::dvec2 imgui_window_t::cursor_position()
 {
     glm::dvec2 pos;
@@ -577,24 +578,22 @@ glm::dvec2 imgui_window_t::cursor_position()
 
 imgui_window_t::~imgui_window_t()
 {
-    if (vao_id) glDeleteVertexArrays(1, &vao_id);
-    if (vbo_id) glDeleteBuffers(1, &vbo_id);
-    if (ibo_id) glDeleteBuffers(1, &ibo_id);
+    glDeleteBuffers(1, &ui_ibo_id);
+    glDeleteBuffers(1, &ui_vbo_id);
+    glDeleteVertexArrays(1, &ui_vao_id);
 
-    if (g_ShaderHandle && g_VertHandle) glDetachShader(g_ShaderHandle, g_VertHandle);
-    if (g_VertHandle) glDeleteShader(g_VertHandle);
+    glDetachShader(ui_program_id, ui_vs_id);
+    glDeleteShader(ui_vs_id);
 
-    if (g_ShaderHandle && g_FragHandle) glDetachShader(g_ShaderHandle, g_FragHandle);
-    if (g_FragHandle) glDeleteShader(g_FragHandle);
+    glDetachShader(ui_program_id, ui_fs_id);
+    glDeleteShader(ui_fs_id);
 
-    if (g_ShaderHandle) glDeleteProgram(g_ShaderHandle);
+    glDeleteProgram(ui_program_id);
 
-    if (font_texture_id)
-    {
-        glDeleteTextures(1, &font_texture_id);
-        ImGui::GetIO().Fonts->TexID = 0;
-    }
+    glDeleteTextures(1, &ui_font_tex_id);
+    ImGui::GetIO().Fonts->TexID = 0;
     ImGui::Shutdown();
+
     glfwDestroyWindow(window);
 }
 

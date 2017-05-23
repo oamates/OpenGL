@@ -17,19 +17,13 @@ vec2 SampleAOZ(vec2 uv)
     return texture(texture0, TexCoord + uv * InvFullRes).rg;
 }
 
-vec2 PointSampleAOZ(vec2 uv)
-{
-    ivec2 coord = ivec2(round(gl_FragCoord.xy + uv));
-    return texelFetch(texture0, coord, 0).rg;
-}
-
 float CrossBilateralWeight(float r, float z, float z0)
 {
     const float BlurSigma = (KERNEL_RADIUS + 1.0f) * 0.5f;
-    const float BlurFalloff = 1.0f / (2.0f*BlurSigma*BlurSigma);
+    const float BlurFalloff = 1.0f / (2.0f * BlurSigma * BlurSigma);
 
     float dz = z0 - z;
-    return exp2(-r*r*BlurFalloff - dz*dz);
+    return exp2(-r * r * BlurFalloff - dz * dz);
 }
 
 void main(void)
@@ -42,9 +36,9 @@ void main(void)
     float total_weight = w;
     float i = 1.0;
 
-    for(; i <= KERNEL_RADIUS/2; i += 1.0)
+    for(; i <= KERNEL_RADIUS / 2; i += 1.0)
     {
-        aoz = SampleAOZ( vec2(i,0) );
+        aoz = SampleAOZ(vec2(i, 0));
         w = CrossBilateralWeight(i, aoz.y, center_z);
         total_ao += aoz.x * w;
         total_weight += w;

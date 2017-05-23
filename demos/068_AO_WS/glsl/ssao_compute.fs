@@ -15,7 +15,7 @@ uniform vec4 samples[kernel_size];
 uniform float radius;
 uniform float bias;
 
-out float FragmentOcclusion;
+layout (location = 0) out vec2 FragmentOcclusionR;
 
 void main()
 {
@@ -63,5 +63,5 @@ void main()
         }
     }
     
-    FragmentOcclusion = occlusion / total;
+    FragmentOcclusionR = vec2(occlusion / total, R);
 }                                            
