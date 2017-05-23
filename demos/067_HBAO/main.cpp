@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gs_view_matrix = geometryShader["view_matrix"];
 
 
-    glsl_shader_t quad_vs(GL_VERTEX_SHADER, "glsl/fullscreen.vs");
+    glsl_shader_t quad_vs(GL_VERTEX_SHADER, "glsl/quad.vs");
 
     glsl_program_t compositeShader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/composite.fs"));
     compositeShader.enable();
