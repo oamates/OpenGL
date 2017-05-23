@@ -7,6 +7,7 @@
 #include <random>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
@@ -30,8 +31,8 @@
 std::default_random_engine generator;
 std::normal_distribution<float> gaussRand(0.0, 1.0);
 
-const int res_x = 1280;
-const int res_y = 1024;
+const int res_x = 1920;
+const int res_y = 1080;
 
 struct demo_window_t : public imgui_window_t
 {
@@ -81,13 +82,14 @@ struct demo_window_t : public imgui_window_t
     void update_ui() override
     {
         sprintf(fps_str, "Average FPS: %2.1f", fps());
+        set_title(fps_str);
 
         if (show_another_window)
         {
             ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
-            ImGui::Begin(fps_str, &show_another_window);
+            ImGui::Begin("Ambient Occlusion", &show_another_window);
 
-            if (ImGui::CollapsingHeader("Ambient Occlusion algorithms"))
+            if (ImGui::CollapsingHeader("Algorithms"))
             {
                 ImGui::RadioButton("World-Space AO with normal + distance textures", &e, 0);
                 ImGui::RadioButton("Camera-Space AO with normal + distance textures", &e, 1);
@@ -282,7 +284,7 @@ float factor(const glm::vec3& v)
     float q2 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 5.0f * v))));
     float q3 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 9.0f * v))));
     float q4 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex(17.0f * v))));
-    return -0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
+    return 0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
 }
 
 vertex_pn_t cube_face_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const vertex_pn_t& C, const glm::vec3& uvw)
@@ -318,7 +320,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("AO Effect Shader", 4, 3, 3, res_x, res_y, false);
+    demo_window_t window("AO Effect Shader", 4, 3, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
     // generate SSAO sample kernel points
@@ -354,7 +356,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gp_pv_matrix         = geometry_pass["projection_view_matrix"];
     uniform_t uni_gp_normal_matrix     = geometry_pass["normal_matrix"];
     uniform_t uni_gp_camera_ws         = geometry_pass["camera_ws"];
-    geometry_pass["model_matrix"]      = model_matrix;
+    uniform_t uni_gp_model_matrix      = geometry_pass["model_matrix"];
 
 
     glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_compute.vs"), 
@@ -391,13 +393,16 @@ int main(int argc, char *argv[])
 
     lighting_pass["ssao_blurred_tex"] = 4;
     lighting_pass["tb_tex"]           = 5;
-    lighting_pass["model_matrix"]     = model_matrix;
 
+    uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
     uniform_t uni_lp_pv_matrix        = lighting_pass["projection_view_matrix"];
     uniform_t uni_lp_normal_matrix    = lighting_pass["normal_matrix"];
     uniform_t uni_lp_camera_ws        = lighting_pass["camera_ws"];
     uniform_t uni_lp_light_ws         = lighting_pass["light_ws"];
     uniform_t uni_lp_draw_mode        = lighting_pass["draw_mode"];
+    uniform_t uni_lp_Ks               = lighting_pass["Ks"];
+    uniform_t uni_lp_Ns               = lighting_pass["Ns"];
+    uniform_t uni_lp_bf               = lighting_pass["bf"];
 
     //===================================================================================================================================================================================================================
     // load model
@@ -421,7 +426,8 @@ int main(int argc, char *argv[])
     // load 2D texture for trilinear blending in lighting shader
     //================================  ===================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE5);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/green_mineral.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -443,6 +449,12 @@ int main(int argc, char *argv[])
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex(-1);
 
+    glm::mat4 demon_model_matrix = glm::scale(glm::vec3(2.5f));
+    glm::mat4 room_model_matrix = glm::scale(glm::vec3(23.5f));
+    glm::mat3 demon_normal_matrix = glm::mat3(1.0f); //glm::inverse(glm::mat3(demon_model_matrix));
+    glm::mat3 room_normal_matrix = glm::mat3(1.0f); //inverse(glm::mat3(room_model_matrix));
+
+
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
@@ -454,10 +466,9 @@ int main(int argc, char *argv[])
         // 1. Update matrix and geometric data
         //===============================================================================================================================================================================================================
         float time = window.frame_ts;
-        glm::vec3 light_ws = glm::vec3(2.0f * glm::cos(time), 4.0f, -2.0f * glm::sin(time));
+        glm::vec3 light_ws = glm::vec3(3.0f * glm::cos(time), 3.0f * glm::sin(time), 7.0f);
         glm::mat4& view_matrix = window.camera.view_matrix;
         glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
-        glm::mat3 normal_matrix = glm::inverse(glm::mat3(model_matrix));
         glm::mat3 camera_matrix = glm::inverse(glm::mat3(view_matrix));
         glm::vec3 camera_ws = -camera_matrix * glm::vec3(view_matrix[3]);
 
@@ -470,15 +481,19 @@ int main(int argc, char *argv[])
 
         geometry_pass.enable();
         uni_gp_pv_matrix = projection_view_matrix;
-        uni_gp_normal_matrix = normal_matrix;
         uni_gp_camera_ws = camera_ws;
 
+        uni_gp_normal_matrix = demon_normal_matrix;
+        uni_gp_model_matrix = demon_model_matrix;
         glCullFace(GL_BACK);
         model.render();
 
+        uni_gp_normal_matrix = room_normal_matrix;
+        uni_gp_model_matrix = room_model_matrix;
         glCullFace(GL_FRONT);
-        //cube_vao.render();
+        cube_vao.render();
 
+        glCullFace(GL_BACK);
 
         //===============================================================================================================================================================================================================
         // 3. SSAO pass: compute occlusion
@@ -514,16 +529,29 @@ int main(int argc, char *argv[])
         lighting_pass.enable();
 
         uni_lp_pv_matrix = projection_view_matrix;
-        uni_lp_normal_matrix = normal_matrix;
         uni_lp_camera_ws = camera_ws;
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
 
+        glActiveTexture(GL_TEXTURE5);
+
+        glBindTexture(GL_TEXTURE_2D, demon_tex_id);
+        uni_lp_Ks = 0.92f;
+        uni_lp_Ns = 24.0f;
+        uni_lp_bf = 0.0427f;
+        uni_lp_normal_matrix = demon_normal_matrix;
+        uni_lp_model_matrix = demon_model_matrix;
         glCullFace(GL_BACK);
         model.render();
 
+        glBindTexture(GL_TEXTURE_2D, room_tex_id);
+        uni_lp_Ks = 1.44f;
+        uni_lp_Ns = 44.0f;
+        uni_lp_bf = 0.08425f;
+        uni_lp_normal_matrix = room_normal_matrix;
+        uni_lp_model_matrix = room_model_matrix;
         glCullFace(GL_FRONT);
-        //cube_vao.render();
+        cube_vao.render();
 
 
         //===============================================================================================================================================================================================================

@@ -85,7 +85,7 @@ float factor(const glm::vec3& v)
     return -0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
 }
 
-vertex_pn_t cube_face_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const vertex_pn_t& C, const glm::vec3& uvw)
+vertex_pnoh_t cube_face_tess_func (const vertex_pnoh_t& A, const vertex_pnoh_t& B, const vertex_pnoh_t& C, const glm::vec3& uvw)
 {
     vertex_pnoh_t vertex;
     vertex.position = uvw.x * A.position + uvw.y * B.position + uvw.z * C.position;
