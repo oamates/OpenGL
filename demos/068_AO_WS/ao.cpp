@@ -11,6 +11,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/noise.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -19,7 +20,12 @@
 #include "camera.hpp"
 #include "shader.hpp"
 #include "image.hpp"
+#include "plato.hpp"
+#include "vertex.hpp"
 #include "vao.hpp"
+#include "tess.hpp"
+#include "attribute.hpp"
+
 
 std::default_random_engine generator;
 std::normal_distribution<float> gaussRand(0.0, 1.0);
@@ -35,7 +41,7 @@ struct demo_window_t : public imgui_window_t
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
@@ -59,6 +65,64 @@ struct demo_window_t : public imgui_window_t
         double norm = glm::length(mouse_delta);
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
+    }
+
+    //===================================================================================================================================================================================================================
+    // UI data
+    //===================================================================================================================================================================================================================
+    char fps_str[32];
+    bool show_test_window = true;
+    bool show_another_window = true;
+    int e = 0;
+    float f1 = 0.123f, f2 = 0.0f;
+    bool blur0 = true;
+    bool blur1 = true;
+
+    void update_ui() override
+    {
+        sprintf(fps_str, "Average FPS: %2.1f", fps());
+
+        if (show_another_window)
+        {
+            ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+            ImGui::Begin(fps_str, &show_another_window);
+
+            if (ImGui::CollapsingHeader("Ambient Occlusion algorithms"))
+            {
+                ImGui::RadioButton("World-Space AO with normal + distance textures", &e, 0);
+                ImGui::RadioButton("Camera-Space AO with normal + distance textures", &e, 1);
+            }
+
+
+            if (ImGui::CollapsingHeader("Algorithm settings"))
+            {
+                switch(e)
+                {
+                    case 0:
+                        ImGui::SliderFloat("Radius", &f1,   0.0f,  1.0f, "%.4f");
+                        ImGui::SliderFloat("Bias",   &f2, -10.0f, 10.0f, "%.4f");
+                        ImGui::Checkbox("Use Blur", &blur0);
+                    break;
+
+                    case 1:
+                        ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
+                        ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
+                        ImGui::Checkbox("Use Blur", &blur1);
+                    break;
+
+                    default:
+                    break;
+                }
+            }
+
+            ImGui::End();
+        }
+
+        if (show_test_window)
+        {
+            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+            ImGui::ShowTestWindow(&show_test_window);            
+        }
     }
 };
 
@@ -90,6 +154,7 @@ void check_status()
 
     exit_msg("FBO incomplete : %s", msg);
 }
+
 
 //=======================================================================================================================================================================================================================
 // Setup 1 :: renderbuffer object + one color attachment
@@ -209,6 +274,35 @@ GLuint create_noise_texture(GLenum texture_unit, int res_x, int res_y)
     free(noise_vec3);
     return noise_texture_id;
 }
+
+
+float factor(const glm::vec3& v)
+{
+    float q1 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v))));
+    float q2 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 5.0f * v))));
+    float q3 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 9.0f * v))));
+    float q4 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex(17.0f * v))));
+    return -0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
+}
+
+vertex_pn_t cube_face_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const vertex_pn_t& C, const glm::vec3& uvw)
+{
+    vertex_pn_t vertex;
+    vertex.position = uvw.x * A.position + uvw.y * B.position + uvw.z * C.position;
+    vertex.normal = glm::normalize(uvw.x * A.normal + uvw.y * B.normal + uvw.z * C.normal);
+    vertex.position += factor(vertex.position) * vertex.normal; 
+    return vertex;
+}
+
+vertex_pn_t cube_edge_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const glm::vec2& uv)
+{
+    vertex_pn_t vertex;
+    vertex.position = uv.x * A.position + uv.y * B.position;
+    vertex.normal = glm::normalize(uv.x * A.normal + uv.y * B.normal);
+    vertex.position += factor(vertex.position) * vertex.normal; 
+    return vertex;
+}
+
 
 
 //=======================================================================================================================================================================================================================
@@ -338,11 +432,16 @@ int main(int argc, char *argv[])
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    //===================================================================================================================================================================================================================
-    // GUI data
-    //===================================================================================================================================================================================================================
-    bool show_test_window = true;
-    bool show_another_window = true;
+
+    vertex_pn_t initial_vertices[plato::icosahedron::V];
+ 
+    for(GLuint v = 0; v < plato::icosahedron::V; ++v)
+        initial_vertices[v] = vertex_pn_t(plato::icosahedron::vertices[v], -plato::icosahedron::vertices[v]);    
+
+    vao_t cube_vao = tess::generate_vao_mt(initial_vertices, plato::icosahedron::V, plato::icosahedron::quads, plato::icosahedron::Q, cube_edge_tess_func, cube_face_tess_func, 128); 
+
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(-1);
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -350,37 +449,6 @@ int main(int argc, char *argv[])
     while (!window.should_close())
     {
         window.new_frame();
-
-        //===============================================================================================================================================================================================================
-        // 0. 'Render' UI elements :: UI uses texture unit 0 and alters GL State as follows :
-        //   - enables GL_BLEND and modifies blend equation
-        //   - disables GL_DEPTH_TEST
-        //   - disables GL_CULL_FACE
-        //   - enables GL_SCISSOR_TEST
-        //   - modifies viewport
-        //===============================================================================================================================================================================================================
-        static char fps_str[32];
-        sprintf(fps_str, "Average FPS: %2.1f", window.fps());
-
-        if (show_another_window)
-        {
-            ImGui::SetNextWindowSize(ImVec2(256, 512), ImGuiSetCond_FirstUseEver);
-            ImGui::Begin(fps_str, &show_another_window);
-            ImGui::Text("Hello");
-            ImGui::End();
-        }
-
-        if (show_test_window)
-        {
-            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-            ImGui::ShowTestWindow(&show_test_window);
-        }
-
-        glDisable(GL_BLEND);
-        glEnable(GL_CULL_FACE);
-        glEnable(GL_DEPTH_TEST);
-        glDisable(GL_SCISSOR_TEST);
-        glViewport(0, 0, res_x, res_y);
 
         //===============================================================================================================================================================================================================
         // 1. Update matrix and geometric data
@@ -405,7 +473,12 @@ int main(int argc, char *argv[])
         uni_gp_normal_matrix = normal_matrix;
         uni_gp_camera_ws = camera_ws;
 
+        glCullFace(GL_BACK);
         model.render();
+
+        glCullFace(GL_FRONT);
+        //cube_vao.render();
+
 
         //===============================================================================================================================================================================================================
         // 3. SSAO pass: compute occlusion
@@ -446,9 +519,23 @@ int main(int argc, char *argv[])
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
 
+        glCullFace(GL_BACK);
         model.render();
 
+        glCullFace(GL_FRONT);
+        //cube_vao.render();
+
+
+        //===============================================================================================================================================================================================================
+        // 6. show UI and restore OpenGL setting
+        //===============================================================================================================================================================================================================
         window.end_frame();
+
+        glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_SCISSOR_TEST);
+        glViewport(0, 0, res_x, res_y);
     }
 
     //===================================================================================================================================================================================================================

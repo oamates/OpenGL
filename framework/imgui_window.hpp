@@ -73,6 +73,7 @@ struct imgui_window_t
     virtual void on_character(unsigned int codepoint) {};
     virtual void on_scroll(double xoffset, double yoffset) {};
     virtual void on_resize(int width, int height) {};
+    virtual void update_ui() {};
 
     //===================================================================================================================================================================================================================
     // window-dependent interface functions of GLFW

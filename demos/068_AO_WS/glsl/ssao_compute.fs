@@ -46,7 +46,7 @@ void main()
             //======================================================================================================================================================
             // get sample position in camera space and in ndc
             //======================================================================================================================================================
-            vec3 sample_ws = position_ws + radius * sample;
+            vec3 sample_ws = position_ws + 0.25f * radius * sample;
             float sample_R = length(sample_ws - camera_ws);
 
             vec4 sample_ss = projection_view_matrix * vec4(sample_ws, 1.0f);
@@ -58,8 +58,8 @@ void main()
             //======================================================================================================================================================
             // get sample distance, range check & accumulate
             //======================================================================================================================================================
-            occlusion += smoothstep(sample_R, 1.01 * sample_R, actual_R);
-            total += 1.0;
+            occlusion += dp * smoothstep(1.0 * sample_R, (1.0 + 0.06125 / actual_R) * sample_R, actual_R);
+            total += dp;
         }
     }
     

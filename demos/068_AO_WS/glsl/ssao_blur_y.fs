@@ -33,7 +33,9 @@ void main(void)
     float total_ao = ao_r.x * w;
     float total_weight = w;
 
-    for(int i = 0; i <= KERNEL_RADIUS / 2; ++i)
+    int i = 1;
+
+    while(i <= KERNEL_RADIUS / 2)
     {
         ao_r = sample_AO_R(vec2(0.0f,  i));
         w = weight(i, ao_r.y, center_R);
@@ -44,7 +46,23 @@ void main(void)
         w = weight(i, ao_r.y, center_R);
         total_ao += ao_r.x * w;
         total_weight += w;
+
+        ++i;
     }
+
+    while(i <= KERNEL_RADIUS)
+    {
+        ao_r = sample_AO_R( vec2(0.0f,  0.5f + i));
+        w = weight(i, ao_r.y, center_R);
+        total_ao += ao_r.x * w;
+        total_weight += w;
+
+        ao_r = sample_AO_R( vec2(0.0f, -0.5f - i));
+        w = weight(i, ao_r.y, center_R);
+        total_ao += ao_r.x * w;
+        total_weight += w;
+        i += 2;
+    }    
 
     float ao = total_ao / total_weight;
     OcclusionBlurredR = vec2(ao, center_R);

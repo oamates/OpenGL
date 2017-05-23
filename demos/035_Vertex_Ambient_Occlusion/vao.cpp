@@ -85,14 +85,12 @@ float factor(const glm::vec3& v)
     return -0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
 }
 
-vertex_pnoh_t cube_face_tess_func (const vertex_pnoh_t& A, const vertex_pnoh_t& B, const vertex_pnoh_t& C, const glm::vec3& uvw)
+vertex_pn_t cube_face_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const vertex_pn_t& C, const glm::vec3& uvw)
 {
     vertex_pnoh_t vertex;
     vertex.position = uvw.x * A.position + uvw.y * B.position + uvw.z * C.position;
     vertex.normal = glm::normalize(uvw.x * A.normal + uvw.y * B.normal + uvw.z * C.normal);
     vertex.position += factor(vertex.position) * vertex.normal; 
-    vertex.occlusion = 0.5f;
-    vertex.hue = 0.5f;
     return vertex;
 }
 
@@ -102,8 +100,6 @@ vertex_pnoh_t cube_edge_tess_func (const vertex_pnoh_t& A, const vertex_pnoh_t& 
     vertex.position = uv.x * A.position + uv.y * B.position;
     vertex.normal = glm::normalize(uv.x * A.normal + uv.y * B.normal);
     vertex.position += factor(vertex.position) * vertex.normal; 
-    vertex.occlusion = 0.5f;
-    vertex.hue = 0.5f;
     return vertex;
 }
 
@@ -382,7 +378,7 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &quad_vao_id);        
 
     glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
+    glPrimitiveRestartIndex(0xFFFF);
     glEnable(GL_CULL_FACE);
 
     //===================================================================================================================================================================================================================

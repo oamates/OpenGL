@@ -433,15 +433,15 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (const GLvoid*) offsetof(ImDrawVert, col));
 
     //===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+
+    //===================================================================================================================================================================================================================
     // create font texture and build texture atlas
+    // load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders.
+    // If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
     //===================================================================================================================================================================================================================
     unsigned char* pixels;
     int width, height;
-
-    //===================================================================================================================================================================================================================
-    // Load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders.
-    // If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
-    //===================================================================================================================================================================================================================
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   
     
     glActiveTexture(GL_TEXTURE0);
@@ -471,34 +471,39 @@ void imgui_window_t::new_frame()
 
     glfw::poll_events();
 
-    //===================================================================================================================================================================================================================
-    // Setup display size (every frame to accommodate for window resizing)
-    //===================================================================================================================================================================================================================
-    int w, h;
-    int display_w, display_h;
-    glfwGetWindowSize(window, &w, &h);
-    glfwGetFramebufferSize(window, &display_w, &display_h);
-    io.DisplaySize = ImVec2((float)w, (float)h);
-    io.DisplayFramebufferScale = ImVec2(w > 0 ? ((float)display_w / w) : 0, h > 0 ? ((float)display_h / h) : 0);
-
-    //===================================================================================================================================================================================================================
-    // Setup inputs ::
-    //  - we already got mouse wheel, keyboard keys & characters from glfw callbacks polled in glfwPollEvents())
-    //  - mouse position in screen coordinates (set to -1,-1 if no mouse / window is not in focus)
-    //  - if a mouse press event came, always pass it as if mouse held this frame, so we don't miss click-release events that are shorter than 1 frame
-    //===================================================================================================================================================================================================================
-    io.MousePos = (glfwGetWindowAttrib(window, GLFW_FOCUSED)) ? ImVec2((float)mouse.x, (float)mouse.y) : ImVec2(-1.0f, -1.0f);  // 
-
-    for (int i = 0; i < 3; i++)
+    if (imgui_active)
     {
-        io.MouseDown[i] = mouse_pressed[i] || (glfwGetMouseButton(window, i) != 0);    
-        mouse_pressed[i] = false;
-    }
 
-    io.MouseWheel = mouse_wheel;
-    mouse_wheel = 0.0;
-    
-    ImGui::NewFrame();
+        //===============================================================================================================================================================================================================
+        // Setup display size (every frame to accommodate for window resizing)
+        //===============================================================================================================================================================================================================
+        int w, h;
+        int display_w, display_h;
+        glfwGetWindowSize(window, &w, &h);
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        io.DisplaySize = ImVec2((float)w, (float)h);
+        io.DisplayFramebufferScale = ImVec2(w > 0 ? ((float)display_w / w) : 0, h > 0 ? ((float)display_h / h) : 0);
+
+        //===============================================================================================================================================================================================================
+        // Setup inputs ::
+        //  - we already got mouse wheel, keyboard keys & characters from glfw callbacks polled in glfwPollEvents())
+        //  - mouse position in screen coordinates (set to -1,-1 if no mouse / window is not in focus)
+        //  - if a mouse press event came, always pass it as if mouse held this frame, so we don't miss click-release events that are shorter than 1 frame
+        //===============================================================================================================================================================================================================
+        io.MousePos = (glfwGetWindowAttrib(window, GLFW_FOCUSED)) ? ImVec2((float)mouse.x, (float)mouse.y) : ImVec2(-1.0f, -1.0f);  // 
+
+        for (int i = 0; i < 3; i++)
+        {
+            io.MouseDown[i] = mouse_pressed[i] || (glfwGetMouseButton(window, i) != 0);    
+            mouse_pressed[i] = false;
+        }
+
+        io.MouseWheel = mouse_wheel;
+        mouse_wheel = 0.0;
+
+        ImGui::NewFrame();
+        update_ui();
+    }    
 }
 
 void imgui_window_t::end_frame()
