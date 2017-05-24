@@ -279,6 +279,7 @@ int main(int argc, char *argv[])
     ssao_cs.enable();
     ssao_cs["depth_tex"] = 1;
     ssao_cs["resolution"] = glm::vec2(res_x, res_y);
+    ssao_cs["inv_resolution"] = glm::vec3(1.0f / res_x, 1.0f / res_y);
     ssao_cs["focal_scale"] = focal_scale;
     ssao_cs["inv_focal_scale"] = inv_focal_scale;
     ssao_cs["samples"] = ssao_kernel;    

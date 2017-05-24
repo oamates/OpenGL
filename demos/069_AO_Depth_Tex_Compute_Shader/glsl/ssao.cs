@@ -16,6 +16,8 @@ layout (r32f, binding = 0) uniform image2D ssao_image;
 uniform sampler2D depth_tex;
 
 uniform vec2 resolution;
+uniform vec3 texel_size;            // = inverse resolution and 0 the last component
+
 uniform vec2 focal_scale;
 uniform vec2 inv_focal_scale;
 
@@ -36,12 +38,30 @@ float csZ(float depth)
     return znear / (depth - 1.0);
 }
 
+vec3 csPosition(vec2 uv)
+{
+    vec2 ndc = 2.0 * uv - 1.0;
+    vec3 view = vec3(focal_scale * ndc, -1.0f);
+    float depth = texture(depth_tex, uv).r;
+    float Z = csZ(depth);
+    vec3 position_cs = -Z * view;
+    return position_cs;
+}
 
 void main()
 {
     float FragmentOcclusion;
 
     vec2 uv = vec2(gl_GlobalInvocationID.xy) / resolution;
+
+    vec3 P   = GetViewPos(uv);    
+    vec3 Pr  = GetViewPos(uv + texel_size.xz);
+    vec3 Pl  = GetViewPos(uv - texel_size.xz);
+    vec3 Pt  = GetViewPos(uv + texel_size.zy);
+    vec3 Pb  = GetViewPos(uv - texel_size.zy);
+
+
+
     vec2 ndc = 2.0 * uv - 1.0;
     vec3 view = vec3(focal_scale * ndc, -1.0f);
 
@@ -49,6 +69,49 @@ void main()
     float Z = csZ(depth);
 
     vec3 position_cs = -Z * view;
+
+    
+    vec3 dPdu = MinDiff(P, Pr, Pl);                                                     // Calculate tangent basis vectors using the minimum difference
+    vec3 dPdv = MinDiff(P, Pt, Pb) * (AORes.y * InvAORes.x);
+
+    
+    vec3 random = texture(texture1, TexCoord.xy * NoiseScale).rgb;                      // Get the random samples from the noise texture
+
+    // Calculate the projected size of the hemisphere
+    vec2 rayRadiusUV = 0.5 * R * FocalLen / -P.z;
+    float rayRadiusPix = rayRadiusUV.x * AORes.x;
+
+    float ao = 1.0;
+
+    // Make sure the radius of the evaluated hemisphere is more than a pixel
+    if (rayRadiusPix > 1.0)
+    {
+        ao = 0.0;
+        float numSteps;
+        vec2 stepSizeUV;
+
+        // Compute the number of steps
+        ComputeSteps(stepSizeUV, numSteps, rayRadiusPix, random.z);
+
+        float alpha = 2.0 * PI / numDirections;
+
+        // Calculate the horizon occlusion of each direction
+        for(float d = 0; d < numDirections; ++d)
+        {
+            float theta = alpha * d;
+
+            // Apply noise to the direction
+            vec2 dir = RotateDirections(vec2(cos(theta), sin(theta)), random.xy);
+            vec2 deltaUV = dir * stepSizeUV;
+
+            // Sample the pixels along the direction
+            ao += HorizonOcclusion(deltaUV, P, dPdu, dPdv, random.z, numSteps);
+        }
+
+        // Average the results and produce the final AO
+        ao = 1.0 - ao / numDirections * AOStrength;
+    }
+
 
 
     //==========================================================================================================================================================
