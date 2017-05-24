@@ -5,25 +5,29 @@ in vec3 view;
 
 const int kernel_size = 64;
 
-uniform sampler2D noise_tex;
-uniform sampler2D normal_cs_tex;
+uniform sampler2DShadow depth_tex;
+uniform sampler2D normal_ws_tex;
 
-uniform vec2 inv_focal_scale;
+uniform mat4 projection_view_matrix;
+uniform mat3 camera_matrix;
+uniform vec3 camera_ws;
 uniform vec4 samples[kernel_size];
 uniform float radius;
 uniform float bias;
 
-out float FragmentOcclusion;
+layout (location = 0) out vec2 FragmentOcclusionR;
 
 void main()
 {
     //==========================================================================================================================================================
     // Get camera-space normal and Z
     //==========================================================================================================================================================
-    vec4 data_in = texture(normal_cs_tex, uv);
-    vec3 N_cs = normalize(data_in.xyz);
-    float Z_cs = data_in.w; 
-    vec3 position_cs = -Z_cs * view;
+    vec4 data_in = texture(normal_ws_tex, uv);
+    vec3 N_ws = normalize(data_in.xyz);
+    float R = data_in.w;                                        // distance from fragment to camera 
+    vec3 v = normalize(view);
+    vec3 position_cs = R * normalize(v);
+    vec3 position_ws = camera_ws + camera_matrix * position_cs;
     
     //==========================================================================================================================================================
     // Iterate over the sample kernel and calculate occlusion factor
@@ -34,7 +38,7 @@ void main()
     for(int i = 0; i < kernel_size; ++i)
     {
         vec3 sample = samples[i].xyz;
-        float dp = dot(sample, N_cs);
+        float dp = dot(sample, N_ws);
 
         if (dp > 0.0f)
         {
@@ -42,21 +46,20 @@ void main()
             //======================================================================================================================================================
             // get sample position in camera space and in ndc
             //======================================================================================================================================================
-            vec3 sample_cs = position_cs + radius * sample;
-            float sample_Z_cs = sample_cs.z;
+            vec3 sample_ws = position_ws + radius * sample;
+            vec4 sample_ss = projection_view_matrix * vec4(sample_ws, 1.0f);
+            vec3 ndc = sample_ss.xyz / sample_ss.w;
+            vec3 uvw = 0.5f + 0.5f * ndc;
 
-            vec2 ndc = inv_focal_scale * sample_cs.xy / (-sample_Z_cs);
-            vec2 uv = 0.5f + 0.5f * ndc;
-
-            float actual_Z_cs = texture(normal_cs_tex, uv).w;
+            uvw.z += 0.0016 / R;
 
             //======================================================================================================================================================
-            // get sample z-value, range check & accumulate
+            // get sample distance, range check & accumulate
             //======================================================================================================================================================
-            occlusion += (sample_Z_cs > actual_Z_cs + 0.05) ? 1.0 : 0.0;
-            total += 1.0;
+            occlusion += dp * texture(depth_tex, uvw);
+            total += dp;
         }
     }
     
-    FragmentOcclusion = occlusion / total;
+    FragmentOcclusionR = vec2(occlusion / total, R);
 }                                            

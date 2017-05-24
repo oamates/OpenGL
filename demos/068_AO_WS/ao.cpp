@@ -280,10 +280,10 @@ GLuint create_noise_texture(GLenum texture_unit, int res_x, int res_y)
 
 float factor(const glm::vec3& v)
 {
-    float q1 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v))));
-    float q2 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 5.0f * v))));
-    float q3 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex( 9.0f * v))));
-    float q4 = glm::sqrt(glm::sqrt(glm::abs(0.5f - glm::simplex(17.0f * v))));
+    float q1 = glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v)));
+    float q2 = glm::sqrt(glm::abs(0.5f - glm::simplex( 5.0f * v)));
+    float q3 = glm::sqrt(glm::abs(0.5f - glm::simplex( 9.0f * v)));
+    float q4 = glm::sqrt(glm::abs(0.5f - glm::simplex(17.0f * v)));
     return 0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
 }
 
@@ -328,9 +328,9 @@ int main(int argc, char *argv[])
     std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
     std::default_random_engine generator;
 
-    glm::vec4 ssao_kernel[32];
+    glm::vec4 ssao_kernel[64];
 
-    for (GLuint i = 0; i < 32; ++i)
+    for (GLuint i = 0; i < 64; ++i)
     {
         glm::vec3 v = glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator));
         ssao_kernel[i] = glm::vec4(v, 0.125 * glm::abs(gaussRand(generator)));
@@ -403,6 +403,7 @@ int main(int argc, char *argv[])
     uniform_t uni_lp_Ks               = lighting_pass["Ks"];
     uniform_t uni_lp_Ns               = lighting_pass["Ns"];
     uniform_t uni_lp_bf               = lighting_pass["bf"];
+    uniform_t uni_lp_tex_scale        = lighting_pass["tex_scale"];
 
     //===================================================================================================================================================================================================================
     // load model
@@ -427,7 +428,7 @@ int main(int argc, char *argv[])
     //================================  ===================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE5);
     GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-    GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/green_mineral.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/chiseled_ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -449,10 +450,10 @@ int main(int argc, char *argv[])
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex(-1);
 
-    glm::mat4 demon_model_matrix = glm::scale(glm::vec3(2.5f));
+    glm::mat4 demon_model_matrix = glm::scale(glm::translate(glm::vec3(0.0, -3.0, -8.0)), glm::vec3(2.5f));
     glm::mat4 room_model_matrix = glm::scale(glm::vec3(23.5f));
-    glm::mat3 demon_normal_matrix = glm::mat3(1.0f); //glm::inverse(glm::mat3(demon_model_matrix));
-    glm::mat3 room_normal_matrix = glm::mat3(1.0f); //inverse(glm::mat3(room_model_matrix));
+    glm::mat3 demon_normal_matrix = glm::mat3(1.0f);
+    glm::mat3 room_normal_matrix = glm::mat3(1.0f);
 
 
     //===================================================================================================================================================================================================================
@@ -466,7 +467,7 @@ int main(int argc, char *argv[])
         // 1. Update matrix and geometric data
         //===============================================================================================================================================================================================================
         float time = window.frame_ts;
-        glm::vec3 light_ws = glm::vec3(3.0f * glm::cos(time), 3.0f * glm::sin(time), 7.0f);
+        glm::vec3 light_ws = glm::vec3(4.0f * glm::cos(time), 8.0f, 4.0f * glm::sin(time));
         glm::mat4& view_matrix = window.camera.view_matrix;
         glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
         glm::mat3 camera_matrix = glm::inverse(glm::mat3(view_matrix));
@@ -539,17 +540,21 @@ int main(int argc, char *argv[])
         uni_lp_Ks = 0.92f;
         uni_lp_Ns = 24.0f;
         uni_lp_bf = 0.0427f;
+        uni_lp_tex_scale = 0.1275f;
         uni_lp_normal_matrix = demon_normal_matrix;
         uni_lp_model_matrix = demon_model_matrix;
+
         glCullFace(GL_BACK);
         model.render();
 
         glBindTexture(GL_TEXTURE_2D, room_tex_id);
-        uni_lp_Ks = 1.44f;
-        uni_lp_Ns = 44.0f;
-        uni_lp_bf = 0.08425f;
+        uni_lp_Ks = 1.14f;
+        uni_lp_Ns = 80.0f;
+        uni_lp_bf = 0.00625f;
+        uni_lp_tex_scale = 0.0775f;
         uni_lp_normal_matrix = room_normal_matrix;
         uni_lp_model_matrix = room_model_matrix;
+
         glCullFace(GL_FRONT);
         cube_vao.render();
 

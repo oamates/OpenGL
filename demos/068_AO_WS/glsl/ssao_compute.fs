@@ -3,7 +3,7 @@
 in vec2 uv;
 in vec3 view;
 
-const int kernel_size = 128;
+const int kernel_size = 64;
 
 uniform sampler2D noise_tex;
 uniform sampler2D normal_ws_tex;

@@ -11,12 +11,13 @@ uniform vec3 light_ws;
 uniform float Ks;
 uniform float Ns;
 uniform float bf;
+uniform float tex_scale;
 uniform int draw_mode;
 
 out vec4 FragmentColor;
 
 
-const vec3 light_color = vec3(0.91, 0.97, 0.71);
+const vec3 light_color = vec3(0.76, 1.08, 0.83);
 const vec3 rgb_power = vec3(0.299f, 0.587f, 0.114f);
 
 vec3 tex2d(vec2 uv)
@@ -26,11 +27,11 @@ vec3 tex2d(vec2 uv)
 
 vec3 tex3d(in vec3 p, in vec3 n)
 {
-    p *= 0.1275;
+    p *= tex_scale;
     vec3 w = max(abs(n) - 0.317f, 0.0f);
     w /= dot(w, vec3(1.0f));
     mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
-    return pow(rgb_samples * w, vec3(0.96));
+    return pow(rgb_samples * w, vec3(1.16));
 }
 
 vec3 bumped_normal(in vec3 p, in vec3 n)
@@ -49,7 +50,7 @@ void main()
     float ao = texture(ssao_blurred_tex, uv).r;
 
     vec3 diffuse_color = tex3d(position_ws, normal_ws);
-    vec3 ambient_color = 0.37f * ao * diffuse_color;                                        // direct influence of AO on ambient color
+    vec3 ambient_color = 0.25f * ao * diffuse_color;                                        // direct influence of AO on ambient color
 
     vec3 n = bumped_normal(position_ws, normalize(normal_ws));
     vec3 color = ambient_color;
@@ -67,8 +68,9 @@ void main()
 
     vec3 specular = light_color * specular_factor;
 
-    float attenuation = 1.0;
-    color = color + sqrt(ao) * attenuation * (diffuse + specular);                          // moderate influence of AO on diffuse + specular colors
+    float attenuation = 1.0 / (1.0 + 0.075 * distance);
+
+    color = color + attenuation * ao * (diffuse + specular);                          // moderate influence of AO on diffuse + specular colors
 
     if(draw_mode == 0)
         FragmentColor = vec4(color, 1.0);

@@ -1,10 +1,12 @@
 #version 330 core
 
-layout (location = 0) out vec4 normal_cs_out;
+layout (location = 0) out vec4 normal_ws_out;
 
-in vec4 normal_cs;
+uniform vec3 camera_ws;
+in vec3 position_ws;
+in vec3 normal_ws;
 
 void main()
 {    
-    normal_cs_out = normal_cs;
+    normal_ws_out = vec4(normal_ws, length(position_ws - camera_ws));
 }

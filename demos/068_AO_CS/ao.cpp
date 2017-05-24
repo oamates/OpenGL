@@ -7,35 +7,42 @@
 #include <random>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtc/noise.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
 #include "gl_info.hpp"
-#include "glfw_window.hpp"
+#include "imgui_window.hpp"
 #include "camera.hpp"
 #include "shader.hpp"
 #include "image.hpp"
 #include "vao.hpp"
+#include "plato.hpp"
+#include "vertex.hpp"
+#include "vao.hpp"
+#include "tess.hpp"
+#include "attribute.hpp"
 
 std::default_random_engine generator;
 std::normal_distribution<float> gaussRand(0.0, 1.0);
 
-const int res_x = 1280;
-const int res_y = 1024;
+const int res_x = 1920;
+const int res_y = 1080;
 
-struct demo_window_t : public glfw_window_t
+struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
     int draw_mode = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
@@ -60,8 +67,66 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
-};
 
+    //===================================================================================================================================================================================================================
+    // UI data
+    //===================================================================================================================================================================================================================
+    char fps_str[32];
+    bool show_test_window = true;
+    bool show_another_window = true;
+    int e = 0;
+    float f1 = 0.123f, f2 = 0.0f;
+    bool blur0 = true;
+    bool blur1 = true;
+
+    void update_ui() override
+    {
+        sprintf(fps_str, "Average FPS: %2.1f", fps());
+        set_title(fps_str);
+
+        if (show_another_window)
+        {
+            ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+            ImGui::Begin("Ambient Occlusion", &show_another_window);
+
+            if (ImGui::CollapsingHeader("Algorithms"))
+            {
+                ImGui::RadioButton("World-Space AO with normal + distance textures", &e, 0);
+                ImGui::RadioButton("Camera-Space AO with normal + distance textures", &e, 1);
+            }
+
+
+            if (ImGui::CollapsingHeader("Algorithm settings"))
+            {
+                switch(e)
+                {
+                    case 0:
+                        ImGui::SliderFloat("Radius", &f1,   0.0f,  1.0f, "%.4f");
+                        ImGui::SliderFloat("Bias",   &f2, -10.0f, 10.0f, "%.4f");
+                        ImGui::Checkbox("Use Blur", &blur0);
+                    break;
+
+                    case 1:
+                        ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
+                        ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
+                        ImGui::Checkbox("Use Blur", &blur1);
+                    break;
+
+                    default:
+                    break;
+                }
+            }
+
+            ImGui::End();
+        }
+
+        if (show_test_window)
+        {
+            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+            ImGui::ShowTestWindow(&show_test_window);            
+        }
+    }
+};
 
 void check_status()
 {
@@ -210,6 +275,34 @@ GLuint create_noise_texture(GLenum texture_unit, int res_x, int res_y)
     return noise_texture_id;
 }
 
+float factor(const glm::vec3& v)
+{
+    float q1 = glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v)));
+    float q2 = glm::sqrt(glm::abs(0.5f - glm::simplex( 5.0f * v)));
+    float q3 = glm::sqrt(glm::abs(0.5f - glm::simplex( 9.0f * v)));
+    float q4 = glm::sqrt(glm::abs(0.5f - glm::simplex(17.0f * v)));
+    return 0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
+}
+
+vertex_pn_t cube_face_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const vertex_pn_t& C, const glm::vec3& uvw)
+{
+    vertex_pn_t vertex;
+    vertex.position = uvw.x * A.position + uvw.y * B.position + uvw.z * C.position;
+    vertex.normal = glm::normalize(uvw.x * A.normal + uvw.y * B.normal + uvw.z * C.normal);
+    vertex.position += factor(vertex.position) * vertex.normal; 
+    return vertex;
+}
+
+vertex_pn_t cube_edge_tess_func (const vertex_pn_t& A, const vertex_pn_t& B, const glm::vec2& uv)
+{
+    vertex_pn_t vertex;
+    vertex.position = uv.x * A.position + uv.y * B.position;
+    vertex.normal = glm::normalize(uv.x * A.normal + uv.y * B.normal);
+    vertex.position += factor(vertex.position) * vertex.normal; 
+    return vertex;
+}
+
+
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -224,7 +317,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("AO Effect Shader", 4, 3, 3, res_x, res_y, false);
+    demo_window_t window("AO Effect Shader", 4, 3, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
     // generate SSAO sample kernel points
@@ -266,8 +359,8 @@ int main(int argc, char *argv[])
     glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_compute.vs"), 
                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_compute.fs"));
     ssao_compute.enable();
-    ssao_compute["noise_tex"] = 0;
-    ssao_compute["normal_cs_tex"] = 1;
+    ssao_compute["noise_tex"] = 1;
+    ssao_compute["normal_cs_tex"] = 2;
     ssao_compute["samples"] = ssao_kernel;
     ssao_compute["focal_scale"] = focal_scale;
     ssao_compute["inv_focal_scale"] = inv_focal_scale;
@@ -278,7 +371,7 @@ int main(int argc, char *argv[])
     glsl_program_t ssao_blur(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_blur.fs"));
     ssao_blur.enable();
-    ssao_blur["ssao_input"] = 2;
+    ssao_blur["ssao_input"] = 3;
     ssao_blur["texel_size"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
 
 
@@ -286,15 +379,19 @@ int main(int argc, char *argv[])
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_lighting.fs"));
     lighting_pass.enable();
 
-    lighting_pass["ssao_blurred_tex"] = 3;
-    lighting_pass["tb_tex"]           = 4;
-    lighting_pass["model_matrix"]     = model_matrix;
+    lighting_pass["ssao_blurred_tex"] = 4;
+    lighting_pass["tb_tex"]           = 5;
 
+    uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
     uniform_t uni_lp_pv_matrix        = lighting_pass["projection_view_matrix"];
     uniform_t uni_lp_normal_matrix    = lighting_pass["normal_matrix"];
     uniform_t uni_lp_camera_ws        = lighting_pass["camera_ws"];
     uniform_t uni_lp_light_ws         = lighting_pass["light_ws"];
     uniform_t uni_lp_draw_mode        = lighting_pass["draw_mode"];
+    uniform_t uni_lp_Ks               = lighting_pass["Ks"];
+    uniform_t uni_lp_Ns               = lighting_pass["Ns"];
+    uniform_t uni_lp_bf               = lighting_pass["bf"];
+    uniform_t uni_lp_tex_scale        = lighting_pass["tex_scale"];
 
     //===================================================================================================================================================================================================================
     // load model
@@ -307,17 +404,18 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // framebuffer object and textures for geometry rendering step
     //===================================================================================================================================================================================================================
-    GLuint noise_tex_id = create_noise_texture(GL_TEXTURE0, res_x, res_y);
+    GLuint noise_tex_id = create_noise_texture(GL_TEXTURE1, res_x, res_y);
 
-    fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
-    fbo_color_t ssao_compute_fbo(res_x, res_y, GL_R32F, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
-    fbo_color_t ssao_blur_fbo(res_x, res_y, GL_R32F, GL_CLAMP_TO_EDGE, GL_TEXTURE3);
+    fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
+    fbo_color_t ssao_compute_fbo(res_x, res_y, GL_R32F, GL_CLAMP_TO_EDGE, GL_TEXTURE3);
+    fbo_color_t ssao_blur_fbo(res_x, res_y, GL_R32F, GL_CLAMP_TO_EDGE, GL_TEXTURE4);
 
     //===================================================================================================================================================================================================================
     // load 2D texture for trilinear blending in lighting shader
     //================================  ===================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE4);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    glActiveTexture(GL_TEXTURE5);
+    GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/chiseled_ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -327,6 +425,22 @@ int main(int argc, char *argv[])
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
+
+
+    vertex_pn_t initial_vertices[plato::icosahedron::V];
+ 
+    for(GLuint v = 0; v < plato::icosahedron::V; ++v)
+        initial_vertices[v] = vertex_pn_t(plato::icosahedron::vertices[v], -plato::icosahedron::vertices[v]);    
+
+    vao_t cube_vao = tess::generate_vao_mt(initial_vertices, plato::icosahedron::V, plato::icosahedron::quads, plato::icosahedron::Q, cube_edge_tess_func, cube_face_tess_func, 128); 
+
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(-1);
+
+    glm::mat4 demon_model_matrix = glm::scale(glm::translate(glm::vec3(0.0, -3.0, -8.0)), glm::vec3(2.5f));
+    glm::mat4 room_model_matrix = glm::scale(glm::vec3(23.5f));
+    glm::mat3 demon_normal_matrix = glm::mat3(1.0f);
+    glm::mat3 room_normal_matrix = glm::mat3(1.0f);
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -340,6 +454,8 @@ int main(int argc, char *argv[])
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
         glm::vec3 light_ws = glm::vec3(2.0f * glm::cos(time), 4.0f, -2.0f * glm::sin(time));
+        glm::mat4& view_matrix = window.camera.view_matrix;
+
         glm::mat4 view_model_matrix = window.camera.view_matrix * model_matrix;
         glm::mat3 normal_vm_matrix = glm::inverse(glm::mat3(view_model_matrix));
         glm::mat3 normal_matrix = glm::inverse(glm::mat3(model_matrix));
@@ -356,11 +472,18 @@ int main(int argc, char *argv[])
         glEnable(GL_DEPTH_TEST);
 
         geometry_pass.enable();
-        
-        uni_gp_vm_matrix        = view_model_matrix;
-        uni_gp_normal_vm_matrix = normal_vm_matrix;
 
+        uni_gp_vm_matrix        = view_matrix * demon_model_matrix;
+        uni_gp_normal_vm_matrix = glm::inverse(glm::mat3(view_matrix));
+        glCullFace(GL_BACK);
         model.render();
+
+        uni_gp_vm_matrix        = view_matrix * room_model_matrix;
+        //uni_gp_normal_vm_matrix = normal_vm_matrix;
+        glCullFace(GL_FRONT);
+        cube_vao.render();
+
+        glCullFace(GL_BACK);
 
         //===============================================================================================================================================================================================================
         // SSAO pass: compute occlusion
@@ -394,9 +517,36 @@ int main(int argc, char *argv[])
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
 
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, demon_tex_id);
+        uni_lp_Ks = 0.92f;
+        uni_lp_Ns = 24.0f;
+        uni_lp_bf = 0.0427f;
+        uni_lp_tex_scale = 0.1275f;
+        uni_lp_normal_matrix = demon_normal_matrix;
+        uni_lp_model_matrix = demon_model_matrix;
+
+        glCullFace(GL_BACK);
         model.render();
 
+        glBindTexture(GL_TEXTURE_2D, room_tex_id);
+        uni_lp_Ks = 1.14f;
+        uni_lp_Ns = 80.0f;
+        uni_lp_bf = 0.00625f;
+        uni_lp_tex_scale = 0.0775f;
+        uni_lp_normal_matrix = room_normal_matrix;
+        uni_lp_model_matrix = room_model_matrix;
+
+        glCullFace(GL_FRONT);
+        cube_vao.render();
+
         window.end_frame();
+
+        glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_SCISSOR_TEST);
+        glViewport(0, 0, res_x, res_y);
     }
 
     //===================================================================================================================================================================================================================

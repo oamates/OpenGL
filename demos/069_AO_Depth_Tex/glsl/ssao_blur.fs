@@ -13,7 +13,7 @@ void main()
 
     vec2 q = gl_FragCoord.xy;
 
-    const float size = 0.5;
+    const float size = 2.0;
 
     vec4 c00_00 = textureGather(ssao_input, uv);
 
