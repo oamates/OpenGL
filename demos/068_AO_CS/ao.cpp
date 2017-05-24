@@ -247,34 +247,6 @@ struct fbo_color_t
 
 };
 
-//=======================================================================================================================================================================================================================
-// Setup 2 :: renderbuffer object + one color attachment
-//=======================================================================================================================================================================================================================
-GLuint create_noise_texture(GLenum texture_unit, int res_x, int res_y)
-{
-    GLuint noise_texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &noise_texture_id);
-    glBindTexture(GL_TEXTURE_2D, noise_texture_id);
-
-    glm::vec3* noise_vec3 = (glm::vec3*) malloc(res_x * res_y * sizeof(glm::vec3));
-
-    int idx = 0;
-    for(int y = 0; y < res_y; ++y)
-        for(int x = 0; x < res_x; ++x)
-            noise_vec3[idx++] = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, res_x, res_y, 0, GL_RGB, GL_FLOAT, noise_vec3);
-
-    free(noise_vec3);
-    return noise_texture_id;
-}
-
 float factor(const glm::vec3& v)
 {
     float q1 = glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v)));
@@ -331,6 +303,7 @@ int main(int argc, char *argv[])
     {
         glm::vec3 v = glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator));
         v = gaussRand(generator) * glm::normalize(v);
+        if (v.z < 0.0f) v.z = -v.z;
         ssao_kernel[i] = v;
     }
 
@@ -359,7 +332,6 @@ int main(int argc, char *argv[])
     glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_compute.vs"), 
                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_compute.fs"));
     ssao_compute.enable();
-    ssao_compute["noise_tex"] = 1;
     ssao_compute["normal_cs_tex"] = 2;
     ssao_compute["samples"] = ssao_kernel;
     ssao_compute["focal_scale"] = focal_scale;
@@ -404,8 +376,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // framebuffer object and textures for geometry rendering step
     //===================================================================================================================================================================================================================
-    GLuint noise_tex_id = create_noise_texture(GL_TEXTURE1, res_x, res_y);
-
     fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
     fbo_color_t ssao_compute_fbo(res_x, res_y, GL_R32F, GL_CLAMP_TO_EDGE, GL_TEXTURE3);
     fbo_color_t ssao_blur_fbo(res_x, res_y, GL_R32F, GL_CLAMP_TO_EDGE, GL_TEXTURE4);

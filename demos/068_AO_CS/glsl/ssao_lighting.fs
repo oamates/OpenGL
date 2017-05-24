@@ -17,7 +17,7 @@ uniform int draw_mode;
 out vec4 FragmentColor;
 
 
-const vec3 light_color = vec3(0.76, 1.08, 0.83);
+const vec3 light_color = vec3(0.76, 0.83, 1.13);
 const vec3 rgb_power = vec3(0.299f, 0.587f, 0.114f);
 
 vec3 tex2d(vec2 uv)

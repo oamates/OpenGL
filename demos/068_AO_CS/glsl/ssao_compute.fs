@@ -5,7 +5,6 @@ in vec3 view;
 
 const int kernel_size = 32;
 
-uniform sampler2D noise_tex;
 uniform sampler2D normal_cs_tex;
 
 uniform vec2 inv_focal_scale;
@@ -14,6 +13,14 @@ uniform float radius;
 uniform float bias;
 
 out float FragmentOcclusion;
+
+const mat3 hash_matrix = mat3
+(
+    vec3(11.0, 14.0, 71.0),
+    vec3(78.0, 13.0, 57.0),
+    vec3(22.0, 19.0, 17.0)
+);
+
 
 void main()
 {
@@ -28,7 +35,8 @@ void main()
     //==========================================================================================================================================================
     // Get random vector tangent vector and compute local tangent and bitangent
     //==========================================================================================================================================================
-    vec3 rand_vec3 = texture(noise_tex, uv).xyz;
+    vec3 rand_vec3 = fract(41719.73157 * sin(hash_matrix * vec3(gl_FragCoord.xy, 1.0)));
+
     vec3 T_cs = normalize(rand_vec3 - N_cs * dot(rand_vec3, N_cs));
     vec3 B_cs = cross(N_cs, T_cs);
     mat3 tangent_frame = mat3(T_cs, B_cs, N_cs);
