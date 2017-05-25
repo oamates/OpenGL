@@ -252,12 +252,13 @@ int main(int argc, char *argv[])
     std::default_random_engine generator;
     std::normal_distribution<float> gaussRand(0.0, 1.0);
 
-    glm::vec4 ssao_kernel[64];
+    glm::vec4 ssao_kernel[32];
 
-    for (GLuint i = 0; i < 64; ++i)
+    for (GLuint i = 0; i < 32; ++i)
     {
-        glm::vec3 v = glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator));
-        ssao_kernel[i] = glm::vec4(v, 0.125 * glm::abs(gaussRand(generator)));
+        glm::vec3 v = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
+        if (v.z < 0) v.z = -v.z;
+        ssao_kernel[i] = glm::vec4(v, 0.75 * glm::abs(gaussRand(generator)));
     }
 
     //===================================================================================================================================================================================================================
@@ -279,7 +280,7 @@ int main(int argc, char *argv[])
     ssao_cs.enable();
     ssao_cs["depth_tex"] = 1;
     ssao_cs["resolution"] = glm::vec2(res_x, res_y);
-    ssao_cs["inv_resolution"] = glm::vec3(1.0f / res_x, 1.0f / res_y);
+    ssao_cs["texel_size"] = glm::vec3(1.0f / res_x, 1.0f / res_y, 0.0f);
     ssao_cs["focal_scale"] = focal_scale;
     ssao_cs["inv_focal_scale"] = inv_focal_scale;
     ssao_cs["samples"] = ssao_kernel;    
@@ -402,7 +403,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, geometry_fbo.texture_id);
 
         ssao_cs.enable();
-        glDispatchCompute(res_x / 8, res_y / 8, 1);
+        glDispatchCompute(res_x / 16, res_y / 16, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         //===============================================================================================================================================================================================================
