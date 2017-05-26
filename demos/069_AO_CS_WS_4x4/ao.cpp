@@ -304,9 +304,9 @@ int main(int argc, char *argv[])
 
     for (GLuint i = 0; i < 64; ++i)
     {
-        glm::vec3 v = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
+        glm::vec3 v = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), 2.0 * gaussRand(generator)));
         if (v.z < 0) v.z = -v.z;
-        ssao_kernel[i] = glm::vec4(v, glm::abs(gaussRand(generator)));
+        ssao_kernel[i] = glm::vec4(v, 0.125f * glm::abs(gaussRand(generator)));
     }
 
     //===================================================================================================================================================================================================================
@@ -332,7 +332,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gp_model_matrix      = geometry_pass["model_matrix"];
 
 
-    glsl_program_t ssao_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ssao4x4.cs"));
+    glsl_program_t ssao_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ssao2x2.cs"));
     ssao_cs.enable();
     ssao_cs["data_ws"] = 1;
     ssao_cs["resolution"] = glm::vec2(res_x, res_y);
@@ -471,7 +471,7 @@ int main(int argc, char *argv[])
         uni_sc_camera_ws = camera_ws;
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
-        glDispatchCompute(res_x / 24, res_y / 24, 1);
+        glDispatchCompute(res_x / 2, res_y / 2, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         //===============================================================================================================================================================================================================
