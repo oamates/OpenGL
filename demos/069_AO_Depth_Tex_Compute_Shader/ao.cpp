@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
     ssao_cs.enable();
     ssao_cs["depth_tex"] = 1;
     ssao_cs["resolution"] = glm::vec2(res_x, res_y);
-    ssao_cs["texel_size"] = glm::vec3(1.0f / res_x, 1.0f / res_y, 0.0f);
+    ssao_cs["texel_size"] = glm::vec4(1.0f / res_x, 1.0f / res_y, -1.0f / res_x, -1.0f / res_y);
     ssao_cs["focal_scale"] = focal_scale;
     ssao_cs["inv_focal_scale"] = inv_focal_scale;
     ssao_cs["samples"] = ssao_kernel;    
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glBindImageTexture(0, ssao_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+    glBindImageTexture(0, ssao_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
     //===================================================================================================================================================================================================================
     // load 2D texture for trilinear blending in lighting shader

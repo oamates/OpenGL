@@ -21,12 +21,12 @@
 #include "camera.hpp"
 #include "shader.hpp"
 #include "image.hpp"
-#include "vao.hpp"
 #include "plato.hpp"
 #include "vertex.hpp"
 #include "vao.hpp"
 #include "tess.hpp"
 #include "attribute.hpp"
+
 
 std::default_random_engine generator;
 std::normal_distribution<float> gaussRand(0.0, 1.0);
@@ -129,6 +129,7 @@ struct demo_window_t : public imgui_window_t
     }
 };
 
+
 void check_status()
 {
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -156,6 +157,7 @@ void check_status()
 
     exit_msg("FBO incomplete : %s", msg);
 }
+
 
 //=======================================================================================================================================================================================================================
 // Setup 1 :: renderbuffer object + one color attachment
@@ -324,34 +326,32 @@ int main(int argc, char *argv[])
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_geometry.fs"));
     geometry_pass.enable();
 
-    uniform_t uni_gp_vm_matrix        = geometry_pass["view_model_matrix"];
-    uniform_t uni_gp_normal_vm_matrix = geometry_pass["normal_vm_matrix"];
-    geometry_pass["projection_matrix"] = projection_matrix;
+    uniform_t uni_gp_pv_matrix         = geometry_pass["projection_view_matrix"];
+    uniform_t uni_gp_normal_matrix     = geometry_pass["normal_matrix"];
+    uniform_t uni_gp_camera_ws         = geometry_pass["camera_ws"];
+    uniform_t uni_gp_model_matrix      = geometry_pass["model_matrix"];
 
 
-    glsl_program_t ssao_compute(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_compute.vs"), 
-                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_compute.fs"));
-    ssao_compute.enable();
-    ssao_compute["normal_cs_tex"] = 2;
-    ssao_compute["samples"] = ssao_kernel;
-    ssao_compute["focal_scale"] = focal_scale;
-    ssao_compute["inv_focal_scale"] = inv_focal_scale;
-    ssao_compute["radius"] = 1.5f;
-    ssao_compute["bias"] = 0.25f;
+    glsl_program_t ssao_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ssao.cs"));
+    ssao_cs.enable();
+    ssao_cs["data_ws"] = 1;
+    ssao_cs["resolution"] = glm::vec2(res_x, res_y);
+    ssao_cs["texel_size"] = glm::vec4(1.0f / res_x, 1.0f / res_y, -1.0f / res_x, -1.0f / res_y);
+    ssao_cs["focal_scale"] = focal_scale;
+    ssao_cs["inv_focal_scale"] = inv_focal_scale;
+    ssao_cs["samples"] = ssao_kernel;    
 
-    glsl_program_t ssao_blur(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
-                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_blur.fs"));
-    ssao_blur.enable();
-    ssao_blur["ssao_input"] = 3;
-    ssao_blur["texel_size"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
+    uniform_t uni_sc_pv_matrix     = ssao_cs["projection_view_matrix"];
+    uniform_t uni_sc_camera_matrix = ssao_cs["camera_matrix"];
+    uniform_t uni_sc_camera_ws     = ssao_cs["camera_ws"];
 
 
     glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_lighting.vs"), 
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_lighting.fs"));
     lighting_pass.enable();
 
-    lighting_pass["ssao_blurred_tex"] = 4;
-    lighting_pass["tb_tex"]           = 5;
+    lighting_pass["ssao_blurred_tex"] = 2;
+    lighting_pass["tb_tex"]           = 3;
 
     uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
     uniform_t uni_lp_pv_matrix        = lighting_pass["projection_view_matrix"];
@@ -375,19 +375,28 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // framebuffer object and textures for geometry rendering step
     //===================================================================================================================================================================================================================
-    fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA16F, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
-    fbo_color_t ssao_compute_fbo(res_x, res_y, GL_R16F, GL_CLAMP_TO_EDGE, GL_TEXTURE3);
-    fbo_color_t ssao_blur_fbo(res_x, res_y, GL_R16F, GL_CLAMP_TO_EDGE, GL_TEXTURE4);
+    fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
+
+    GLuint ssao_tex_id;
+    glActiveTexture(GL_TEXTURE2);
+    glGenTextures(1, &ssao_tex_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_tex_id);
+    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindImageTexture(0, ssao_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+
 
     //===================================================================================================================================================================================================================
     // load 2D texture for trilinear blending in lighting shader
-    //================================  ===================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE5);
+    //================================  =================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE3);
     GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/chiseled_ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-
-    GLuint vao_id;
-    glGenVertexArrays(1, &vao_id);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glViewport(0, 0, window.res_x, window.res_y);
@@ -411,66 +420,59 @@ int main(int argc, char *argv[])
     glm::mat3 demon_normal_matrix = glm::mat3(1.0f);
     glm::mat3 room_normal_matrix = glm::mat3(1.0f);
 
+
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
     while (!window.should_close())
     {
         window.new_frame();
-        
-
-        float time = window.frame_ts;
-        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
-        glm::vec3 camera_ws = window.camera.position();
-        glm::vec3 light_ws = glm::vec3(2.0f * glm::cos(time), 4.0f, -2.0f * glm::sin(time));
-        glm::mat4& view_matrix = window.camera.view_matrix;
-
-        glm::mat4 view_model_matrix = window.camera.view_matrix * model_matrix;
-        glm::mat3 normal_vm_matrix = glm::mat3(view_model_matrix);
-        glm::mat3 normal_matrix = glm::inverse(glm::mat3(model_matrix));
-
-        static char title[32];
-        sprintf(title, "FPS: %2.1f", window.fps());
-        window.set_title(title);
 
         //===============================================================================================================================================================================================================
-        // Geometry Pass: render scene's geometry / color data into gbuffer
+        // 1. Update matrix and geometric data
+        //===============================================================================================================================================================================================================
+        float time = window.frame_ts;
+        glm::vec3 light_ws = glm::vec3(4.0f * glm::cos(time), 8.0f, 4.0f * glm::sin(time));
+        glm::mat4& view_matrix = window.camera.view_matrix;
+        glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
+        glm::mat3 camera_matrix = glm::inverse(glm::mat3(view_matrix));
+        glm::vec3 camera_ws = -camera_matrix * glm::vec3(view_matrix[3]);
+
+        //===============================================================================================================================================================================================================
+        // 2. Geometry Pass: render scene's geometry / color data into gbuffer
         //===============================================================================================================================================================================================================
         geometry_fbo.bind();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
         geometry_pass.enable();
+        uni_gp_pv_matrix = projection_view_matrix;
+        uni_gp_camera_ws = camera_ws;
 
-        uni_gp_vm_matrix        = view_matrix * demon_model_matrix;
-        uni_gp_normal_vm_matrix = normal_vm_matrix;
+        uni_gp_normal_matrix = demon_normal_matrix;
+        uni_gp_model_matrix = demon_model_matrix;
         glCullFace(GL_BACK);
         model.render();
 
-        uni_gp_vm_matrix        = view_matrix * room_model_matrix;
-        //uni_gp_normal_vm_matrix = normal_vm_matrix;
+        uni_gp_normal_matrix = room_normal_matrix;
+        uni_gp_model_matrix = room_model_matrix;
         glCullFace(GL_FRONT);
         cube_vao.render();
 
         glCullFace(GL_BACK);
 
         //===============================================================================================================================================================================================================
-        // SSAO pass: compute occlusion
+        // 3. Compute Shader SSAO pass
         //===============================================================================================================================================================================================================
-        glBindVertexArray(vao_id);
-        glDisable(GL_DEPTH_TEST);
+        ssao_cs.enable();
 
-        ssao_compute_fbo.bind();
-        ssao_compute.enable();
+        uni_sc_pv_matrix = projection_view_matrix;
+        uni_sc_camera_matrix = camera_matrix;
+        uni_sc_camera_ws = camera_ws;
 
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-        //===============================================================================================================================================================================================================
-        // Blur pass: removing noise
-        //===============================================================================================================================================================================================================
-        ssao_blur_fbo.bind();
-        ssao_blur.enable();
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
+        glDispatchCompute(res_x / 8, res_y / 8, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         //===============================================================================================================================================================================================================
         // 4. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
@@ -482,12 +484,12 @@ int main(int argc, char *argv[])
         lighting_pass.enable();
 
         uni_lp_pv_matrix = projection_view_matrix;
-        uni_lp_normal_matrix = normal_matrix;
         uni_lp_camera_ws = camera_ws;
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
 
-        glActiveTexture(GL_TEXTURE5);
+        glActiveTexture(GL_TEXTURE3);
+
         glBindTexture(GL_TEXTURE_2D, demon_tex_id);
         uni_lp_Ks = 0.92f;
         uni_lp_Ns = 24.0f;
@@ -510,6 +512,10 @@ int main(int argc, char *argv[])
         glCullFace(GL_FRONT);
         cube_vao.render();
 
+
+        //===============================================================================================================================================================================================================
+        // 6. show UI and restore OpenGL state
+        //===============================================================================================================================================================================================================
         window.end_frame();
 
         glDisable(GL_BLEND);
@@ -524,4 +530,4 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glfw::terminate();
     return 0;
-}                           
+}

@@ -88,6 +88,7 @@ struct demo_window_t : public imgui_window_t
         {
             ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
             ImGui::Begin("Ambient Occlusion", &show_another_window);
+            ImGui::Text("Application average %.3f ms/frame (%.3f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
             if (ImGui::CollapsingHeader("Algorithms"))
             {
@@ -249,35 +250,6 @@ struct fbo_color_t
 
 };
 
-//=======================================================================================================================================================================================================================
-// Setup 2 :: renderbuffer object + one color attachment
-//=======================================================================================================================================================================================================================
-GLuint create_noise_texture(GLenum texture_unit, int res_x, int res_y)
-{
-    GLuint noise_texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &noise_texture_id);
-    glBindTexture(GL_TEXTURE_2D, noise_texture_id);
-
-    glm::vec3* noise_vec3 = (glm::vec3*) malloc(res_x * res_y * sizeof(glm::vec3));
-
-    int idx = 0;
-    for(int y = 0; y < res_y; ++y)
-        for(int x = 0; x < res_x; ++x)
-            noise_vec3[idx++] = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, res_x, res_y, 0, GL_RGB, GL_FLOAT, noise_vec3);
-
-    free(noise_vec3);
-    return noise_texture_id;
-}
-
-
 float factor(const glm::vec3& v)
 {
     float q1 = glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v)));
@@ -333,7 +305,7 @@ int main(int argc, char *argv[])
     for (GLuint i = 0; i < 64; ++i)
     {
         glm::vec3 v = glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator));
-        ssao_kernel[i] = glm::vec4(v, 0.125 * glm::abs(gaussRand(generator)));
+        ssao_kernel[i] = glm::vec4(v, glm::abs(gaussRand(generator)));
     }
 
     //===================================================================================================================================================================================================================
@@ -371,8 +343,6 @@ int main(int argc, char *argv[])
     ssao_compute["samples"] = ssao_kernel;
     ssao_compute["focal_scale"] = focal_scale;
 //    ssao_compute["bias"] = 0.25f;
-
-
 
     glsl_program_t ssao_blur_x(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"), 
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_blur_x.fs"));
@@ -416,8 +386,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // framebuffer object and textures for geometry rendering step
     //===================================================================================================================================================================================================================
-    //GLuint noise_tex_id = create_noise_texture(GL_TEXTURE0, res_x, res_y);
-
     fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
     fbo_color_t ssao_compute_fbo(res_x, res_y, GL_RG32F, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
     fbo_color_t ssao_blur_x_fbo(res_x, res_y, GL_RG32F, GL_CLAMP_TO_EDGE, GL_TEXTURE3);
@@ -425,7 +393,7 @@ int main(int argc, char *argv[])
 
     //===================================================================================================================================================================================================================
     // load 2D texture for trilinear blending in lighting shader
-    //================================  ===================================================================================================================================================================================
+    //================================  =================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE5);
     GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/chiseled_ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);

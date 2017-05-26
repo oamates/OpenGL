@@ -5,7 +5,6 @@ in vec3 view;
 
 const int kernel_size = 64;
 
-uniform sampler2D noise_tex;
 uniform sampler2D normal_ws_tex;
 
 uniform mat4 projection_view_matrix;
@@ -42,10 +41,10 @@ void main()
 
         if (dp > 0.0f)
         {
-            float radius = samples[i].w;
             //======================================================================================================================================================
             // get sample position in camera space and in ndc
             //======================================================================================================================================================
+            float radius = samples[i].w;
             vec3 sample_ws = position_ws + 0.25f * radius * sample;
             float sample_R = length(sample_ws - camera_ws);
 
