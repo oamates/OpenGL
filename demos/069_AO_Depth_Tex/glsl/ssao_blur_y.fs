@@ -9,7 +9,7 @@ layout (location = 0) out vec2 OcclusionBlurredR;
 
 const int KERNEL_RADIUS = 8;
 const float BLUR_DECAY = 0.025f;
-const float SHARPNESS = 0.03125f;
+const float SHARPNESS = 0.01125f;
 
 vec2 sample_AO_R(vec2 shift)
 {

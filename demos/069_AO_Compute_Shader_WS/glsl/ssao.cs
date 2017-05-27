@@ -15,15 +15,13 @@ layout (r32f, binding = 0) uniform image2D ssao_image;
 
 uniform sampler2D data_ws;
 
-uniform vec2 resolution;
-uniform vec4 texel_size;            // = inverse resolution and 0 the last component
+uniform vec2 texel_size;
 uniform vec2 focal_scale;
-uniform vec2 inv_focal_scale;
 uniform mat4 projection_view_matrix;
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
 
-const int kernel_size = 32;
+const int kernel_size = 64;
 uniform vec4 samples[kernel_size];
 
 const float two_pi = 6.28318530718;
@@ -38,7 +36,7 @@ const mat3 hash_matrix = mat3
 
 void main()
 {
-    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + vec2(0.5)) / resolution;
+    vec2 uv = texel_size * (vec2(gl_GlobalInvocationID.xy) + vec2(0.5));
     vec2 ndc = 2.0 * uv - 1.0;
     vec3 view = vec3(focal_scale * ndc, -1.0f);
 
@@ -46,8 +44,8 @@ void main()
     // Get camera-space normal and Z
     //==========================================================================================================================================================
     vec4 g = texture(data_ws, uv);
-    vec3 N_ws = normalize(g.xyz);
-    float R = g.w;                                        // distance from fragment to camera 
+    vec3 n = normalize(g.xyz);
+    float R = g.w;
     vec3 position_cs = R * normalize(view);
     vec3 position_ws = camera_ws + camera_matrix * position_cs;
 
@@ -55,8 +53,8 @@ void main()
     // Cook some random 2x2 rotation matrix
     //==========================================================================================================================================================
     vec3 T = fract(41719.73157 * cos(hash_matrix * vec3(gl_GlobalInvocationID.xy, 1.0)));
-    vec3 t = normalize(T - dot(T, N_ws) * N_ws);
-    mat3 tbn = mat3(t, cross(N_ws, t), N_ws);
+    vec3 t = normalize(T - dot(T, n) * n);
+    mat3 tbn = mat3(t, cross(n, t), n);
 
     //==========================================================================================================================================================
     // Iterate over the sample kernel and calculate occlusion factor
@@ -64,33 +62,29 @@ void main()
     float ao = 0.0;
     float W = 0.0f;
 
-    for(int i = 0; i < kernel_size; ++i)
+    for(int i = 0; i < 40; ++i)
     {
         vec3 s = tbn * samples[i].xyz;
-        float dp = dot(s, N_ws);
+        float w = samples[i].z;
+        float radius = samples[i].w;
 
-        if (dp > 0.0f)
-        {
-            //======================================================================================================================================================
-            // get sample position in camera space and in ndc
-            //======================================================================================================================================================
-            float radius = samples[i].w;
+        //======================================================================================================================================================
+        // compute sample position in camera space and in ndc
+        //======================================================================================================================================================
+        vec3 sample_ws = position_ws + radius * s;
+        float sample_R = length(sample_ws - camera_ws);
 
-            vec3 sample_ws = position_ws + 0.125 * radius * s;
-            float sample_R = length(sample_ws - camera_ws);
+        vec4 sample_ss = projection_view_matrix * vec4(sample_ws, 1.0f);
+        vec2 ndc = sample_ss.xy / sample_ss.w;
+        vec2 uv = 0.5f + 0.5f * ndc;
 
-            vec4 sample_ss = projection_view_matrix * vec4(sample_ws, 1.0f);
-            vec2 ndc = sample_ss.xy / sample_ss.w;
-            vec2 uv = 0.5f + 0.5f * ndc;
+        float actual_R = texture(data_ws, uv).w;
 
-            float actual_R = texture(data_ws, uv).w;
-
-            //======================================================================================================================================================
-            // get sample distance, range check & accumulate
-            //======================================================================================================================================================
-            ao += dp * smoothstep(1.0 * sample_R, (1.0 + 0.06125 / actual_R) * sample_R, actual_R);
-            W += dp;
-        }
+        //======================================================================================================================================================
+        // get sample distance, range check & accumulate
+        //======================================================================================================================================================
+        ao += w * smoothstep(sample_R, (1.0 + 0.06125 / actual_R) * sample_R, actual_R);
+        W += w;
     }
 
     ao /= W;

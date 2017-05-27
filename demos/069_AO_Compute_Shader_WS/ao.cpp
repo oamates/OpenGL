@@ -38,6 +38,7 @@ struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
     int draw_mode = 0;
+    bool blur_enabled = true;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -58,6 +59,9 @@ struct demo_window_t : public imgui_window_t
 
         if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
             draw_mode = (draw_mode + 1) % 5;
+
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            blur_enabled = !blur_enabled;
 
     }
 
@@ -89,6 +93,7 @@ struct demo_window_t : public imgui_window_t
             ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
             ImGui::Begin("Ambient Occlusion", &show_another_window);
             ImGui::Text("Application average %.3f ms/frame (%.3f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::Text("Blur enabled : %s", blur_enabled ? "true" : "false");
 
             if (ImGui::CollapsingHeader("Algorithms"))
             {
@@ -300,13 +305,13 @@ int main(int argc, char *argv[])
     std::default_random_engine generator;
     std::normal_distribution<float> gaussRand(0.0, 1.0);
 
-    glm::vec4 ssao_kernel[32];
+    glm::vec4 ssao_kernel[64];
 
-    for (GLuint i = 0; i < 32; ++i)
+    for (GLuint i = 0; i < 64; ++i)
     {
         glm::vec3 v = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
         if (v.z < 0) v.z = -v.z;
-        ssao_kernel[i] = glm::vec4(v, glm::abs(gaussRand(generator)));
+        ssao_kernel[i] = glm::vec4(v, 0.125 * glm::abs(gaussRand(generator)));
     }
 
     //===================================================================================================================================================================================================================
@@ -335,10 +340,8 @@ int main(int argc, char *argv[])
     glsl_program_t ssao_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ssao.cs"));
     ssao_cs.enable();
     ssao_cs["data_ws"] = 1;
-    ssao_cs["resolution"] = glm::vec2(res_x, res_y);
-    ssao_cs["texel_size"] = glm::vec4(1.0f / res_x, 1.0f / res_y, -1.0f / res_x, -1.0f / res_y);
+    ssao_cs["texel_size"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     ssao_cs["focal_scale"] = focal_scale;
-    ssao_cs["inv_focal_scale"] = inv_focal_scale;
     ssao_cs["samples"] = ssao_kernel;    
 
     uniform_t uni_sc_pv_matrix     = ssao_cs["projection_view_matrix"];
@@ -346,12 +349,23 @@ int main(int argc, char *argv[])
     uniform_t uni_sc_camera_ws     = ssao_cs["camera_ws"];
 
 
+    glsl_program_t hblur_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/hblur.cs"));
+    hblur_cs.enable();
+    hblur_cs["data_in"] = 2;
+    hblur_cs["texel_size"] = glm::vec3(1.0f / res_x, 1.0f / res_y, 0.0f);
+
+    glsl_program_t vblur_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/vblur.cs"));
+    vblur_cs.enable();
+    vblur_cs["data_in"] = 3;
+    vblur_cs["texel_size"] = glm::vec3(1.0f / res_x, 1.0f / res_y, 0.0f);
+
+
     glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_lighting.vs"), 
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_lighting.fs"));
     lighting_pass.enable();
 
-    lighting_pass["ssao_blurred_tex"] = 2;
-    lighting_pass["tb_tex"]           = 3;
+    lighting_pass["ssao_blurred_tex"] = 4;
+    lighting_pass["tb_tex"]           = 5;
 
     uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
     uniform_t uni_lp_pv_matrix        = lighting_pass["projection_view_matrix"];
@@ -388,13 +402,41 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glBindImageTexture(0, ssao_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(0, ssao_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+
+    GLuint ssao_hblur_id;
+    glActiveTexture(GL_TEXTURE3);
+    glGenTextures(1, &ssao_hblur_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_hblur_id);
+    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindImageTexture(1, ssao_hblur_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+
+    GLuint ssao_vblur_id;
+    glActiveTexture(GL_TEXTURE4);
+    glGenTextures(1, &ssao_vblur_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_vblur_id);
+    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindImageTexture(2, ssao_vblur_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
 
 
     //===================================================================================================================================================================================================================
     // load 2D texture for trilinear blending in lighting shader
     //================================  =================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(GL_TEXTURE5);
     GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/chiseled_ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
@@ -474,6 +516,24 @@ int main(int argc, char *argv[])
         glDispatchCompute(res_x / 8, res_y / 8, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+        glActiveTexture(GL_TEXTURE4);
+
+        if (window.blur_enabled)
+        {
+            hblur_cs.enable();
+            glDispatchCompute(res_x / 8, res_y / 8, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            vblur_cs.enable();
+            glDispatchCompute(res_x / 8, res_y / 8, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            glBindTexture(GL_TEXTURE_2D, ssao_vblur_id);
+        }
+        else    
+            glBindTexture(GL_TEXTURE_2D, ssao_tex_id);
+
+
         //===============================================================================================================================================================================================================
         // 4. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
         //===============================================================================================================================================================================================================
@@ -488,12 +548,12 @@ int main(int argc, char *argv[])
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
 
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE5);
 
         glBindTexture(GL_TEXTURE_2D, demon_tex_id);
         uni_lp_Ks = 0.92f;
         uni_lp_Ns = 24.0f;
-        uni_lp_bf = 0.0427f;
+        uni_lp_bf = 0.0577f;
         uni_lp_tex_scale = 0.1275f;
         uni_lp_normal_matrix = demon_normal_matrix;
         uni_lp_model_matrix = demon_model_matrix;
@@ -504,7 +564,7 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, room_tex_id);
         uni_lp_Ks = 1.14f;
         uni_lp_Ns = 80.0f;
-        uni_lp_bf = 0.00625f;
+        uni_lp_bf = 0.01125f;
         uni_lp_tex_scale = 0.0775f;
         uni_lp_normal_matrix = room_normal_matrix;
         uni_lp_model_matrix = room_model_matrix;

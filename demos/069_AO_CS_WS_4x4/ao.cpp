@@ -332,7 +332,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gp_model_matrix      = geometry_pass["model_matrix"];
 
 
-    glsl_program_t ssao_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ssao2x2.cs"));
+    glsl_program_t ssao_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ssao3x3.cs"));
     ssao_cs.enable();
     ssao_cs["data_ws"] = 1;
     ssao_cs["resolution"] = glm::vec2(res_x, res_y);
@@ -471,7 +471,7 @@ int main(int argc, char *argv[])
         uni_sc_camera_ws = camera_ws;
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
-        glDispatchCompute(res_x / 2, res_y / 2, 1);
+        glDispatchCompute(res_x / 3, res_y / 3, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         //===============================================================================================================================================================================================================

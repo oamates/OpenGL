@@ -20,7 +20,7 @@ uniform mat4 projection_view_matrix;
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
 
-const int PIXEL_INPUT_SIZE = 3;
+const int PIXEL_INPUT_SIZE = 4;
 const int CLOUD_SIZE = 9 * PIXEL_INPUT_SIZE;
 
 uniform vec4 samples[CLOUD_SIZE];
@@ -36,19 +36,6 @@ const mat3 hash_matrix = mat3
 );
 
 shared vec4 cloud[CLOUD_SIZE];
-
-const int neighbor_pixels[SQUARE_SIZE][8] = 
-{
-    { 1,  3,  4,  2,  6,  5,  7,  8},
-    { 0,  2,  4,  3,  5,  7,  6,  8},
-    { 1,  5,  0,  4,  8,  3,  7,  6},
-    { 0,  4,  6,  1,  7,  5,  2,  8},
-    { 0,  1,  2,  3,  5,  6,  7,  8},
-    { 2,  4,  8,  1,  7,  3,  0,  6},
-    { 3,  7,  4,  0,  8,  1,  5,  2},
-    { 4,  6,  8,  3,  5,  1,  0,  2},
-    { 5,  7,  4,  2,  6,  1,  3,  0}
-};
 
 float attenuation(float distance)
 {
@@ -117,14 +104,44 @@ void main()
         vec3 q = d / l;
         float dp = dot(q, n);
 
-        //if (dp > 0)
-        {
-            float w = max(dp, 0.0) * attenuation(l);
-            ao += w * c.w;
-            W += w;
-        }
+        float w = max(dp, 0.0) * attenuation(l);
+        ao += w * c.w;
+        W += w;
     }
 
     ao /= W;
+    imageStore(ssao_image, ivec2(gl_GlobalInvocationID.xy), vec4(ao, 0.0, 0.0, 0.0));
+
+    float ao_values[7];
+
+    //====================================================================================================================================================================================================================
+    // Horizontal blur
+    //====================================================================================================================================================================================================================
+    for (int i = -3; i <= 3; ++i)
+        ao_values[i + 3] = imageLoad(ssao_image, ivec2(gl_GlobalInvocationID.xy) + ivec2(i, 0)).r;        
+
+    barrier();
+
+    ao = 0;
+    for (int i = -3; i <= 3; ++i)
+        ao += ao_values[i + 3];
+    ao /= 7.0;
+
+    imageStore(ssao_image, ivec2(gl_GlobalInvocationID.xy), vec4(ao, 0.0, 0.0, 0.0));
+
+    //====================================================================================================================================================================================================================
+    // Vertical blur
+    //====================================================================================================================================================================================================================
+
+    for (int i = -3; i <= 3; ++i)
+        ao_values[i + 3] = imageLoad(ssao_image, ivec2(gl_GlobalInvocationID.xy) + ivec2(0, i)).r;        
+
+    barrier();
+
+    ao = 0;
+    for (int i = -3; i <= 3; ++i)
+        ao += ao_values[i + 3];
+    ao /= 7.0;
+
     imageStore(ssao_image, ivec2(gl_GlobalInvocationID.xy), vec4(ao, 0.0, 0.0, 0.0));
 }

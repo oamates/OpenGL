@@ -88,6 +88,7 @@ struct demo_window_t : public imgui_window_t
         {
             ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
             ImGui::Begin("Ambient Occlusion", &show_another_window);
+            ImGui::Text("Application average %.3f ms/frame (%.3f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
             if (ImGui::CollapsingHeader("Algorithms"))
             {
@@ -250,34 +251,6 @@ struct fbo_color_t
 };
 
 //=======================================================================================================================================================================================================================
-// Setup 2 :: renderbuffer object + one color attachment
-//=======================================================================================================================================================================================================================
-GLuint create_noise_texture(GLenum texture_unit, int res_x, int res_y)
-{
-    GLuint noise_texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &noise_texture_id);
-    glBindTexture(GL_TEXTURE_2D, noise_texture_id);
-
-    glm::vec3* noise_vec3 = (glm::vec3*) malloc(res_x * res_y * sizeof(glm::vec3));
-
-    int idx = 0;
-    for(int y = 0; y < res_y; ++y)
-        for(int x = 0; x < res_x; ++x)
-            noise_vec3[idx++] = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, res_x, res_y, 0, GL_RGB, GL_FLOAT, noise_vec3);
-
-    free(noise_vec3);
-    return noise_texture_id;
-}
-
-//=======================================================================================================================================================================================================================
 // Setup 3 :: framebuffer with one depth and one color attachment
 //=======================================================================================================================================================================================================================
 struct fbo_depth_color_t
@@ -389,15 +362,16 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // generate SSAO sample kernel points
     //===================================================================================================================================================================================================================
-    std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // generates random floats between 0.0 and 1.0
     std::default_random_engine generator;
+    std::normal_distribution<float> gaussRand(0.0, 1.0);
 
-    glm::vec4 ssao_kernel[64];
+    glm::vec4 ssao_kernel[24];
 
-    for (GLuint i = 0; i < 64; ++i)
+    for (GLuint i = 0; i < 24; ++i)
     {
-        glm::vec3 v = glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator));
-        ssao_kernel[i] = glm::vec4(v, 0.125 * glm::abs(gaussRand(generator)));
+        glm::vec3 v = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), 2.0 * gaussRand(generator)));
+        if (v.z < 0) v.z = -v.z;
+        ssao_kernel[i] = glm::vec4(v, 0.125f * glm::abs(gaussRand(generator)));
     }
 
     //===================================================================================================================================================================================================================
