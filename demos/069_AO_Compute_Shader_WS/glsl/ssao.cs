@@ -21,7 +21,7 @@ uniform mat4 projection_view_matrix;
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
 
-const int kernel_size = 64;
+const int kernel_size = 32;
 uniform vec4 samples[kernel_size];
 
 const float two_pi = 6.28318530718;
@@ -62,7 +62,7 @@ void main()
     float ao = 0.0;
     float W = 0.0f;
 
-    for(int i = 0; i < 40; ++i)
+    for(int i = 0; i < 32; ++i)
     {
         vec3 s = tbn * samples[i].xyz;
         float w = samples[i].z;

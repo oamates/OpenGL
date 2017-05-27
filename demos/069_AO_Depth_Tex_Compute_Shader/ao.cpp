@@ -38,6 +38,10 @@ struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
     int draw_mode = 0;
+    bool blur_enabled = true;    
+
+    GLuint64 ts[5];
+    GLuint queryID[5];
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -59,6 +63,8 @@ struct demo_window_t : public imgui_window_t
         if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
             draw_mode = (draw_mode + 1) % 5;
 
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            blur_enabled = !blur_enabled;
     }
 
     void on_mouse_move() override
@@ -88,6 +94,22 @@ struct demo_window_t : public imgui_window_t
         {
             ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
             ImGui::Begin("Ambient Occlusion", &show_another_window);
+
+            double FPS = fps();
+            ImGui::Text("Application average %.3f ms/frame (%.3f FPS)", 1000.0f / FPS, FPS);
+            ImGui::Text("Blur enabled : %s", blur_enabled ? "true" : "false");
+
+            double geometry_time = (ts[1] - ts[0]) / 1000000.0;
+            double ao_time =       (ts[2] - ts[1]) / 1000000.0;
+            double blur_time =     (ts[3] - ts[2]) / 1000000.0;
+            double lighting_time = (ts[4] - ts[3]) / 1000000.0;
+            double total_time =    (ts[4] - ts[0]) / 1000000.0;
+
+            ImGui::Text("Geometry pass : %2.3f ms", geometry_time);
+            ImGui::Text("AO compute : %2.3f ms", ao_time);
+            ImGui::Text("Blur pass : %2.3f ms", blur_time);
+            ImGui::Text("Lighting pass : %2.3f ms", lighting_time);
+            ImGui::Text("Total time : %2.3f ms", total_time);
 
             if (ImGui::CollapsingHeader("Algorithms"))
             {
@@ -258,7 +280,7 @@ int main(int argc, char *argv[])
     {
         glm::vec3 v = glm::normalize(glm::vec3(gaussRand(generator), gaussRand(generator), gaussRand(generator)));
         if (v.z < 0) v.z = -v.z;
-        ssao_kernel[i] = glm::vec4(v, 0.75 * glm::abs(gaussRand(generator)));
+        ssao_kernel[i] = glm::vec4(v, 0.125 * glm::abs(gaussRand(generator)));
     }
 
     //===================================================================================================================================================================================================================
@@ -283,14 +305,23 @@ int main(int argc, char *argv[])
     ssao_cs["texel_size"] = glm::vec4(1.0f / res_x, 1.0f / res_y, -1.0f / res_x, -1.0f / res_y);
     ssao_cs["focal_scale"] = focal_scale;
     ssao_cs["inv_focal_scale"] = inv_focal_scale;
-    ssao_cs["samples"] = ssao_kernel;    
+    ssao_cs["samples"] = ssao_kernel;
 
+    glsl_program_t hblur_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/hblur.cs"));
+    hblur_cs.enable();
+    hblur_cs["data_in"] = 2;
+    hblur_cs["texel_size"] = glm::vec3(1.0f / res_x, 1.0f / res_y, 0.0f);
+
+    glsl_program_t vblur_cs(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/vblur.cs"));
+    vblur_cs.enable();
+    vblur_cs["data_in"] = 3;
+    vblur_cs["texel_size"] = glm::vec3(1.0f / res_x, 1.0f / res_y, 0.0f);
 
     glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ssao_lighting.vs"), 
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ssao_lighting.fs"));
     lighting_pass.enable();
-    lighting_pass["ssao_blurred_tex"] = 2;
-    lighting_pass["tb_tex"]           = 3;
+    lighting_pass["ssao_blurred_tex"] = 4;
+    lighting_pass["tb_tex"]           = 5;
 
     uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
     uniform_t uni_lp_pv_matrix        = lighting_pass["projection_view_matrix"];
@@ -318,10 +349,10 @@ int main(int argc, char *argv[])
     vao_t cube_vao = tess::generate_vao_mt(initial_vertices, plato::icosahedron::V, plato::icosahedron::quads, plato::icosahedron::Q, cube_edge_tess_func, cube_face_tess_func, 128); 
 
     //===================================================================================================================================================================================================================
-    // framebuffer object with depth texture attached
-    // compute shader output
     // Texture unit 1 : depth texture
     // Texture unit 2 : ssao texture
+    // Texture unit 3 : horizontally blurred ssao
+    // Texture unit 3 : vertically blurred ssao
     //===================================================================================================================================================================================================================
 
     fbo_depth_t geometry_fbo(res_x, res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
@@ -339,10 +370,38 @@ int main(int argc, char *argv[])
 
     glBindImageTexture(0, ssao_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
+    GLuint ssao_hblur_id;
+    glActiveTexture(GL_TEXTURE3);
+    glGenTextures(1, &ssao_hblur_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_hblur_id);
+    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindImageTexture(1, ssao_hblur_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+
+    GLuint ssao_vblur_id;
+    glActiveTexture(GL_TEXTURE4);
+    glGenTextures(1, &ssao_vblur_id);
+    glBindTexture(GL_TEXTURE_2D, ssao_vblur_id);
+    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindImageTexture(2, ssao_vblur_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+
     //===================================================================================================================================================================================================================
     // load 2D texture for trilinear blending in lighting shader
     //================================  ===================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(GL_TEXTURE5);
     GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/plumbum.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     GLuint room_tex_id = image::png::texture2d("../../../resources/tex2d/chiseled_ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
@@ -365,6 +424,8 @@ int main(int argc, char *argv[])
     while (!window.should_close())
     {
         window.new_frame();
+        glGenQueries(5, window.queryID);
+        glQueryCounter(window.queryID[0], GL_TIMESTAMP);
 
         //===============================================================================================================================================================================================================
         // 1. Update matrix and geometric data
@@ -394,6 +455,7 @@ int main(int argc, char *argv[])
         uni_gp_pvm_matrix = pvm_matrix;
         glCullFace(GL_FRONT);
         cube_vao.render();
+        glQueryCounter(window.queryID[1], GL_TIMESTAMP);        
 
         //===============================================================================================================================================================================================================
         // 3. Compute Shader SSAO pass
@@ -403,11 +465,36 @@ int main(int argc, char *argv[])
         glBindTexture(GL_TEXTURE_2D, geometry_fbo.texture_id);
 
         ssao_cs.enable();
-        glDispatchCompute(res_x / 16, res_y / 16, 1);
+        glDispatchCompute(res_x / 8, res_y / 8, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glQueryCounter(window.queryID[2], GL_TIMESTAMP);
+
 
         //===============================================================================================================================================================================================================
-        // 4. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
+        // 4. Compute Shader blur pass
+        //===============================================================================================================================================================================================================
+        glActiveTexture(GL_TEXTURE4);
+
+        if (window.blur_enabled)
+        {
+            hblur_cs.enable();
+            glDispatchCompute(res_x / 8, res_y / 8, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            vblur_cs.enable();
+            glDispatchCompute(res_x / 8, res_y / 8, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            glBindTexture(GL_TEXTURE_2D, ssao_vblur_id);
+        }
+        else    
+            glBindTexture(GL_TEXTURE_2D, ssao_tex_id);
+
+        glQueryCounter(window.queryID[3], GL_TIMESTAMP);
+
+
+        //===============================================================================================================================================================================================================
+        // 5. Lighting Pass :: deferred Blinn-Phong lighting with added screen-space ambient occlusion
         //===============================================================================================================================================================================================================
         glEnable(GL_DEPTH_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -420,7 +507,7 @@ int main(int argc, char *argv[])
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;
 
-        glActiveTexture(GL_TEXTURE3);
+        glActiveTexture(GL_TEXTURE5);
 
         glBindTexture(GL_TEXTURE_2D, demon_tex_id);
         uni_lp_Ks = 0.92f;
@@ -442,8 +529,29 @@ int main(int argc, char *argv[])
         glCullFace(GL_FRONT);
         cube_vao.render();
 
+        glQueryCounter(window.queryID[4], GL_TIMESTAMP);
+
         //===============================================================================================================================================================================================================
-        // 5. show UI and restore OpenGL setting
+        // 6. Record operations timings
+        //===============================================================================================================================================================================================================
+        bool stop = false;
+        while (!stop)
+        {
+            stop = true;
+            for(int i = 0; i < 5; ++i)
+            {
+                GLint available;
+                glGetQueryObjectiv(window.queryID[i], GL_QUERY_RESULT_AVAILABLE, &available);
+                if (!available)
+                    stop = false;
+            }
+        }
+
+        for(int i = 0; i < 5; ++i)
+            glGetQueryObjectui64v(window.queryID[i], GL_QUERY_RESULT, &window.ts[i]);        
+
+        //===============================================================================================================================================================================================================
+        // 7. show UI and restore OpenGL setting
         //===============================================================================================================================================================================================================
         window.end_frame();
 

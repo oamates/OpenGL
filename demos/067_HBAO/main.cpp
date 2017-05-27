@@ -81,7 +81,7 @@ GLuint generateNoiseTexture(int width, int height)
 Model* mdl;
 Geometry* model;
 
-double timeStamps[7];
+//double timeStamps[7];
 unsigned int queryID[7];
 
 Surface * surface0;
@@ -417,18 +417,19 @@ int main(int argc, char *argv[])
         glViewport(0, 0, WIDTH, HEIGHT);
         compositeShader.enable();
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
         glQueryCounter(queryID[6], GL_TIMESTAMP);
 
-        GLint stopTimerAvailable = 0;
         bool stop = false;
-
         while (!stop)
         {
             stop = true;
-            for(int i = 0; i < 7; ++i)
+            for(int i = 0; i < 6; ++i)
             {
-                glGetQueryObjectiv(queryID[1], GL_QUERY_RESULT_AVAILABLE, &stopTimerAvailable);
-                if(!stopTimerAvailable) stop = false;
+                GLint available;
+                glGetQueryObjectiv(queryID[i], GL_QUERY_RESULT_AVAILABLE, &available);
+                if (!available)
+                    stop = false;
             }
         }
 
