@@ -204,7 +204,6 @@ struct fbo_depth_t
         glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
@@ -223,13 +222,24 @@ struct fbo_depth_t
         glDeleteFramebuffers(1, &fbo_id);
     }
 };
-
+/*
 float factor(const glm::vec3& v)
 {
     float q1 = glm::sqrt(glm::abs(0.5f - glm::simplex( 2.0f * v)));
     float q2 = glm::sqrt(glm::abs(0.5f - glm::simplex( 5.0f * v)));
     float q3 = glm::sqrt(glm::abs(0.5f - glm::simplex( 9.0f * v)));
     float q4 = glm::sqrt(glm::abs(0.5f - glm::simplex(17.0f * v)));
+    return 0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
+}
+*/
+float factor(const glm::vec3& v)
+{
+    return 0.125 * gaussRand(generator);
+
+    float q1 = glm::abs(0.5f - glm::simplex( 2.0f * v));
+    float q2 = glm::abs(0.5f - glm::simplex( 5.0f * v));
+    float q3 = glm::abs(0.5f - glm::simplex( 9.0f * v));
+    float q4 = glm::abs(0.5f - glm::simplex(17.0f * v));
     return 0.15f * (q1 + 0.5 * q2 + 0.25 * q3 + 0.125 * q4);    
 }
 
@@ -271,9 +281,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // generate SSAO sample kernel points
     //===================================================================================================================================================================================================================
-    std::default_random_engine generator;
-    std::normal_distribution<float> gaussRand(0.0, 1.0);
-
     glm::vec4 ssao_kernel[32];
 
     for (GLuint i = 0; i < 32; ++i)
@@ -325,7 +332,6 @@ int main(int argc, char *argv[])
 
     uniform_t uni_lp_pvm_matrix       = lighting_pass["pvm_matrix"];
     uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
-    uniform_t uni_lp_pv_matrix        = lighting_pass["projection_view_matrix"];
     uniform_t uni_lp_normal_matrix    = lighting_pass["normal_matrix"];
     uniform_t uni_lp_camera_ws        = lighting_pass["camera_ws"];
     uniform_t uni_lp_light_ws         = lighting_pass["light_ws"];
@@ -421,11 +427,13 @@ int main(int argc, char *argv[])
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     while (!window.should_close())
     {
         window.new_frame();
@@ -462,11 +470,9 @@ int main(int argc, char *argv[])
         cube_vao.render();
         glQueryCounter(window.queryID[1], GL_TIMESTAMP);        
 
-
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, geometry_fbo.fbo_id);
         glBlitFramebuffer(0, 0, res_x, res_y, 0, 0, res_x, res_y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
         //===============================================================================================================================================================================================================
         // 3. Compute Shader SSAO pass
@@ -511,7 +517,6 @@ int main(int argc, char *argv[])
 
         lighting_pass.enable();
 
-        uni_lp_pv_matrix = projection_view_matrix;
         uni_lp_camera_ws = camera_ws;
         uni_lp_light_ws = light_ws;
         uni_lp_draw_mode = window.draw_mode;

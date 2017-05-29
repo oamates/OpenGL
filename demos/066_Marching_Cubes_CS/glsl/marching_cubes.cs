@@ -14,7 +14,7 @@ layout (location = 0) uniform sampler3D density_texture;
 layout (std430, binding = 0) buffer shader_data
 {
 	vec3 vertices[];
-};
+}
 
 layout (binding = 0, offset = 0) uniform atomic_uint triangles_count;
 

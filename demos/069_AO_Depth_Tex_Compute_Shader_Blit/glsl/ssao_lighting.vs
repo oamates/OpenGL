@@ -8,7 +8,6 @@ out vec3 normal_ws;
 
 uniform mat4 pvm_matrix;
 uniform mat4 model_matrix;
-uniform mat4 projection_view_matrix;
 uniform mat3 normal_matrix;
 
 invariant gl_Position;

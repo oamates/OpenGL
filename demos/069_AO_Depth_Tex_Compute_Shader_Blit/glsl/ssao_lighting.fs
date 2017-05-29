@@ -31,7 +31,7 @@ vec3 tex3d(in vec3 p, in vec3 n)
     vec3 w = max(abs(n) - 0.317f, 0.0f);
     w /= dot(w, vec3(1.0f));
     mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
-    return pow(rgb_samples * w, vec3(1.16));
+    return pow(rgb_samples * w, vec3(0.96));
 }
 
 vec3 bumped_normal(in vec3 p, in vec3 n)
