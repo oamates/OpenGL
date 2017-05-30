@@ -336,7 +336,7 @@ const GLbyte surface_triangles[0x100][0x10] =
 //========================================================================================================================================================================================================================
 // tetrahedral gradient
 //========================================================================================================================================================================================================================
-glm::dvec3 gradient(scalar_field func, const glm::dvec3& point, const double delta = 0.0125)
+glm::dvec3 gradient(scalar_field func, const glm::dvec3& point, const double delta = 0.00125)
 {
 	double f100 = func(point + glm::dvec3( delta, -delta, -delta));
 	double f001 = func(point + glm::dvec3(-delta, -delta,  delta));
@@ -355,26 +355,31 @@ glm::dvec3 gradient(scalar_field func, const glm::dvec3& point, const double del
 
 void isosurface::generate_vao(scalar_field func)
 {
-	const int cube_size = 80;
+	const int cube_size = 200;
+    
 	const double delta = 2.0 / cube_size;
 
 	//====================================================================================================================================================================================================================
-	// used to assign every edge a unique index value
+	// used to assign every edge a unique index (or, better, hash as the range is not contiguous) value
 	//====================================================================================================================================================================================================================
-	static const GLuint edge_local_hash[12] = 
+    const unsigned int SHIFT = 10;
+
+	const GLuint edge_local_hash[12] = 
 	{
-		(1 << 0) + (0 << 10) + (0 << 20),
-		(2 << 0) + (1 << 10) + (0 << 20),
-		(1 << 0) + (2 << 10) + (0 << 20),
-		(0 << 0) + (1 << 10) + (0 << 20),
-		(1 << 0) + (0 << 10) + (2 << 20),
-		(2 << 0) + (1 << 10) + (2 << 20),
-		(1 << 0) + (2 << 10) + (2 << 20),
-		(0 << 0) + (1 << 10) + (2 << 20),
-		(0 << 0) + (0 << 10) + (1 << 20),
-		(2 << 0) + (0 << 10) + (1 << 20),
-		(2 << 0) + (2 << 10) + (1 << 20),
-		(0 << 0) + (2 << 10) + (1 << 20)
+		(1 << 0) + (0 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(2 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(1 << 0) + (2 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(0 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
+
+		(1 << 0) + (0 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(2 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(1 << 0) + (2 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(0 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
+
+		(0 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
+		(2 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
+		(2 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT)),
+		(0 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT))
 	};
 
 	//====================================================================================================================================================================================================================
@@ -434,7 +439,7 @@ void isosurface::generate_vao(scalar_field func)
 				// Find the point of intersection of the surface with each edge, then find the normal to the surface at those points
 				//========================================================================================================================================================================================================
 				mask = 1;
-				GLuint edge_global_hash = (p << 0) + (q << 10) + (r << 20);
+				GLuint edge_global_hash = (p << 1) + (q << (SHIFT + 1)) + (r << (SHIFT + SHIFT + 1));
 				GLuint buffer_index[12];
 
 	            for(GLuint i = 0; i < 12; i++)
@@ -472,7 +477,8 @@ void isosurface::generate_vao(scalar_field func)
 							//============================================================================================================================================================================================
 							// store index value into the map 
 							//============================================================================================================================================================================================
-							edge_to_index[edge_hash] = vertex_index++;
+							edge_to_index[edge_hash] = vertex_index;
+                            vertex_index++;
 	            		}
     			    }
 					mask <<= 1;

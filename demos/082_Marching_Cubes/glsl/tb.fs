@@ -26,7 +26,7 @@ vec3 tex2d(vec2 uv)
 
 vec3 tex3d(in vec3 p, in vec3 n)
 {
-    p *= 0.04875;
+    p *= 1.5875;
     vec3 w = max(abs(n) - 0.317f, 0.0f);
     w /= dot(w, vec3(1.0f));
     mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
@@ -48,7 +48,7 @@ vec3 bump_normal(in vec3 p, in vec3 n)
 vec3 deform_normal(in vec3 p, inout vec3 n)
 {
     const float scale = 0.02875f; 
-    const float delta = 0.06250f;
+    const float delta = 0.01250f;
     const vec2 dp = vec2(delta, -delta); 
     const vec2 e = scale * dp; 
     const mat4x3 m = mat4x3(vec3( 1.0f, -1.0f, -1.0f), 
@@ -77,7 +77,6 @@ vec3 deform_normal(in vec3 p, inout vec3 n)
 
 void main()
 {
-    
     vec3 n = normalize(normal_ws);
     vec3 q = deform_normal(position_ws, n);
 

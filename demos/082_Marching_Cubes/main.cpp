@@ -24,6 +24,7 @@
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
+    bool wireframe_mode = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -41,6 +42,11 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            wireframe_mode = !wireframe_mode;
+
+        glPolygonMode(GL_FRONT_AND_BACK, wireframe_mode ? GL_LINE : GL_FILL);
     }
 
     void on_mouse_move() override
@@ -54,7 +60,8 @@ struct demo_window_t : public glfw_window_t
 
 glm::dvec3 tri(const glm::dvec3& x)
 {
-    return glm::abs(glm::fract(x) - glm::dvec3(0.5));
+    glm::dvec3 q = glm::abs(glm::fract(x) - glm::dvec3(0.5));
+    return glm::clamp(q, 0.05, 0.45);
 }
 
 double sdf(const glm::dvec3& p)
@@ -64,6 +71,11 @@ double sdf(const glm::dvec3& p)
     glm::dvec3 q = pp + (op - glm::dvec3(0.25)) * 0.3;
     q = glm::cos(0.444 * q + glm::sin(1.112 * glm::dvec3(pp.z, pp.x, pp.y)));
     return glm::length(q) - 1.05;
+}
+
+double sdf1(const glm::dvec3& p)
+{
+    return glm::length(p) - 1.05;
 }
 
 
@@ -101,7 +113,8 @@ int main(int argc, char *argv[])
     trilinear_blend["tb_tex2d"] = 0;
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint grass_tex = image::png::texture2d("../../../resources/tex2d/clay.png");
+    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
 
     //===================================================================================================================================================================================================================
     // light variables
@@ -114,7 +127,6 @@ int main(int argc, char *argv[])
     isosurface cave;
     cave.generate_vao(sdf);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
