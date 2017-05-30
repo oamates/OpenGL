@@ -19,6 +19,7 @@
 #include "camera.hpp"
 #include "shader.hpp"
 #include "isosurface.hpp"
+#include "image.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
@@ -57,11 +58,12 @@ glm::dvec3 tri(const glm::dvec3& x)
 }
 
 double sdf(const glm::dvec3& p)
-{    
-    glm::dvec3 op = tri(1.1 * p + tri(1.1 * glm::dvec3(p.z, p.x, p.y)));
-    glm::dvec3 q = p + (op - glm::dvec3(0.25)) * 0.3;
-    q = glm::cos(0.444 * q + glm::sin(1.112 * glm::dvec3(p.z, p.x, p.y)));
-    return glm::length(p) - 1.05;
+{
+    glm::dvec3 pp = 8.0 * p;
+    glm::dvec3 op = tri(1.1 * pp + tri(1.1 * glm::dvec3(pp.z, pp.x, pp.y)));
+    glm::dvec3 q = pp + (op - glm::dvec3(0.25)) * 0.3;
+    q = glm::cos(0.444 * q + glm::sin(1.112 * glm::dvec3(pp.z, pp.x, pp.y)));
+    return glm::length(q) - 1.05;
 }
 
 
@@ -80,17 +82,39 @@ int main(int argc, char *argv[])
 
     demo_window_t window("CPU Marching cubes algorithm", 4, 3, 3, 1920, 1080, true);
 
+    //===================================================================================================================================================================================================================
+    // Load trilinear blend shader which produces nice 3-dimensional material texture from arbitrary 2 dimensional input
+    //===================================================================================================================================================================================================================
+    glsl_program_t trilinear_blend(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/tb.vs"),
+                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/tb.fs"));
+
+    trilinear_blend.enable();
+    uniform_t uniform_model_matrix           = trilinear_blend["model_matrix"];
+    uniform_t uniform_projection_view_matrix = trilinear_blend["projection_view_matrix"];
+    uniform_t uniform_camera_ws              = trilinear_blend["camera_ws"];
+    uniform_t uniform_light_ws               = trilinear_blend["light_ws"];
+    uniform_t uniform_Ka                     = trilinear_blend["Ka"];
+    uniform_t uniform_Kd                     = trilinear_blend["Kd"];
+    uniform_t uniform_Ks                     = trilinear_blend["Ks"];
+    uniform_t uniform_Ns                     = trilinear_blend["Ns"];
+    uniform_t uniform_bf                     = trilinear_blend["bf"];
+    trilinear_blend["tb_tex2d"] = 0;
+
+    glActiveTexture(GL_TEXTURE0);
+    GLuint grass_tex = image::png::texture2d("../../../resources/tex2d/clay.png");
 
     //===================================================================================================================================================================================================================
     // light variables
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
     isosurface cave;
+    cave.generate_vao(sdf);
 
-    cave.generate_vao(sdf, 0.0);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
@@ -103,6 +127,29 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+
+        float time = glfw::time();
+        const float light_radius = 43.0f;
+        glm::vec3 light_ws = glm::vec3(light_radius * cos(0.5f * time), 25.0f, light_radius * sin(0.5f * time));
+        glm::vec3 camera_ws = window.camera.position();
+
+        //===============================================================================================================================================================================================================
+        // Render the output of marching cubes algorithm
+        //===============================================================================================================================================================================================================
+//        trilinear_blend.enable();
+        uniform_projection_view_matrix = projection_view_matrix;
+        uniform_light_ws = light_ws;
+        uniform_camera_ws = camera_ws;
+
+        uniform_model_matrix = glm::mat4(1.0f);
+        uniform_Ka = glm::vec3(0.17f);
+        uniform_Kd = glm::vec3(1.0f);
+        uniform_Ks = glm::vec3(0.33f);
+        uniform_Ns = 20.0f;
+        uniform_bf = 0.1875f;
+
+        cave.render();
 
         window.end_frame();
     }
