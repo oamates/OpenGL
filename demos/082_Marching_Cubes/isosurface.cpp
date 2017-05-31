@@ -350,32 +350,28 @@ glm::dvec3 gradient(scalar_field func, const glm::dvec3& point, const double del
 }
 
 //========================================================================================================================================================================================================================
-// Indexed mesh, representing a level surface
+// Indexed mesh, representing a level surface, constructed in one thread
 //========================================================================================================================================================================================================================
-
 void isosurface::generate_vao(scalar_field func)
 {
-	const int cube_size = 200;
-    
+	const int cube_size = 128;
 	const double delta = 2.0 / cube_size;
+    const double grad_delta = 0.0625 * delta;
 
 	//====================================================================================================================================================================================================================
 	// used to assign every edge a unique index (or, better, hash as the range is not contiguous) value
 	//====================================================================================================================================================================================================================
     const unsigned int SHIFT = 10;
-
 	const GLuint edge_local_hash[12] = 
 	{
 		(1 << 0) + (0 << SHIFT) + (0 << (SHIFT + SHIFT)),
 		(2 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
 		(1 << 0) + (2 << SHIFT) + (0 << (SHIFT + SHIFT)),
 		(0 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
-
 		(1 << 0) + (0 << SHIFT) + (2 << (SHIFT + SHIFT)),
 		(2 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
 		(1 << 0) + (2 << SHIFT) + (2 << (SHIFT + SHIFT)),
 		(0 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
-
 		(0 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
 		(2 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
 		(2 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT)),
@@ -390,7 +386,6 @@ void isosurface::generate_vao(scalar_field func)
 
 	std::map<GLuint, GLuint> edge_to_index;
 
-
 	GLuint vertex_index = 0;
 
 	glm::dvec3 base_point;
@@ -398,11 +393,8 @@ void isosurface::generate_vao(scalar_field func)
 
 	double values[8];
 
-	debug_msg("Marching cubes begin");
-
 	for (GLuint r = 0; r < cube_size; ++r)
 	{
-		debug_msg("Marching cubes r = %u", r);
 		base_point.y = -1.0;
 		for (GLuint q = 0; q < cube_size; ++q)
 		{
@@ -465,14 +457,12 @@ void isosurface::generate_vao(scalar_field func)
 							buffer_index[i] = vertex_index;
 							double value0 = values[cube_edges[i][0]];
 							double value1 = values[cube_edges[i][1]];
-	    	        		double dv = value1 - value0;
-							double offset = (dv == 0.0) ? 0.5 : -value0 / dv;
+	    	        		double dv = value0 - value1;
+							double offset = value0 / dv;
 
 							glm::dvec3 position = base_point + delta * (cube_vertices[cube_edges[i][0]] + offset * edge_directions[i]);
-							glm::dvec3 normal = gradient(func, position, 0.00125);
+							glm::dvec3 normal = gradient(func, position, grad_delta);
 	            			vertices.push_back(vertex_pn_t(glm::vec3(position), glm::vec3(normal)));
-
-//	            			debug_msg("normal = {%f, %f, %f}", normal.x, normal.y, normal.z);
 
 							//============================================================================================================================================================================================
 							// store index value into the map 
@@ -484,7 +474,6 @@ void isosurface::generate_vao(scalar_field func)
 					mask <<= 1;
 				}
 				
-	            
 				//========================================================================================================================================================================================================
 				// add index triple for each triangle in the surface_triangles list for the given cube_type to the index buffer
 				//========================================================================================================================================================================================================
@@ -503,31 +492,35 @@ void isosurface::generate_vao(scalar_field func)
 	}
 
   	vao.init(GL_TRIANGLES, vertices, indices);
-	debug_msg("Marching cubes done. Vertices = %u. Indices = %u.", (int) vertices.size(), (int) indices.size());
 }
 
+//========================================================================================================================================================================================================================
+// Indexed mesh, representing a level surface, constructed in one thread
+//========================================================================================================================================================================================================================
 void isosurface::generate_vao_mt(scalar_field func)
 {
-	const int cube_size = 256;
+	const int cube_size = 128;
 	const double delta = 2.0 / cube_size;
+    const double grad_delta = 0.0625 * delta;
 
 	//====================================================================================================================================================================================================================
-	// used to assign every edge a unique index value
+	// used to assign every edge a unique index (or, better, hash as the range is not contiguous) value
 	//====================================================================================================================================================================================================================
-	static const GLuint edge_local_hash[12] = 
+    const unsigned int SHIFT = 10;
+	const GLuint edge_local_hash[12] = 
 	{
-		(1 << 0) + (0 << 10) + (0 << 20),
-		(2 << 0) + (1 << 10) + (0 << 20),
-		(1 << 0) + (2 << 10) + (0 << 20),
-		(0 << 0) + (1 << 10) + (0 << 20),
-		(1 << 0) + (0 << 10) + (2 << 20),
-		(2 << 0) + (1 << 10) + (2 << 20),
-		(1 << 0) + (2 << 10) + (2 << 20),
-		(0 << 0) + (1 << 10) + (2 << 20),
-		(0 << 0) + (0 << 10) + (1 << 20),
-		(2 << 0) + (0 << 10) + (1 << 20),
-		(2 << 0) + (2 << 10) + (1 << 20),
-		(0 << 0) + (2 << 10) + (1 << 20)
+		(1 << 0) + (0 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(2 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(1 << 0) + (2 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(0 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
+		(1 << 0) + (0 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(2 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(1 << 0) + (2 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(0 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
+		(0 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
+		(2 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
+		(2 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT)),
+		(0 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT))
 	};
 
 	//====================================================================================================================================================================================================================
@@ -538,7 +531,6 @@ void isosurface::generate_vao_mt(scalar_field func)
 
 	std::map<GLuint, GLuint> edge_to_index;
 
-
 	GLuint vertex_index = 0;
 
 	glm::dvec3 base_point;
@@ -546,11 +538,8 @@ void isosurface::generate_vao_mt(scalar_field func)
 
 	double values[8];
 
-	debug_msg("Marching cubes begin");
-
 	for (GLuint r = 0; r < cube_size; ++r)
 	{
-		debug_msg("Marching cubes r = %u", r);
 		base_point.y = -1.0;
 		for (GLuint q = 0; q < cube_size; ++q)
 		{
@@ -565,7 +554,7 @@ void isosurface::generate_vao_mt(scalar_field func)
 				GLuint cube_type = 0;
 				GLuint mask = 1;
 				
-				for(GLuint i = 0; i < 8; ++i)
+				for (GLuint i = 0; i < 8; ++i)
 				{
 					values[i] = func(base_point + delta * cube_vertices[i]);
 					if (values[i] <= 0.0) cube_type |= mask;
@@ -587,7 +576,7 @@ void isosurface::generate_vao_mt(scalar_field func)
 				// Find the point of intersection of the surface with each edge, then find the normal to the surface at those points
 				//========================================================================================================================================================================================================
 				mask = 1;
-				GLuint edge_global_hash = (p << 0) + (q << 10) + (r << 20);
+				GLuint edge_global_hash = (p << 1) + (q << (SHIFT + 1)) + (r << (SHIFT + SHIFT + 1));
 				GLuint buffer_index[12];
 
 	            for(GLuint i = 0; i < 12; i++)
@@ -613,23 +602,23 @@ void isosurface::generate_vao_mt(scalar_field func)
 							buffer_index[i] = vertex_index;
 							double value0 = values[cube_edges[i][0]];
 							double value1 = values[cube_edges[i][1]];
-	    	        		double dv = value1 - value0;
-							double offset = (dv == 0.0) ? 0.5 : value0 / dv;
+	    	        		double dv = value0 - value1;
+							double offset = value0 / dv;
 
 							glm::dvec3 position = base_point + delta * (cube_vertices[cube_edges[i][0]] + offset * edge_directions[i]);
-							glm::dvec3 normal = gradient(func, position, 0.00125);
+							glm::dvec3 normal = gradient(func, position, grad_delta);
 	            			vertices.push_back(vertex_pn_t(glm::vec3(position), glm::vec3(normal)));
 
 							//============================================================================================================================================================================================
 							// store index value into the map 
 							//============================================================================================================================================================================================
-							edge_to_index[edge_hash] = vertex_index++;
+							edge_to_index[edge_hash] = vertex_index;
+                            vertex_index++;
 	            		}
     			    }
 					mask <<= 1;
 				}
 				
-	            
 				//========================================================================================================================================================================================================
 				// add index triple for each triangle in the surface_triangles list for the given cube_type to the index buffer
 				//========================================================================================================================================================================================================
@@ -648,5 +637,4 @@ void isosurface::generate_vao_mt(scalar_field func)
 	}
 
   	vao.init(GL_TRIANGLES, vertices, indices);
-	debug_msg("Marching cubes done. Vertices = %u. Indices = %u.", (int) vertices.size(), (int) indices.size());
 }

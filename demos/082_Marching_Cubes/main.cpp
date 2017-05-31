@@ -73,13 +73,6 @@ double sdf(const glm::dvec3& p)
     return glm::length(q) - 1.05;
 }
 
-double sdf1(const glm::dvec3& p)
-{
-    return glm::length(p) - 1.05;
-}
-
-
-
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -113,7 +106,7 @@ int main(int argc, char *argv[])
     trilinear_blend["tb_tex2d"] = 0;
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
 
     //===================================================================================================================================================================================================================
@@ -149,17 +142,16 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // Render the output of marching cubes algorithm
         //===============================================================================================================================================================================================================
-//        trilinear_blend.enable();
         uniform_projection_view_matrix = projection_view_matrix;
         uniform_light_ws = light_ws;
         uniform_camera_ws = camera_ws;
 
         uniform_model_matrix = glm::mat4(1.0f);
-        uniform_Ka = glm::vec3(0.17f);
-        uniform_Kd = glm::vec3(1.0f);
+        uniform_Ka = glm::vec3(0.15f);
+        uniform_Kd = glm::vec3(0.77f);
         uniform_Ks = glm::vec3(0.33f);
         uniform_Ns = 20.0f;
-        uniform_bf = 0.1875f;
+        uniform_bf = 0.2875f;
 
         cave.render();
 

@@ -26,7 +26,7 @@ vec3 tex2d(vec2 uv)
 
 vec3 tex3d(in vec3 p, in vec3 n)
 {
-    p *= 1.5875;
+    p *= 0.4875;
     vec3 w = max(abs(n) - 0.317f, 0.0f);
     w /= dot(w, vec3(1.0f));
     mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
@@ -35,7 +35,7 @@ vec3 tex3d(in vec3 p, in vec3 n)
 
 vec3 bump_normal(in vec3 p, in vec3 n)
 {
-    const vec2 e = vec2(0.0625, 0);
+    const vec2 e = vec2(0.03125, 0);
     mat3 mp = mat3(tex3d(p + e.xyy, n), tex3d(p + e.yxy, n), tex3d(p + e.yyx, n));
     mat3 mm = mat3(tex3d(p - e.xyy, n), tex3d(p - e.yxy, n), tex3d(p - e.yyx, n));
     vec3 g = (rgb_power * (mp - mm)) / e.x;
@@ -78,7 +78,7 @@ vec3 deform_normal(in vec3 p, inout vec3 n)
 void main()
 {
     vec3 n = normalize(normal_ws);
-    vec3 q = deform_normal(position_ws, n);
+    vec3 b = bump_normal(position_ws, n);
 
     vec3 v = normalize(view);
     float light_distance = length(light);
@@ -88,24 +88,16 @@ void main()
     float specular_factor = 0.0f;
     float cos_theta = dot(n, l);
 
+    vec3 q = tex3d(n, b);
     vec3 ambient = Ka * q;
     vec3 diffuse = Kd * q;
 
-
     if (cos_theta > 0.0f) 
     {
-        // Phong lighting
-        //vec3 r = reflect(-l, n);
-        //float cos_alpha = max(dot(v, r), 0.0f);
-        //float exponent = 0.25f * Ns;
         diffuse_factor = cos_theta;
-        
-        // Blinn - Phong lighting
         vec3 h = normalize(l + v);
-        float cos_alpha = max(dot(h, n), 0.0f);
-        float exponent = Ns;
-
-        specular_factor = 0.125 * pow(cos_alpha, exponent);
+        float cos_alpha = max(dot(h, b), 0.0f);
+        specular_factor = 0.125 * pow(cos_alpha, Ns);
     }
     vec3 color = ambient + diffuse_factor * diffuse + specular_factor * Ks;
 
