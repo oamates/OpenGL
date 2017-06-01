@@ -497,11 +497,15 @@ void isosurface::generate_vao(scalar_field func)
 //========================================================================================================================================================================================================================
 // Indexed mesh, representing a level surface, constructed in one thread
 //========================================================================================================================================================================================================================
-void isosurface::generate_vao_mt(scalar_field func)
+void isosurface::generate_vao_2(scalar_field func)
 {
-	const int cube_size = 128;
-	const double delta = 2.0 / cube_size;
-    const double grad_delta = 0.0625 * delta;
+	const int CUBE_SIZE = 128;
+	const int CUBE_SIZE_PLUS_1 = CUBE_SIZE + 1;
+
+    const double CUBE_MIN_BOUND = -1.0;
+    const double CUBE_MAX_BOUND = 1.0;
+    const double DELTA = (CUBE_MAX_BOUND - CUBE_MIN_BOUND) / double(CUBE_SIZE);
+    const double GRADIENT_DELTA = 0.0625 * DELTA;
 
 	//====================================================================================================================================================================================================================
 	// used to assign every edge a unique index (or, better, hash as the range is not contiguous) value
@@ -529,14 +533,76 @@ void isosurface::generate_vao_mt(scalar_field func)
 	std::vector<vertex_pn_t> vertices;
 	std::vector<GLuint> indices;
 
-	std::map<GLuint, GLuint> edge_to_index;
+	double z_layer_values[CUBE_SIZE_PLUS_1][CUBE_SIZE_PLUS_1];
+	double y_layer_values[CUBE_SIZE_PLUS_1];
 
-	GLuint vertex_index = 0;
+	glm::dvec3 p = glm::dvec3(CUBE_MIN_BOUND);
 
-	glm::dvec3 base_point;
-	base_point.z = -1.0;
+	//====================================================================================================================================================================================================================
+	// fill in the first z-layer of data
+	//====================================================================================================================================================================================================================
 
-	double values[8];
+	double value = func(p);
+	y_layer_values[0] = value;
+
+	for(GLuint x = 0; x < CUBE_SIZE; ++x)
+	{
+		p.x += DELTA;
+		double xplus_value = func(p);
+
+
+		
+	}
+
+	for(GLuint y = 0; y <= CUBE_SIZE; ++y)
+	{
+		p.x = CUBE_MIN_BOUND;
+		for(GLuint x = 0; x <= CUBE_SIZE; ++x)
+		{
+
+		}
+		p.y += DELTA;
+	}
+
+
+	//====================================================================================================================================================================================================================
+	// the main loop
+	//====================================================================================================================================================================================================================
+	for(GLuint z = 0; z < CUBE_SIZE; ++z)
+	{
+		//================================================================================================================================================================================================================
+		// working on the z-layer number z + 1 and the previous one, i.e. z
+		//   step 1 :: calculate values of the field on the new layer, simultaneously detecting z - orthogonal edges which 
+		//             contain zeros of the field, generate new vertices, and calculate their data
+		//================================================================================================================================================================================================================
+
+		for(GLuint y = 0; y <= CUBE_SIZE; ++x)
+		{
+			//====================================================================================================================================================================================================================
+			// fill in the first z-layer of data
+			//====================================================================================================================================================================================================================
+			for(GLuint x = 0; x <= CUBE_SIZE; ++x)
+			{
+				for(GLuint x = 0; x <= CUBE_SIZE; ++x)
+				{
+
+				}
+
+			}
+			//============================================================================================================================================================================================================
+			// working on the z-layer number z + 1 and the previous one, i.e z
+			//   step 1 :: calculate values of the field on the new layer, simultaneously detecting z - orthogonal edges which 
+			//             contain zero of the field, generate new vertices, and calculate their data
+			//============================================================================================================================================================================================================
+
+
+
+		}
+
+	}
+
+
+
 
 	for (GLuint r = 0; r < cube_size; ++r)
 	{
