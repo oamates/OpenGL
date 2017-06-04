@@ -17,7 +17,7 @@ void main()
 {
     mat3 normal_matrix = transpose(inverse(mat3(model_matrix)));
 
-    vec4 position_ws4 = model_matrix * vec4(5.0 * position_in, 1.0f);
+    vec4 position_ws4 = model_matrix * vec4(16.0 * position_in, 1.0f);
     position_ws = vec3(position_ws4);
     normal_ws = normal_matrix * normal_in;
 

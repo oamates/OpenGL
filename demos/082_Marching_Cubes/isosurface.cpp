@@ -33,6 +33,23 @@ const glm::dvec3 cube_vertices[8] =
 //========================================================================================================================================================================================================================
 const GLbyte cube_edges[12][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
 
+const unsigned int SHIFT = 10;
+const GLuint edge_local_hash[12] = 
+{
+	(1 << 0) + (0 << SHIFT) + (0 << (SHIFT + SHIFT)),
+	(2 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
+	(1 << 0) + (2 << SHIFT) + (0 << (SHIFT + SHIFT)),
+	(0 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
+	(1 << 0) + (0 << SHIFT) + (2 << (SHIFT + SHIFT)),
+	(2 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
+	(1 << 0) + (2 << SHIFT) + (2 << (SHIFT + SHIFT)),
+	(0 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
+	(0 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
+	(2 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
+	(2 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT)),
+	(0 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT))
+};
+
 //========================================================================================================================================================================================================================
 // edge_directions lists the direction vector for all cube edges
 //========================================================================================================================================================================================================================
@@ -354,29 +371,9 @@ glm::dvec3 gradient(scalar_field func, const glm::dvec3& point, const double del
 //========================================================================================================================================================================================================================
 void isosurface::generate_vao(scalar_field func)
 {
-	const int cube_size = 128;
+	const int cube_size = 160;
 	const double delta = 2.0 / cube_size;
     const double grad_delta = 0.0625 * delta;
-
-	//====================================================================================================================================================================================================================
-	// used to assign every edge a unique index (or, better, hash as the range is not contiguous) value
-	//====================================================================================================================================================================================================================
-    const unsigned int SHIFT = 10;
-	const GLuint edge_local_hash[12] = 
-	{
-		(1 << 0) + (0 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(2 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(1 << 0) + (2 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(0 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(1 << 0) + (0 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(2 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(1 << 0) + (2 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(0 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(0 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
-		(2 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
-		(2 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT)),
-		(0 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT))
-	};
 
 	//====================================================================================================================================================================================================================
 	// data arrays to be used as attribute and index buffers
@@ -493,10 +490,23 @@ void isosurface::generate_vao(scalar_field func)
 
   	vao.init(GL_TRIANGLES, vertices, indices);
 }
-
+/*
 //========================================================================================================================================================================================================================
 // Indexed mesh, representing a level surface, constructed in one thread
 //========================================================================================================================================================================================================================
+
+enum
+{
+	VERTEX000_BIT = 0x01,
+	VERTEX100_BIT = 0x02,
+	VERTEX010_BIT = 0x04,
+	VERTEX110_BIT = 0x08,
+	VERTEX001_BIT = 0x10,
+	VERTEX101_BIT = 0x20,
+	VERTEX011_BIT = 0x40,
+	VERTEX111_BIT = 0x80
+}
+
 void isosurface::generate_vao_2(scalar_field func)
 {
 	const int CUBE_SIZE = 128;
@@ -508,60 +518,138 @@ void isosurface::generate_vao_2(scalar_field func)
     const double GRADIENT_DELTA = 0.0625 * DELTA;
 
 	//====================================================================================================================================================================================================================
-	// used to assign every edge a unique index (or, better, hash as the range is not contiguous) value
-	//====================================================================================================================================================================================================================
-    const unsigned int SHIFT = 10;
-	const GLuint edge_local_hash[12] = 
-	{
-		(1 << 0) + (0 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(2 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(1 << 0) + (2 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(0 << 0) + (1 << SHIFT) + (0 << (SHIFT + SHIFT)),
-		(1 << 0) + (0 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(2 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(1 << 0) + (2 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(0 << 0) + (1 << SHIFT) + (2 << (SHIFT + SHIFT)),
-		(0 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
-		(2 << 0) + (0 << SHIFT) + (1 << (SHIFT + SHIFT)),
-		(2 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT)),
-		(0 << 0) + (2 << SHIFT) + (1 << (SHIFT + SHIFT))
-	};
-
-	//====================================================================================================================================================================================================================
 	// data arrays to be used as attribute and index buffers
 	//====================================================================================================================================================================================================================
 	std::vector<vertex_pn_t> vertices;
 	std::vector<GLuint> indices;
 
+	//====================================================================================================================================================================================================================
+	// auxiliary data arrays
+	//====================================================================================================================================================================================================================
 	double z_layer_values[CUBE_SIZE_PLUS_1][CUBE_SIZE_PLUS_1];
-	double y_layer_values[CUBE_SIZE_PLUS_1];
 
+	//====================================================================================================================================================================================================================
+	// step 0 :: fill in the first z-layer of data
+	//====================================================================================================================================================================================================================
 	glm::dvec3 p = glm::dvec3(CUBE_MIN_BOUND);
+	double value;
+	double* value_ptr = z_layer_values;
+	uint8_t* mask_ptr = z_layer_masks;
+	double alpha;
+
+	x_value = func(p);
+	*(value_ptr++) = x_value;
+	uint8_t x_mask = x_value < 0.0;
+
+	for (GLuint x = 0; x < CUBE_SIZE; ++x)
+	{
+		p.x += DELTA;
+		value = func(p);
+		uint8_t mask = value < 0.0;
+
+		if (mask != x_mask)
+		{
+			alpha = value / (value - x_value);
+			glm::dvec3 position = glm::dvec3(p.x - alpha * delta, p.y, p.z);
+			glm::dvec3 normal = gradient(func, position, GRADIENT_DELTA);
+	        vertices.push_back(vertex_pn_t(glm::vec3(position), glm::vec3(normal)));
+		}
+
+		y_layer_masks[x] = x_mask | (mask << 1);
+		*(value_ptr++) = value;
+		x_value = value;
+	}
+
+	for(GLuint y = 0; y < CUBE_SIZE; ++y)
+	{
+
+		p.y += delta;
+		p.x = CUBE_MIN_BOUND;
+		x_value = func(p);
+
+		y_value = *(value_ptr - CUBE_SIZE_PLUS_1);
+		uint8_t x_mask = x_value < 0.0;
+		uint8_t y_mask = y_layer_masks[0]; 
+
+		if ()
+
+		*(value_ptr++) = x_value;
+
+
+		for(GLuint x = 0; x < CUBE_SIZE; ++x)
+		{
+			p.x += DELTA;
+			value = func(p);
+			*(value_ptr++) = value;
+			mask = value < 0.0;
+
+			// y_layer_masks[x] <-- x_mask | (mask << 1)
+			// z_layer_masks[y][x] <-- y_mask | ((x_mask | (mask << 1)) << 2)
+			// y_mask
+
+
+			if ((y_layer_masks[x] ^ mask) & 1)
+			{
+				y_value = z_layer_values[y][0];
+				alpha = value / (value - y_value);
+			glm::dvec3 position = glm::dvec3(p.x, p.y - alpha * delta, p.z);
+			glm::dvec3 normal = gradient(func, position, GRADIENT_DELTA);
+	        vertices.push_back(vertex_pn_t(glm::vec3(position), glm::vec3(normal)));
+
+
+		}
+
+			p.x += delta;
+			double value = func(p);
+			uint8_t mask = value < 0.0;
+			if (((y_layer_masks[x] >> 1) ^ mask) & 1)
+			{
+
+			}
+
+
+}
+
+
+void isosurface::generate_vao_2(scalar_field func)
+{
+	uint8_t z_layer_masks[CUBE_SIZE][CUBE_SIZE];
+	uint8_t y_layer_masks[CUBE_SIZE];
+
 
 	//====================================================================================================================================================================================================================
 	// fill in the first z-layer of data
 	//====================================================================================================================================================================================================================
 
-	double value = func(p);
-	y_layer_values[0] = value;
 
-	for(GLuint x = 0; x < CUBE_SIZE; ++x)
-	{
-		p.x += DELTA;
-		double xplus_value = func(p);
-
-
-		
-	}
-
-	for(GLuint y = 0; y <= CUBE_SIZE; ++y)
-	{
-		p.x = CUBE_MIN_BOUND;
-		for(GLuint x = 0; x <= CUBE_SIZE; ++x)
+		for(GLuint x = 0; x < CUBE_SIZE; ++x)
 		{
+			p.x += delta;
+			double x_value = func(p);
+			uint8_t x_mask = value < 0.0;
+			uint8_t y_mask = mask | (x_mask << 1);
 
+			if (x_mask != mask)
+			{
+	    		double dv = value - x_value;
+				double offset = value / dv;
+				glm::dvec3 position = glm::dvec3(......................, p.y, p.z);
+				glm::dvec3 normal = gradient(func, position, grad_delta);
+	        	vertices.push_back(vertex_pn_t(glm::vec3(position), glm::vec3(normal)));
+			}
+			uint8_t y_mask = ;
+			uint8_t z_mask = mask | (x_mask << 1);
+
+			y_layer_masks[x] = mask | (x_mask << 1);
+			y_layer_values[x + 1] = x_value;
+			value = x_value;
 		}
-		p.y += DELTA;
+
+		uint8_t x_mask
+		for(GLuint x = 0; x < CUBE_SIZE; ++x)
+		{
+			uint8_t y_mask = y_layer_masks[x];
+			if (y_mask)
 	}
 
 
@@ -578,9 +666,9 @@ void isosurface::generate_vao_2(scalar_field func)
 
 		for(GLuint y = 0; y <= CUBE_SIZE; ++x)
 		{
-			//====================================================================================================================================================================================================================
+			//============================================================================================================================================================================================================
 			// fill in the first z-layer of data
-			//====================================================================================================================================================================================================================
+			//============================================================================================================================================================================================================
 			for(GLuint x = 0; x <= CUBE_SIZE; ++x)
 			{
 				for(GLuint x = 0; x <= CUBE_SIZE; ++x)
@@ -595,112 +683,8 @@ void isosurface::generate_vao_2(scalar_field func)
 			//             contain zero of the field, generate new vertices, and calculate their data
 			//============================================================================================================================================================================================================
 
-
-
 		}
-
 	}
-
-
-
-
-	for (GLuint r = 0; r < cube_size; ++r)
-	{
-		base_point.y = -1.0;
-		for (GLuint q = 0; q < cube_size; ++q)
-		{
-			base_point.x = -1.0;
-			for (GLuint p = 0; p < cube_size; ++p)
-			{
-				//========================================================================================================================================================================================================
-				// calculate function values at the cube's corners and the cube type, 
-				// i.e compute mask which vertices are inside of the isosurface (the value at the vertex is below the isovalue) and which are outside of it
-				//========================================================================================================================================================================================================
-
-				GLuint cube_type = 0;
-				GLuint mask = 1;
-				
-				for (GLuint i = 0; i < 8; ++i)
-				{
-					values[i] = func(base_point + delta * cube_vertices[i]);
-					if (values[i] <= 0.0) cube_type |= mask;
-					mask <<= 1;
-				}
-
-				//========================================================================================================================================================================================================
-	            // find which edges are intersected by the surface
-				// nothing to do if the cube is entirely inside or outside of the surface
-				//========================================================================================================================================================================================================
-	            GLuint edges_bitmask = intersected_edges[cube_type];
-				if (!edges_bitmask)
-				{ 
-					base_point.x += delta;
-					continue;
-				}
-				
-				//========================================================================================================================================================================================================
-				// Find the point of intersection of the surface with each edge, then find the normal to the surface at those points
-				//========================================================================================================================================================================================================
-				mask = 1;
-				GLuint edge_global_hash = (p << 1) + (q << (SHIFT + 1)) + (r << (SHIFT + SHIFT + 1));
-				GLuint buffer_index[12];
-
-	            for(GLuint i = 0; i < 12; i++)
-				{
-					//====================================================================================================================================================================================================
-    			    // if there is an intersection on this edge
-					//====================================================================================================================================================================================================
-    			    if(edges_bitmask & mask)
-    			    {
-						GLuint edge_hash = edge_global_hash + edge_local_hash[i];						
-                        std::map<GLuint, GLuint>::iterator it = edge_to_index.find(edge_hash);
-
-						//================================================================================================================================================================================================
-						// if the vertex already exists, get its index, otherwise create a new one
-						//================================================================================================================================================================================================
-						if (it != edge_to_index.end())
-							buffer_index[i] = it->second;										
-						else
-						{
-							//============================================================================================================================================================================================
-							// a new vertex has to be created
-							//============================================================================================================================================================================================
-							buffer_index[i] = vertex_index;
-							double value0 = values[cube_edges[i][0]];
-							double value1 = values[cube_edges[i][1]];
-	    	        		double dv = value0 - value1;
-							double offset = value0 / dv;
-
-							glm::dvec3 position = base_point + delta * (cube_vertices[cube_edges[i][0]] + offset * edge_directions[i]);
-							glm::dvec3 normal = gradient(func, position, grad_delta);
-	            			vertices.push_back(vertex_pn_t(glm::vec3(position), glm::vec3(normal)));
-
-							//============================================================================================================================================================================================
-							// store index value into the map 
-							//============================================================================================================================================================================================
-							edge_to_index[edge_hash] = vertex_index;
-                            vertex_index++;
-	            		}
-    			    }
-					mask <<= 1;
-				}
-				
-				//========================================================================================================================================================================================================
-				// add index triple for each triangle in the surface_triangles list for the given cube_type to the index buffer
-				//========================================================================================================================================================================================================
-				for (GLuint i = 0; surface_triangles[cube_type][i] != -1; i += 3)
-				{
-					indices.push_back(buffer_index[surface_triangles[cube_type][i + 0]]); 
-					indices.push_back(buffer_index[surface_triangles[cube_type][i + 1]]); 
-					indices.push_back(buffer_index[surface_triangles[cube_type][i + 2]]);
-				}
-	            
-				base_point.x += delta;
-			}			
-			base_point.y += delta;
-		}
-		base_point.z += delta;
-	}
-
   	vao.init(GL_TRIANGLES, vertices, indices);
 }
+*/

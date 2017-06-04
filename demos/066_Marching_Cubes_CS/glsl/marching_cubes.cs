@@ -1,6 +1,6 @@
 #version 430 core
 
-layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout (local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
 //==============================================================================================================================================================
 // Density function computed by the previous compute stage
@@ -14,7 +14,7 @@ layout (location = 0) uniform sampler3D density_texture;
 layout (std430, binding = 0) buffer shader_data
 {
 	vec3 vertices[];
-}
+};
 
 layout (binding = 0, offset = 0) uniform atomic_uint triangles_count;
 
@@ -374,8 +374,9 @@ void main()
 		cube_vertices[i].x = cube_vertices[i].x * z / znear;
 		cube_vertices[i].y = cube_vertices[i].y * z / znear;
 		density_value[i] = texture(density_texture, findex / vec3(div_size)).r;
-		if (density_value[i] <= 0.0f) cube_type |= bitmask[i];
-	};
+		if (density_value[i] <= 0.0f) 
+			cube_type |= bitmask[i];
+	}
 	 
 	if ((cube_type == 0) || (cube_type == 255)) return;
 

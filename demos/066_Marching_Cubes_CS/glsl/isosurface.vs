@@ -1,7 +1,6 @@
 #version 430 core
 
-uniform mat4 view_matrix;
-uniform mat4 inverse_view_matrix;
+uniform mat4 camera_matrix;
 
 const float znear = 1.0f;
 const float zfar = 7.0f;
@@ -30,6 +29,6 @@ out vec3 position_cs;
 void main()
 {
 	position_cs = position[gl_VertexID];
-	position_ws = vec3(inverse_view_matrix * vec4(position_cs, 1.0f)); 
+	position_ws = vec3(camera_matrix * vec4(position_cs, 1.0f)); 
 	gl_Position = projection_matrix * vec4(position_cs, 1.0f);
-};
+}

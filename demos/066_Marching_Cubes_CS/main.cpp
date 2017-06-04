@@ -81,22 +81,21 @@ int main(int argc, char *argv[])
                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/isosurface.fs"));
 
     isosurface.enable();
-	uniform_t isosurface_inverse_view_matrix_id = isosurface["inverse_view_matrix"];
-	uniform_t isosurface_view_matrix = isosurface["view_matrix"];                                            
+	uniform_t uni_iso_camera_matrix = isosurface["camera_matrix"];                                         
 
     //===================================================================================================================================================================================================================
 	// Density compute shader
     //===================================================================================================================================================================================================================
     glsl_program_t density_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/density_compute.cs"));
     density_compute.enable();
-	uniform_t inverse_view_matrix_id = density_compute["inverse_view_matrix"];
+	uniform_t uni_dc_camera_matrix = density_compute["camera_matrix"];
 
     //===================================================================================================================================================================================================================
 	// Marching cubes compute shader
     //===================================================================================================================================================================================================================
 	glsl_program_t marching_cubes(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/marching_cubes.cs"));
     marching_cubes.enable();
-	uniform_t uniform_inverse_view_matrix_id = marching_cubes["inverse_view_matrix"];
+	uniform_t uniform_mc_camera_matrix = marching_cubes["camera_matrix"];
 
     //===================================================================================================================================================================================================================
 	// Create image texture to be used for the GL_COMPUTE_SHADER output
@@ -147,23 +146,23 @@ int main(int argc, char *argv[])
         window.new_frame();
 
 		float time = window.frame_ts;
-		glm::mat4 inverse_view_matrix = glm::inverse(window.camera.view_matrix); 
+		glm::mat4 camera_matrix = glm::inverse(window.camera.view_matrix); 
 
-		debug_msg("Current camera matrix = %s", glm::to_string(inverse_view_matrix).c_str());
+		//debug_msg("Current camera matrix = %s", glm::to_string(camera_matrix).c_str());
 
 		//===============================================================================================================================================================================================================
 		// Compute density texture3D
 		//===============================================================================================================================================================================================================
 		density_compute.enable();
-		inverse_view_matrix_id = inverse_view_matrix;
-		glDispatchCompute(TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+		uni_dc_camera_matrix = camera_matrix;
+		glDispatchCompute(TEXTURE_SIZE / 4, TEXTURE_SIZE / 4, TEXTURE_SIZE / 4);
 
 		//===============================================================================================================================================================================================================
 		// Marching cubes compute shader
 		//===============================================================================================================================================================================================================
 		marching_cubes.enable();
-		//uniform_inverse_view_matrix_id = inverse_view_matrix;
-		glDispatchCompute(TEXTURE_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+		//uniform_inverse_view_matrix_id = camera_matrix;
+		glDispatchCompute(TEXTURE_SIZE / 4, TEXTURE_SIZE / 4, TEXTURE_SIZE / 4);
 
 		//===============================================================================================================================================================================================================
 		// Read how many triangles were produced, and zero the counter for next iteration
@@ -179,17 +178,16 @@ int main(int argc, char *argv[])
 		// Finally, render the mesh constructed by marching cubes compute shader
 		//===============================================================================================================================================================================================================
 		isosurface.enable();
-		isosurface_view_matrix = window.camera.view_matrix;
-		isosurface_inverse_view_matrix_id = inverse_view_matrix;
+		uni_iso_camera_matrix = camera_matrix;
 		glDrawArrays(GL_TRIANGLES, 0, 3 * triangles_count);
 
 		// ==============================================================================================================================================================================================================
 		// Done.
 		// ==============================================================================================================================================================================================================
         window.end_frame();
-	}; 
+	}
     
-	glfw::terminate();																										// close OpenGL window and terminate GLFW
+	glfw::terminate();
 	return 0;
 }
 

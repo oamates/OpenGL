@@ -66,7 +66,7 @@ glm::dvec3 tri(const glm::dvec3& x)
 
 double sdf(const glm::dvec3& p)
 {
-    glm::dvec3 pp = 8.0 * p;
+    glm::dvec3 pp = 16.0 * p;
     glm::dvec3 op = tri(1.1 * pp + tri(1.1 * glm::dvec3(pp.z, pp.x, pp.y)));
     glm::dvec3 q = pp + (op - glm::dvec3(0.25)) * 0.3;
     q = glm::cos(0.444 * q + glm::sin(1.112 * glm::dvec3(pp.z, pp.x, pp.y)));
@@ -78,6 +78,13 @@ double sdf(const glm::dvec3& p)
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+    uint8_t qqq = 23 < 45;
+    uint8_t ppp = 56 < 45;
+
+    debug_msg("23 < 45 = %u", qqq);
+    debug_msg("56 < 45 = %u", ppp);
+
+
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080
@@ -114,8 +121,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
 
     isosurface cave;
     cave.generate_vao(sdf);
