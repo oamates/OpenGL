@@ -19,7 +19,7 @@ struct isosurface
 	~isosurface() {}
 
     void generate_vao(scalar_field func);
-    //void generate_vao_mt(scalar_field func);
+    void generate_vao_2(scalar_field func);
 	void render()
         { vao.render(); }
 };

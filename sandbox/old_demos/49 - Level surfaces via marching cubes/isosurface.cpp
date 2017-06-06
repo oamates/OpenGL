@@ -431,7 +431,7 @@ void isosurface::generate_vao(scalar_field func, float iso_value)
 				// Find the point of intersection of the surface with each edge, then find the normal to the surface at those points
 				// ======================================================================================================================================================================================================
 				mask = 1;
-				GLuint edge_global_hash = (p << 0) + (q << 10) + (r << 20);
+				GLuint edge_global_hash = (p << 1) + (q << 11) + (r << 21);
 				GLuint buffer_index[12];
 
 	            for(GLuint i = 0; i < 12; i++)
