@@ -1,7 +1,7 @@
 #ifndef _isosurface_included_12375612350902375324392930126548301853229202342556      
 #define _isosurface_included_12375612350902375324392930126548301853229202342556
 
-#include <GL/glew.h> 														                                                // OpenGL extensions
+#include <GL/glew.h>                                                                                                        // OpenGL extensions
 #include <glm/glm.hpp>
 
 #include "vao.hpp"
@@ -11,16 +11,17 @@
 //========================================================================================================================================================================================================================
 typedef double (*scalar_field) (const glm::dvec3& point);
 
-struct isosurface
+struct iso_surface_t
 {
     vao_t vao;
 
-	isosurface() {}
-	~isosurface() {}
+    iso_surface_t() {}
+    ~iso_surface_t() {}
 
+    void generate_vao_ori(scalar_field func);
     void generate_vao(scalar_field func);
-    void generate_vao_2(scalar_field func);
-	void render()
+
+    void render()
         { vao.render(); }
 };
 

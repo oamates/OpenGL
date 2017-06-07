@@ -73,58 +73,13 @@ double sdf(const glm::dvec3& p)
     return glm::length(q) - 1.05;
 }
 
-/*
-
-void rework()
-{
-    const char* output[13] = {"-1,", " 0,", " 1,", " 2,", " 3,", " 4,", " 5,", " 6,", " 7,", " 8,", " 9,", "10,", "11,"};
-
-    int w[13] = {-1, 0, 5, 1, 4, 2, 7, 3, 6, 8, 9, 11, 10};
-
-
-    GLbyte triangles[256][16];
-
-    for (int i = 0; i < 256; ++i)
-    {
-        int s = (i & 0x33) | ((i & 0x04) << 1) | ((i & 0x08) >> 1) | ((i & 0x40) << 1) | ((i & 0x80) >> 1);
-
-        for(int j = 0; j < 16; ++j)
-        {
-            int q = surface_triangles555[s][j];
-            triangles[i][j] = w[q + 1];
-        }
-    }
-
-
-    printf("const GLbyte triangles[0x100][0x10] = \n{\n");
-    for (int i = 0; i < 256; ++i)
-    {
-        printf("{");
-        int idx = 0;
-
-        for(int j = 0; j < 5; ++j)
-        {
-            for(int k = 0; k < 3; ++k)
-            {
-                int q = triangles[i][idx++]; 
-                const char* s = output[q + 1];
-                printf("%s", s);
-            }
-            printf(" ");
-        }
-        printf("-1},\n");
-    }
-}
-*/
-
+#include "utils.hpp"
 
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-    //rework();
-
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080
@@ -164,8 +119,14 @@ int main(int argc, char *argv[])
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
 
-    isosurface cave;
-    cave.generate_vao_2(sdf);
+    iso_surface_t cave;
+//    uint64_t t0 = utils::timer::ns();
+    cave.generate_vao(sdf);
+
+//    uint64_t t1 = utils::timer::ns();
+//    int64_t te = t1 - t0;
+//    double te_sec = double(te) / double(1000000000);
+//    debug_msg("Time to construct the surface : %f seconds.", te_sec);
 
 
     //===================================================================================================================================================================================================================
