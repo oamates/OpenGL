@@ -74,25 +74,45 @@ double sdf(const glm::dvec3& p)
 }
 
 /*
+
 void rework()
 {
-    int w[12] = {0, 5, 1, 4, 2, 7, 3, 6, 8, 9, 10, 11};
+    const char* output[13] = {"-1,", " 0,", " 1,", " 2,", " 3,", " 4,", " 5,", " 6,", " 7,", " 8,", " 9,", "10,", "11,"};
+
+    int w[13] = {-1, 0, 5, 1, 4, 2, 7, 3, 6, 8, 9, 11, 10};
+
+
+    GLbyte triangles[256][16];
+
+    for (int i = 0; i < 256; ++i)
+    {
+        int s = (i & 0x33) | ((i & 0x04) << 1) | ((i & 0x08) >> 1) | ((i & 0x40) << 1) | ((i & 0x80) >> 1);
+
+        for(int j = 0; j < 16; ++j)
+        {
+            int q = surface_triangles555[s][j];
+            triangles[i][j] = w[q + 1];
+        }
+    }
+
+
     printf("const GLbyte triangles[0x100][0x10] = \n{\n");
     for (int i = 0; i < 256; ++i)
     {
         printf("{");
-        for(int j = 0; j < 16; ++j)
-        {
-            int q = triangles[i][j]; 
-            if (q == -1)
-            {
-                printf("\t-1,");
-                continue;
-            }
+        int idx = 0;
 
-            printf("\t%u,", w[q]);
+        for(int j = 0; j < 5; ++j)
+        {
+            for(int k = 0; k < 3; ++k)
+            {
+                int q = triangles[i][idx++]; 
+                const char* s = output[q + 1];
+                printf("%s", s);
+            }
+            printf(" ");
         }
-        printf("},\n");
+        printf("-1},\n");
     }
 }
 */
