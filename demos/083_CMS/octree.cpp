@@ -9,39 +9,40 @@
 namespace cms
 {
 
+// A table setting the face relationship
+// Given the position of a cell within its parent
+// it returns the 3 faces of that cell that touch
+// the parent. (they would be the same for the parent)
 
-/// @brief A table setting the face relationship
-/// Given the position of a cell within its parent
-/// it returns the 3 faces of that cell that touch
-/// the parent. (they would be the same for the parent)
-///
-static const CONTACT FACE_RELATIONSHIP_TABLE[8][3] = {
-  {BACK , BOTTOM, LEFT },
-  {FRONT, BOTTOM, LEFT },
-  {BACK , TOP   , LEFT },
-  {FRONT, TOP   ,   LEFT },
-  {BACK , BOTTOM, RIGHT},
-  {FRONT, BOTTOM, RIGHT},
-  {BACK , TOP   ,   RIGHT},
-  {FRONT, TOP   ,   RIGHT}
+static const CONTACT FACE_RELATIONSHIP_TABLE[8][3] = 
+{
+    {BACK , BOTTOM, LEFT },
+    {FRONT, BOTTOM, LEFT },
+    {BACK , TOP   , LEFT },
+    {FRONT, TOP   ,   LEFT },
+    {BACK , BOTTOM, RIGHT},
+    {FRONT, BOTTOM, RIGHT},
+    {BACK , TOP   ,   RIGHT},
+    {FRONT, TOP   ,   RIGHT}
 };
 
-static const uint8_t SUB_FACE_TABLE[8][3] = {
-  {0 , 0 , 0 },
-  {0 , 1 , 1 },
-  {1 , 0 , 2 },
-  {1 , 1 , 3 },
-  {2 , 2 , 0 },
-  {2 , 3 , 1 },
-  {3 , 2 , 2 },
-  {3 , 3 , 3 }
+static const uint8_t SUB_FACE_TABLE[8][3] = 
+{
+    {0, 0, 0},
+    {0, 1, 1},
+    {1, 0, 2},
+    {1, 1, 3},
+    {2, 2, 0},
+    {2, 3, 1},
+    {3, 2, 2},
+    {3, 3, 3}
 };
 
 
-/// @brief Edge direction table
-/// Given one of the 12 edges of a cube it returns
-/// the direction of the edge (0=x, 1=y, 2=z)
-///
+// Edge direction table
+// Given one of the 12 edges of a cube it returns
+// the direction of the edge (0=x, 1=y, 2=z)
+
 static const uint8_t EDGE_DIRECTION[12] =
 {
    /* 0  1  2  3  4  5  6  7  8  9  10 11  Index */
@@ -49,12 +50,12 @@ static const uint8_t EDGE_DIRECTION[12] =
 };
 
 
-/// @brief Cell neighbour table
-/// See: 'Cell Point and Subcell Layout' in tables header (mind +1 to index)
-///
-/// @param: axis of neighbour [3]
-/// @param: current cell ID within parent [8]
-///
+// Cell neighbour table
+// See: 'Cell Point and Subcell Layout' in tables header (mind +1 to index)
+//
+// @param: axis of neighbour [3]
+// @param: current cell ID within parent [8]
+
 static const uint8_t NEIGHBOUR_ADDRESS_TABLE[3][8] =
 {
   // Beware neighbour slots start at 1 and not 0!
@@ -73,56 +74,32 @@ Octree::Octree(Index3D& samples,
                Vec3& offsets,
                Isosurface *fn,
                float& complexSurfThresh) :
-  m_samples(samples),
-  m_sampleData(sampleData),
-  m_minLvl(minLvl),
-  m_maxLvl(maxLvl),
-  m_offsets(offsets),
-  m_fn(fn),
-  m_complexSurfThresh(complexSurfThresh)
+    m_samples(samples),
+    m_sampleData(sampleData),
+    m_minLvl(minLvl),
+    m_maxLvl(maxLvl),
+    m_offsets(offsets),
+    m_fn(fn),
+    m_complexSurfThresh(complexSurfThresh)
 {
 }
-
-
-//------------------------------------------------------------
-
 
 Octree::~Octree()
 {
-  // Deleting cells
-  for(uint i=0;i<m_cells.size();++i)
-  {
-    if(m_cells[i])
-      delete m_cells[i];
-  }
+    
+    for(unsigned int i = 0; i < m_cells.size(); ++i)                        // Deleting cells
+        if(m_cells[i]) 
+            delete m_cells[i];
 }
-
-
-//------------------------------------------------------------
-
 
 Cell* Octree::getRoot()
-{
-  return m_root;
-}
-
-
-//------------------------------------------------------------
-
+    { return m_root; }
 
 std::vector<Cell*> Octree::getAllCells() const
-{
-  return m_cells;
-}
-
-
-//------------------------------------------------------------
-
+    { return m_cells; }
 
 Cell* Octree::getCellAt(int _i) const
-{
-  return m_cells[_i];
-}
+    { return m_cells[_i]; }
 
 
 
@@ -249,17 +226,17 @@ void Octree::acquireCellInfo(Cell* c)
 
 void Octree::subdivideCell(Cell *i_parent)
 {
-  uint parLvl = i_parent->getSubdivLvl();
-  int thisLvl = parLvl+1;
+    unsigned int parLvl = i_parent->getSubdivLvl();
+    int thisLvl = parLvl+1;
 
-  Index3D offsets;
-  offsets[0] = ((m_samples[0]-1)/util::intPower(2,thisLvl)); //change because octree starts from 0
-  offsets[1] = ((m_samples[1]-1)/util::intPower(2,thisLvl)); //change
-  offsets[2] = ((m_samples[2]-1)/util::intPower(2,thisLvl)); //change
+    Index3D offsets;
+    offsets[0] = ((m_samples[0] - 1) / util::intPower(2, thisLvl)); //change because octree starts from 0
+    offsets[1] = ((m_samples[1] - 1) / util::intPower(2, thisLvl)); //change
+    offsets[2] = ((m_samples[2] - 1) / util::intPower(2, thisLvl)); //change
 
-  int parIndX = i_parent->getC000().m_x;
-  int parIndY = i_parent->getC000().m_y;
-  int parIndZ = i_parent->getC000().m_z;
+    int parIndX = i_parent->getC000().m_x;
+    int parIndY = i_parent->getC000().m_y;
+    int parIndZ = i_parent->getC000().m_z;
 
   for(int i=0;i<8;++i)
   {
@@ -318,12 +295,12 @@ void Octree::subdivideCell(Cell *i_parent)
     i_parent->pushChild(c, i);
 
     // If base octree level still not reached => subdivide
-    if( (uint)thisLvl < m_minLvl )
+    if( (unsigned int)thisLvl < m_minLvl )
     {
       subdivideCell(c);
     }
     // If the next level would be the min and max octree levels => check for subdiv
-    else if( ( (uint)thisLvl >= m_minLvl ) && ( (uint)thisLvl < m_maxLvl) ) /// @todo change to <= max?!
+    else if( ( (unsigned int)thisLvl >= m_minLvl ) && ( (unsigned int)thisLvl < m_maxLvl) ) /// @todo change to <= max?!
     {
       // Check if the cell should be subdivided
       // due to a complex surface or edge ambiguity
@@ -590,7 +567,7 @@ void Octree::findNeighbours(Cell* cellA)
   // Actually find and assign the neighbour if such exists at the given address
   for(int i=0; i<6; ++i)
   {
-    uint addressKey = tempAddress[i].getFormatted();
+    unsigned int addressKey = tempAddress[i].getFormatted();
 
     Cell* cellB = m_cellAddresses[addressKey];
 
@@ -701,7 +678,7 @@ void Octree::markTransitionalFaces()
   int transCounter =0;
 
   // Loop through all leaf (straddling) cells
-  for(uint i=0;i<m_leafCells.size();++i)
+  for(unsigned int i=0;i<m_leafCells.size();++i)
   {
     assert(m_leafCells[i]->getState() == LEAF);
 

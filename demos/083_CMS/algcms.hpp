@@ -18,56 +18,43 @@
 namespace cms
 {
 
-/// @class AlgCMS
-/// @brief The actual Cubical Marching Squares isosurface extraction algorithm
-/// @brief Inherits from the abstract base class Isosurface
-/// @todo finish preservation of 2d sharp features and face disambiguation functions
-///
-class AlgCMS : public Isosurface
+// AlgCMS :: The actual Cubical Marching Squares isosurface extraction algorithm
+// Inherits from the abstract base class Isosurface
+// todo :: finish preservation of 2d sharp features and face disambiguation functions
+
+struct AlgCMS : public Isosurface
 {
-  /// @brief AlgCMS class type definitions
-  typedef std::vector<Strip> StripVec;
-  typedef std::vector<Vertex> VertexVec;
-  typedef Array3D<EdgeBlock> A3DEdgeBlock;
-  typedef Array3D<float> A3DFloat;
-  
-public:
+    // AlgCMS class type definitions
+    typedef std::vector<Strip> StripVec;
+    typedef std::vector<Vertex> VertexVec;
+    typedef Array3D<EdgeBlock> A3DEdgeBlock;
+    typedef Array3D<float> A3DFloat;
 
-//================== Constutor(s) and Destructor ====================
-  /// @brief Empty constructor
-  /// @warning need be set first, before using!
-            AlgCMS();
+    //================== Constutor(s) and Destructor ====================
+    // Empty constructor :: need be set first, before using!
+    AlgCMS();
 
 
-  /// @brief Function (isosurf) only constructor
-  /// the resolution is set to defualt 2-6 (4-128)
-  /// the bbox is defaulted to: -1 - 1 in xyz
-            AlgCMS( Isosurface* i_fn );
+    // Function (isosurf) only constructor, the resolution is set to defualt 2-6 (4-128)
+    // the bbox is defaulted to: [-1..1] in xyz
+    AlgCMS(Isosurface* i_fn);
 
 
-  /// @brief A semi-full constructor
-  /// supplying the isosurface, bbox and only the max depth of the octree
-  /// the min depth (base) will be be defaulted to 2
-             AlgCMS(       Isosurface *i_fn    ,
-                  const Range i_container[] ,
-                        uint i_octreeDepth  );
+    // A semi-full constructor supplying the isosurface, bbox and only the max depth of the octree
+    // the min depth (base) will be be defaulted to 2
+    AlgCMS(Isosurface *i_fn, const Range i_container[], unsigned int i_octreeDepth);
 
 
-  /// @brief Full constructor
-  /// @param taking an isosurface, bbox, octree min and max depth
-             AlgCMS(       Isosurface* i_fn          ,
-                  const Range       i_container[] ,
-                        uint        i_octreeBase  ,
-                        uint        i_octreeDepth );
+    // Full constructor, taking an isosurface, bbox, octree min and max depth
+    AlgCMS(Isosurface* i_fn, const Range i_container[], unsigned int i_octreeBase, unsigned int i_octreeDepth);
 
 
-  /// @brief copy constructor
-             AlgCMS( const AlgCMS& i_copy );
+    // copy constructor
+    AlgCMS( const AlgCMS& i_copy );
 
 
-  /// @brief Destructor
-  /// destorying the octree instance
-              ~AlgCMS();
+    // Destructor, destorying the octree instance
+    ~AlgCMS();
 
 
 //================== Public Interface Functions ====================
@@ -80,13 +67,13 @@ public:
 
   /// @brief Setting manually the minimum and maximum Octree levels
   /// the minimum would be clamped at 2; a normal range is [3 - 8]
-  void        setOctreeLevels( uint i_min ,
-                               uint i_max );
+  void        setOctreeLevels( unsigned int i_min ,
+                               unsigned int i_max );
 
 
   /// @brief Returns the min([0]) and max([1]) levels of the octree
   /// @param takes a reference to an unsigned int array with size >2
-  void        getOctreeLevels( uint* o_lvls );
+  void        getOctreeLevels( unsigned int* o_lvls );
 
 
   /// @brief Set the sampling quality manually for X, Y and Z dimensions
@@ -102,7 +89,7 @@ public:
 
 
   /// @brief Setting the interpolation quality level (Default is 5)
-  void        setZeroApproximation( uint i_zeroApproximation );
+  void        setZeroApproximation( unsigned int i_zeroApproximation );
 
 
   /// @brief Returning the interpolation quality level
@@ -138,20 +125,6 @@ public:
 
   //=============== Debugging and Visualisation Tools =================
 
-  /// @brief Exporting a Py script at the specified path
-  /// contains Maya Python commands which create boxes representing oc-cells
-  /// justLeafs (optional) - if true will cull out all BRANCH and empty cells
-  bool         exportOctreeToMaya( const std::string& i_fName           ,
-                                         bool         justLeafs = false ) const;
-
-
-  /// @brief Exporting a Py script (for blender) at the specified path
-  /// works same as maya script but for blender
-  /// @warning requires blender 2.72 or higher cause of 'radius' keyword
-  bool         exportOctreeToBlender( const std::string& i_fName           ,
-                                            bool         justLeafs = false ) const;
-
-
   /// @brief a testing function which is used to test whether a cell id belongs to the
   /// desired cells to mesh
   bool         isInDesired( int _id );
@@ -166,7 +139,7 @@ public:
 
 
   /// @brief a vector of indices to the cells which are desired to be meshed
-  intVec       m_desiredCells;
+  std::vector<int>       m_desiredCells;
 
 
 private:
@@ -236,11 +209,11 @@ private:
 
   /// @brief The level to which the base grid
   /// is to be subdivided (foundation of the octree)
-  uint         m_octMinLvl;
+  unsigned int         m_octMinLvl;
 
 
   /// @brief The maximum level (depth) of the octree
-  uint         m_octMaxLvl;
+  unsigned int         m_octMaxLvl;
 
 
   /// @brief The user defined threshold of what should
@@ -250,7 +223,7 @@ private:
 
   /// @brief the linear interpolation quality
   /// e.g. the maximum number of recursions
-  uint         m_zeroApproximation;
+  unsigned int         m_zeroApproximation;
 
 
   /// @brief A flag which the user can set, whether the median point
@@ -272,7 +245,7 @@ private:
 
 
   /// @brief comment
-  Vec3         findCrossingPoint(       uint quality ,
+  Vec3         findCrossingPoint(unsigned int quality ,
                                   const Point& pt0   ,
                                   const Point& pt1   );
   
@@ -284,22 +257,22 @@ private:
 
   /// @brief todo comment
   void         tessellateComponent( Mesh&    o_mesh    ,
-                                    uintVec& component );
+                                    std::vector<unsigned int>& component );
 
 
   /// @brief todo comment
   void         makeTri( Mesh&    o_mesh          ,
-                        uintVec& i_threeVertInds );
+                        std::vector<unsigned int>& i_threeVertInds );
   
   
   /// @brief todo comment
   void         makeTriFan( Mesh&    o_mesh         ,
-                           uintVec& i_cellVertInds );
+                           std::vector<unsigned int>& i_cellVertInds );
 
 
   /// @brief todo comment
   void         makeTriSeq( Mesh&    o_mesh         ,
-                           uintVec& i_cellVertInds );
+                           std::vector<unsigned int>& i_cellVertInds );
 
 
   /// @brief todo comment
@@ -383,7 +356,7 @@ private:
 
   /// @brief For a given transitional face, collect all
   void           segmentFromTwin( Face*    face        ,
-                                  uintVec& o_comp      ,
+                                  std::vector<unsigned int>& o_comp      ,
                                   int      lastData    ,
                                   int&     currentEdge );
 
@@ -398,26 +371,26 @@ private:
   /// that the cell had transitional faces
   void            collectStrips( Cell*       c             ,
                                  StripVec&   o_cellStrips  ,
-                                 uintVecVec& o_transitSegs );
+                                 std::vector<std::vector<unsigned int>>& o_transitSegs );
 
 
   /// @brief Taking all the strips of a given cell and linking them together to form components
-  void            linkStrips( uintVec&    o_comp      ,
+  void            linkStrips( std::vector<unsigned int>&    o_comp      ,
                               StripVec&   strips      ,
-                              uintVecVec& transitSegs );
+                              std::vector<std::vector<unsigned int>>& transitSegs );
 
 
   /// @brief Used to compare whether a given strip and an existing segment match
   /// by checking the first and last value of the segment against the strip data
   /// @return true if they match and false if they don't
   bool             compareStripToSeg( Strip&   str ,
-                                      uintVec& seg );
+                                      std::vector<unsigned int>& seg );
 
 
   /// @brief Inserts data from twin of a transitional face. Using provided segments.
   /// @param all parameters are references to arrays and flags, which get writen and returned
-  void             insertDataFromTwin(       uintVec&    o_comp           ,
-                                             uintVecVec& segs             ,
+  void             insertDataFromTwin(       std::vector<unsigned int>&    o_comp           ,
+                                             std::vector<std::vector<unsigned int>>& segs             ,
                                              Strip&      str              ,
                                              bool&       transit          ,
                                              int&        addedInIterconst ,

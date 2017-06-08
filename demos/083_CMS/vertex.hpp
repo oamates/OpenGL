@@ -1,43 +1,48 @@
-#ifndef CMS_VERTEX_H
-#define CMS_VERTEX_H
+#ifndef _cms_vertex_included_82437513491235412783561820735610875618274356723427
+#define _cms_vertex_included_82437513491235412783561820735610875618274356723427
 
-#include "vec3.hpp"
-#include "types.hpp"
 #include <vector>
 
+#include "vec3.hpp"
 
 namespace cms
 {
 
-
 struct Vertex
 {
-  Vertex();
-
-  Vertex(Vec3 i_vertex, Vec3 i_normal);
-
-  /// @brief set intersection point by value
-  void setPos(Vec3 i_pos);
-
-  /// @brief read-only reference to the intersection point
-  const Vec3& getPos() const;
-
-  /// @brief set intersection normal by value
-  void setNormal(Vec3 i_normal);
-
-  /// @brief read-only reference to the normal vector
-  const Vec3& getNormal() const;
-
-  /// @brief a print function formatting and printing the data
-  void print() const;
-
-  intVec onPath;
-
+    std::vector<int> onPath;
     Vec3 m_pos;
     Vec3 m_normal;
+
+    Vertex() : 
+        m_pos(Vec3(0, 0, 0)),
+        m_normal(Vec3(0, 0, 0))
+    {}
+
+    Vertex(Vec3 i_pos, Vec3 i_normal) :
+        m_pos(i_pos),
+        m_normal(i_normal)
+    {}
+
+    void setPos(Vec3 i_pos)
+        { m_pos = i_pos; }
+
+    const Vec3& getPos() const
+        { return m_pos; }
+
+    void setNormal(Vec3 i_normal)
+        { m_normal = i_normal; }
+
+    const Vec3& getNormal() const
+        { return m_normal; }
+
+    void print() const
+    {
+        std::cout << "Point: " << m_pos << std::endl << "Normal: " << m_normal << std::endl;
+    }
+
 };
 
+} // namespace cms
 
-} //namespace cms
-
-#endif //CMS_VERTEX_H
+#endif // _cms_vertex_included_82437513491235412783561820735610875618274356723427

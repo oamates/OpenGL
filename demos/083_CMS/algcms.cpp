@@ -12,8 +12,7 @@
 namespace cms
 {
 
-AlgCMS::AlgCMS() :
-  m_fn(0), m_sampled(false)
+AlgCMS::AlgCMS() : m_fn(0), m_sampled(false)
 {
 }
 
@@ -1352,23 +1351,6 @@ void AlgCMS::createMesh(Mesh& o_mesh)
                       m_vertices[i].getPos().m_y,
                       m_vertices[i].getPos().m_z);
   }
-}
-
-
-//=========================== OTHER FUNCTIONS ================================
-
-bool AlgCMS::exportOctreeToMaya(const std::string& i_fName, bool justLeafs) const
-{
-  ///todo check for .py and add if there is none
-  return m_octree->exportToMaya(i_fName, justLeafs, m_desiredCells);
-}
-
-//-----------------------------------------------------------------------
-
-bool AlgCMS::exportOctreeToBlender(const std::string& i_fName, bool justLeafs) const
-{
-  ///todo check for .py and add if there is none
-  return m_octree->exportToBlender(i_fName, justLeafs, m_desiredCells);
 }
 
 //-----------------------------------------------------------------------

@@ -15,35 +15,28 @@ Cell::Cell( int _id,
   m_id(_id), m_state(i_state), m_parent(i_parent), m_subdivLvl(i_subdivLvl),
   m_c000(i_c000), m_offsets(i_offsets), m_posInParent(i_posInPar)
 {
-  m_centre = Vec3(0.f, 0.f, 0.f);
+    m_centre = Vec3(0.f, 0.f, 0.f);
 
-  // Initialising the 8 octree children to NULL
-  for(int i=0;i<8;++i)
-    m_children[i] = NULL;
-
-
-  // Generating the 6 cell faces / HEAP /
-  for(int i=0;i<6;++i)
-  {
-    m_faces[i] = new Face(i, m_id);
-  }
+    // Initialising the 8 octree children to NULL
+    for(int i = 0; i < 8; ++i)
+        m_children[i] = 0;
 
 
-  // Initialise the address
-  if(m_parent)
-  {
-    m_address.set(m_parent->m_address.getRaw(), m_posInParent+1);
-  }
-  else
-  {
-      m_address.reset();
-  }
+    // Generating the 6 cell faces / HEAP /
+    for(int i = 0; i < 6; ++i)
+    {
+        m_faces[i] = new Face(i, m_id);
+    }
 
-  // Clear the neighbour array
-  for(int i=0;i<6;++i)
-  {
-    m_neighbours[i] = NULL;
-  }
+    // Initialise the address
+    if(m_parent)
+        m_address.set(m_parent->m_address.getRaw(), m_posInParent + 1);
+    else
+        m_address.reset();
+
+    // Clear the neighbour array
+    for(int i = 0; i < 6; ++i)
+        m_neighbours[i] = 0;
 }
 
 
@@ -92,7 +85,7 @@ Cell* Cell::getParent() const
 //----------------------------------
 
 
-void Cell::setSubdivLvl(uint i_subdivLvl)
+void Cell::setSubdivLvl(unsigned int i_subdivLvl)
 {
   m_subdivLvl = i_subdivLvl;
 }
@@ -235,29 +228,14 @@ void Cell::pushComponent(std::vector<unsigned int> i_comp)
   m_components.push_back(i_comp);
 }
 
-
 std::vector<std::vector<unsigned int> > Cell::getComponents()
-{
-  return m_components;
-}
-
-
-//----------------------------------
-
+    { return m_components; }
 
 Face* Cell::getFaceAt(int position)
-{
-  return m_faces[position];
-}
-
-
-//----------------------------------
-
+    { return m_faces[position]; }
 
 int8_t Cell::getPosInParent()
-{
-  return m_posInParent;
-}
+    { return m_posInParent; }
 
 
 } //namespace cms

@@ -10,42 +10,34 @@
 #include "index3d.hpp"
 #include "face.hpp"
 #include "util.hpp"
-#include "types.hpp"
 
 namespace cms
 {
 
-/// @brief Cell State enumerator
-/// BRANCH may also mean EMPTY
 enum CellState 
 { 
-  BRANCH  = 0,
-  LEAF    = 1
+    BRANCH  = 0,                            // BRANCH may also mean EMPTY
+    LEAF    = 1
 };
 
 
-/// @class Cell
-/// @brief Cell is used to construct the octree
-/// each cell in the octree is a Cell object
-/// @todo optimize the component array
-///
-class Cell
-{
-  /// @brief Typedefs of Cell class
-  typedef std::vector<int8_t> int8Vec;
+// Cell is used to construct the octree :: each cell in the octree is a Cell object
+// todo :: optimize the component array
 
-public:
+struct Cell
+{
+    typedef std::vector<int8_t> int8Vec;
 
   //============== Constructor(s) and Destructor =============
 
-  /// @brief Full Constructor
-  /// @param int i_id the cell's unique identifier
-  /// @param CellState i_state - the cell state - (enumerator)
-  /// @param Cell* i_parent - a pointer to the parent cell (null if root)
-  /// @param uint i_subdivLvl - the level of subdivision
-  /// @param Index3D i_c000 - the 000 corner of the cell in the samples array
-  /// @param Index3D i_offset - the dimensions of the cell in sample slabs xyz
-                  Cell(int        i_id        ,
+  // Full Constructor
+  // int i_id the cell's unique identifier
+  // CellState i_state - the cell state - (enumerator)
+  // Cell* i_parent - a pointer to the parent cell (null if root)
+  // uint i_subdivLvl - the level of subdivision
+  // Index3D i_c000 - the 000 corner of the cell in the samples array
+  // Index3D i_offset - the dimensions of the cell in sample slabs xyz
+                  Cell(int i_id,
                         CellState i_state     ,
                         Cell*     i_parent    ,
                         uint8_t   i_subdivLvl ,
@@ -75,9 +67,9 @@ public:
 
 
   /// @brief Setting the level of subdivision of the cell
-  void             setSubdivLvl( uint i_subdivLvl );
+  void             setSubdivLvl( unsigned int i_subdivLvl );
 
-  /// @brief getting a read-only reference (uint) of the cell depth
+  /// @brief getting a read-only reference (unsigned int) of the cell depth
   const uint8_t&   getSubdivLvl() const;
 
 
@@ -112,10 +104,10 @@ public:
   /// @brief Add child cell point onto the children array
   /// @param providing a ptr to a child cell and the index at which it should be set
   void             pushChild(       Cell* child , 
-                              const uint index  );
+                              const unsigned int index  );
 
   /// @brief Getting a child cell ptr from the specified index
-  Cell*            getChild( const uint index ) const;
+  Cell*            getChild( const unsigned int index ) const;
 
 
   /// @brief Setting the width of the cell in 3D space
@@ -140,10 +132,10 @@ public:
 
 
   /// @brief push_back component onto the component vector of the cell
-  void             pushComponent( uintVec i_comp );
+  void             pushComponent( std::vector<unsigned int> i_comp );
 
   /// @brief Retrieve the component array of the cell
-  uintVecVec       getComponents(); /// todo fix with offset
+  std::vector<std::vector<unsigned int>>       getComponents(); /// todo fix with offset
 
 
   /// @brief Get a ptr to a cell face at the specified position
@@ -212,7 +204,7 @@ private:
   Cell*      m_children[8];
 
   /// @brief The array of components for this cell
-  uintVecVec m_components; /// todo get rid of vec of vec
+  std::vector<std::vector<unsigned int>> m_components; /// todo get rid of vec of vec
 
   /// @brief The Array of cell faces
   Face*      m_faces[6];

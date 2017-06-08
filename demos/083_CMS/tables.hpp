@@ -4,7 +4,7 @@ namespace cms
 {
 
 /*
-  USING LEFT HANDED SYSTEM (... i know...)
+  USING LEFT HANDED SYSTEM
 
     Data tables for marching squares
 
@@ -98,7 +98,7 @@ namespace cms
 
 // For a given set of filled corners, this array defines
 // the cell edges from which we draw interior edges
-//
+
 static const int8_t EDGE_MAP[16][2][2] = {
     {{-1, -1}, {-1, -1}}, // ----
     {{0, 2}, {-1, -1}},   // ---0
@@ -121,7 +121,7 @@ static const int8_t EDGE_MAP[16][2][2] = {
 
 
 // Indexed by edge number, returns vertex index
-//
+
 static const int8_t VERTEX_MAP[4][2] = {
     {0, 2},
     {3, 1},
@@ -129,41 +129,38 @@ static const int8_t VERTEX_MAP[4][2] = {
     {2, 3}
 };
 
-//----------------------------------------------
-
 
 // FACE_VERTEX[i] gives the four vertices (as 3-bit corner indices)
 // that define face i on an octree cell
-//
- static const uint8_t FACE_VERTEX[6][4] = {
-     {2, 0, 6, 4}, // face 0
-     {1, 3, 5, 7}, // face 1
-     {0, 1, 4, 5}, // face 2
-     {6, 7, 2, 3}, // face 3
-     {2, 3, 0, 1}, // face 4
-     {4, 5, 6, 7}, // face 5
- };
+
+static const uint8_t FACE_VERTEX[6][4] = 
+{
+    {2, 0, 6, 4}, // face 0
+    {1, 3, 5, 7}, // face 1
+    {0, 1, 4, 5}, // face 2
+    {6, 7, 2, 3}, // face 3
+    {2, 3, 0, 1}, // face 4
+    {4, 5, 6, 7}, // face 5
+};
 
 
-/// Added by George Rassovsky
-// Given an edge it gives back the two
-// cell vertices that connect it
-// @ at pos 0 and 1 - the order will always
-// be in the positive direction...
-//
-static const int8_t EDGE_VERTICES[12][2] = {
-  {2, 6}, // edge 0
-  {0, 4}, // edge 1
-  {0, 2}, // edge 2
-  {4, 6}, // edge 3
-  {1, 5}, // edge 4
-  {3, 7}, // edge 5
-  {1, 3}, // edge 6
-  {5, 7}, // edge 7
-  {0, 1}, // edge 8
-  {4, 5}, // edge 9
-  {2, 3}, // edge 10
-  {6, 7}  // edge 11
+// Given an edge it gives back the two cell vertices that connect it
+// at pos 0 and 1 - the order will always be in the positive direction...
+
+static const int8_t EDGE_VERTICES[12][2] = 
+{
+    {2, 6}, // edge 0
+    {0, 4}, // edge 1
+    {0, 2}, // edge 2
+    {4, 6}, // edge 3
+    {1, 5}, // edge 4
+    {3, 7}, // edge 5
+    {1, 3}, // edge 6
+    {5, 7}, // edge 7
+    {0, 1}, // edge 8
+    {4, 5}, // edge 9
+    {2, 3}, // edge 10
+    {6, 7}  // edge 11
 };
 
 

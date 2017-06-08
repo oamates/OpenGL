@@ -6,18 +6,16 @@
 #include "util.hpp"
 #include "strip.hpp"
 
-
 namespace cms
 {
 
-
-/// @brief Face State enumerator
+// Face State enumerator
 /// BRANCH_FACE may also mean EMPTY
 enum FaceState 
 { 
-  BRANCH_FACE  = 0,
-  LEAF_FACE    = 1,
-  TRANSIT_FACE = 2
+    BRANCH_FACE  = 0,
+    LEAF_FACE    = 1,
+    TRANSIT_FACE = 2
 };
 
 /// @struct Face
@@ -27,10 +25,10 @@ enum FaceState
 ///
 struct Face
 {
-  // Face struct typedefs
-  typedef std::vector<Strip> StripVec;
+    // Face struct typedefs
+    typedef std::vector<Strip> StripVec;
 
-  /// @brief Full Contructor
+    // Full Contructor
   /// @param int _id - the unique identifier of the face
   /// @param int _cellInd - the unique identifier of it's cell
   /// @param sets all other members to a default value
@@ -85,7 +83,7 @@ struct Face
   /// a more complex set of strips, it stores them here when it has
   /// collected them
   /// @todo: fix the vec of vec
-  uintVecVec transitSegs;
+  std::vector<std::vector<unsigned int>> transitSegs;
 };
 
 
