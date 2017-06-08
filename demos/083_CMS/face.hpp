@@ -1,5 +1,5 @@
-#ifndef CMS_FACE_H
-#define CMS_FACE_H
+#ifndef _cms_face_included_5918463059816203857612035876104561384756138974561394
+#define _cms_face_included_5918463059816203857612035876104561384756138974561394
 
 #include "cell.hpp"
 #include "vec3.hpp"
@@ -19,7 +19,7 @@ enum FaceState
 };
 
 /// @struct Face
-/// @brief A Face structure stores information about
+// A Face structure stores information about
 /// cell faces such as data on the face and it's belonging cell
 /// @todo optimise the transitSegs vec of vec structure
 ///
@@ -46,39 +46,39 @@ struct Face
                   children[i] = nullptr;
               }
 
-  /// @brief the unique identifier of the face
+  // the unique identifier of the face
   int        id; //todo only used for debug
 
-  /// @brief the unique identifier of the face's cell
+  // the unique identifier of the face's cell
   int        cellInd;
 
-  /// @brief a flag denoting whether the face has been taken care of
+  // a flag denoting whether the face has been taken care of
   bool       skip;
 
-  /// @brief the state enumerator of the face
+  // the state enumerator of the face
   FaceState  state;
 
-  /// @brief a flag for face sharp features
+  // a flag for face sharp features
   /// todo: to be used
   bool       sharpFeature;
 
-  /// @brief the exact face sharp feature position in 3d space
+  // the exact face sharp feature position in 3d space
   /// todo: to be used
   Vec3       featurePosition;
 
-  /// @brief a ptr to the face's twin face
+  // a ptr to the face's twin face
   Face*      twin;
 
-  /// @brief a ptr to the face's parent face
+  // a ptr to the face's parent face
   Face*      parent;
 
-  /// @brief an array of 4 ptrs of the face's child face's
+  // an array of 4 ptrs of the face's child face's
   Face*      children[4];
 
-  /// @brief a vector of strips on that face
+  // a vector of strips on that face
   StripVec   strips;
 
-  /// @brief an Array of transitional segments on that face
+  // an Array of transitional segments on that face
   /// if it was a transitional face, it would have a twin with more
   /// a more complex set of strips, it stores them here when it has
   /// collected them
@@ -87,6 +87,6 @@ struct Face
 };
 
 
-} //namespace cms
+} // namespace cms
 
-#endif //CMS_FACE_H
+#endif // _cms_face_included_5918463059816203857612035876104561384756138974561394

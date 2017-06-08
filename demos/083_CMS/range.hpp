@@ -1,39 +1,31 @@
-#ifndef CMS_RANGE_H
-#define CMS_RANGE_H
+#ifndef _cms_range_included_879127560376561082035617354682375423754626723546827
+#define _cms_range_included_879127560376561082035617354682375423754626723546827
 
 #include <cassert>
 
 namespace cms
 {
 
+struct Range
+{
+    Range() {}
 
-/// @struct Range
-/// @brief  A 1D datastructure holding 2 floating point numbers
-struct Range{
+    Range(float i_lower, float i_upper)
+        : m_lower(i_lower), m_upper(i_upper)
+    {
+        assert(m_lower <= m_upper);
+    }
 
-        Range(){}
+    void  operator() (float i_lower, float i_upper)
+    {
+        m_lower = i_lower;
+        m_upper = i_upper;
+    }
 
-
-        Range( float i_lower ,float i_upper ) :
-          m_lower( i_lower ),
-          m_upper( i_upper )
-        {
-          assert( m_lower <= m_upper );
-        }
-
-
-  void  operator()( float i_lower , float i_upper )
-  {
-    m_lower = i_lower;
-    m_upper = i_upper;
-  }
-
-
-  float m_lower;
-  float m_upper;
+    float m_lower;
+    float m_upper;
 };
 
+} // namespace cms
 
-} //namespace cms
-
-#endif //CMS_RANGE_H
+#endif // _cms_range_included_879127560376561082035617354682375423754626723546827

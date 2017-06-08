@@ -1,5 +1,5 @@
-#ifndef CMS_CELL_H
-#define CMS_CELL_H
+#ifndef _cms_cell_included_9810568431078235067138560347562107836458974356893746
+#define _cms_cell_included_9810568431078235067138560347562107836458974356893746
 
 #include <vector>
 #include "address.hpp"
@@ -20,7 +20,6 @@ enum CellState
     LEAF    = 1
 };
 
-
 // Cell is used to construct the octree :: each cell in the octree is a Cell object
 // todo :: optimize the component array
 
@@ -28,56 +27,53 @@ struct Cell
 {
     typedef std::vector<int8_t> int8Vec;
 
-  //============== Constructor(s) and Destructor =============
-
-  // Full Constructor
-  // int i_id the cell's unique identifier
-  // CellState i_state - the cell state - (enumerator)
-  // Cell* i_parent - a pointer to the parent cell (null if root)
-  // uint i_subdivLvl - the level of subdivision
-  // Index3D i_c000 - the 000 corner of the cell in the samples array
-  // Index3D i_offset - the dimensions of the cell in sample slabs xyz
-                  Cell(int i_id,
-                        CellState i_state     ,
-                        Cell*     i_parent    ,
-                        uint8_t   i_subdivLvl ,
-                        Index3D   i_c000      ,
-                        Index3D   i_offset    ,
-                        int8_t    i_posInPar  );
-
-
-  /// @brief Destructor
-  /// looping and destroying all children individually
-                   ~Cell();
-
-  //============== Accessors and Mutators =============
-
-  /// @brief Set enumerator cell state
-  void             setState( CellState i_state );
-
-  /// @brief Get the cell state enumerator
-  const CellState& getState() const;
+    //============== Constructor(s) and Destructor =============
+    
+    // Full Constructor
+    // int i_id the cell's unique identifier
+    // CellState i_state - the cell state - (enumerator)
+    // Cell* i_parent - a pointer to the parent cell (null if root)
+    // uint i_subdivLvl - the level of subdivision
+    // Index3D i_c000 - the 000 corner of the cell in the samples array
+    // Index3D i_offset - the dimensions of the cell in sample slabs xyz
+    Cell(int i_id,
+          CellState i_state     ,
+          Cell*     i_parent    ,
+          uint8_t   i_subdivLvl ,
+          Index3D   i_c000      ,
+          Index3D   i_offset    ,
+          int8_t    i_posInPar  );
 
 
-  /// @brief Setting the pointer to the parent cell
-  void             setParent( Cell* i_parent );
+    // destructor :: looping and destroying all children individually
+    ~Cell();
 
-  /// @brief Getting a pointer to the parent cell
-  Cell*            getParent() const;
+    //============== Accessors and Mutators =============
+
+    // Set enumerator cell state
+    void setState(CellState i_state);
+
+    // Get the cell state enumerator
+    const CellState& getState() const;
+
+    // Setting the pointer to the parent cell
+    void setParent(Cell* i_parent);
+
+    // Getting a pointer to the parent cell
+    Cell* getParent() const;
+
+    // Setting the level of subdivision of the cell
+    void setSubdivLvl(unsigned int i_subdivLvl);
+
+    // getting a read-only reference (unsigned int) of the cell depth
+    const uint8_t& getSubdivLvl() const;
 
 
-  /// @brief Setting the level of subdivision of the cell
-  void             setSubdivLvl( unsigned int i_subdivLvl );
+    // Setting the corner 000 3d index
+    void setC000(Index3D i_c000);
 
-  /// @brief getting a read-only reference (unsigned int) of the cell depth
-  const uint8_t&   getSubdivLvl() const;
-
-
-  /// @brief Setting the corner 000 3d index
-  void             setC000( Index3D i_c000 );
-
-  /// @brief Getting a read-only 3d index of the corner at 000
-  const Index3D&   getC000() const;
+    // Getting a read-only 3d index of the corner at 000
+    const Index3D& getC000() const;
 
 
   /// @brief Setting the xyz offset (dimensions) of the cell in discrete samples
@@ -145,9 +141,6 @@ struct Cell
   /// @brief Return a int8_t of the position of the cell in relation to it's parent
   int8_t           getPosInParent();
 
-
- public:
-
   //============== Public Members ================
 
   //temp todo
@@ -166,8 +159,6 @@ struct Cell
 
 
   Address   m_address; // todo: public for now
-
-private:
 
   //============== Private Members ================
 
@@ -214,11 +205,6 @@ private:
 
 };
 
+} // namespace cms
 
-
-
-
-} //namespace cms
-
-
-#endif //CMS_CELL_H
+#endif // _cms_cell_included_9810568431078235067138560347562107836458974356893746
