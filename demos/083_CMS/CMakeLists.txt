@@ -1,4 +1,4 @@
-add_executable (cms algcms.cpp cell.cpp main.cpp octree.cpp vec3.cpp)
+add_executable (cms algcms.cpp cell.cpp main.cpp octree.cpp)
 
 add_custom_command(TARGET cms POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/glsl ${CMAKE_CURRENT_BINARY_DIR}/glsl)
 
