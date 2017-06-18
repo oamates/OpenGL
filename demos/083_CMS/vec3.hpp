@@ -22,6 +22,7 @@ struct Vec3
     float m_x, m_y, m_z;
 
     Vec3(const Vec3& _v) : m_x(_v.m_x), m_y(_v.m_y), m_z(_v.m_z) {}
+
     Vec3(float _x = 0.0, float _y = 0.0, float _z = 0.0) : m_x(_x), m_y(_y), m_z(_z) {}
 
     void set(float _x, float _y, float _z)

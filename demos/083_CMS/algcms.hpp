@@ -30,8 +30,10 @@ struct AlgCMS : public Isosurface
     typedef Array3D<EdgeBlock> A3DEdgeBlock;
     typedef Array3D<float> A3DFloat;
 
-    //================== Constutor(s) and Destructor ====================
-    AlgCMS();
+    //===================================================================================================================================================================================================================
+    // Constutors and Destructor
+    //===================================================================================================================================================================================================================
+    AlgCMS() : m_fn(0), m_sampled(false) {}
 
     // Function (isosurf) only constructor, the resolution is set to defualt 2-6 (4-128)
     // the bbox is defaulted to: [-1..1] in xyz
@@ -46,15 +48,21 @@ struct AlgCMS : public Isosurface
 
     // copy constructor
     AlgCMS( const AlgCMS& i_copy );
+                        
+    ~AlgCMS()                                                                   // Destructor, destorying the octree instance
+    {
+  
+        if (m_octree)                                                           // Deleting octree
+            delete m_octree;
+    }
 
-    // Destructor, destorying the octree instance
-    ~AlgCMS();
+    //===================================================================================================================================================================================================================
+    // Interface Functions
+    //===================================================================================================================================================================================================================
+    
+    Real operator() (Real x, Real y, Real z) const                              // the overloaded function call operator from Isosurface
+        { return (*m_fn)(x, y, z); }
 
-
-    //================== Public Interface Functions ====================
-
-    // the overloaded function call operator from Isosurface
-    Real operator() (Real x, Real y, Real z) const;
 
     // Setting manually the minimum and maximum Octree levels
     // the minimum would be clamped at 2; a normal range is [3 - 8]
@@ -131,20 +139,12 @@ struct AlgCMS : public Isosurface
 
     // ---=== Member Variables ===---
 
-    // a Mesh object which will get populated, once the algorithm is done, and store the verts, inds, normals
-    Mesh         m_mesh;
-
-    // A ptr to the specified Isosurface
-    Isosurface*  m_fn;
-
-    // the samples in xyz
-    Index3D      m_samples;
-
-    // a flag denoting if the function has been samlped
-    bool m_sampled;
-
-    // the bbox of the function
-    Range m_container[3];
+    
+    Mesh m_mesh;                                            // a Mesh object which will get populated, once the algorithm is done, and store the verts, inds, normals
+    Isosurface* m_fn;                                       // A ptr to the specified Isosurface
+    Index3D m_samples;                                      // the samples in xyz
+    bool m_sampled;                                         // a flag denoting if the function has been samlped
+    Range m_container[3];                                   // the bbox of the function
 
     // the individual dimenstions in 3D space
     float m_xMax, m_xMin,
