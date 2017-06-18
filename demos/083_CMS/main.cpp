@@ -4,6 +4,13 @@
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
 
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/random.hpp>
+#include <glm/gtx/norm.hpp>
+
+
 #include <iostream>
 #include <vector>
 #include <math.h>
@@ -81,7 +88,23 @@ struct ExampleClass
     // ============================================================================================================================================================================================================================
     float operator()(float x, float y, float z) const
     {
-        return torusFunction(x, y, z);
+//        return torusFunction(x, y, z);
+        return cubeFunction(x, y, z);
+
+    }
+
+    glm::vec3 gradient(float x, float y, float z) const
+    {
+        const float gradient_delta = 0.06125;
+
+        float f100 = (*this)(x + gradient_delta, y - gradient_delta, z - gradient_delta);
+        float f001 = (*this)(x - gradient_delta, y - gradient_delta, z + gradient_delta);
+        float f010 = (*this)(x - gradient_delta, y + gradient_delta, z - gradient_delta);  
+        float f111 = (*this)(x + gradient_delta, y + gradient_delta, z + gradient_delta);
+
+        return glm::normalize(glm::vec3( f100 - f001 - f010 + f111, 
+                                        -f100 - f001 + f010 + f111, 
+                                        -f100 + f001 - f010 + f111));
     }
 
 };
@@ -95,13 +118,6 @@ static const char * OBJ_NAME            = "test.obj";
 
 int ADDRESS_SIZE = MAX_OCTREE_RES; // To be used by some of the classes
 
-
-
-#include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/constants.hpp>
-#include <glm/gtc/random.hpp>
-#include <glm/gtx/norm.hpp>
 
 #include "log.hpp"
 #include "gl_info.hpp"
@@ -217,6 +233,41 @@ int main(int argc, char *argv[])
     cmsAlg.extractSurface(mesh);                                            // Proceed to extract the surface <runs the algorithm>
     mesh.exportOBJ(OBJ_NAME);                                               // Export the created mesh as an .OBJ file
 
+    GLuint vao_id, vbo_id, nbo_id, ibo_id;
+
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, mesh.m_vertices.size() * sizeof(float), mesh.m_vertices.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    for (int i = 0; i < mesh.m_vertices.size() / 3; ++i)
+    {
+        glm::vec3 g = t.gradient(mesh.m_vertices[3 * i + 0], mesh.m_vertices[3 * i + 1], mesh.m_vertices[3 * i + 2]);
+        mesh.m_normals.push_back(g.x);
+        mesh.m_normals.push_back(g.y);
+        mesh.m_normals.push_back(g.z);
+    }
+
+    glGenBuffers(1, &nbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, nbo_id);
+    glBufferData(GL_ARRAY_BUFFER, mesh.m_normals.size() * sizeof(float), mesh.m_normals.data(), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glGenBuffers(1, &ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.m_indices.size() * sizeof(GLuint), mesh.m_indices.data(), GL_STATIC_DRAW);
+
+    debug_msg("mesh.m_vertices.size() = %u", (unsigned int) mesh.m_vertices.size());
+    debug_msg("mesh.m_normals.size() = %u", (unsigned int) mesh.m_normals.size());
+    debug_msg("mesh.m_indices.size() = %u", (unsigned int) mesh.m_indices.size());
+
+
+
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
     //===================================================================================================================================================================================================================
@@ -249,7 +300,7 @@ int main(int argc, char *argv[])
         uniform_Ns = 20.0f;
         uniform_bf = 0.2875f;
 
-        // cave.render();
+        glDrawElements(GL_TRIANGLES, mesh.m_indices.size(), GL_UNSIGNED_INT, 0);
 
         window.end_frame();
     }

@@ -30,13 +30,10 @@ struct Edge
   
     void setEmpty(bool i_empty)                                 // setting the bool flag, for occupied edge
         { m_empty = i_empty; }
-
-
   
     const bool& empty() const                                   // a bool flag denoting whether the edge has data
         { return m_empty; }
 
- 
 };
 
 // structure EdgeBlock holding 3 edges with ordering x y z - right up front

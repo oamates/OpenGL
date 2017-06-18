@@ -135,7 +135,7 @@ struct Cell
     void setOffsets(Index3D i_offsets)                                                              // Setting the xyz offset (dimensions) of the cell in discrete samples
         { m_offsets = i_offsets; }
   
-    const Index3D&   getOffsets() const                                                             // Getting the xyz offset sample (dimensions) of the cell
+    const Index3D& getOffsets() const                                                               // Getting the xyz offset sample (dimensions) of the cell
         { return m_offsets; }
   
     void setPointInds(Index3D i_pointInds[])                                                        // Setting the 3D Index of the corner points of the cell

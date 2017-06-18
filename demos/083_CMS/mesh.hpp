@@ -87,7 +87,6 @@ struct Mesh
             i_bbox[0] = std::min(i_bbox[0], m_vertices[i]);
             i_bbox[3] = std::max(i_bbox[3], m_vertices[i]);
         }
-
         
         for(unsigned int i = 1; i < m_vertices.size(); i += 3)                              // Y limits
         {
@@ -120,7 +119,7 @@ struct Mesh
         // Write the face info
         for(unsigned f = 0; f < m_indices.size(); f += 3)
         {
-            fileOut<<"f "<<m_indices[f]+1<<" "<<m_indices[f+1]+1<<" "<<m_indices[f+2]+1<<std::endl;
+            fileOut << "f " << m_indices[f] + 1 << " " << m_indices[f + 1] + 1 << " " << m_indices[f + 2] + 1 << std::endl;
         }
 
         debug_msg("Exported mesh path: %s", fullPath.c_str());

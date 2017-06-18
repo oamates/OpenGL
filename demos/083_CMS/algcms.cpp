@@ -692,43 +692,41 @@ void AlgCMS::editTransitionalFaces()
                 resolveTransitionalFace(cells[i]->getFaceAt(j));
 }
 
-//-------------------------------------------------------------
-
 void AlgCMS::traceComponent()
 {
-  std::vector<Cell*> cells = m_octree->getAllCells();
+    std::vector<Cell*> cells = m_octree->getAllCells();
 
-  /// Trace the strips into segments and components
-  // Loop through all cells and link components for all LEAF cells
-  // Start from lowest subdivision ?!?! TODO
-  for(unsigned i=0;i<m_octMaxLvl;++i)
-  {
-    for(unsigned j=0; j<cells.size(); ++j)
+    // Trace the strips into segments and components
+    // Loop through all cells and link components for all LEAF cells
+    // Start from lowest subdivision ?!?! TODO
+    for(unsigned int i = 0; i < m_octMaxLvl; ++i)
     {
-      if(cells[j]->getSubdivLvl() == m_octMaxLvl-i)
-      {
-        //Trace the Segments to form Component(s)
-        if(cells[j]->getState() == LEAF)
+        for(unsigned int j = 0; j < cells.size(); ++j)
         {
-          std::vector<Strip> cellStrips;
-          std::vector< std::vector<unsigned int> > transitSegs;
-          std::vector<unsigned int> component;
+            if(cells[j]->getSubdivLvl() == m_octMaxLvl-i)
+            {
+                // Trace the Segments to form Component(s)
+                if(cells[j]->getState() == LEAF)
+                {
+                    std::vector<Strip> cellStrips;
+                    std::vector< std::vector<unsigned int> > transitSegs;
+                    std::vector<unsigned int> component;
 
-          //Collect all the Strips from that cell
-          collectStrips(cells[j], cellStrips, transitSegs);
+                    // Collect all the Strips from that cell
+                    collectStrips(cells[j], cellStrips, transitSegs);
 
 
-          /// Link the strips into components
-          while(cellStrips.size()>0)
-          {
-            linkStrips(component, cellStrips, transitSegs);
-            cells[j]->pushComponent(component);
-            component.clear();
-          }
+                    // Link the strips into components
+                    while(cellStrips.size() > 0)
+                    {
+                        linkStrips(component, cellStrips, transitSegs);
+                        cells[j]->pushComponent(component);
+                        component.clear();
+                    }
+                }
+            }
         }
-      }
     }
-  }
 }
 
 void AlgCMS::resolveTransitionalFace(Face *face)
@@ -866,194 +864,145 @@ void AlgCMS::resolveTransitionalFace(Face *face)
 
 void AlgCMS::traverseFace(Face *face, std::vector<Strip>& transitStrips)
 {
-  if(face == NULL)
-    return;
+    if(!face) return;
 
-  assert(face->state != TRANSIT_FACE);
+    assert(face->state != TRANSIT_FACE);
 
-  //If it is a branch face, traverse through all it's children
-  if(face->state == BRANCH_FACE)
-  {
-    for(int i=0;i<4;++i)
-      traverseFace(face->children[i], transitStrips);
-  }
-
-  // If it is a LEAF face collect all valid strips
-  else if(face->state == LEAF_FACE)
-  {
-    // Check all the strips in a face
-    for(unsigned i=0;i<face->strips.size();++i)
+    
+    if(face->state == BRANCH_FACE)                                  // If it is a branch face, traverse through all it's children
     {
-      if(face->strips[i].skip == false)
-        transitStrips.push_back(face->strips[i]);
-      else
-        assert(face->strips[i].data[0] == -1);
+        for(int i= 0; i < 4; ++i)
+            traverseFace(face->children[i], transitStrips);
     }
-  }
+    else if(face->state == LEAF_FACE)                               // If it is a LEAF face collect all valid strips
+    {
+    
+        for(unsigned int i = 0; i < face->strips.size(); ++i)             // Check all the strips in a face
+        {
+            if(face->strips[i].skip == false)
+                transitStrips.push_back(face->strips[i]);
+            else
+                assert(face->strips[i].data[0] == -1);
+        }
+    }
 }
 
-//======================= TRACING COMPONENTS ==============================
-
-void AlgCMS::collectStrips(Cell* c,
-                        std::vector<Strip> &o_cellStrips,
-                        std::vector< std::vector<unsigned int> > &o_transitSegs)
+void AlgCMS::collectStrips(Cell* c, std::vector<Strip> &o_cellStrips, std::vector<std::vector<unsigned int>>& o_transitSegs)
 {
-  // Looping through all faces of the cell
-  for(int f=0; f<6; ++f)
-  {
-    // If it is a leaf face, just copy the full strips
-    if(c->getFaceAt(f)->state == LEAF_FACE)
+    for(int f = 0; f < 6; ++f)                                          // Looping through all faces of the cell
     {
-      for(unsigned i=0; i<c->getFaceAt(f)->strips.size(); ++i)
-      {
-        // Check there is valid data
-        if(c->getFaceAt(f)->strips[i].data[0] != -1)
+        if(c->getFaceAt(f)->state == LEAF_FACE)                         // If it is a leaf face, just copy the full strips
         {
-          // Create a temp strip and store the cell edges in it
-          o_cellStrips.push_back(c->getFaceAt(f)->strips[i]);
+            for(unsigned int i = 0; i < c->getFaceAt(f)->strips.size(); ++i)
+            {
+                if(c->getFaceAt(f)->strips[i].data[0] != -1)                // Check there is valid data
+                    o_cellStrips.push_back(c->getFaceAt(f)->strips[i]);               // Create a temp strip and store the cell edges in it
+            }
         }
-      }
+        else if(c->getFaceAt(f)->state == TRANSIT_FACE)                     // For a Transitional Face, we must take the transit segment too as it contains all the data (vertices in between the start and end of strip)
+        {
+            if(!c->getFaceAt(f)->twin)                                            // Check if there is a valid twin
+                break;
+
+            assert(c->getFaceAt(f)->twin->strips.size() == c->getFaceAt(f)->twin->transitSegs.size());
+      
+            for(unsigned int i = 0; i < c->getFaceAt(f)->twin->strips.size(); ++i)            // Push the current strips andtransit
+            {
+                if(c->getFaceAt(f)->twin->strips[i].data[0] != -1)
+                {
+                    o_transitSegs.push_back(c->getFaceAt(f)->twin->transitSegs[i]);
+                    o_cellStrips.push_back(c->getFaceAt(f)->twin->strips[i]);
+                }
+            }
+        }
     }
 
-    // For a Transitional Face, we must take the transit segment too
-    // as it contains all the data (vertices in between the start and end of strip)
-    else if(c->getFaceAt(f)->state == TRANSIT_FACE)
-    {
-      //Check if there is a valid twin
-      if(!c->getFaceAt(f)->twin)
-        break;
-
-      assert(c->getFaceAt(f)->twin->strips.size() == c->getFaceAt(f)->twin->transitSegs.size());
-
-      // Push the current strips andtransit
-      for(unsigned i=0; i<c->getFaceAt(f)->twin->strips.size(); ++i)
-      {
-        if(c->getFaceAt(f)->twin->strips[i].data[0] != -1)
-        {
-          o_transitSegs.push_back(c->getFaceAt(f)->twin->transitSegs[i]);
-          o_cellStrips.push_back(c->getFaceAt(f)->twin->strips[i]);
-        }
-      }
-    }
-  }
-
-  // A Leaf cell must have at least 3 strips to form a component
-  // unless it is has just a single looping component from a transit face
-    assert(o_cellStrips.size() > 0);
-
+    
+    assert(o_cellStrips.size() > 0);                                                        // A Leaf cell must have at least 3 strips to form a component unless it is has just a single looping component from a transit face
 }
 
-//----------------------------------------------------------------------
-
-
-void AlgCMS::linkStrips(std::vector<unsigned int> &o_comp,
-                     std::vector<Strip> &strips,
-                     std::vector< std::vector<unsigned int> > &transitSegs)
+void AlgCMS::linkStrips(std::vector<unsigned int> &o_comp, std::vector<Strip> &strips, std::vector<std::vector<unsigned int>> &transitSegs)
 {
-  assert(o_comp.size() == 0);
+    assert(o_comp.size() == 0);
 
-  int addedInIteration;
-  bool backwards;
+    int addedInIteration;
+    bool backwards;
 
-  // add a new value to the beginning
-  o_comp.push_back(strips[0].data[0]);
+    
+    o_comp.push_back(strips[0].data[0]);                                                    // add a new value to the beginning
 
-  do
-  {
-    addedInIteration = 0;
-
-    // Loop through all current strips
-    for(unsigned i=0; i<strips.size(); ++i)
+    do
     {
-      int s_d0 = strips[i].data[0];
-      int s_d1 = strips[i].data[1];
+        addedInIteration = 0;
 
-      ///todo add a check for front and back like above?
-
-      if(((int)o_comp.back() == s_d0) ||
-         ((int)o_comp.back() == s_d1))
-      {
-        if((int)o_comp.back() == s_d0)
+    
+        for(unsigned int i = 0; i < strips.size(); ++i)                                             // Loop through all current strips
         {
-          backwards = false;
-          bool transit = false;
+            int s_d0 = strips[i].data[0];
+            int s_d1 = strips[i].data[1];
 
-          // If there are no transitSegs, no point in checking
-          if(transitSegs.size() > 0)
-          {
-            // Checks for matching segment and inserts from twin if found
-            insertDataFromTwin(o_comp,
-                               transitSegs,
-                               strips[i],
-                               transit,
-                               addedInIteration,
-                               backwards);
-          }
+            // todo :: add a check for front and back like above?
 
-          // If the strip does not belong to a transitional face
-          // just get the next value from the strip
-          if(transit == false)
-          {
-            o_comp.push_back(s_d1);
-            ++addedInIteration;
-          }
+            if(((int)o_comp.back() == s_d0) || ((int)o_comp.back() == s_d1))
+            {
+                if((int)o_comp.back() == s_d0)
+                {
+                    backwards = false;
+                    bool transit = false;
+
+          
+                    if(transitSegs.size() > 0)                                // If there are no transitSegs, no point in checking
+                        insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards);           // Checks for matching segment and inserts from twin if found
+
+          // If the strip does not belong to a transitional face just get the next value from the strip
+                    if(transit == false)
+                    {
+                        o_comp.push_back(s_d1);
+                        ++addedInIteration;
+                    }
+                }
+                else if((int)o_comp.back() == s_d1)
+                {
+                    backwards = true;
+                    bool transit = false;
+          
+                    if(transitSegs.size() > 0)    // If there are no transitSegs, no point in checking
+                        insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards);   // Checks for matching segment and inserts from twin if found
+          
+                    if(transit == false)                                                                            // If the strip does not belong to a transitional face just get the next value from the strip
+                    {
+                        o_comp.push_back(s_d0);
+                        ++addedInIteration;
+                    }
+                }
+            }
+            else
+                continue;                                                                                           // skip to next iteration
+      
+            strips.erase(strips.begin() + i);                                                                       // Delete the currently added strip
         }
-        else if((int)o_comp.back() == s_d1)
-        {
-          backwards = true;
-          bool transit = false;
-
-          // If there are no transitSegs, no point in checking
-          if(transitSegs.size() > 0)
-          {
-            // Checks for matching segment and inserts from twin if found
-            insertDataFromTwin(o_comp,
-                               transitSegs,
-                               strips[i],
-                               transit,
-                               addedInIteration,
-                               backwards);
-          }
-          // If the strip does not belong to a transitional face
-          // just get the next value from the strip
-          if(transit == false)
-          {
-            o_comp.push_back(s_d0);
-            ++addedInIteration;
-          }
-        }
-      }
-      else
-        continue; // skip to next iteration
+    
+        if(o_comp.front() == o_comp.back())                                                 // Check whether the component closes on itself
+            o_comp.erase(o_comp.begin());                                                   //delete first vertex as it is duplex with last
 
 
-      // Delete the currently added strip
-      strips.erase(strips.begin() + i);
+        for(unsigned int i = 0; i < o_comp.size(); ++i)
+            assert(o_comp[i] < m_vertices.size());
     }
+    while(addedInIteration > 0);
 
-    // Check whether the component closes on itself
-    if(o_comp.front() == o_comp.back())
-      o_comp.erase(o_comp.begin()); //delete first vertex as it is duplex with last
-
-
-    for(unsigned i=0;i<o_comp.size();++i)
-      assert(o_comp[i] < m_vertices.size());
-  }
-  while(addedInIteration > 0);
-
-  do
-  {
-    addedInIteration = 0;
-
-    // Loop through all current strips
-    for(unsigned i=0; i<strips.size(); ++i)
+    do
     {
-      int s_d0 = strips[i].data[0];
-      int s_d1 = strips[i].data[1];
+        addedInIteration = 0;
+
+    
+        for(unsigned int i = 0; i < strips.size(); ++i)                                                                         // Loop through all current strips
+        {
+            int s_d0 = strips[i].data[0];
+            int s_d1 = strips[i].data[1];
 
       // Check Adding to Front
-      if(((int)o_comp.front() == s_d0) ||
-              ((int)o_comp.front() == s_d1))
+      if(((int)o_comp.front() == s_d0) || ((int)o_comp.front() == s_d1))
       {
         if((int)o_comp.front() == s_d0)
         {

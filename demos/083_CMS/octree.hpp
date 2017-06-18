@@ -41,7 +41,6 @@ static const int8_t faceTwinTable[7][2] =
 
 struct Octree
 {
-    // Octree class type-definitions
     typedef std::vector<Cell*> CellVec;
     typedef std::vector<Face*> FaceVec;
     typedef Array3D<float> A3DFloat;
@@ -60,42 +59,51 @@ struct Octree
     float& m_complexSurfThresh;
 
 
-    Octree(Index3D& samples,
-           A3DFloat& sampleData,
-           unsigned int& minLvl,
-           unsigned int& maxLvl,
-           Vec3& offsets,
-           Isosurface* fn,
-           float& complexSurfThresh);
+    Octree(Index3D& samples, A3DFloat& sampleData, unsigned int& minLvl, unsigned int& maxLvl, 
+           Vec3& offsets, Isosurface* fn, float& complexSurfThresh) 
+        : m_samples(samples), m_sampleData(sampleData), m_minLvl(minLvl), m_maxLvl(maxLvl),
+          m_offsets(offsets), m_fn(fn), m_complexSurfThresh(complexSurfThresh)
+    {}
 
-    ~Octree();
+    ~Octree()
+    {
+        for(unsigned int i = 0; i < m_cells.size(); ++i)                            // Deleting cells
+            if(m_cells[i]) 
+                delete m_cells[i];
+    }
 
-
-    // The function that is called for creating the Octree from the samples
-    // It creates the root cell and calls subdivideCell function on it, recursively creating the octree
-    void buildOctree();
-
-    // Returns a pointer to the root cell of the octree
-    Cell*       getRoot();
+    //===================================================================================================================================================================================================================
+    // main function :: creates the root cell and calls subdivideCell function on it, recursively creating the octree
+    //===================================================================================================================================================================================================================
+    void buildOctree()
+    {
+        makeStructure();                                                            // create the octree structure by establishing the root and recursing onwards
+        populateHalfFaces();                                                        // create the half-face structure for all cells
+        setFaceRelationships();                                                     // create the Face parent-children relationships
+        markTransitionalFaces();                                                    // flag all transitional faces
+    }
     
-    CellVec     getAllCells() const;
+    Cell* getRoot()                                                                 // Returns a pointer to the root cell of the octree
+        { return m_root; }
     
-    Cell*       getCellAt( int _i ) const;
+    CellVec getAllCells() const
+        { return m_cells; }
+    
+    Cell* getCellAt( int _i ) const
+        { return m_cells[_i]; }
+
     
     //===================================================================================================================================================================================================================
-    //---- Basic Octree Generation Functions ----//
+    // Basic Octree Generation Functions
     //===================================================================================================================================================================================================================
     
-    // Creating the root and then starting off the tree by calling
-    // the recursive functions which build it - thus forming the structure
+    // Creating the root and then starting off the tree by calling the recursive functions which build it - thus forming the structure
     void makeStructure();
     
-    // A recursive function which checks if the current cell needs
-    // subdividing and recursively doing so if necessary called by buildOctree()
+    // A recursive function which checks if the current cell needs subdividing and recursively doing so if necessary called by buildOctree()
     void subdivideCell( Cell* i_parent );
     
-    // Obtains aditional cell info, which is stored in the cell,
-    // i.e.: the sample point indices at the 8 corners, and it's dimensions
+    // Obtains aditional cell info, which is stored in the cell, i.e.: the sample point indices at the 8 corners, and it's dimensions
     void acquireCellInfo(Cell* c);
     
     // Check if there is a chance for a surface in that cell
@@ -114,20 +122,22 @@ struct Octree
     void findGradient(Vec3& o_gradient, const Index3D& i_array3dInds);
     
     
-    //---- Half-Face Assignment Functions ----//
+    //===================================================================================================================================================================================================================
+    // Half-Face Assignment Functions
+    //===================================================================================================================================================================================================================
     
     void findNeighbours(Cell* c);
     
-    // The function that loops through all the cells and for each neighbouring cells sets 
-    // their twin values on their faces thus making the half-face structure
+    // The function that loops through all the cells and for each neighbouring cells sets their twin values on their faces thus making the half-face structure
     void populateHalfFaces();
     
-    // Setting the half-face structure of Cell A and Cell B
-    // where the contact variable names the face of Cell B into contact!
+    // Setting the half-face structure of Cell A and Cell B where the contact variable names the face of Cell B into contact!
     void setFaceTwins(Cell* a, Cell* b, CONTACT);
     
     
-    //---- Parent-Children Face Relationship Functions ----//
+    //===================================================================================================================================================================================================================
+    // Parent-Children Face Relationship Functions
+    //===================================================================================================================================================================================================================
     
     // Loops through all the cells and establishes face relationships between parent and child cells
     void setFaceRelationships();
