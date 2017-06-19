@@ -178,7 +178,6 @@ void octree_t::subdivideCell(cell_t* parent)
                 subdivideCell(c);
             else
             {
-                
                 if(checkForSurface(c))                                                          // If not check whether there is any surface at all
                 {
                     c->state = LEAF;
@@ -248,7 +247,6 @@ bool octree_t::checkForEdgeAmbiguity(cell_t* c)
             ++index[edgeDirection];
         }
     }
-
   
     return edgeAmbiguity;                                                                       // Return result of check for two crossing points on any edge in this cell
 }
