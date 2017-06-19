@@ -18,15 +18,8 @@ template<typename T> struct Array3D
     glm::ivec3 size;                                                                    // An Index3D storing the size of the 3D array wrapper in X, Y and Z
     Range m_bbox[3];                                                                    // The BBox of the Array3D stored as an array of 3 Ranges (-x +x), (-y, +y), (-z, +z)
     
-    Array3D()                                                                           // Empty constructor - sets bbox to (-1,1) in xyz
-    {
-        for(int i = 0; i < 3; ++i)
-        {
-            size[i] = 1;
-            m_bbox[i] = Range(-1.0f, 1.0f);
-        }
-    }
-
+    Array3D() {}                                                                        
+    
     Array3D(Range bbox[3], int xSlab, int ySlab, int zSlab)                            // Full constructor, taking the bbox and the samples - resizing the array
     {
         for(int i = 0; i < 3; ++i)
@@ -40,35 +33,11 @@ template<typename T> struct Array3D
 
     ~Array3D() {}
 
-    void operator() (const int x, const int y, const int z, T value)
-    {
-        data[(x * size.y + y) * size.z + z] = value;
-    }
+    T& operator[] (const glm::ivec3& index)
+        { return data[size.z * (size.y * index.x + index.y) + index.z]; }
 
-    void setValueAt(int x, int y, int z, T value)
-    {
-        data[size.z * (size.y * x + y) + z] = value;
-    }
-
-    void setValueAt(glm::ivec3 xyz, T value)
-    {
-        data[(xyz.x * size.y + xyz.y) * size.z + xyz.z] = value;
-    }
-
-    T getValueAt(int x, int y, int z) const
-    {
-        return data[(x * size.y + y) * size.z + z];
-    }
-
-    T getValueAt(glm::ivec3 xyz) const
-    {
-        return data[(xyz.x * size.y + xyz.y) * size.z + xyz.z];
-    }
-
-    int getIndexAt(int x, int y, int z) const
-    {
-        return (x * size.y + y) * size.z + z;
-    }
+    const T& operator[] (const glm::ivec3& index) const
+        { return data[size.z * (size.y * index.x + index.y) + index.z]; }
 
     int getIndexAt(glm::ivec3 xyz) const
     {
@@ -114,8 +83,8 @@ template<typename T> struct Array3D
 
 };
 
-template class Array3D<float>;
-template class Array3D<edge_block_t>;
+template struct Array3D<float>;
+template struct Array3D<edge_block_t>;
 
 } // namespace cms
 

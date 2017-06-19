@@ -2,7 +2,6 @@
 #define _cms_face_included_5918463059816203857612035876104561384756138974561394
 
 #include "cell.hpp"
-#include "util.hpp"
 #include "strip.hpp"
 
 namespace cms

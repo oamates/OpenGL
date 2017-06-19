@@ -2,19 +2,21 @@
 #define _cms_address_5981234562873460175920501725396152345301725670325378123568
 
 #include <cstddef>
+#include <array>
 
-#include "util.hpp"
-
-extern int ADDRESS_SIZE;
+extern const int ADDRESS_SIZE;
 
 namespace cms
 {
 
-// Stores the address of a cell in an array of consecutive uint8_t(s)
+//=======================================================================================================================================================================================================================
+// structure that stores the address of a cell in a fixed-length byte array
+//=======================================================================================================================================================================================================================
 
 struct address_t
 {
     std::vector<uint8_t> m_rawAddress;                                          // Storing the actual address
+//    std::array<uint8_t, ADDRESS_SIZE> m_rawAddress;                                          // Storing the actual address
 
     address_t()
         { m_rawAddress.resize(ADDRESS_SIZE); }
@@ -36,23 +38,16 @@ struct address_t
     void reset()                                                                // Resets all the address to zero for the full size of the address
         { m_rawAddress.assign(ADDRESS_SIZE, 0); }
     
-    // Retrieves the address as a single uint
-    // We use an unsigned integers (uint) which is 32-bit on all* platforms and can store a range of 4 billion
-    // which is 10 digits. Thus can safely be used for up to depth 9 (2^9 == 512 samples).
-    // Thus max address == 888888888
-    uint32_t getFormatted()
-        { return formatAddress(); }
-    
-    uint32_t formatAddress()                                                    // Formats the raw address into a single long integer
+    //===================================================================================================================================================================================================================
+    // computes unique hash value of the address
+    // elements of m_rawAddress are < 8, so octal value m_rawAddress of can be used for ADDRESS_SIZE <= 10 
+    //===================================================================================================================================================================================================================
+    uint32_t hash()
     {
         uint32_t formattedAddress = 0;
-
         for(int32_t i = ADDRESS_SIZE - 1; i >= 0; --i)
-        {
-            if (m_rawAddress[i])
-                formattedAddress += m_rawAddress[i] * (util::intPower(10, i));
-        }
-        return formattedAddress;
+            formattedAddress = (formattedAddress << 3) + m_rawAddress[i];
+        return formattedAddress;        
     }
 
 };

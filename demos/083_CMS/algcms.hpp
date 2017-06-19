@@ -5,7 +5,6 @@
 
 #include <glm/glm.hpp>
 
-#include "isosurface.hpp"
 #include "edge.hpp"
 #include "range.hpp"
 #include "cell.hpp"
@@ -24,17 +23,6 @@ struct point_t
     point_t(const glm::vec3& position, float value) 
         : position(position), value(value)
     {}
-
-    ~point_t() {};
-
-};
-
-struct mesh_t
-{
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<unsigned int> indices;  
-    mesh_t() {};
 };
 
 struct vertex_t
@@ -49,22 +37,28 @@ struct vertex_t
     {}
 };
 
+struct mesh_t
+{
+    std::vector<vertex_t> vertices;
+    std::vector<unsigned int> indices;  
+    mesh_t() {};
+};
+
 //=======================================================================================================================================================================================================================
 // Cubical Marching Squares isosurface extraction algorithm
 //=======================================================================================================================================================================================================================
 
-struct AlgCMS : public Isosurface
+template<typename scalar_field_t> struct AlgCMS
 {
     //===================================================================================================================================================================================================================
     // algorithm data
     //===================================================================================================================================================================================================================
+    scalar_field_t scalar_field;
     Array3D<float> m_sampleData;                                                // The sampling 1D array masked in an Array3D wrapper class
     Array3D<edge_block_t> m_edgeData;                                           // The edgeblock 1D array masked in an Array3D wrapper class EdgeBlock has 3 edges
     std::vector<vertex_t> m_vertices;                                           // The vertex array, storing all the vertices in the mesh-to-be
-    octree_t* octree;                                                           // the octree of the current function
+    octree_t<scalar_field_t>* octree;                                           // the octree of the current function
 
-    mesh_t mesh;                                                                // a Mesh object which will get populated, once the algorithm is done, and store the verts, inds, normals
-    Isosurface* m_fn;                                                           // A ptr to the specified Isosurface
     glm::ivec3 m_samples;                                                       // the samples in xyz
     Range m_container[3];                                                       // the bbox of the function
 
@@ -84,16 +78,15 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     // constructor
     //===================================================================================================================================================================================================================
-    AlgCMS(Isosurface *i_fn, const Range i_container[], unsigned int min_level, unsigned int max_level)
-        : m_fn(i_fn)
+    AlgCMS(const Range i_container[], unsigned int min_level, unsigned int max_level)
     {
         m_octMinLvl = min_level;
         m_octMaxLvl = max_level;
     
-        for(int i = 0; i < 3; ++i) // xyz ranges of the container
+        for(int i = 0; i < 3; ++i)
             m_container[i] = i_container[i];
     
-        int numOfSamples = (1 << m_octMaxLvl) + 1; // samples = cells+1
+        int numOfSamples = (1 << m_octMaxLvl) + 1;
         m_samples[0] = numOfSamples;
         m_samples[1] = numOfSamples;
         m_samples[2] = numOfSamples;
@@ -118,9 +111,7 @@ struct AlgCMS : public Isosurface
         m_edgeData.resize(m_samples);
         m_edgeData.setBBox(m_container);
 
-        octree = new octree_t(m_samples, m_sampleData, m_octMinLvl, m_octMaxLvl, m_offsets, m_fn, complex_surface_threshold);
-    
-        assert((m_samples[0] > 8) && (m_samples[1] > 8) && (m_samples[2] > 8));
+        octree = new octree_t<scalar_field_t>(m_samples, m_sampleData, m_octMinLvl, m_octMaxLvl, m_offsets, complex_surface_threshold);
     
         for(int i = 0; i < m_samples.x; ++i)
         {
@@ -137,8 +128,8 @@ struct AlgCMS : public Isosurface
                     const float tz = static_cast<float>(k) / static_cast<float>(m_samples.z - 1);
                     const float zPos = m_zMin + (m_zMax - m_zMin) * tz;
     
-                    float val = (*m_fn)(xPos, yPos, zPos);
-                    m_sampleData(i, j, k, val);
+                    float val = scalar_field(glm::vec3(xPos, yPos, zPos));
+                    m_sampleData[glm::ivec3(i, j, k)] = val;
                 }
             }
         }
@@ -151,23 +142,17 @@ struct AlgCMS : public Isosurface
         { if (octree) delete octree; }
 
     //===================================================================================================================================================================================================================
-    // interface Functions
-    //===================================================================================================================================================================================================================
-    float operator() (float x, float y, float z) const                          // the overloaded function call operator from Isosurface
-        { return (*m_fn)(x, y, z); }
-
-    //===================================================================================================================================================================================================================
     // the main function which extracts a surface out of sampling data, saving it into a given mesh object
     //===================================================================================================================================================================================================================
     void extractSurface(mesh_t& mesh)
     {
         octree->buildOctree();                                                  // call the function that would recursively generate the octree
         octree_root = octree->root;                                             // get the octree root cell
-        cubicalMarchingSquaresAlg();                                            // traverse the octree and create components from each leaf cell
-        tessellationTraversal(octree_root, mesh);                               // traverse the tree again and meshing all components
-
-        for(unsigned i = 0; i < m_vertices.size(); ++i)                         // load the vertices onto the mesh
-            mesh.vertices.push_back(m_vertices[i].position);
+        generateSegments(octree_root);                                          // traverse through the octree and generate segments for all LEAF cells
+        editTransitionalFaces();                                                // resolve transitional faces
+        traceComponent();                                                       // trace the strips into segments and components
+        tessellationTraversal(octree_root, mesh);                               // traverse the tree again meshing all the components
+        mesh.vertices = m_vertices;                                             // copy the vertices onto the mesh
     }
 
     glm::vec3 find_zero(unsigned int quality, const point_t& p0, const point_t& p1)
@@ -175,7 +160,7 @@ struct AlgCMS : public Isosurface
         float alpha = p0.value / (p0.value - p1.value);
         glm::vec3 p = p0.position + alpha * (p1.position - p0.position);        // interpolate
 
-        float value = (*m_fn)(p.x, p.y, p.z);                                   // resample
+        float value = scalar_field(p);                                          // resample
         point_t pt(p, value);                                                   // save the point
 
         const float EPSILON = 0.00001f;
@@ -198,10 +183,10 @@ struct AlgCMS : public Isosurface
     void makeFaceSegments(const glm::ivec3 inds[], face_t* face)
     {
         const uint8_t edges =                                                   // aquire the index of the edges based on the face corner samples
-            (m_sampleData.getValueAt(inds[0]) < 0 ? 1 : 0) |
-            (m_sampleData.getValueAt(inds[1]) < 0 ? 2 : 0) |
-            (m_sampleData.getValueAt(inds[2]) < 0 ? 4 : 0) |
-            (m_sampleData.getValueAt(inds[3]) < 0 ? 8 : 0);
+            (m_sampleData[inds[0]] < 0 ? 1 : 0) |
+            (m_sampleData[inds[1]] < 0 ? 2 : 0) |
+            (m_sampleData[inds[2]] < 0 ? 4 : 0) |
+            (m_sampleData[inds[3]] < 0 ? 8 : 0);
   
         const int8_t e0a = EDGE_MAP[edges][0][0];                               // the edges of the first strip
         const int8_t e0b = EDGE_MAP[edges][0][1];
@@ -236,7 +221,7 @@ struct AlgCMS : public Isosurface
 
         median.position /= float(numOfInds);
         
-        float value = (*m_fn)(median.position.x, median.position.y, median.position.z);
+        float value = scalar_field(median.position);
         median.normal = glm::normalize(gradient(0.5f * m_offsets, median.position, value));
         median.position -= value * median.normal;
 
@@ -259,19 +244,13 @@ struct AlgCMS : public Isosurface
     // gradient of the field function
     //===================================================================================================================================================================================================================
     glm::vec3 gradient(const glm::vec3& dimensions, const glm::vec3& position)
-    {
-        float value = (*m_fn)(position.x, position.y, position.z);
-        float dx = (*m_fn)(position.x + dimensions.x, position.y,                position.z);
-        float dy = (*m_fn)(position.x,                position.y + dimensions.y, position.z);
-        float dz = (*m_fn)(position.x,                position.y,                position.z + dimensions.z);
-        return glm::vec3(dx - value, dy - value, dz - value);
-    }
+        { return gradient(dimensions, position, scalar_field(position)); }
 
     glm::vec3 gradient(const glm::vec3& dimensions, const glm::vec3& position, const float& value)
     {
-        float dx = (*m_fn)(position.x + dimensions.x, position.y,                position.z);
-        float dy = (*m_fn)(position.x,                position.y + dimensions.y, position.z);
-        float dz = (*m_fn)(position.x,                position.y,                position.z + dimensions.z);
+        float dx = scalar_field(glm::vec3(position.x + dimensions.x, position.y, position.z));
+        float dy = scalar_field(glm::vec3(position.x, position.y + dimensions.y, position.z));
+        float dz = scalar_field(glm::vec3(position.x, position.y, position.z + dimensions.z));
         return glm::vec3(dx - value, dy - value, dz - value);
     }
     
@@ -280,16 +259,16 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     void tessellationTraversal(cell_t* cell, mesh_t& mesh)
     {
-        if(!cell) return;                                                           // skip empty nodes
+        if(!cell) return;                                                       // skip empty nodes
   
-        if(cell->state == BRANCH)                                                   // if the node is a BRANCH go deeper
+        if(cell->state == BRANCH)                                               // if the node is a BRANCH go deeper
         {
             for(int i = 0; i < 8; ++i)
                 tessellationTraversal(cell->children[i], mesh);
             return;
         }
         
-        for(unsigned int i = 0; i < cell->components.size(); ++i)                   // the node is a leaf, tessellate segment
+        for(unsigned int i = 0; i < cell->components.size(); ++i)               // the node is a leaf, tessellate segment
             tessellateComponent(mesh, cell->components[i]);
     }
 
@@ -299,7 +278,7 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     int getEdgesBetwixt(Range& o_range, const glm::ivec3& pt0, const glm::ivec3& pt1) const
     {
-        int direction = -1;                                                         // 0 - right(x), 1 - up(y), 2 - front(z)
+        int direction = -1;                                                     // 0 - right(x), 1 - up(y), 2 - front(z)
         int diffX = abs(pt0.x - pt1.x);
         int diffY = abs(pt0.y - pt1.y);
         int diffZ = abs(pt0.z - pt1.z);
@@ -335,30 +314,30 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     int exactSignChangeIndex(const Range& range, int& dir, glm::ivec3& ind0, glm::ivec3& ind1) const
     {
-        glm::ivec3 firstIndex;                                                      // check for going from smaller to higher
+        glm::ivec3 firstIndex;                                                  // check for going from smaller to higher
         if(ind0[dir] == range.m_lower)
             firstIndex = ind0;
         else if(ind1[dir] == range.m_lower)
             firstIndex = ind1;
   
-        if(fabs(range.m_lower - range.m_upper) == 1)                                // if there are only two indices, return the first one
+        if(fabs(range.m_lower - range.m_upper) == 1)                            // if there are only two indices, return the first one
             return firstIndex[dir];
 
-        glm::ivec3 indexer = firstIndex;                                            // loop through all samples on the cell edge and find the sign change
+        glm::ivec3 indexer = firstIndex;                                        // loop through all samples on the cell edge and find the sign change
         for(int i = range.m_lower; i < range.m_upper; ++i)
         {
             indexer[dir] = i;
-            float thisValue = m_sampleData.getValueAt(indexer);
+            float thisValue = m_sampleData[indexer];
 
-            indexer[dir] = i + 1;                                                   // increment the indexer so we get the value of the next pt on the edge
-            float nextValue = m_sampleData.getValueAt(indexer);
+            indexer[dir] = i + 1;                                               // increment the indexer so we get the value of the next pt on the edge
+            float nextValue = m_sampleData[indexer];
 
-            if(thisValue * nextValue <= 0.0f)                                       // check current value against next one, if negative, edge found return sign change index
+            if(thisValue * nextValue <= 0.0f)                                   // check current value against next one, if negative, edge found return sign change index
                 return i;
         }
 
         assert(true);
-        return -1;                                                                  // returns error value (no sign change found)
+        return -1;                                                              // returns error value (no sign change found)
     }
 
     //===================================================================================================================================================================================================================
@@ -366,30 +345,30 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     void makeVertex(strip_t& strip, const int& dir, const glm::ivec3& crossingIndex0, const glm::ivec3& crossingIndex1, int index)
     {
-        glm::vec3 pos0 = m_sampleData.getPositionAt(crossingIndex0);                // recover two points and find the surface zero between them
-        float val0 = m_sampleData.getValueAt(crossingIndex0);
+        glm::vec3 pos0 = m_sampleData.getPositionAt(crossingIndex0);            // recover two points and find the surface zero between them
+        float val0 = m_sampleData[crossingIndex0];
         point_t pt0(pos0, val0);
     
         glm::vec3 pos1 = m_sampleData.getPositionAt(crossingIndex1);
-        float val1 = m_sampleData.getValueAt(crossingIndex1);
+        float val1 = m_sampleData[crossingIndex1];
         point_t pt1(pos1, val1);
     
-        glm::vec3 zero_point = find_zero(zero_search_iterations, pt0, pt1);         // find the exact position and normal at the crossing point
+        glm::vec3 zero_point = find_zero(zero_search_iterations, pt0, pt1);     // find the exact position and normal at the crossing point
         glm::vec3 normal = glm::normalize(gradient(m_offsets, zero_point));
     
-        vertex_t vert(zero_point, normal);                                          // create a vertex
+        vertex_t vert(zero_point, normal);                                      // create a vertex
         m_vertices.push_back(vert);
     
-        strip.data[index] = m_vertices.size() - 1;                                  // place the data onto the currect strip
+        strip.data[index] = m_vertices.size() - 1;                              // place the data onto the currect strip
         strip.block[index] = crossingIndex0;
         strip.dir[index] = dir;
     
-        edge_block_t edge_block = m_edgeData.getValueAt(crossingIndex0);            // put the data onto the global 3D array of edges
+        edge_block_t edge_block = m_edgeData[crossingIndex0];                   // put the data onto the global 3D array of edges
         if(edge_block.empty)
             edge_block.empty = false;
         assert(edge_block.edge_indices[dir] == -1);
         edge_block.edge_indices[dir] = m_vertices.size() - 1;
-        m_edgeData.setValueAt(crossingIndex0, edge_block);
+        m_edgeData[crossingIndex0] = edge_block;
     }
 
     //===================================================================================================================================================================================================================
@@ -399,12 +378,12 @@ struct AlgCMS : public Isosurface
     {
         assert((edge0 != -1) && (edge1 != -1));
         strip_t strip(false, edge0, edge1);
-        populate_strip(strip, inds, 0);                                              // 1st edge of First Strip - e0a
-        populate_strip(strip, inds, 1);                                              // 2nd edge of First Strip - e0b
+        populate_strip(strip, inds, 0);                                         // 1st edge of First Strip - e0a
+        populate_strip(strip, inds, 1);                                         // 2nd edge of First Strip - e0b
 
         // todo :: Check for face sharp features here
 
-        face->strips[strip_index] = strip;                                          // populate current face with the created strip
+        face->strips[strip_index] = strip;                                      // populate current face with the created strip
         face->skip = false;
     }
 
@@ -413,49 +392,39 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     void populate_strip(strip_t& strip, const glm::ivec3 inds[], int index)
     {
-        const int8_t faceEdge = strip.edge[index];                                  // get the edge on the currently examined face
+        const int8_t faceEdge = strip.edge[index];                              // get the edge on the currently examined face
         glm::ivec3 ind_0 = inds[VERTEX_MAP[faceEdge][0]];
         glm::ivec3 ind_1 = inds[VERTEX_MAP[faceEdge][1]];
     
-        Range range;                                                                // get the range and the direction (of an edge block) which the edge represents
+        Range range;                                                            // get the range and the direction (of an edge block) which the edge represents
         int dir = getEdgesBetwixt(range, ind_0, ind_1);
         assert(abs(ind_0[dir] - ind_1[dir]) > 0);
         assert((ind_0[dir] == range.m_lower) || (ind_0[dir] == range.m_upper));
         assert((ind_1[dir] == range.m_lower) || (ind_1[dir] == range.m_upper));
     
-        int signChange = exactSignChangeIndex(range, dir, ind_0, ind_1);            // find the exact sign change on that bigger edge range, getting the index of the sample, just before the sign change = edge of change
+        int signChange = exactSignChangeIndex(range, dir, ind_0, ind_1);        // find the exact sign change on that bigger edge range, getting the index of the sample, just before the sign change = edge of change
         assert((signChange >= range.m_lower) && (signChange < range.m_upper));
     
-        glm::ivec3 crossingIndex_0 = ind_0;                                         // set the exact two point indices between the zero crossing
+        glm::ivec3 crossingIndex_0 = ind_0;                                     // set the exact two point indices between the zero crossing
         glm::ivec3 crossingIndex_1 = ind_0;
         crossingIndex_0[dir] = signChange;
         crossingIndex_1[dir] = signChange + 1;
-        assert(m_sampleData.getValueAt(crossingIndex_0) * m_sampleData.getValueAt(crossingIndex_1) <= 0.0f);
+        assert(m_sampleData[crossingIndex_0] * m_sampleData[crossingIndex_1] <= 0.0f);
     
-        bool duplicate = false;                                                     // check for duplicate vertices on the same edge
-        if(m_edgeData.getValueAt(crossingIndex_0).empty == false)                   // check global datastructor edgeblock
+        bool duplicate = false;                                                 // check for duplicate vertices on the same edge
+        if(!m_edgeData[crossingIndex_0].empty)                                  // check global datastructor edgeblock
         {
-            if(m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir] != -1)      // check exact global edge
+            if(m_edgeData[crossingIndex_0].edge_indices[dir] != -1)             // check exact global edge
             {
-                strip.data[index] = m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir];
+                strip.data[index] = m_edgeData[crossingIndex_0].edge_indices[dir];
                 strip.block[index] = crossingIndex_0;
                 strip.dir[index] = dir;
                 duplicate = true;
             }
         }
     
-        if(!duplicate)                                                              // if there is no previous vertex registered to that edge, proceed to find it.
+        if(!duplicate)                                                          // if there is no previous vertex registered to that edge, proceed to find it.
             makeVertex(strip, dir, crossingIndex_0, crossingIndex_1, index);
-    }
-
-    //===================================================================================================================================================================================================================
-    // performs the main stages of the algorithm
-    //===================================================================================================================================================================================================================
-    void cubicalMarchingSquaresAlg()
-    {
-        generateSegments(octree->root);                                             // traverse through the octree and generate segments for all LEAF cells
-        editTransitionalFaces();                                                    // resolve transitional faces
-        traceComponent();                                                           // trace the strips into segments and components
     }
 
     //===================================================================================================================================================================================================================
@@ -463,19 +432,19 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     void generateSegments(cell_t* cell)
     {
-        if(!cell) return;                                                           // skip empty nodes
+        if(!cell) return;                                                       // skip empty nodes
   
-        if(cell->state == BRANCH)                                                   // if the node is a BRANCH go deeper
+        if(cell->state == BRANCH)                                               // if the node is a BRANCH go deeper
         {
             for(int i = 0; i < 8; ++i)
                 generateSegments(cell->children[i]);
             return;
         }
 
-        glm::ivec3 indices[4];                                                      // the node is a leaf, generate segment   
-        for(int f = 0; f < 6; ++f)                                                  // for all the faces in this LEAF cell
+        for(int f = 0; f < 6; ++f)                                              // for all the faces in this LEAF cell
         {
-            for(int v = 0; v < 4; ++v)                                              // convert face vertex index to cell vertex index
+            glm::ivec3 indices[4];                                              // the node is a leaf, generate segment   
+            for(int v = 0; v < 4; ++v)                                          // convert face vertex index to cell vertex index
             {
                 const uint8_t vindex = FACE_VERTEX[f][v];
                 indices[v] = cell->point_indices[vindex];
@@ -492,10 +461,10 @@ struct AlgCMS : public Isosurface
     {
         std::vector<cell_t*> cells = octree->cells;
     
-        for(unsigned int i = 0; i < cells.size(); ++i)                              // loop through all cells and all faces and find every transitional face
+        for(unsigned int i = 0; i < cells.size(); ++i)                          // loop through all cells and all faces and find every transitional face
             for(int j = 0; j < 6; ++j)
                 if(cells[i]->faces[j]->state == TRANSIT_FACE)
-                    resolveTransitionalFace(cells[i]->faces[j]);                    // pass it for getting the data from it's twin
+                    resolveTransitionalFace(cells[i]->faces[j]);                // pass it for getting the data from it's twin
     }
 
     //===================================================================================================================================================================================================================
@@ -506,7 +475,7 @@ struct AlgCMS : public Isosurface
         assert(face->twin->state == BRANCH_FACE);
         assert(face->twin->transitSegs.size() > 0);
   
-        for(unsigned int i = 0; i < face->twin->transitSegs.size(); ++i)                    // Looping through all transitional Face separate segments
+        for(unsigned int i = 0; i < face->twin->transitSegs.size(); ++i)        // Looping through all transitional Face separate segments
         {
             if(face->twin->strips[i].skip == false)
             {
@@ -536,26 +505,26 @@ struct AlgCMS : public Isosurface
     //===================================================================================================================================================================================================================
     void collectStrips(cell_t* c, std::vector<strip_t>& o_cellStrips, std::vector<std::vector<unsigned int>>& o_transitSegs)
     {
-        for(int f = 0; f < 6; ++f)                                                  // Looping through all faces of the cell
+        for(int f = 0; f < 6; ++f)                                              // Looping through all faces of the cell
         {
-            if(c->faces[f]->state == LEAF_FACE)                                     // If it is a leaf face, just copy the full strips
+            if(c->faces[f]->state == LEAF_FACE)                                 // If it is a leaf face, just copy the full strips
             {
                 for(unsigned int i = 0; i < c->faces[f]->strips.size(); ++i)
                 {
-                    if(c->faces[f]->strips[i].data[0] != -1)                        // Check there is valid data
-                        o_cellStrips.push_back(c->faces[f]->strips[i]);             // Create a temp strip and store the cell edges in it
+                    if(c->faces[f]->strips[i].data[0] != -1)                    // Check there is valid data
+                        o_cellStrips.push_back(c->faces[f]->strips[i]);         // Create a temp strip and store the cell edges in it
                 }
             }
-            else if(c->faces[f]->state == TRANSIT_FACE)                             // For a Transitional Face, we must take the transit segment too as it contains all the data (vertices in between the start and end of strip)
+            else if(c->faces[f]->state == TRANSIT_FACE)                         // For a Transitional Face, we must take the transit segment too as it contains all the data (vertices in between the start and end of strip)
             {
-                if(!c->faces[f]->twin)                                              // Check if there is a valid twin
+                if(!c->faces[f]->twin)                                          // Check if there is a valid twin
                     break;
     
                 assert(c->faces[f]->twin->strips.size() == c->faces[f]->twin->transitSegs.size());
           
                 for(unsigned int i = 0; i < c->faces[f]->twin->strips.size(); ++i)            
                 {
-                    if(c->faces[f]->twin->strips[i].data[0] != -1)                  // Push the current strips and transit
+                    if(c->faces[f]->twin->strips[i].data[0] != -1)              // Push the current strips and transit
                     {
                         o_transitSegs.push_back(c->faces[f]->twin->transitSegs[i]);
                         o_cellStrips.push_back(c->faces[f]->twin->strips[i]);
@@ -563,7 +532,7 @@ struct AlgCMS : public Isosurface
                 }
             }
         }
-        assert(o_cellStrips.size() > 0);                                            // A Leaf cell must have at least 3 strips to form a component unless it is has just a single looping component from a transit face
+        assert(o_cellStrips.size() > 0);                                        // A Leaf cell must have at least 3 strips to form a component unless it is has just a single looping component from a transit face
     }
 
 
@@ -577,13 +546,13 @@ struct AlgCMS : public Isosurface
         int addedInIteration;
         bool backwards;
     
-        o_comp.push_back(strips[0].data[0]);                                        // add a new value to the beginning
+        o_comp.push_back(strips[0].data[0]);                                    // add a new value to the beginning
 
         do
         {
             addedInIteration = 0;
         
-            for(unsigned int i = 0; i < strips.size(); ++i)                         // Loop through all current strips
+            for(unsigned int i = 0; i < strips.size(); ++i)                     // Loop through all current strips
             {
                 int s_d0 = strips[i].data[0];
                 int s_d1 = strips[i].data[1];
@@ -597,10 +566,10 @@ struct AlgCMS : public Isosurface
                         backwards = false;
                         bool transit = false;
               
-                        if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        if(transitSegs.size() > 0)                              // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
                             insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards);
               
-                        if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
+                        if(!transit)                                            // If the strip does not belong to a transitional face just get the next value from the strip
                         {
                             o_comp.push_back(s_d1);
                             ++addedInIteration;

@@ -9,7 +9,6 @@
 #include "address.hpp"
 #include "range.hpp"
 #include "face.hpp"
-#include "util.hpp"
 
 namespace cms
 {
@@ -31,10 +30,8 @@ struct cell_t
     face_t* faces[6];                                                                               // array of cell faces
 
     uint8_t level;                                                                                  // the level of subdivision of the cell
-    uint8_t max_level;                                                                              // the maximum subdivision of the octree (needed for Address)
 
-    std::vector<int8_t> raw_address;                                                                // the address of the cell
-    address_t address;
+    address_t address;                                                                              // the address of the cell
 
     glm::ivec3 index;                                                                               // the index of the point at the 000 corner of the cell
     glm::ivec3 offset;                                                                              // the discrete dimensions of the cell based on the samples

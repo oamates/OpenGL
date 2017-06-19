@@ -15,44 +15,43 @@
 #include <vector>
 #include <math.h>
 
-#include "isosurface.hpp"
 #include "algcms.hpp"
 
 struct ExampleClass
 {
-    // Sphere function
-    float sphereFunction(float x, float y, float z) const
+    float sphereFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         return x * x + y * y + z * z - 1.0f;
     }
 
-    // Cube function
-    float cubeFunction(float x, float y, float z) const
+    float cubeFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         return std::max(fabs(x) - 1.0f, std::max((fabs(y) - 1.0f), fabs(z) - 1.0f));
     }
 
-    // Cone function
-    float coneFunction(float x, float y, float z) const
+    float coneFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         return 10.0f * (x * x + y * y) - (z - 1.0f) * (z - 1.0f);
     }
 
-    // Anti-tank-like function
-    float antiTankFunction(float x, float y, float z) const
+    float antiTankFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         return x * x * y * y + x * x * z * z + y * y * z * z - 0.01f;
     }
 
-    // Heart function
-    float heartFunction(float x, float y, float z) const
+    float heartFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         return pow(x * x + y * y + 2.0f * z * z - 0.5f, 3.0) - y * y * y * (x * x - 0.01f * z * z);
     }
 
-    // Torus function
-    float torusFunction(float x, float y, float z) const
+    float torusFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         float R = 0.45f;
         float r = 0.2f;
         float x0 = x - 0.25f;
@@ -61,9 +60,9 @@ struct ExampleClass
         return q * q - 4.0f * R * R * (z * z + x0 * x0);
     }
 
-    // Double torus function
-    float doubleTorusFunction(float x, float y, float z) const
+    float doubleTorusFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         float x2 = x * x;
         float x3 = x2 * x;
         float x4 = x2 * x2;
@@ -71,9 +70,9 @@ struct ExampleClass
         return -(0.01f - x4 + 2.0f * x3 * x3 - x4 * x4 + 2.0f * x2 * y2 - 2.0f * x4 * y2 - y2 * y2 - z * z);
     }
 
-    // Interlinked torii function
-    float linkedToriiFunction(float x, float y, float z) const
+    float linkedToriiFunction(const glm::vec3& p) const
     {
+        float x = p.x, y = p.y, z = p.z; 
         float R = 0.45f;
         float r = 0.2f;
         float x0 = x - 0.25f;
@@ -83,29 +82,27 @@ struct ExampleClass
         return (q0 * q0 - 4.0f * R * R * (x0 * x0 + z * z)) * (q1 * q1 - 4.0f * R * R * (x1 * x1 + y * y));
     }
 
-    glm::dvec3 tri(const glm::dvec3& x) const
+    glm::vec3 tri(const glm::vec3& x) const
     {
-        glm::dvec3 q = glm::abs(glm::fract(x) - glm::dvec3(0.5));
-        return glm::clamp(q, 0.05, 0.45);
+        glm::vec3 q = glm::abs(glm::fract(x) - glm::vec3(0.5f));
+        return glm::clamp(q, 0.05f, 0.45f);
     }
 
-    double sdf(float x, float y, float z) const
+    float sdf(const glm::vec3& p) const
     {
-        glm::dvec3 p = glm::dvec3(x, y, z);
-        glm::dvec3 pp = 16.0 * p;
-        glm::dvec3 op = tri(1.1 * pp + tri(1.1 * glm::dvec3(pp.z, pp.x, pp.y)));
-        glm::dvec3 q = pp + (op - glm::dvec3(0.25)) * 0.3;
-        q = glm::cos(0.444 * q + glm::sin(1.112 * glm::dvec3(pp.z, pp.x, pp.y)));
-        return glm::length(q) - 1.05;
+        glm::vec3 pp = 16.0f * p;
+        glm::vec3 op = tri(1.1f * pp + tri(1.1f * glm::vec3(pp.z, pp.x, pp.y)));
+        glm::vec3 q = pp + (op - glm::vec3(0.25f)) * 0.3f;
+        q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(pp.z, pp.x, pp.y)));
+        return glm::length(q) - 1.05f;
     }
 
-    // ============================================================================================================================================================================================================================
-    float operator()(float x, float y, float z) const
+    float operator()(const glm::vec3& p) const
     {
-//        return torusFunction(x, y, z);
-        return antiTankFunction(x, y, z);
+        return antiTankFunction(p);
     }
 
+    
     glm::vec3 gradient(const glm::vec3& p) const
     {
         float x = p.x; 
@@ -113,26 +110,24 @@ struct ExampleClass
         float z = p.z;
         const float gradient_delta = 0.06125;
 
-        float f100 = (*this)(x + gradient_delta, y - gradient_delta, z - gradient_delta);
-        float f001 = (*this)(x - gradient_delta, y - gradient_delta, z + gradient_delta);
-        float f010 = (*this)(x - gradient_delta, y + gradient_delta, z - gradient_delta);  
-        float f111 = (*this)(x + gradient_delta, y + gradient_delta, z + gradient_delta);
+        float f100 = (*this)(glm::vec3(x + gradient_delta, y - gradient_delta, z - gradient_delta));
+        float f001 = (*this)(glm::vec3(x - gradient_delta, y - gradient_delta, z + gradient_delta));
+        float f010 = (*this)(glm::vec3(x - gradient_delta, y + gradient_delta, z - gradient_delta));  
+        float f111 = (*this)(glm::vec3(x + gradient_delta, y + gradient_delta, z + gradient_delta));
 
         return glm::normalize(glm::vec3( f100 - f001 - f010 + f111, 
                                         -f100 - f001 + f010 + f111, 
                                         -f100 + f001 - f010 + f111));
     }
-
 };
 
 
 static float BBOX_SIZE                  = 2.0f;
-static int MIN_OCTREE_RES               = 2;
-static int MAX_OCTREE_RES               = 8;
+static const int MIN_OCTREE_RES               = 2;
+static const int MAX_OCTREE_RES               = 8;
 static float COMPLEX_SURFACE_THRESHOLD  = 0.85f;
 
-int ADDRESS_SIZE = MAX_OCTREE_RES; // To be used by some of the classes
-
+const int ADDRESS_SIZE = MAX_OCTREE_RES;
 
 #include "log.hpp"
 #include "gl_info.hpp"
@@ -140,7 +135,6 @@ int ADDRESS_SIZE = MAX_OCTREE_RES; // To be used by some of the classes
 #include "glfw_window.hpp"
 #include "camera.hpp"
 #include "shader.hpp"
-#include "isosurface.hpp"
 #include "image.hpp"
 
 struct demo_window_t : public glfw_window_t
@@ -229,10 +223,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // run CMS algorithm and generate iso-surface
     //===================================================================================================================================================================================================================
-    ExampleClass t;
-
-    cms::Isosurface_t<ExampleClass> iso(&t);
-
     float halfSize = 0.5f * BBOX_SIZE;
 
     cms::Range container[3] = 
@@ -242,44 +232,28 @@ int main(int argc, char *argv[])
         cms::Range(-halfSize, halfSize)
     };
 
-    cms::AlgCMS cmsAlg(&iso, container, MIN_OCTREE_RES, MAX_OCTREE_RES);
+    cms::AlgCMS<ExampleClass> cmsAlg(container, MIN_OCTREE_RES, MAX_OCTREE_RES);
     cmsAlg.complex_surface_threshold = COMPLEX_SURFACE_THRESHOLD;                 // Set the complex surface threshold
 
     cms::mesh_t mesh;
     cmsAlg.extractSurface(mesh);                                            // Proceed to extract the surface <runs the algorithm>
 
-    GLuint vao_id, vbo_id, nbo_id, ibo_id;
+    GLuint vao_id, vbo_id, ibo_id;
 
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(glm::vec3), mesh.vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(cms::vertex_t), mesh.vertices.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    for (int i = 0; i < mesh.vertices.size(); ++i)
-    {
-        glm::vec3 g = t.gradient(mesh.vertices[i]);
-        mesh.normals.push_back(g);
-    }
-
-    glGenBuffers(1, &nbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, nbo_id);
-    glBufferData(GL_ARRAY_BUFFER, mesh.normals.size() * sizeof(glm::vec3), mesh.normals.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cms::vertex_t), (const GLvoid*) offsetof(cms::vertex_t, position));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(cms::vertex_t), (const GLvoid*) offsetof(cms::vertex_t, normal));
 
     glGenBuffers(1, &ibo_id);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(GLuint), mesh.indices.data(), GL_STATIC_DRAW);
-
-    debug_msg("mesh.m_vertices.size() = %u", (unsigned int) mesh.vertices.size());
-    debug_msg("mesh.m_normals.size() = %u", (unsigned int) mesh.normals.size());
-    debug_msg("mesh.m_indices.size() = %u", (unsigned int) mesh.indices.size());
-
-
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
