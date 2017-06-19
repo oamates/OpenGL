@@ -85,12 +85,27 @@ struct ExampleClass
         return (q0 * q0 - 4.0f * R * R * (x0 * x0 + z * z)) * (q1 * q1 - 4.0f * R * R * (x1 * x1 + y * y));
     }
 
+    glm::dvec3 tri(const glm::dvec3& x) const
+    {
+        glm::dvec3 q = glm::abs(glm::fract(x) - glm::dvec3(0.5));
+        return glm::clamp(q, 0.05, 0.45);
+    }
+
+    double sdf(float x, float y, float z) const
+    {
+        glm::dvec3 p = glm::dvec3(x, y, z);
+        glm::dvec3 pp = 16.0 * p;
+        glm::dvec3 op = tri(1.1 * pp + tri(1.1 * glm::dvec3(pp.z, pp.x, pp.y)));
+        glm::dvec3 q = pp + (op - glm::dvec3(0.25)) * 0.3;
+        q = glm::cos(0.444 * q + glm::sin(1.112 * glm::dvec3(pp.z, pp.x, pp.y)));
+        return glm::length(q) - 1.05;
+    }
+
     // ============================================================================================================================================================================================================================
     float operator()(float x, float y, float z) const
     {
 //        return torusFunction(x, y, z);
-        return cubeFunction(x, y, z);
-
+        return antiTankFunction(x, y, z);
     }
 
     glm::vec3 gradient(float x, float y, float z) const
@@ -114,7 +129,6 @@ static float BBOX_SIZE                  = 2.0f;
 static int MIN_OCTREE_RES               = 2;
 static int MAX_OCTREE_RES               = 8;
 static float COMPLEX_SURFACE_THRESHOLD  = 0.85f;
-static const char * OBJ_NAME            = "test.obj";
 
 int ADDRESS_SIZE = MAX_OCTREE_RES; // To be used by some of the classes
 
@@ -207,8 +221,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
+    //glEnable(GL_CULL_FACE);
+    //glCullFace(GL_FRONT);
 
 
     //===================================================================================================================================================================================================================
@@ -231,7 +245,6 @@ int main(int argc, char *argv[])
     cms::Mesh mesh;
     cmsAlg.setComplexSurfThresh(COMPLEX_SURFACE_THRESHOLD);                 // Set the complex surface threshold
     cmsAlg.extractSurface(mesh);                                            // Proceed to extract the surface <runs the algorithm>
-    mesh.exportOBJ(OBJ_NAME);                                               // Export the created mesh as an .OBJ file
 
     GLuint vao_id, vbo_id, nbo_id, ibo_id;
 
@@ -282,7 +295,7 @@ int main(int argc, char *argv[])
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
         float time = glfw::time();
-        const float light_radius = 43.0f;
+        const float light_radius = 12.5f;
         glm::vec3 light_ws = glm::vec3(light_radius * cos(0.5f * time), 25.0f, light_radius * sin(0.5f * time));
         glm::vec3 camera_ws = window.camera.position();
 

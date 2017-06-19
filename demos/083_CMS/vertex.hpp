@@ -8,39 +8,20 @@
 namespace cms
 {
 
-struct Vertex
+struct vertex_t
 {
-    std::vector<int> onPath;
-    Vec3 m_pos;
-    Vec3 m_normal;
+    Vec3 position;
+    Vec3 normal;
 
-    Vertex() : 
-        m_pos(Vec3(0, 0, 0)),
-        m_normal(Vec3(0, 0, 0))
+    vertex_t() : 
+        position(Vec3(0, 0, 0)),
+        normal(Vec3(0, 0, 0))
     {}
 
-    Vertex(Vec3 i_pos, Vec3 i_normal) :
-        m_pos(i_pos),
-        m_normal(i_normal)
+    vertex_t(Vec3 position, Vec3 normal) :
+        position(position),
+        normal(normal)
     {}
-
-    void setPos(Vec3 i_pos)
-        { m_pos = i_pos; }
-
-    const Vec3& getPos() const
-        { return m_pos; }
-
-    void setNormal(Vec3 i_normal)
-        { m_normal = i_normal; }
-
-    const Vec3& getNormal() const
-        { return m_normal; }
-
-    void print() const
-    {
-        std::cout << "Point: " << m_pos << std::endl << "Normal: " << m_normal << std::endl;
-    }
-
 };
 
 } // namespace cms

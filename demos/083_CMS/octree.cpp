@@ -9,21 +9,22 @@
 namespace cms
 {
 
-// A table setting the face relationship
-// Given the position of a cell within its parent
-// it returns the 3 faces of that cell that touch
+//=======================================================================================================================================================================================================================
+// Table setting the face relationship
+// Given the position of a cell within its parent returns the 3 faces of that cell that touch
 // the parent. (they would be the same for the parent)
+//=======================================================================================================================================================================================================================
 
 static const CONTACT FACE_RELATIONSHIP_TABLE[8][3] = 
 {
-    {BACK , BOTTOM, LEFT },
+    {BACK,  BOTTOM, LEFT },
     {FRONT, BOTTOM, LEFT },
-    {BACK , TOP   , LEFT },
-    {FRONT, TOP   ,   LEFT },
-    {BACK , BOTTOM, RIGHT},
+    {BACK,  TOP,    LEFT },
+    {FRONT, TOP,    LEFT },
+    {BACK,  BOTTOM, RIGHT},
     {FRONT, BOTTOM, RIGHT},
-    {BACK , TOP   ,   RIGHT},
-    {FRONT, TOP   ,   RIGHT}
+    {BACK,  TOP,    RIGHT},
+    {FRONT, TOP,    RIGHT}
 };
 
 static const uint8_t SUB_FACE_TABLE[8][3] = 
@@ -144,8 +145,8 @@ void Octree::subdivideCell(Cell *i_parent)
 
     Index3D offsets;
     offsets[0] = ((m_samples[0] - 1) / util::intPower(2, thisLvl));                             // change because octree starts from 0
-    offsets[1] = ((m_samples[1] - 1) / util::intPower(2, thisLvl));                             // change
-    offsets[2] = ((m_samples[2] - 1) / util::intPower(2, thisLvl));                             // change
+    offsets[1] = ((m_samples[1] - 1) / util::intPower(2, thisLvl));
+    offsets[2] = ((m_samples[2] - 1) / util::intPower(2, thisLvl));
 
     int parIndX = i_parent->getC000().m_x;
     int parIndY = i_parent->getC000().m_y;
@@ -369,28 +370,28 @@ void Octree::findNeighbours(Cell* cellA)
                 // OTHERWISE it means it belongs to a different parent
                 //                 front(+Z) top(+Y) right(+X)                                  back(-Z) bottom(-Y) left(-X)
                 if(((i & 1) && (slotVal < tempNeighbourAddress[i][slot])) || ((!(i & 1)) && (slotVal > tempNeighbourAddress[i][slot])))    
-                    sameParent = true;                                                                  // if it has the same parent then proceed and copy the remaining address slots from the current address as they will be the same
+                    sameParent = true;                                                          // if it has the same parent then proceed and copy the remaining address slots from the current address as they will be the same
             }
         }
-        tempAddress[i].populateAddress(tempNeighbourAddress[i]);                                        // Populate actual address
+        tempAddress[i].populateAddress(tempNeighbourAddress[i]);                                // Populate actual address
     }
   
-    for(int i = 0; i < 6; ++i)                                                                          // Actually find and assign the neighbour if such exists at the given address
+    for(int i = 0; i < 6; ++i)                                                                  // Actually find and assign the neighbour if such exists at the given address
     {
         unsigned int addressKey = tempAddress[i].getFormatted();
         Cell* cellB = m_cellAddresses[addressKey];
         
-        if(cellB)                                                                                       // Proceed if there is such a neighbouring cell
+        if(cellB)                                                                               // Proceed if there is such a neighbouring cell
         {
             CONTACT contact = (CONTACT)i;
       
-            if(i & 1)                                                                                   // todo :: Temporary save the neighbours addresses in the order:
+            if(i & 1)                                                                           // todo :: Temporary save the neighbours addresses in the order:
                 cellA->m_neighbours[contact - 1] = cellB;
             else
                 cellA->m_neighbours[contact + 1] = cellB;
 
       
-            setFaceTwins(cellB, cellA, contact);                                                        // Set face twins of the neighbouring cells based on their contact face
+            setFaceTwins(cellB, cellA, contact);                                                // Set face twins of the neighbouring cells based on their contact face
         }
     }
 
@@ -404,12 +405,12 @@ void Octree::populateHalfFaces()
     debug_msg("Number of cells: %u" << (unsigned int) m_cells.size());
 #endif
   
-    for(Cell* c : m_cells) findNeighbours(c);                                                              // todo :: optimise because this will set some neighbours twice
+    for(Cell* c : m_cells) findNeighbours(c);                                                   // todo :: optimise because this will set some neighbours twice
 }
 
 void Octree::setFaceTwins(Cell* a, Cell* b, CONTACT contact)
 {
-    int valA = faceTwinTable[contact][0];                                               // Assigning each face's twin based on the contact type
+    int valA = faceTwinTable[contact][0];                                                       // Assigning each face's twin based on the contact type
     int valB = faceTwinTable[contact][1];
     b->getFaceAt(valA)->twin = a->getFaceAt(valB);
     a->getFaceAt(valB)->twin = b->getFaceAt(valA);
@@ -418,9 +419,9 @@ void Octree::setFaceTwins(Cell* a, Cell* b, CONTACT contact)
 
 void Octree::setFaceRelationships()
 {
-    for(Cell* cell : m_cells)                                                           // Loop through all the cells of the octree and assign the face relationship b/n parent and child cells
+    for(Cell* cell : m_cells)                                                                   // Loop through all the cells of the octree and assign the face relationship b/n parent and child cells
     {
-        if(cell == nullptr || cell == m_root) continue;                                 // Continue if cell is null
+        if(cell == nullptr || cell == m_root) continue;                                         // Continue if cell is null
 
         int location = cell->getPosInParent();
 
@@ -434,7 +435,7 @@ void Octree::setFaceRelationships()
             cell->getParent()->getFaceAt(con)->children[posOfSubFace] = cell->getFaceAt(con);
         }
     
-        if(cell->getState() == LEAF)                                                    // If this is a leaf cell then set all its half-faces as LEAFs
+        if(cell->getState() == LEAF)                                                            // If this is a leaf cell then set all its half-faces as LEAFs
         {
             for(int i = 0; i < 6; ++i)
                 cell->getFaceAt(i)->state = LEAF_FACE;
@@ -446,16 +447,16 @@ void Octree::markTransitionalFaces()
 {
     int transCounter = 0;
   
-    for(unsigned int i = 0; i < m_leafCells.size(); ++i)                                // Loop through all leaf (straddling) cells
+    for(unsigned int i = 0; i < m_leafCells.size(); ++i)                                        // Loop through all leaf (straddling) cells
     {
         assert(m_leafCells[i]->getState() == LEAF);
 
-        for(int j = 0; j < 6; ++j)                                                      // Loop through all faces of such a cell
+        for(int j = 0; j < 6; ++j)                                                              // Loop through all faces of such a cell
         {
             Face* f = m_leafCells[i]->getFaceAt(j);
             assert(f->state == LEAF_FACE);
       
-            if((f->twin) && (f->twin->children[0]))                                     // Check against null ptr
+            if((f->twin) && (f->twin->children[0]))                                             // Check against null ptr
             {
                 assert(f->twin->children[1]);
                 assert(f->twin->children[2]);

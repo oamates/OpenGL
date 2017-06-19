@@ -23,15 +23,10 @@ enum CellState
 
 struct Cell
 {
-    typedef std::vector<int8_t> int8Vec;
-
-
-    //============== Public Members ================
-
     Cell* m_neighbours[6];
     int m_id;
     Range m_x, m_y, m_z;                                                                        // the public dimensions of the cell through ranges in xyz
-    int8Vec m_rawAddress;                                                                       // The address of the cell
+    std::vector<int8_t> m_rawAddress;                                                           // The address of the cell
     Address m_address;
 
     enum CellState m_state;                                                                     // The state of the current cell - based on State enumerator
@@ -64,42 +59,30 @@ struct Cell
     // Index3D i_c000 - the 000 corner of the cell in the samples array
     // Index3D i_offset - the dimensions of the cell in sample slabs xyz
 
-    Cell(int _id,
-         CellState i_state,
-         Cell* i_parent,
-         uint8_t i_subdivLvl,
-         Index3D i_c000,
-         Index3D i_offsets,
-         int8_t i_posInPar) :
-        m_id(_id), m_state(i_state), m_parent(i_parent), m_subdivLvl(i_subdivLvl),
-        m_c000(i_c000), m_offsets(i_offsets), m_posInParent(i_posInPar)
+    Cell(int _id, CellState i_state, Cell* i_parent, uint8_t i_subdivLvl, Index3D i_c000, Index3D i_offsets, int8_t i_posInPar)
+        : m_id(_id), m_state(i_state), m_parent(i_parent), m_subdivLvl(i_subdivLvl),
+          m_c000(i_c000), m_offsets(i_offsets), m_posInParent(i_posInPar)
     {
         m_centre = Vec3(0.0f, 0.0f, 0.0f);
-
-        // Initialising the 8 octree children to NULL
-        for(int i = 0; i < 8; ++i)
+        
+        for(int i = 0; i < 8; ++i)                                                                  // Initialising the 8 octree children to NULL
             m_children[i] = 0;
-
-        // Generating the 6 cell faces / HEAP /
-        for(int i = 0; i < 6; ++i)
+        
+        for(int i = 0; i < 6; ++i)                                                                  // Generating the 6 cell faces / HEAP /
             m_faces[i] = new Face(i, m_id);
-
-        // Initialise the address
-        if(m_parent)
+        
+        if(m_parent)                                                                                // Initialise the address
             m_address.set(m_parent->m_address.getRaw(), m_posInParent + 1);
         else
             m_address.reset();
-
-        // Clear the neighbour array
-        for(int i = 0; i < 6; ++i)
+        
+        for(int i = 0; i < 6; ++i)                                                                  // Clear the neighbour array
             m_neighbours[i] = 0;
     }
 
-    // destructor :: looping and destroying all children individually
-    ~Cell()
+    ~Cell()                                                                                         // destructor :: looping and destroying all children individually
     {
-        // Delete the six faces of the cell
-        for(int i = 0; i < 6; ++i)
+        for(int i = 0; i < 6; ++i)                                                                  // delete the six faces of the cell
         {
             if(m_faces[i])
                 delete m_faces[i];

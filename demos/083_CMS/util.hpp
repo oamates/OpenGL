@@ -13,7 +13,6 @@ namespace util
     inline int intPower(int i_num, int i_ind)                                                      // A replacement for the stl pow function, working with int
     {
         int result = i_num;
-
         if(i_ind == 0) return 1;
 
         for(int i = 0; i < i_ind - 1; ++i)

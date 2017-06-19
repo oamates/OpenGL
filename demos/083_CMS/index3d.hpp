@@ -6,8 +6,6 @@
 namespace cms
 {
 
-// Index3D, serving as a vec3 for integer values
-
 struct Index3D
 {
     int m_x;

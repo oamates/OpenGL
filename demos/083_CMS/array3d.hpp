@@ -11,15 +11,13 @@
 namespace cms
 {
 
-// Array3D :: wrapper for a 1D array
-// used for 'float' and 'EdgeBlock' types, in the sample and edge array
+// Array3D :: wrapper for a 3D array, used for 'float' and 'EdgeBlock' types, in the sample and edge array
 
 template <class T> struct Array3D
 {
     std::vector<T> m_data;                                                              // The dynamic 1D array of the actual data
     Index3D m_indices;                                                                  // An Index3D storing the size of the 3D array wrapper in X, Y and Z
     Range m_bbox[3];                                                                    // The BBox of the Array3D stored as an array of 3 Ranges (-x +x), (-y, +y), (-z, +z)
-
     
     Array3D()                                                                           // Empty constructor - sets bbox to (-1,1) in xyz
     {
@@ -189,7 +187,7 @@ template <class T> struct Array3D
 };
 
 template class Array3D<float>;
-template class Array3D<EdgeBlock>;
+template class Array3D<edge_block_t>;
 
 } // namespace cms
 

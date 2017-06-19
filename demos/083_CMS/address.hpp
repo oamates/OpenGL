@@ -25,9 +25,7 @@ struct Address
         for(int32_t i = 0; i < ADDRESS_SIZE; ++i)
         {
             if(parentAddressPtr[i] != 0)                                        // Copy the parent's address
-            {
                 m_rawAddress[i] = parentAddressPtr[i];
-            }
             else
             {
                 m_rawAddress[i] = posInParent;                                  // Add the new position in parent to the address
@@ -55,7 +53,6 @@ struct Address
     uint32_t formatAddress()                                                    // Formats the raw address into a single long integer
     {
         uint32_t formattedAddress = 0;
-
 
         for(int32_t i = ADDRESS_SIZE - 1; i >= 0; --i)
         {

@@ -2,8 +2,6 @@
 #define _cms_mesh_included_1872356784325143058634561237512030785203751238546234
 
 #include <vector>
-#include <string>
-#include <fstream>
 #include <limits>
 
 #include "log.hpp"
@@ -60,7 +58,6 @@ struct Mesh
         m_vertices.push_back(i_y);
         m_vertices.push_back(i_z);
     }
-
   
     void pushNormal(float i_x, float i_y, float i_z)                                        // push normal on the end of the mesh normal vector
     {
@@ -68,7 +65,6 @@ struct Mesh
         m_normals.push_back(i_y);
         m_normals.push_back(i_z);
     }
-
     
     void pushIndex(int i_ind)                                                               // push index on the end of the mesh index vector
         { m_indices.push_back(i_ind); }
@@ -100,31 +96,6 @@ struct Mesh
             i_bbox[5] = std::max(i_bbox[5], m_vertices[i]);
         }
     }
-
-    // Exports the mesh as a Wavefront OBJ file
-    void exportOBJ(const std::string &i_fName) const
-    {
-        std::string fullPath = i_fName;
-
-        std::fstream fileOut;
-        fileOut.open(fullPath.c_str(), std::ios::out);
-
-        fileOut << "# CMS Isosurface extraction." << std::endl;
-
-        for(unsigned int i = 0; i < m_vertices.size(); i += 3)
-        {
-            fileOut << "v " << m_vertices[i] << " " << m_vertices[i + 1] << " " << m_vertices[i + 2] << std::endl;
-        }
-
-        // Write the face info
-        for(unsigned f = 0; f < m_indices.size(); f += 3)
-        {
-            fileOut << "f " << m_indices[f] + 1 << " " << m_indices[f + 1] + 1 << " " << m_indices[f + 2] + 1 << std::endl;
-        }
-
-        debug_msg("Exported mesh path: %s", fullPath.c_str());
-    }
-
 };
 
 
