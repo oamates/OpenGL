@@ -16,7 +16,6 @@ namespace cms
 #define FCompare(a,b) \
     (((a) - EPSILON) < (b) && ((a) + EPSILON) > (b))
 
-
 struct Vec3
 {
     float m_x, m_y, m_z;

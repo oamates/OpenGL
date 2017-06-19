@@ -225,10 +225,10 @@ Vec3 AlgCMS::findCrossingPoint(unsigned int quality, const Point& pt0, const Poi
 {
     const float isoValue = m_fn->iso_level;
 
-    Vec3 p0 = pt0.getPosition();
-    float v0 = pt0.getValue();
-    Vec3 p1 = pt1.getPosition();
-    float v1 = pt1.getValue();
+    Vec3 p0 = pt0.position;
+    float v0 = pt0.value;
+    Vec3 p1 = pt1.position;
+    float v1 = pt1.value;
 
     float alpha = (isoValue - v0) / (v1 - v0);
   
@@ -575,7 +575,7 @@ void AlgCMS::generateSegments(cell_t* c)                                        
             for(int v = 0; v < 4; ++v)                                          // Convert face vert to cell vert
             {
                 const uint8_t vert = FACE_VERTEX[f][v];
-                indices[v] = c->getPointInds()[vert];
+                indices[v] = c->point_indices[vert];
             }
             c->faces[f]->strips.resize(2);
             makeFaceSegments(indices, c->faces[f]);

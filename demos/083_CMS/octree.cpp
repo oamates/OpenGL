@@ -103,24 +103,8 @@ void octree_t::acquireCellInfo(cell_t* c)
             ptIndices[i].m_z -= 1;
     }
 
-    c->setPointInds(ptIndices);
-
-    // the info below is only used when exporting the octree to a script and those calculations should really be done only then, 
-    // no need to store all that data otherwise. Setting the exact positions of the corners in 3D space
-    Range rangeX;
-    rangeX.m_lower = m_sampleData.getPositionAt(ptIndices[0]).m_x;
-    rangeX.m_upper = m_sampleData.getPositionAt(ptIndices[7]).m_x;
-    c->m_x = rangeX;
-    
-    Range rangeY;
-    rangeY.m_lower = m_sampleData.getPositionAt(ptIndices[0]).m_y;
-    rangeY.m_upper = m_sampleData.getPositionAt(ptIndices[7]).m_y;
-    c->m_y = rangeY;
-    
-    Range rangeZ;
-    rangeZ.m_lower = m_sampleData.getPositionAt(ptIndices[0]).m_z;
-    rangeZ.m_upper = m_sampleData.getPositionAt(ptIndices[7]).m_z;
-    c->m_z = rangeZ;
+    for(int i = 0; i < 8; ++i)
+        c->point_indices[i] = ptIndices[i];
 }
 
 void octree_t::subdivideCell(cell_t* parent)
@@ -218,7 +202,7 @@ void octree_t::subdivideCell(cell_t* parent)
                 leafs.push_back(c);
             }
         }
-        m_cellAddresses[c->m_address.getFormatted()] = c;                                       // Assigning cells to addresses :: todo  will this work here (recursive) better 
+        m_cellAddresses[c->address.getFormatted()] = c;                                         // Assigning cells to addresses :: todo  will this work here (recursive) better 
     }
 }
 
@@ -232,12 +216,12 @@ bool octree_t::checkForSubdivision(cell_t* c)
 
 bool octree_t::checkForSurface(cell_t* c)
 {
-    const Index3D *p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
+//    const Index3D* p = c->point_indices;                                                       // Get a pointer to the index of the c000 corner of this point
   
     int inside = 0;                                                                             // Check if all the corners are inside then discard
     for(int i = 0; i < 8; ++i)
     {
-        if(m_sampleData.getValueAt(*(p + i)) < 0.0f)
+        if(m_sampleData.getValueAt(c->point_indices[i]) < 0.0f)
             ++inside;
     }
                                                                         
@@ -247,14 +231,14 @@ bool octree_t::checkForSurface(cell_t* c)
 bool octree_t::checkForEdgeAmbiguity(cell_t* c)
 {
     bool edgeAmbiguity = false;                                                                 // Initialise return value
-    const Index3D *indPtr = c->getPointInds();                                                  // Getting the index of the c000 point of the current cell
+//    const Index3D *indPtr = c->getPointInds();                                                  // Getting the index of the c000 point of the current cell
   
     for(int i = 0; i < 12; ++i)                                                                 // Loop through all the edges of the cell
     {
         int cellPtA = EDGE_VERTICES[i][0];                                                      // Getting the start and end cell points of this edge
         int cellPtB = EDGE_VERTICES[i][1];
-        Index3D ptA = indPtr[cellPtA];                                                          // Getting the start and end sample indices of this edge
-        Index3D ptB = indPtr[cellPtB];
+        Index3D ptA = c->point_indices[cellPtA];                                                          // Getting the start and end sample indices of this edge
+        Index3D ptB = c->point_indices[cellPtB];
         int lastIndex = m_sampleData.getIndexAt(ptB);
         Index3D prevIndex = ptA;                                                                // Setting the initial index to the start point index
         int crossingPoints = 0;                                                                 // Resetting the crossing point of this edge to zero
@@ -284,18 +268,18 @@ bool octree_t::checkForComplexSurface(cell_t* c)
 {
     bool complexSurface = false;                                                                // Initialise return value
   
-    const Index3D* p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
+//    const Index3D* p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
   
     for(int i = 0; i < 7; ++i)                                                                  // Loop through all the cell points and check current point against all the rest remaining
     {
-        Index3D indA = *(p + i);
+        Index3D indA = c->point_indices[i];
         Vec3 normalA;
         findGradient(normalA, indA);
         normalA.normalize();
 
         for(int j = i + 1; j < 8; ++j)
         {
-            Index3D indB = *(p + j);
+            Index3D indB = c->point_indices[j];
             Vec3 normalB;
             findGradient(normalB, indB);
             normalB.normalize();
@@ -322,10 +306,10 @@ void octree_t::findGradient(Vec3& o_gradient, const Index3D& i_array3dInds)
     o_gradient = Vec3(dx - val, dy - val, dz - val);
 }
 
-void octree_t::findNeighbours(cell_t* cellA)
+void octree_t::findNeighbours(cell_t* cell)
 {
-    if(cellA->id == 0) return;                                                                  // Dismiss the root as it doesn't have neighbours
-    Address tempAddress[6];                                                                     // Create an array of 6 addresses with a size of the max octree depth
+    if(cell->id == 0) return;                                                                  // Dismiss the root as it doesn't have neighbours
+    address_t tempAddress[6];                                                                   // Create an array of 6 addresses with a size of the max octree depth
     std::vector<uint8_t> tempNeighbourAddress[6];                                               // An array of the six neighbours' addresses, each having an address size equivelent to the maximum octree depth
   
     for(unsigned int i = 0; i < 6; ++i)                                                         // Fill with zeros up to the size of the addresses
@@ -339,12 +323,11 @@ void octree_t::findNeighbours(cell_t* cellA)
         {
       
             if(sameParent)                                                                      // If the same parent has been detected, copy the rest of the address from cellA
-                tempNeighbourAddress[i][slot] = cellA->m_address.getRaw()[slot];
+                tempNeighbourAddress[i][slot] = cell->address.m_rawAddress[slot];
             else
             {
-                uint8_t slotVal = cellA->m_address.getRaw()[slot];                              // Get the value: For this cell (cellA), at depth (slot)
+                uint8_t slotVal = cell->address.m_rawAddress[slot];                            // Get the value: For this cell (cellA), at depth (slot)
                 int axis = i / 2;                                                               // For i (0..5) should result in: 0 0 1 1 2 2
-                
                 
                 if(slotVal == 0)                                                                // Check against zero as the table does not support
                     tempNeighbourAddress[i][slot] = 0;
@@ -359,24 +342,24 @@ void octree_t::findNeighbours(cell_t* cellA)
                     sameParent = true;                                                          // if it has the same parent then proceed and copy the remaining address slots from the current address as they will be the same
             }
         }
-        tempAddress[i].populateAddress(tempNeighbourAddress[i]);                                // Populate actual address
+        tempAddress[i].m_rawAddress = tempNeighbourAddress[i];                                  // Populate actual address
     }
   
     for(int i = 0; i < 6; ++i)                                                                  // Actually find and assign the neighbour if such exists at the given address
     {
         unsigned int addressKey = tempAddress[i].getFormatted();
-        cell_t* cellB = m_cellAddresses[addressKey];
+        cell_t* neighbour_cell = m_cellAddresses[addressKey];
         
-        if(cellB)                                                                               // Proceed if there is such a neighbouring cell
+        if(neighbour_cell)                                                                      // Proceed if there is such a neighbouring cell
         {
             CONTACT contact = (CONTACT)i;
       
             if(i & 1)                                                                           // todo :: Temporary save the neighbours addresses in the order:
-                cellA->neighbours[contact - 1] = cellB;
+                cell->neighbours[contact - 1] = neighbour_cell;
             else
-                cellA->neighbours[contact + 1] = cellB;
+                cell->neighbours[contact + 1] = neighbour_cell;
       
-            setFaceTwins(cellB, cellA, contact);                                                // Set face twins of the neighbouring cells based on their contact face
+            setFaceTwins(neighbour_cell, cell, contact);                                        // Set face twins of the neighbouring cells based on their contact face
         }
     }
 
@@ -404,7 +387,7 @@ void octree_t::setFaceRelationships()
     {
         if(cell == 0 || cell == root) continue;                                                 // Continue if cell is null
 
-        int location = cell->getPosInParent();
+        int location = cell->position_in_parent;
 
         for(int side = 0; side < 3; ++side)
         {
