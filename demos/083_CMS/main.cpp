@@ -17,7 +17,6 @@
 
 #include "isosurface.hpp"
 #include "algcms.hpp"
-#include "mesh.hpp"
 
 struct ExampleClass
 {
@@ -244,7 +243,7 @@ int main(int argc, char *argv[])
     };
 
     cms::AlgCMS cmsAlg(&iso, container, MIN_OCTREE_RES, MAX_OCTREE_RES);
-    cmsAlg.setComplexSurfThresh(COMPLEX_SURFACE_THRESHOLD);                 // Set the complex surface threshold
+    cmsAlg.complex_surface_threshold = COMPLEX_SURFACE_THRESHOLD;                 // Set the complex surface threshold
 
     cms::mesh_t mesh;
     cmsAlg.extractSurface(mesh);                                            // Proceed to extract the surface <runs the algorithm>

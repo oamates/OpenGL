@@ -67,8 +67,8 @@ static const uint8_t NEIGHBOUR_ADDRESS_TABLE[3][8] =
 //=======================================================================================================================================================================================================================
 void octree_t::makeStructure()
 {
-    Index3D c000 = Index3D(0, 0, 0);                                            // Establish Root
-    Index3D offsets = m_samples - 1;
+    glm::ivec3 c000 = glm::ivec3(0);                                            // Establish Root
+    glm::ivec3 offsets = samples - 1;
     root = new cell_t(0, BRANCH, 0, 0, c000, offsets, 0);
     cells.push_back(root);                                                      // Pushing the root as the first element of the cell array
     acquireCellInfo(root);                                                      // Calculating and storing information about the root cell
@@ -76,35 +76,29 @@ void octree_t::makeStructure()
 }
 
 void octree_t::acquireCellInfo(cell_t* c)
-{
+{  
+    glm::ivec3 index = c->index;                                                                       // Extracting values from cell
+    glm::ivec3 offset = c->offset;
   
-    Index3D index = c->index;                                                                       // Extracting values from cell
-    Index3D offset = c->offset;
-
-  
-    Index3D ptIndices[8];                                                                           // Corner information
-    ptIndices[0] = Index3D(index.m_x,              index.m_y,              index.m_z);              // c000
-    ptIndices[1] = Index3D(index.m_x,              index.m_y,              index.m_z + offset.m_z); // c001
-    ptIndices[2] = Index3D(index.m_x,              index.m_y + offset.m_y, index.m_z);              // c010
-    ptIndices[3] = Index3D(index.m_x,              index.m_y + offset.m_y, index.m_z + offset.m_z); // c011
-    ptIndices[4] = Index3D(index.m_x + offset.m_x, index.m_y,              index.m_z);              // c100
-    ptIndices[5] = Index3D(index.m_x + offset.m_x, index.m_y,              index.m_z + offset.m_z); // c101
-    ptIndices[6] = Index3D(index.m_x + offset.m_x, index.m_y + offset.m_y, index.m_z);              // c110
-    ptIndices[7] = Index3D(index.m_x + offset.m_x, index.m_y + offset.m_y, index.m_z + offset.m_z); // c111
-
+    glm::ivec3 indices[8];                                                                           // Corner information
+    indices[0] = glm::ivec3(index.x,            index.y,            index.z);            // c000
+    indices[1] = glm::ivec3(index.x,            index.y,            index.z + offset.z); // c001
+    indices[2] = glm::ivec3(index.x,            index.y + offset.y, index.z);            // c010
+    indices[3] = glm::ivec3(index.x,            index.y + offset.y, index.z + offset.z); // c011
+    indices[4] = glm::ivec3(index.x + offset.x, index.y,            index.z);            // c100
+    indices[5] = glm::ivec3(index.x + offset.x, index.y,            index.z + offset.z); // c101
+    indices[6] = glm::ivec3(index.x + offset.x, index.y + offset.y, index.z);            // c110
+    indices[7] = glm::ivec3(index.x + offset.x, index.y + offset.y, index.z + offset.z); // c111
                                                                                                     // Clamp the ends of the samples to avoid garbage
     for(int i = 0; i < 8; ++i)                                                                      // todo :: optimize check
     {
-        if(ptIndices[i].m_x == m_samples.m_x)
-            ptIndices[i].m_x -= 1;
-        if(ptIndices[i].m_y == m_samples.m_y)
-            ptIndices[i].m_y -= 1;
-        if(ptIndices[i].m_z == m_samples.m_z)
-            ptIndices[i].m_z -= 1;
+        if(indices[i].x == samples.x) indices[i].x -= 1;
+        if(indices[i].y == samples.y) indices[i].y -= 1;
+        if(indices[i].z == samples.z) indices[i].z -= 1;
     }
 
     for(int i = 0; i < 8; ++i)
-        c->point_indices[i] = ptIndices[i];
+        c->point_indices[i] = indices[i];
 }
 
 void octree_t::subdivideCell(cell_t* parent)
@@ -112,65 +106,63 @@ void octree_t::subdivideCell(cell_t* parent)
     unsigned int parent_level = parent->level;
     int this_level = parent_level + 1;
 
-    Index3D offsets;
+    glm::ivec3 offsets;
 
-    offsets[0] = ((m_samples[0] - 1) / util::intPower(2, this_level));                             // change because octree starts from 0
-    offsets[1] = ((m_samples[1] - 1) / util::intPower(2, this_level));
-    offsets[2] = ((m_samples[2] - 1) / util::intPower(2, this_level));
+    offsets[0] = ((samples[0] - 1) / util::intPower(2, this_level));                             // change because octree starts from 0
+    offsets[1] = ((samples[1] - 1) / util::intPower(2, this_level));
+    offsets[2] = ((samples[2] - 1) / util::intPower(2, this_level));
 
-    int parIndX = parent->index.m_x;
-    int parIndY = parent->index.m_y;
-    int parIndZ = parent->index.m_z;
+    int parIndX = parent->index.x;
+    int parIndY = parent->index.y;
+    int parIndZ = parent->index.z;
 
     for(int i = 0; i < 8; ++i)
     {
-        Index3D c000;
+        glm::ivec3 c000;
 
         switch(i)
         {
             case 0:
-                c000.m_x = parIndX;
-                c000.m_y = parIndY;
-                c000.m_z = parIndZ;
+                c000.x = parIndX;
+                c000.y = parIndY;
+                c000.z = parIndZ;
             break;
             case 1:
-                c000.m_x = parIndX;
-                c000.m_y = parIndY;
-                c000.m_z = parIndZ + offsets[2];
+                c000.x = parIndX;
+                c000.y = parIndY;
+                c000.z = parIndZ + offsets[2];
             break;
             case 2:
-                c000.m_x = parIndX;
-                c000.m_y = parIndY + offsets[1];
-                c000.m_z = parIndZ;
+                c000.x = parIndX;
+                c000.y = parIndY + offsets[1];
+                c000.z = parIndZ;
             break;
             case 3:
-                c000.m_x = parIndX;
-                c000.m_y = parIndY + offsets[1];
-                c000.m_z = parIndZ + offsets[2];
+                c000.x = parIndX;
+                c000.y = parIndY + offsets[1];
+                c000.z = parIndZ + offsets[2];
             break;
             case 4:
-                c000.m_x = parIndX + offsets[0];
-                c000.m_y = parIndY;
-                c000.m_z = parIndZ;
+                c000.x = parIndX + offsets[0];
+                c000.y = parIndY;
+                c000.z = parIndZ;
             break;
             case 5:
-                c000.m_x = parIndX + offsets[0];
-                c000.m_y = parIndY;
-                c000.m_z = parIndZ + offsets[2];
+                c000.x = parIndX + offsets[0];
+                c000.y = parIndY;
+                c000.z = parIndZ + offsets[2];
             break;
             case 6:
-                c000.m_x = parIndX + offsets[0];
-                c000.m_y = parIndY + offsets[1];
-                c000.m_z = parIndZ;
+                c000.x = parIndX + offsets[0];
+                c000.y = parIndY + offsets[1];
+                c000.z = parIndZ;
             break;
             case 7:
-                c000.m_x = parIndX + offsets[0];
-                c000.m_y = parIndY + offsets[1];
-                c000.m_z = parIndZ + offsets[2];
+                c000.x = parIndX + offsets[0];
+                c000.y = parIndY + offsets[1];
+                c000.z = parIndZ + offsets[2];
             break;
         }
-
-        assert(m_sampleData.getIndexAt(c000) < m_sampleData.size());
 
         cell_t* c = new cell_t(cells.size(), BRANCH, parent, this_level, c000, offsets, i);     // Create new Cell on he heap
         cells.push_back(c);
@@ -234,13 +226,13 @@ bool octree_t::checkForEdgeAmbiguity(cell_t* c)
     {
         int cellPtA = EDGE_VERTICES[i][0];                                                      // Getting the start and end cell points of this edge
         int cellPtB = EDGE_VERTICES[i][1];
-        Index3D ptA = c->point_indices[cellPtA];                                                          // Getting the start and end sample indices of this edge
-        Index3D ptB = c->point_indices[cellPtB];
+        glm::ivec3 ptA = c->point_indices[cellPtA];                                                          // Getting the start and end sample indices of this edge
+        glm::ivec3 ptB = c->point_indices[cellPtB];
         int lastIndex = m_sampleData.getIndexAt(ptB);
-        Index3D prevIndex = ptA;                                                                // Setting the initial index to the start point index
+        glm::ivec3 prevIndex = ptA;                                                                // Setting the initial index to the start point index
         int crossingPoints = 0;                                                                 // Resetting the crossing point of this edge to zero
         uint8_t edgeDirection = EDGE_DIRECTION[i];                                              // Get the edge direction from the static table
-        Index3D index = ptA;
+        glm::ivec3 index = ptA;
 
         while(index[edgeDirection] <= ptB[edgeDirection])
         {
@@ -267,14 +259,14 @@ bool octree_t::checkForComplexSurface(cell_t* c)
   
     for(int i = 0; i < 7; ++i)                                                                  // Loop through all the cell points and check current point against all the rest remaining
     {
-        Index3D indA = c->point_indices[i];
+        glm::ivec3 indA = c->point_indices[i];
         glm::vec3 normalA;
         findGradient(normalA, indA);
         normalA = glm::normalize(normalA);
 
         for(int j = i + 1; j < 8; ++j)
         {
-            Index3D indB = c->point_indices[j];
+            glm::ivec3 indB = c->point_indices[j];
             glm::vec3 normalB;
             findGradient(normalB, indB);
             normalB = glm::normalize(normalB);//.normalize();
@@ -286,7 +278,7 @@ bool octree_t::checkForComplexSurface(cell_t* c)
     return complexSurface;                                                                      // Return result of check for a comples surface in this cell
 }
 
-void octree_t::findGradient(glm::vec3& o_gradient, const Index3D& i_array3dInds)
+void octree_t::findGradient(glm::vec3& o_gradient, const glm::ivec3& i_array3dInds)
 {
   
     glm::vec3 pos = m_sampleData.getPositionAt(i_array3dInds);                                       // Finding and storing the xyz position of the sample and it's local bbox

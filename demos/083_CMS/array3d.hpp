@@ -6,26 +6,23 @@
 
 #include <glm/glm.hpp>
 
-#include "index3d.hpp"
 #include "range.hpp"
 #include "edge.hpp"
 
 namespace cms
 {
 
-// Array3D :: wrapper for a 3D array, used for 'float' and 'EdgeBlock' types, in the sample and edge array
-
-template <class T> struct Array3D
+template<typename T> struct Array3D
 {
-    std::vector<T> m_data;                                                              // The dynamic 1D array of the actual data
-    Index3D m_indices;                                                                  // An Index3D storing the size of the 3D array wrapper in X, Y and Z
+    std::vector<T> data;                                                                // The dynamic 1D array of the actual data
+    glm::ivec3 size;                                                                    // An Index3D storing the size of the 3D array wrapper in X, Y and Z
     Range m_bbox[3];                                                                    // The BBox of the Array3D stored as an array of 3 Ranges (-x +x), (-y, +y), (-z, +z)
     
     Array3D()                                                                           // Empty constructor - sets bbox to (-1,1) in xyz
     {
         for(int i = 0; i < 3; ++i)
         {
-            m_indices[i] = 1;
+            size[i] = 1;
             m_bbox[i] = Range(-1.0f, 1.0f);
         }
     }
@@ -35,100 +32,55 @@ template <class T> struct Array3D
         for(int i = 0; i < 3; ++i)
             m_bbox[i] = bbox[i];
 
-        m_indices.m_x = xSlab;
-        m_indices.m_y = ySlab;
-        m_indices.m_z = zSlab;
-        m_data.resize(m_indices.m_x * m_indices.m_y * m_indices.m_z);
+        size.x = xSlab;
+        size.y = ySlab;
+        size.z = zSlab;
+        data.resize(size.x * size.y * size.z);
     }
 
     ~Array3D() {}
 
-
     void operator() (const int x, const int y, const int z, T value)
     {
-        assert(x < m_indices.m_x);
-        assert(y < m_indices.m_y);
-        assert(z < m_indices.m_z);
-        m_data[(x * m_indices.m_y + y) * m_indices.m_z + z] = value;
+        data[(x * size.y + y) * size.z + z] = value;
     }
 
-    
-    int size() const                                                                            // Returns the size of the whole flattened Array3D
-        { return m_data.size(); }
-
-    // Used to set the value at a specific position in the Array3D, params :: three integers denoting the location, and a value of type T
     void setValueAt(int x, int y, int z, T value)
     {
-        assert(x < m_indices.m_x);
-        assert(y < m_indices.m_y);
-        assert(z < m_indices.m_z);
-
-        m_data[(x * m_indices.m_y + y) * m_indices.m_z + z] = value;
+        data[size.z * (size.y * x + y) + z] = value;
     }
 
-    // Used to set the value at a specific position in the Array3D, params :: an Index3D denoting the location, and a value of type T
-    void setValueAt(Index3D xyz, T value)
+    void setValueAt(glm::ivec3 xyz, T value)
     {
-        assert(xyz.m_x < m_indices.m_x);
-        assert(xyz.m_y < m_indices.m_y);
-        assert(xyz.m_z < m_indices.m_z);
-        m_data[(xyz.m_x * m_indices.m_y + xyz.m_y) * m_indices.m_z + xyz.m_z] = value;
+        data[(xyz.x * size.y + xyz.y) * size.z + xyz.z] = value;
     }
 
-    // Returns the value from a specific position in the Array3D, params :: three integers denoting the location
     T getValueAt(int x, int y, int z) const
     {
-        assert(x < m_indices.m_x);
-        assert(y < m_indices.m_y);
-        assert(z < m_indices.m_z);
-        return m_data[(x * m_indices.m_y + y) * m_indices.m_z + z];
+        return data[(x * size.y + y) * size.z + z];
     }
 
-    // Returns the value from a specific position in the Array3D, params :: an Index3D denoting the location
-    T getValueAt(Index3D xyz) const
+    T getValueAt(glm::ivec3 xyz) const
     {
-        assert(xyz.m_x < m_indices.m_x); 
-        assert(xyz.m_y < m_indices.m_y); 
-        assert(xyz.m_z < m_indices.m_z);
-        return m_data[(xyz.m_x * m_indices.m_y + xyz.m_y) * m_indices.m_z + xyz.m_z];
+        return data[(xyz.x * size.y + xyz.y) * size.z + xyz.z];
     }
 
-    // Returning the flattened index in the actual 1D array, params :: Three integers denoting the location in the Array3D
     int getIndexAt(int x, int y, int z) const
     {
-        assert(x < m_indices.m_x);
-        assert(y < m_indices.m_y);
-        assert(z < m_indices.m_z);
-        return (x * m_indices.m_y + y) * m_indices.m_z + z;
+        return (x * size.y + y) * size.z + z;
     }
 
-    // Returning the flattened index in the actual 1D array, params :: an Index3D denoting the location in the Array3D
-    int getIndexAt(Index3D xyz) const
+    int getIndexAt(glm::ivec3 xyz) const
     {
-        assert(xyz.m_x < m_indices.m_x);
-        assert(xyz.m_y < m_indices.m_y);
-        assert(xyz.m_z < m_indices.m_z);
-        return (xyz.m_x * m_indices.m_y + xyz.m_y) * m_indices.m_z + xyz.m_z;
-    }
-
-    // Returns a Vec3 of the exact position in 3D space of a specific sample, params :: three integers denoting the location of the sample in the Array3D
-    glm::vec3 getPositionAt(int x, int y, int z) const
-    {
-        const float tx = static_cast<float>(x) / static_cast<float>(m_indices.m_x - 1);
-        const float ty = static_cast<float>(y) / static_cast<float>(m_indices.m_y - 1);
-        const float tz = static_cast<float>(z) / static_cast<float>(m_indices.m_z - 1);
-
-        return glm::vec3(m_bbox[0].m_lower + (m_bbox[0].m_upper - m_bbox[0].m_lower) * tx,
-                         m_bbox[1].m_lower + (m_bbox[1].m_upper - m_bbox[0].m_lower) * ty,
-                         m_bbox[2].m_lower + (m_bbox[2].m_upper - m_bbox[0].m_lower) * tz);
+        return (xyz.x * size.y + xyz.y) * size.z + xyz.z;
     }
 
     // Returns a Vec3 of the exact position in 3D space of a specific sample, params :: An Index3D denoting the location of the sample in the Array3D
-    glm::vec3 getPositionAt(Index3D xyz) const
+    glm::vec3 getPositionAt(glm::ivec3 xyz) const
     {
-        const float tx = static_cast<float>(xyz.m_x) / static_cast<float>(m_indices.m_x - 1);
-        const float ty = static_cast<float>(xyz.m_y) / static_cast<float>(m_indices.m_y - 1);
-        const float tz = static_cast<float>(xyz.m_z) / static_cast<float>(m_indices.m_z - 1);
+        const float tx = static_cast<float>(xyz.x) / static_cast<float>(size.x - 1);
+        const float ty = static_cast<float>(xyz.y) / static_cast<float>(size.y - 1);
+        const float tz = static_cast<float>(xyz.z) / static_cast<float>(size.z - 1);
 
         return glm::vec3(m_bbox[0].m_lower + (m_bbox[0].m_upper - m_bbox[0].m_lower) * tx,
                          m_bbox[1].m_lower + (m_bbox[1].m_upper - m_bbox[0].m_lower) * ty,
@@ -138,19 +90,19 @@ template <class T> struct Array3D
     // Resize the Array3D, params :: three integer values corresponding to X, Y and Z
     void resize(int xSlab, int ySlab, int zSlab)
     {
-        m_indices.m_x = xSlab;
-        m_indices.m_y = ySlab;
-        m_indices.m_z = zSlab;
-        m_data.resize(m_indices.m_x * m_indices.m_y * m_indices.m_z);
+        size.x = xSlab;
+        size.y = ySlab;
+        size.z = zSlab;
+        data.resize(size.x * size.y * size.z);
     }
 
     // Resize the Array3D, params :: an Index3D giving the sizes in X, Y and Z
-    void resize(Index3D slabs)
+    void resize(glm::ivec3 slabs)
     {
-        m_indices.m_x = slabs.m_x;
-        m_indices.m_y = slabs.m_y;
-        m_indices.m_z = slabs.m_z;
-        m_data.resize(m_indices.m_x * m_indices.m_y * m_indices.m_z);
+        size.x = slabs.x;
+        size.y = slabs.y;
+        size.z = slabs.z;
+        data.resize(size.x * size.y * size.z);
     }
 
     // Setting the BBox of the Array3D, params :: an array of ranges (should be size 3) with the min and max values in X, Y and Z

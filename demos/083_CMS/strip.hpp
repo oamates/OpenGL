@@ -1,7 +1,7 @@
 #ifndef _cms_strip_included_158273456437850624378650234765243786578436578436587
 #define _cms_strip_included_158273456437850624378650234765243786578436578436587
 
-#include "index3d.hpp"
+#include <glm/glm.hpp>
 
 namespace cms
 {
@@ -12,11 +12,11 @@ struct strip_t
 {
     bool skip;
     bool loop;
-    int edge[2];            // local cell edge indices
-    int data[2];            // global datastruct edge indices
+    int edge[2];                    // local cell edge indices
+    int data[2];                    // global datastruct edge indices
 
-    Index3D block[2];       // 3D Index of the EdgeBlock into the global datastruct
-    int dir[2];             // Direction of the edge on the edge block
+    glm::ivec3 block[2];            // 3D Index of the EdgeBlock into the global datastruct
+    int dir[2];                     // Direction of the edge on the edge block
 
     strip_t()
         : skip(true), loop(false)

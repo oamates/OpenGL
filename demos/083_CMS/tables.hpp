@@ -1,3 +1,6 @@
+#ifndef _cms_tables_included_23874198751934875619834756764365234875634513472468
+#define _cms_tables_included_23874198751934875619834756764365234875634513472468
+
 #include <cstdint>
 
 namespace cms
@@ -152,4 +155,6 @@ static const int8_t EDGE_VERTICES[12][2] =
     {6, 7}                  // edge 11
 };
 
-} //namespace cms
+} // namespace cms
+
+#endif // _cms_tables_included_23874198751934875619834756764365234875634513472468
