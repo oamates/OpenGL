@@ -216,8 +216,6 @@ bool octree_t::checkForSubdivision(cell_t* c)
 
 bool octree_t::checkForSurface(cell_t* c)
 {
-//    const Index3D* p = c->point_indices;                                                       // Get a pointer to the index of the c000 corner of this point
-  
     int inside = 0;                                                                             // Check if all the corners are inside then discard
     for(int i = 0; i < 8; ++i)
     {
@@ -231,7 +229,6 @@ bool octree_t::checkForSurface(cell_t* c)
 bool octree_t::checkForEdgeAmbiguity(cell_t* c)
 {
     bool edgeAmbiguity = false;                                                                 // Initialise return value
-//    const Index3D *indPtr = c->getPointInds();                                                  // Getting the index of the c000 point of the current cell
   
     for(int i = 0; i < 12; ++i)                                                                 // Loop through all the edges of the cell
     {
@@ -268,42 +265,38 @@ bool octree_t::checkForComplexSurface(cell_t* c)
 {
     bool complexSurface = false;                                                                // Initialise return value
   
-//    const Index3D* p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
-  
     for(int i = 0; i < 7; ++i)                                                                  // Loop through all the cell points and check current point against all the rest remaining
     {
         Index3D indA = c->point_indices[i];
-        Vec3 normalA;
+        glm::vec3 normalA;
         findGradient(normalA, indA);
-        normalA.normalize();
+        normalA = glm::normalize(normalA);
 
         for(int j = i + 1; j < 8; ++j)
         {
             Index3D indB = c->point_indices[j];
-            Vec3 normalB;
+            glm::vec3 normalB;
             findGradient(normalB, indB);
-            normalB.normalize();
+            normalB = glm::normalize(normalB);//.normalize();
 
-            if(normalA.dot(normalB) < m_complexSurfThresh)
+            if(glm::dot(normalA, normalB) < m_complexSurfThresh)
                 complexSurface = true;
         }
     }
     return complexSurface;                                                                      // Return result of check for a comples surface in this cell
 }
 
-void octree_t::findGradient(Vec3& o_gradient, const Index3D& i_array3dInds)
+void octree_t::findGradient(glm::vec3& o_gradient, const Index3D& i_array3dInds)
 {
   
-    Vec3 pos = m_sampleData.getPositionAt(i_array3dInds);                                       // Finding and storing the xyz position of the sample and it's local bbox
-    Vec3 dimensions;
-    for(int i = 0; i < 3; ++i)
-        dimensions[i] = 0.5f * m_offsets[i];
+    glm::vec3 pos = m_sampleData.getPositionAt(i_array3dInds);                                       // Finding and storing the xyz position of the sample and it's local bbox
+    glm::vec3 dimensions = 0.5f * offsets;
                                                                                                 // Calculating the Forward Difference
-    float dx = (*m_fn)(pos.m_x + dimensions.m_x, pos.m_y,                  pos.m_z);
-    float dy = (*m_fn)(pos.m_x,                  pos.m_y + dimensions.m_y, pos.m_z);
-    float dz = (*m_fn)(pos.m_x,                  pos.m_y,                  pos.m_z + dimensions.m_z);
+    float dx = (*m_fn)(pos.x + dimensions.x, pos.y,                pos.z);
+    float dy = (*m_fn)(pos.x,                pos.y + dimensions.y, pos.z);
+    float dz = (*m_fn)(pos.x,                pos.y,                pos.z + dimensions.z);
     float val = m_sampleData.getValueAt(i_array3dInds);
-    o_gradient = Vec3(dx - val, dy - val, dz - val);
+    o_gradient = glm::vec3(dx - val, dy - val, dz - val);
 }
 
 void octree_t::findNeighbours(cell_t* cell)

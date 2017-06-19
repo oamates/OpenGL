@@ -2,7 +2,6 @@
 #define _cms_face_included_5918463059816203857612035876104561384756138974561394
 
 #include "cell.hpp"
-#include "vec3.hpp"
 #include "util.hpp"
 #include "strip.hpp"
 
@@ -26,7 +25,6 @@ struct face_t
     int cell_index;                         // the unique identifier of the face's cell
     bool skip;                              // a flag denoting whether the face has been taken care of
     FaceState state;                        // the state enumerator of the face
-    Vec3 featurePosition;                   // the exact face sharp feature position in 3d space, todo :: to be used
     face_t* twin;                           // a ptr to the face's twin face
     face_t* parent;                         // a ptr to the face's parent face
     face_t* children[4];                    // an array of 4 ptrs of the face's child face's
@@ -38,7 +36,7 @@ struct face_t
 
     face_t(int id, int cell_index)
         : id(id), cell_index(cell_index), 
-          skip(true), state(BRANCH_FACE), /*sharpFeature(false),*/ featurePosition(Vec3(0.0f)), twin(0), parent(0)
+          skip(true), state(BRANCH_FACE), twin(0), parent(0)
     {
         for(int i = 0; i < 4; ++i)
             children[i] = 0;

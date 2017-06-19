@@ -36,9 +36,6 @@ struct address_t
     void reset()                                                                // Resets all the address to zero for the full size of the address
         { m_rawAddress.assign(ADDRESS_SIZE, 0); }
     
-//    void populateAddress(const std::vector<uint8_t>& rawAddress)                // Populate address with an existing raw address
-//        { m_rawAddress = rawAddress; }
-
     // Retrieves the address as a single uint
     // We use an unsigned integers (uint) which is 32-bit on all* platforms and can store a range of 4 billion
     // which is 10 digits. Thus can safely be used for up to depth 9 (2^9 == 512 samples).

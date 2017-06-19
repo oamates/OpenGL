@@ -7,7 +7,6 @@
 #include "vertex.hpp"
 #include "isosurface.hpp"
 #include "mesh.hpp"
-#include "point.hpp"
 #include "edge.hpp"
 #include "range.hpp"
 #include "cell.hpp"
@@ -17,6 +16,19 @@
 
 namespace cms
 {
+
+struct point_t
+{
+    glm::vec3 position;
+    float value;
+
+    point_t(const glm::vec3& position, float value) 
+        : position(position), value(value)
+    {}
+
+    ~point_t() {};
+
+};
 
 // AlgCMS :: The actual Cubical Marching Squares isosurface extraction algorithm
 // Inherits from the abstract base class Isosurface
@@ -66,8 +78,6 @@ struct AlgCMS : public Isosurface
     float getComplexSurfThresh() const;                                         // Returning the value used for the check of a complex surface
     void extractSurface(mesh_t& mesh);                                          // The main function which would sample the function and extract a surface out of it, saving it into a given mesh object
     bool sampleFunction();                                                      // The sampling function used by the extractSurface function, it could be called separately but not necessary
-    bool snapMedian() const;                                                    // Returns the snap to median value
-    void setSnapMedian(bool snapMedian);                                        // Sets the snap median to surface value
 
 
     //===================================================================================================================================================================================================================
@@ -95,7 +105,7 @@ struct AlgCMS : public Isosurface
           m_yMax, m_yMin,
           m_zMax, m_zMin;
     
-    Vec3 m_offsets;                                                             // the dimensions of the bbox as a vec3
+    glm::vec3 m_offsets;                                                        // the dimensions of the bbox as a vec3
     cell_t* octree_root;                                                        // a pointer to the root of the octree
 
     unsigned int m_octMinLvl;                                                   // The level to which the base grid is to be subdivided (foundation of the octree)
@@ -104,22 +114,20 @@ struct AlgCMS : public Isosurface
     float m_complexSurfThresh;                                                  // The user defined threshold of what should be regarded as a complex surface within a cell
     unsigned int m_zeroApproximation;                                           // the linear interpolation quality, e.g. the maximum number of recursions
     
-    bool m_snapMedian;                                                          // A flag which the user can set, whether the median point in each triangle fan should be interpolated (snapped) onto the isosurf
-
-    
     void initSamples();                                                         // initialisation of the number of samples based on the octree levels this should be separate from the initialize function
     
     void initialize();                                                          // Called by all the constructors, initializes some member variables to their default values.
 
-    Vec3 findCrossingPoint(unsigned int quality, const Point& pt0, const Point& pt1);
+    glm::vec3 findCrossingPoint(unsigned int quality, const point_t& pt0, const point_t& pt1);
   
     void makeFaceSegments(const Index3D inds[], face_t* i_face);
     void tessellateComponent(mesh_t& mesh, std::vector<unsigned int>& component);
     void makeTri(mesh_t& mesh, std::vector<unsigned int>& i_threeVertInds);
     void makeTriFan(mesh_t& mesh, std::vector<unsigned int>& i_cellVertInds);
     void makeTriSeq(mesh_t& mesh, std::vector<unsigned int>& i_cellVertInds);
-    void findGradient(Vec3& o_gradient, const Vec3& i_dimensions, const Vec3& i_position);
-    void findGradient(Vec3& o_gradient, const Vec3& i_dimensions, const Vec3& i_position, const float& i_value);
+
+    glm::vec3 findGradient(const glm::vec3& dimensions, const glm::vec3& position);
+    glm::vec3 findGradient(const glm::vec3& dimensions, const glm::vec3& position, const float& value);
     
     void segmentsTraversal(cell_t* c);                                            // A recursive function that will take the Root Cell and traverse the tree extracting the surface from each LEAF
 

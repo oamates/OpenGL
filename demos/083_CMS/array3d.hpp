@@ -3,7 +3,9 @@
 
 #include <cmath>
 #include <vector>
-#include "vec3.hpp"
+
+#include <glm/glm.hpp>
+
 #include "index3d.hpp"
 #include "range.hpp"
 #include "edge.hpp"
@@ -110,43 +112,27 @@ template <class T> struct Array3D
     }
 
     // Returns a Vec3 of the exact position in 3D space of a specific sample, params :: three integers denoting the location of the sample in the Array3D
-    Vec3 getPositionAt(int x, int y, int z) const
+    glm::vec3 getPositionAt(int x, int y, int z) const
     {
-        Vec3 pos;
-
         const float tx = static_cast<float>(x) / static_cast<float>(m_indices.m_x - 1);
-        pos.m_x = m_bbox[0].m_lower + (m_bbox[0].m_upper - m_bbox[0].m_lower) * tx;
         const float ty = static_cast<float>(y) / static_cast<float>(m_indices.m_y - 1);
-        pos.m_y = m_bbox[1].m_lower + (m_bbox[1].m_upper - m_bbox[0].m_lower)*ty;
         const float tz = static_cast<float>(z) / static_cast<float>(m_indices.m_z - 1);
-        pos.m_z = m_bbox[2].m_lower + (m_bbox[2].m_upper - m_bbox[0].m_lower)*tz;
 
-        assert((pos.m_x >= m_bbox[0].m_lower) && (pos.m_x <= m_bbox[0].m_upper));
-        assert((pos.m_y >= m_bbox[1].m_lower) && (pos.m_y <= m_bbox[1].m_upper));
-        assert((pos.m_z >= m_bbox[2].m_lower) && (pos.m_z <= m_bbox[2].m_upper));
-
-        return pos;
+        return glm::vec3(m_bbox[0].m_lower + (m_bbox[0].m_upper - m_bbox[0].m_lower) * tx,
+                         m_bbox[1].m_lower + (m_bbox[1].m_upper - m_bbox[0].m_lower) * ty,
+                         m_bbox[2].m_lower + (m_bbox[2].m_upper - m_bbox[0].m_lower) * tz);
     }
 
     // Returns a Vec3 of the exact position in 3D space of a specific sample, params :: An Index3D denoting the location of the sample in the Array3D
-    Vec3 getPositionAt(Index3D xyz) const
+    glm::vec3 getPositionAt(Index3D xyz) const
     {
-        Vec3 pos;
-        
         const float tx = static_cast<float>(xyz.m_x) / static_cast<float>(m_indices.m_x - 1);
-        pos.m_x = m_bbox[0].m_lower + (m_bbox[0].m_upper - m_bbox[0].m_lower) * tx;
-        
         const float ty = static_cast<float>(xyz.m_y) / static_cast<float>(m_indices.m_y - 1);
-        pos.m_y = m_bbox[1].m_lower + (m_bbox[1].m_upper - m_bbox[0].m_lower) * ty;
-        
         const float tz = static_cast<float>(xyz.m_z) / static_cast<float>(m_indices.m_z - 1);
-        pos.m_z = m_bbox[2].m_lower + (m_bbox[2].m_upper - m_bbox[0].m_lower) * tz;
-        
-        assert((pos.m_x >= m_bbox[0].m_lower)&&(pos.m_x <= m_bbox[0].m_upper));
-        assert((pos.m_y >= m_bbox[1].m_lower)&&(pos.m_y <= m_bbox[1].m_upper));
-        assert((pos.m_z >= m_bbox[2].m_lower)&&(pos.m_z <= m_bbox[2].m_upper));
-        
-        return pos;
+
+        return glm::vec3(m_bbox[0].m_lower + (m_bbox[0].m_upper - m_bbox[0].m_lower) * tx,
+                         m_bbox[1].m_lower + (m_bbox[1].m_upper - m_bbox[0].m_lower) * ty,
+                         m_bbox[2].m_lower + (m_bbox[2].m_upper - m_bbox[0].m_lower) * tz);
     }
 
     // Resize the Array3D, params :: three integer values corresponding to X, Y and Z

@@ -6,8 +6,6 @@
 #include "address.hpp"
 #include "vertex.hpp"
 #include "range.hpp"
-#include "vec3.hpp"
-#include "point.hpp"
 #include "index3d.hpp"
 #include "face.hpp"
 #include "util.hpp"

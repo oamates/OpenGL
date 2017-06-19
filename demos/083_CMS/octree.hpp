@@ -53,14 +53,14 @@ struct octree_t
     Array3D<float>& m_sampleData;
     unsigned int& m_minLvl;
     unsigned int& m_maxLvl;
-    Vec3& m_offsets;
+    glm::vec3& offsets;
     Isosurface* m_fn;
     float& m_complexSurfThresh;
 
     octree_t(Index3D& samples, Array3D<float>& sampleData, unsigned int& minLvl, unsigned int& maxLvl, 
-             Vec3& offsets, Isosurface* fn, float& complexSurfThresh) 
+             glm::vec3& offsets, Isosurface* fn, float& complexSurfThresh) 
         : m_samples(samples), m_sampleData(sampleData), m_minLvl(minLvl), m_maxLvl(maxLvl),
-          m_offsets(offsets), m_fn(fn), m_complexSurfThresh(complexSurfThresh)
+          offsets(offsets), m_fn(fn), m_complexSurfThresh(complexSurfThresh)
     {}
 
     ~octree_t()
@@ -92,7 +92,7 @@ struct octree_t
     bool checkForSubdivision(cell_t* c);                                            // the fucntion which perfoms the checks for subdivision
     bool checkForEdgeAmbiguity(cell_t* c);                                          // the function which checks for more than one sign change on an edge
     bool checkForComplexSurface(cell_t* c);                                         // checks for a complex surface based on the complexSurfaceThreshold
-    void findGradient(Vec3& o_gradient, const Index3D& i_array3dInds);              // finds the gradients at any position in space using the forword difference
+    void findGradient(glm::vec3& o_gradient, const Index3D& i_array3dInds);              // finds the gradients at any position in space using the forword difference
     
     //===================================================================================================================================================================================================================
     // half-face assignment functions

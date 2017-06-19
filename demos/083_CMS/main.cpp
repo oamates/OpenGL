@@ -17,7 +17,6 @@
 
 #include "isosurface.hpp"
 #include "algcms.hpp"
-#include "vec3.hpp"
 #include "mesh.hpp"
 
 struct ExampleClass

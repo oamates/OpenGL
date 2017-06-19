@@ -64,7 +64,6 @@ void AlgCMS::initialize()
 {
     m_zeroApproximation = 2;
     m_complexSurfThresh = 0.6f;
-    m_snapMedian = false;
 
     m_xMax = m_container[0].m_upper;
     m_xMin = m_container[0].m_lower;
@@ -135,16 +134,6 @@ void AlgCMS::setComplexSurfThresh(float i_complexSurfThresh)
 float AlgCMS::getComplexSurfThresh() const
 {
     return m_complexSurfThresh;
-}
-
-bool AlgCMS::snapMedian() const
-{
-    return m_snapMedian;
-}
-
-void AlgCMS::setSnapMedian(bool snapMedian)
-{
-    m_snapMedian = snapMedian;
 }
 
 void AlgCMS::extractSurface(mesh_t& mesh)
@@ -221,63 +210,52 @@ void AlgCMS::makeFaceSegments(const Index3D inds[], face_t* face)
         makeStrip(e1a, e1b, inds, face, 1);
 }
 
-Vec3 AlgCMS::findCrossingPoint(unsigned int quality, const Point& pt0, const Point& pt1)
+glm::vec3 AlgCMS::findCrossingPoint(unsigned int quality, const point_t& pt0, const point_t& pt1)
 {
     const float isoValue = m_fn->iso_level;
 
-    Vec3 p0 = pt0.position;
-    float v0 = pt0.value;
-    Vec3 p1 = pt1.position;
-    float v1 = pt1.value;
+    float alpha = (isoValue - pt0.value) / (pt1.value - pt0.value);
+  
+    glm::vec3 pos = pt0.position + alpha * (pt1.position - pt0.position);                                                                   // Interpolate
+  
+    float val = (*m_fn)(pos.x, pos.y, pos.z);                             // Re-Sample
+  
+    point_t pt(pos, val);                                                         // Save point
 
-    float alpha = (isoValue - v0) / (v1 - v0);
-  
-    Vec3 pos;                                                                   // Interpolate
-    pos.m_x = p0.m_x + alpha * (p1.m_x - p0.m_x);
-    pos.m_y = p0.m_y + alpha * (p1.m_y - p0.m_y);
-    pos.m_z = p0.m_z + alpha * (p1.m_z - p0.m_z);
-  
-    float val = (*m_fn)(pos.m_x, pos.m_y, pos.m_z);                             // Re-Sample
-  
-    Point pt(pos, val);                                                         // Save point
-
+    const float EPSILON = 0.00001f;
   
     if((fabs(isoValue - val) < EPSILON) || (quality == 0))                      // Return if good enough
         return pos;
 
     if(val < 0.0f)
     {
-        if(v0 > 0.0f)
-            pos = findCrossingPoint(quality - 1, pt, pt0);
-        else if(v1 > 0.0f)
-            pos = findCrossingPoint(quality - 1, pt, pt1);
+        pos = (pt0.value > 0.0f) ? findCrossingPoint(quality - 1, pt, pt0):
+                                   findCrossingPoint(quality - 1, pt, pt1);
     }
     else if(val > 0.0f)
     {
-        if(v0 < 0.0f)
-            pos = findCrossingPoint(quality - 1, pt0, pt);
-        else if(v1 < 0.0f)
-            pos = findCrossingPoint(quality - 1, pt1, pt);
+        pos = (pt0.value < 0.0f) ? findCrossingPoint(quality - 1, pt0, pt):
+                                   findCrossingPoint(quality - 1, pt1, pt);
     }
 
     return pos;
 }
 
-void AlgCMS::findGradient(Vec3& o_gradient, const Vec3 &i_dimensions, const Vec3& i_position)
+glm::vec3 AlgCMS::findGradient(const glm::vec3& dimensions, const glm::vec3& position)
 {
-    float val = (*m_fn)(i_position.m_x, i_position.m_y, i_position.m_z);
-    float dx = (*m_fn)(i_position.m_x + i_dimensions.m_x, i_position.m_y, i_position.m_z);
-    float dy = (*m_fn)(i_position.m_x, i_position.m_y + i_dimensions.m_y, i_position.m_z);
-    float dz = (*m_fn)(i_position.m_x, i_position.m_y, i_position.m_z + i_dimensions.m_z);
-    o_gradient = Vec3(dx - val, dy - val, dz - val);
+    float value = (*m_fn)(position.x, position.y, position.z);
+    float dx = (*m_fn)(position.x + dimensions.x, position.y,                position.z);
+    float dy = (*m_fn)(position.x,                position.y + dimensions.y, position.z);
+    float dz = (*m_fn)(position.x,                position.y,                position.z + dimensions.z);
+    return glm::vec3(dx - value, dy - value, dz - value);
 }
 
-void AlgCMS::findGradient(Vec3& o_gradient, const Vec3& i_dimensions, const Vec3& i_position, const float& i_value)
+glm::vec3 AlgCMS::findGradient(const glm::vec3& dimensions, const glm::vec3& position, const float& value)
 {
-    float dx = (*m_fn)(i_position.m_x + i_dimensions.m_x, i_position.m_y, i_position.m_z);
-    float dy = (*m_fn)(i_position.m_x, i_position.m_y + i_dimensions.m_y, i_position.m_z);
-    float dz = (*m_fn)(i_position.m_x, i_position.m_y, i_position.m_z + i_dimensions.m_z);
-    o_gradient = Vec3(dx - i_value, dy - i_value, dz - i_value);
+    float dx = (*m_fn)(position.x + dimensions.x, position.y,                position.z);
+    float dy = (*m_fn)(position.x,                position.y + dimensions.y, position.z);
+    float dz = (*m_fn)(position.x,                position.y,                position.z + dimensions.z);
+    return glm::vec3(dx - value, dy - value, dz - value);
 }
 
 int AlgCMS::getEdgesBetwixt(Range& o_range, const Index3D& pt0, const Index3D& pt1) const
@@ -395,22 +373,18 @@ void AlgCMS::populateStrip(strip_t& strip, const Index3D inds[], int index)
 
 void AlgCMS::makeVertex(strip_t& strip, const int& dir, const Index3D& crossingIndex0, const Index3D& crossingIndex1, int _i)
 {
-    Vec3 pos0 = m_sampleData.getPositionAt(crossingIndex0);                     // Make two points with the info provided and find the surface b/n them
+    glm::vec3 pos0 = m_sampleData.getPositionAt(crossingIndex0);                     // Make two points with the info provided and find the surface b/n them
     float val0 = m_sampleData.getValueAt(crossingIndex0);
-    Point pt0(pos0, val0);
+    point_t pt0(pos0, val0);
     
-    Vec3 pos1 = m_sampleData.getPositionAt(crossingIndex1);
+    glm::vec3 pos1 = m_sampleData.getPositionAt(crossingIndex1);
     float val1 = m_sampleData.getValueAt(crossingIndex1);
-    Point pt1(pos1, val1);
+    point_t pt1(pos1, val1);
     
-    Vec3 crossingPoint = findCrossingPoint(m_zeroApproximation, pt0, pt1);      // Find the exact position and normal at the crossing point
-    Vec3 normal;
-    findGradient(normal, m_offsets, crossingPoint);
-    normal.normalize();
+    glm::vec3 crossingPoint = findCrossingPoint(m_zeroApproximation, pt0, pt1);      // Find the exact position and normal at the crossing point
+    glm::vec3 normal = glm::normalize(findGradient(m_offsets, crossingPoint));
     
-    vertex_t vert;                                                              // Create a vertex from the info
-    vert.position = crossingPoint;
-    vert.normal = normal;
+    vertex_t vert(crossingPoint, normal);                                                              // Create a vertex from the info
     m_vertices.push_back(vert);
     
     strip.data[_i] = m_vertices.size() - 1;                                     // Place the data onto the currect strip
@@ -465,31 +439,16 @@ void AlgCMS::tessellateComponent(mesh_t& mesh, std::vector<unsigned int>& compon
         makeTri(mesh, component);
     else if(numOfInds > 3)                                                      // More than three - find the median and make a fan
     {
-                                                                                // todo :: use maybe if there are no sharp features???
-        float x, y, z;
-        x = y = z = 0.0f;
+        glm::vec3 s(0.0f);
 
         for(unsigned int i = 0; i < component.size(); ++i)
-        {
-            Vec3 currentVert = m_vertices[component[i]].position;
-            x += currentVert.m_x;
-            y += currentVert.m_y;
-            z += currentVert.m_z;
-        }
+            s += m_vertices[component[i]].position;
 
-        Vec3 medVert =  Vec3(x / static_cast<float>(numOfInds),
-                             y / static_cast<float>(numOfInds),
-                             z / static_cast<float>(numOfInds));
+        glm::vec3 medVert = s / float(numOfInds);
         
-        if(m_snapMedian)                                                        // Snap the median point to the surface
-        {
-            float medVal = (*m_fn)(medVert.m_x,medVert.m_y,medVert.m_z);
-            Vec3 medDimension = Vec3(0.5f * m_offsets[0], 0.5f * m_offsets[1], 0.5f * m_offsets[2]);
-            Vec3 medGradient;
-            findGradient(medGradient,medDimension,medVert,medVal);
-            medGradient.normalize();
-            medVert += -medGradient*medVal;
-        }
+        float medVal = (*m_fn)(medVert.x, medVert.y, medVert.z);
+        glm::vec3 medGradient = glm::normalize(findGradient(0.5f * m_offsets, medVert, medVal));
+        medVert -= medGradient * medVal;
 
         median.position = medVert;
         m_vertices.push_back(median);
@@ -726,7 +685,7 @@ void AlgCMS::resolveTransitionalFace(face_t* face)
 
     for(unsigned int i = 0; i < transitSegs.size(); ++i)
     {
-        for(unsigned j=0;j<transitSegs[i].size(); ++j)
+        for(unsigned j = 0; j < transitSegs[i].size(); ++j)
             assert(transitSegs[i][j] < m_vertices.size());                      // Check for valid data
     }
     
@@ -952,7 +911,7 @@ bool AlgCMS::compareStripToSeg(strip_t& str, std::vector<unsigned int>& seg)
 void AlgCMS::createMesh(mesh_t& mesh)
 {
     for(unsigned i = 0; i < m_vertices.size(); ++i)
-        mesh.vertices.push_back(glm::vec3(m_vertices[i].position.m_x, m_vertices[i].position.m_y, m_vertices[i].position.m_z));
+        mesh.vertices.push_back(m_vertices[i].position);
 }
 
 bool AlgCMS::isInDesired(int _id)
