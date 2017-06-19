@@ -6,9 +6,9 @@
 namespace cms
 {
 
-// Strip structure :: holding indices to two vertices and two face edges
+// strip structure :: holding indices to two vertices and two face edges
 
-struct Strip
+struct strip_t
 {
     bool skip;
     bool loop;
@@ -18,7 +18,7 @@ struct Strip
     Index3D block[2];       // 3D Index of the EdgeBlock into the global datastruct
     int dir[2];             // Direction of the edge on the edge block
 
-    Strip()
+    strip_t()
         : skip(true), loop(false)
     {
         edge[0] = -1;
@@ -31,33 +31,31 @@ struct Strip
 
     // the skip boolean - set it to true if there is valid data on the strip
     // edge0 and edge1 are the two edges on which the strip lies
-    Strip(bool _skip, int _edge0, int  _edge1)
-        : skip(_skip), loop(false)
+    strip_t(bool skip, int edge0, int edge1)
+        : skip(skip), loop(false)
     {
-        edge[0] = _edge0;
-        edge[1] = _edge1;
+        edge[0] = edge0;
+        edge[1] = edge1;
         data[0] = -1;
         data[1] = -1;
         dir[0] = -1;
         dir[1] = -1;
     }
 
-    // i is the last
-    void changeBack(Strip& s, int i)
+    void changeBack(strip_t& s, int last)
     {
-        edge[1] = s.edge[i];
-        data[1] = s.data[i];
-        dir[1] = s.dir[i];
-        block[1] = s.block[i];
+        edge[1] = s.edge[last];
+        data[1] = s.data[last];
+        dir[1] = s.dir[last];
+        block[1] = s.block[last];
     }
 
-    // i is the first
-    void changeFront(Strip& s, int i)
+    void changeFront(strip_t& s, int first)
     {
-        edge[0] = s.edge[i];
-        data[0] = s.data[i];
-        dir[0] = s.dir[i];
-        block[0] = s.block[i];
+        edge[0] = s.edge[first];
+        data[0] = s.data[first];
+        dir[0] = s.dir[first];
+        block[0] = s.block[first];
     }
 
 };

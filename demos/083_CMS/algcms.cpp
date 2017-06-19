@@ -76,19 +76,14 @@ void AlgCMS::initialize()
     m_offsets[0] = fabs(m_xMax - m_xMin) / static_cast<float>(m_samples[0] - 1);
     m_offsets[1] = fabs(m_yMax - m_yMin) / static_cast<float>(m_samples[1] - 1);
     m_offsets[2] = fabs(m_zMax - m_zMin) / static_cast<float>(m_samples[2] - 1);
-
-    // Resizing the samplingData array and proceeding with the sampling
-#if CMS_DEBUG_LOG
-    debug_msg("Sampling at (%u, %u, %u)", m_samples.m_x - 1, m_samples.m_y - 1, m_samples.m_z - 1);
-#endif
-    m_sampleData.resize(m_samples);
+    
+    m_sampleData.resize(m_samples);                                                                                     // Resizing the samplingData array and proceeding with the sampling
     m_sampleData.setBBox(m_container);
 
-    m_edgeData.resize(m_samples); ///todo check
+    m_edgeData.resize(m_samples);                                                                                       // todo :: check
     m_edgeData.setBBox(m_container);
-
-    // Creating a pointer to an Octree on the heaps
-    m_octree = new Octree(m_samples, m_sampleData, m_octMinLvl, m_octMaxLvl, m_offsets, m_fn, m_complexSurfThresh);
+    
+    octree = new octree_t(m_samples, m_sampleData, m_octMinLvl, m_octMaxLvl, m_offsets, m_fn, m_complexSurfThresh);     // Creating a pointer to an Octree on the heap
 }
 
 void AlgCMS::setOctreeLevels(unsigned int i_min, unsigned int i_max)
@@ -152,7 +147,7 @@ void AlgCMS::setSnapMedian(bool snapMedian)
     m_snapMedian = snapMedian;
 }
 
-void AlgCMS::extractSurface(Mesh& o_mesh)
+void AlgCMS::extractSurface(mesh_t& mesh)
 {
     if(!m_sampled)
     {
@@ -160,16 +155,16 @@ void AlgCMS::extractSurface(Mesh& o_mesh)
         m_sampled = true;
     }
 
-    m_octree->buildOctree();                                                    // Calling the function that would recursively generate the octree
-    m_octreeRoot = m_octree->getRoot();                                         // Getting the octree root cell
+    octree->buildOctree();                                                      // Calling the function that would recursively generate the octree
+    octree_root = octree->root;                                                 // Getting the octree root cell
   
     if(m_desiredCells.size() > 0)                                               // Only mesh certain cells if applicable
         fixDesiredChildren();
 
     cubicalMarchingSquaresAlg();                                                // Traversing the octree and creating components from each leaf cell
-    tessellationTraversal(m_octreeRoot, o_mesh);                                // Traversing the tree again and meshing all components
+    tessellationTraversal(octree_root, mesh);                                   // Traversing the tree again and meshing all components
 
-    createMesh(o_mesh);                                                         // Loading the vertices onto the mesh
+    createMesh(mesh);                                                           // Loading the vertices onto the mesh
 }
 
 bool AlgCMS::sampleFunction()
@@ -205,7 +200,7 @@ bool AlgCMS::sampleFunction()
     return true;
 }
 
-void AlgCMS::makeFaceSegments(const Index3D inds[], Face *i_face)
+void AlgCMS::makeFaceSegments(const Index3D inds[], face_t* face)
 {
     const uint8_t edges =                                                       // Aquiring the index of the edges based on the face corner samples
         (m_sampleData.getValueAt(inds[0]) < 0 ? 1 : 0) |
@@ -217,13 +212,13 @@ void AlgCMS::makeFaceSegments(const Index3D inds[], Face *i_face)
     const int8_t e0b = EDGE_MAP[edges][0][1];
   
     if (e0a != -1)                                                              // If edge has data generate primary strip
-        makeStrip(e0a, e0b, inds, i_face, 0);
+        makeStrip(e0a, e0b, inds, face, 0);
   
     const int8_t e1a = EDGE_MAP[edges][1][0];                                   // The edges of the second strip are:
     const int8_t e1b = EDGE_MAP[edges][1][1];
   
     if (e1a != -1)                                                              // If Two Strips on a Face
-        makeStrip(e1a, e1b, inds, i_face, 1);
+        makeStrip(e1a, e1b, inds, face, 1);
 }
 
 Vec3 AlgCMS::findCrossingPoint(unsigned int quality, const Point& pt0, const Point& pt1)
@@ -348,22 +343,22 @@ int AlgCMS::exactSignChangeIndex(const Range& range, int& dir, Index3D& ind0, In
     return -1;                                                                  // Returning error value (no sign change found)
 }
 
-void AlgCMS::makeStrip(int edge0, int edge1, const Index3D inds[],  Face* i_face, int stripInd)
+void AlgCMS::makeStrip(int edge0, int edge1, const Index3D inds[], face_t* face, int stripInd)
 {
     assert((edge0 != -1) && (edge1 != -1));
-    Strip s(false, edge0, edge1);
-    populateStrip(s, inds, 0);                                                  // First edge of First Strip - e0a
-    populateStrip(s, inds, 1);                                                  // Second edge of First Strip - e0b
+    strip_t strip(false, edge0, edge1);
+    populateStrip(strip, inds, 0);                                              // First edge of First Strip - e0a
+    populateStrip(strip, inds, 1);                                              // Second edge of First Strip - e0b
 
     // todo :: Check for face sharp features here
 
-    i_face->strips[stripInd] = s;                                               // Populate current face with the created strip
-    i_face->skip = false;
+    face->strips[stripInd] = strip;                                             // Populate current face with the created strip
+    face->skip = false;
 }
 
-void AlgCMS::populateStrip(Strip& o_s, const Index3D inds[], int index)
+void AlgCMS::populateStrip(strip_t& strip, const Index3D inds[], int index)
 {
-    const int8_t faceEdge = o_s.edge[index];                                    // Get the edge on the currently examined face
+    const int8_t faceEdge = strip.edge[index];                                    // Get the edge on the currently examined face
     Index3D ind_0 = inds[VERTEX_MAP[faceEdge][0]];
     Index3D ind_1 = inds[VERTEX_MAP[faceEdge][1]];
     
@@ -385,20 +380,20 @@ void AlgCMS::populateStrip(Strip& o_s, const Index3D inds[], int index)
     bool dupli = false;                                                         // Checking for duplicate vertices on the same edge
     if(m_edgeData.getValueAt(crossingIndex_0).empty == false)                   // check global datastructor edgeblock
     {
-        if(m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir] != -1)        // check exact global edge
+        if(m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir] != -1)      // check exact global edge
         {
-            o_s.data[index] = m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir];
-            o_s.block[index] = crossingIndex_0;
-            o_s.dir[index] = dir;
+            strip.data[index] = m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir];
+            strip.block[index] = crossingIndex_0;
+            strip.dir[index] = dir;
             dupli = true;
         }
     }
     
     if(!dupli)                                                                  // If there is no previous vertex registered to that edge, proceed to find it.
-        makeVertex(o_s, dir, crossingIndex_0, crossingIndex_1, index);
+        makeVertex(strip, dir, crossingIndex_0, crossingIndex_1, index);
 }
 
-void AlgCMS::makeVertex(Strip& o_strip, const int& dir, const Index3D& crossingIndex0, const Index3D& crossingIndex1, int _i)
+void AlgCMS::makeVertex(strip_t& strip, const int& dir, const Index3D& crossingIndex0, const Index3D& crossingIndex1, int _i)
 {
     Vec3 pos0 = m_sampleData.getPositionAt(crossingIndex0);                     // Make two points with the info provided and find the surface b/n them
     float val0 = m_sampleData.getValueAt(crossingIndex0);
@@ -418,11 +413,11 @@ void AlgCMS::makeVertex(Strip& o_strip, const int& dir, const Index3D& crossingI
     vert.normal = normal;
     m_vertices.push_back(vert);
     
-    o_strip.data[_i] = m_vertices.size() - 1;                                   // Place the data onto the currect strip
-    o_strip.block[_i] = crossingIndex0;
-    o_strip.dir[_i] = dir;
+    strip.data[_i] = m_vertices.size() - 1;                                     // Place the data onto the currect strip
+    strip.block[_i] = crossingIndex0;
+    strip.dir[_i] = dir;
     
-    edge_block_t e = m_edgeData.getValueAt(crossingIndex0);                        // Put the data onto the global 3D array of edges
+    edge_block_t e = m_edgeData.getValueAt(crossingIndex0);                     // Put the data onto the global 3D array of edges
     if(e.empty)
         e.empty = false;
     assert(e.edge_indices[dir] == -1);
@@ -430,7 +425,7 @@ void AlgCMS::makeVertex(Strip& o_strip, const int& dir, const Index3D& crossingI
     m_edgeData.setValueAt(crossingIndex0, e);
 }
 
-void AlgCMS::segmentFromTwin(Face *face, std::vector<unsigned int> &o_comp, int lastData, int& currentEdge)
+void AlgCMS::segmentFromTwin(face_t* face, std::vector<unsigned int> &o_comp, int lastData, int& currentEdge)
 {
     assert(face->twin->state == BRANCH_FACE);
     assert(face->twin->transitSegs.size() > 0);
@@ -460,14 +455,14 @@ void AlgCMS::segmentFromTwin(Face *face, std::vector<unsigned int> &o_comp, int 
     }
 }
 
-void AlgCMS::tessellateComponent(Mesh& o_mesh, std::vector<unsigned int>& component)
+void AlgCMS::tessellateComponent(mesh_t& mesh, std::vector<unsigned int>& component)
 {
     vertex_t median;                                                            // todo :: maybe avg the normals too
     int numOfInds = component.size();
     assert(numOfInds >= 3);
     
     if(numOfInds == 3)                                                          // Three Indices - just tringulate
-        makeTri(o_mesh, component);
+        makeTri(mesh, component);
     else if(numOfInds > 3)                                                      // More than three - find the median and make a fan
     {
                                                                                 // todo :: use maybe if there are no sharp features???
@@ -499,31 +494,31 @@ void AlgCMS::tessellateComponent(Mesh& o_mesh, std::vector<unsigned int>& compon
         median.position = medVert;
         m_vertices.push_back(median);
         component.push_back(m_vertices.size() - 1);
-        makeTriFan(o_mesh, component);                                          // Create a triangle fan based on the new mid point
+        makeTriFan(mesh, component);                                            // Create a triangle fan based on the new mid point
     }
 }
 
-void AlgCMS::makeTri(Mesh& o_mesh, std::vector<unsigned int>& i_threeVertInds)
+void AlgCMS::makeTri(mesh_t& mesh, std::vector<unsigned int>& i_threeVertInds)
 {
     for(int i = 0; i < 3; ++i)
-        o_mesh.pushIndex(i_threeVertInds[i]);
+        mesh.indices.push_back(i_threeVertInds[i]);
 }
 
-void AlgCMS::makeTriFan(Mesh& o_mesh, std::vector<unsigned int>& i_cellVerts)
+void AlgCMS::makeTriFan(mesh_t& mesh, std::vector<unsigned int>& i_cellVerts)
 {
     for(unsigned i = 0; i < i_cellVerts.size() - 2; ++i)                        // -2 because median index is at (size-1) and we stich end to begin later
     {
-        o_mesh.pushIndex(i_cellVerts[i_cellVerts.size() - 1]);
-        o_mesh.pushIndex(i_cellVerts[i]);
-        o_mesh.pushIndex(i_cellVerts[i + 1]);
+        mesh.indices.push_back(i_cellVerts[i_cellVerts.size() - 1]);
+        mesh.indices.push_back(i_cellVerts[i]);
+        mesh.indices.push_back(i_cellVerts[i + 1]);
     }
   
-    o_mesh.pushIndex(i_cellVerts[i_cellVerts.size() - 1]);                      // Connecting the last and the first
-    o_mesh.pushIndex(i_cellVerts[i_cellVerts.size() - 2]);
-    o_mesh.pushIndex(i_cellVerts[0]);
+    mesh.indices.push_back(i_cellVerts[i_cellVerts.size() - 1]);                      // Connecting the last and the first
+    mesh.indices.push_back(i_cellVerts[i_cellVerts.size() - 2]);
+    mesh.indices.push_back(i_cellVerts[0]);
 }
 
-void AlgCMS::makeTriSeq(Mesh& o_mesh, std::vector<unsigned int>& i_cellVertInds)
+void AlgCMS::makeTriSeq(mesh_t& mesh, std::vector<unsigned int>& i_cellVertInds)
 {
     std::vector<unsigned int> triVertInds;
     triVertInds.resize(3);
@@ -532,47 +527,47 @@ void AlgCMS::makeTriSeq(Mesh& o_mesh, std::vector<unsigned int>& i_cellVertInds)
         triVertInds[0] = i_cellVertInds[i + 1];
         triVertInds[1] = i_cellVertInds[i + 2];
         triVertInds[2] = i_cellVertInds[0];
-        makeTri(o_mesh, triVertInds);
+        makeTri(mesh, triVertInds);
     }
 }
 
-void AlgCMS::tessellationTraversal(Cell* c, Mesh& m)
+void AlgCMS::tessellationTraversal(cell_t* c, mesh_t& mesh)
 {
     if(!c) return;                                                              // Catching empty BRANCH nodes
   
-    if(c->getState() == BRANCH)                                                 // If it is a BRANCH => go deeper
+    if(c->state == BRANCH)                                                      // If it is a BRANCH => go deeper
     {
         for(int i = 0; i < 8; ++i)
-            tessellationTraversal(c->getChild(i), m);
+            tessellationTraversal(c->children[i], mesh);
+
     }
-    else if(c->getState() == LEAF)                                              // If it is a LEAF => tessellate segment
+    else                                                                        // If it is a LEAF => tessellate segment
     {
-        if(m_desiredCells.size() > 0)                                           // Check for special cases when only certain cells need be tess.
-            if(!isInDesired(c->m_id))
+        if((m_desiredCells.size() > 0) && !isInDesired(c->id))                  // Check for special cases when only certain cells need be tess.
                 return;
     
         for(unsigned i = 0; i < c->getComponents().size(); ++i)                 // todo :: just pass in references or pointers... (back and forth)
-            tessellateComponent(m, c->getComponents()[i]);
+            tessellateComponent(mesh, c->getComponents()[i]);
     }
 }
 
 void AlgCMS::cubicalMarchingSquaresAlg()
 {
-    generateSegments(m_octree->getRoot());                                      // Traverse through the octree and generate segments for all LEAF cells
+    generateSegments(octree->root);                                             // Traverse through the octree and generate segments for all LEAF cells
     editTransitionalFaces();                                                    // Resolving transitional faces
     traceComponent();                                                           // Trace the strips into segments and components
 }
 
-void AlgCMS::generateSegments(Cell* c)                                          // Generate the component data for a cell
+void AlgCMS::generateSegments(cell_t* c)                                        // Generate the component data for a cell
 {
     if(!c) return;                                                              // Catching empty BRANCH nodes
   
-    if(c->getState() == BRANCH)                                                 // If it is a BRANCH => go deeper
+    if(c->state == BRANCH)                                                      // If it is a BRANCH => go deeper
     {
         for(int i = 0; i < 8; ++i)
-            generateSegments(c->getChild(i));
+            generateSegments(c->children[i]);
     }
-    else if(c->getState() == LEAF)                                              // If it is a LEAF => generate segment
+    else                                                                        // If it is a LEAF => generate segment
     {
         Index3D indices[4];                                                     // For all the faces in this LEAF cell
         for(int f = 0; f < 6; ++f)
@@ -582,35 +577,35 @@ void AlgCMS::generateSegments(Cell* c)                                          
                 const uint8_t vert = FACE_VERTEX[f][v];
                 indices[v] = c->getPointInds()[vert];
             }
-            c->getFaceAt(f)->strips.resize(2);
-            makeFaceSegments(indices, c->getFaceAt(f));
+            c->faces[f]->strips.resize(2);
+            makeFaceSegments(indices, c->faces[f]);
         }
     }
 }
 
 void AlgCMS::editTransitionalFaces()
 {
-    std::vector<Cell*> cells = m_octree->getAllCells();
+    std::vector<cell_t*> cells = octree->cells;
     
     for(unsigned int i = 0; i < cells.size(); ++i)                              // Loop through all cells and all faces and find every transitional face. Then pass it for getting the data from it's twin
         for(int j = 0; j < 6; ++j)
-            if(cells[i]->getFaceAt(j)->state == TRANSIT_FACE)
-                resolveTransitionalFace(cells[i]->getFaceAt(j));
+            if(cells[i]->faces[j]->state == TRANSIT_FACE)
+                resolveTransitionalFace(cells[i]->faces[j]);
 }
 
 void AlgCMS::traceComponent()
 {
-    std::vector<Cell*> cells = m_octree->getAllCells();
+    std::vector<cell_t*> cells = octree->cells;
     
     for(unsigned int i = 0; i < m_octMaxLvl; ++i)                               // Trace the strips into segments and components. Loop through all cells and link components for all LEAF cells
     {
         for(unsigned int j = 0; j < cells.size(); ++j)
         {
-            if(cells[j]->getSubdivLvl() == m_octMaxLvl-i)
+            if(cells[j]->level == m_octMaxLvl - i)
             {
-                if(cells[j]->getState() == LEAF)                                // Trace the Segments to form Component(s)
+                if(cells[j]->state == LEAF)                                     // Trace the Segments to form Component(s)
                 {
-                    std::vector<Strip> cellStrips;
+                    std::vector<strip_t> cellStrips;
                     std::vector< std::vector<unsigned int> > transitSegs;
                     std::vector<unsigned int> component;
                     
@@ -628,13 +623,13 @@ void AlgCMS::traceComponent()
     }
 }
 
-void AlgCMS::resolveTransitionalFace(Face *face)
+void AlgCMS::resolveTransitionalFace(face_t* face)
 {
-    assert(m_octree->getCellAt(face->twin->cellInd)->getState() == BRANCH);     // Check if twin face belongs to a Branch cell as it should!
+    assert(octree->cells[face->twin->cell_index]->state == BRANCH);             // Check if twin face belongs to a Branch cell as it should!
     assert(face->twin->state != TRANSIT_FACE);
   
     std::vector< std::vector<unsigned int> > transitSegs;                       // Get twin and traverse all it's children collecting all non-empty strips
-    std::vector<Strip> allStrips;                                               // todo :: get only addresses??
+    std::vector<strip_t> allStrips;                                             // todo :: get only addresses??
     traverseFace(face->twin, allStrips);
   
     if(allStrips.size() == 0)                                                   // If there are no strips on twin face
@@ -646,7 +641,7 @@ void AlgCMS::resolveTransitionalFace(Face *face)
     do
     {
         std::vector<unsigned int> vertInds;
-        Strip longStrip;
+        strip_t longStrip;
         vertInds.push_back(allStrips[0].data[0]);
         vertInds.push_back(allStrips[0].data[1]);
         longStrip = allStrips[0];
@@ -739,7 +734,7 @@ void AlgCMS::resolveTransitionalFace(Face *face)
     allStrips.clear();
 }
 
-void AlgCMS::traverseFace(Face *face, std::vector<Strip>& transitStrips)
+void AlgCMS::traverseFace(face_t* face, std::vector<strip_t>& transitStrips)
 {
     if(!face) return;
 
@@ -752,7 +747,6 @@ void AlgCMS::traverseFace(Face *face, std::vector<Strip>& transitStrips)
     }
     else if(face->state == LEAF_FACE)                                           // If it is a LEAF face collect all valid strips
     {
-    
         for(unsigned int i = 0; i < face->strips.size(); ++i)                   // Check all the strips in a face
         {
             if(face->strips[i].skip == false)
@@ -763,31 +757,31 @@ void AlgCMS::traverseFace(Face *face, std::vector<Strip>& transitStrips)
     }
 }
 
-void AlgCMS::collectStrips(Cell* c, std::vector<Strip> &o_cellStrips, std::vector<std::vector<unsigned int>>& o_transitSegs)
+void AlgCMS::collectStrips(cell_t* c, std::vector<strip_t>& o_cellStrips, std::vector<std::vector<unsigned int>>& o_transitSegs)
 {
     for(int f = 0; f < 6; ++f)                                                  // Looping through all faces of the cell
     {
-        if(c->getFaceAt(f)->state == LEAF_FACE)                                 // If it is a leaf face, just copy the full strips
+        if(c->faces[f]->state == LEAF_FACE)                                     // If it is a leaf face, just copy the full strips
         {
-            for(unsigned int i = 0; i < c->getFaceAt(f)->strips.size(); ++i)
+            for(unsigned int i = 0; i < c->faces[f]->strips.size(); ++i)
             {
-                if(c->getFaceAt(f)->strips[i].data[0] != -1)                    // Check there is valid data
-                    o_cellStrips.push_back(c->getFaceAt(f)->strips[i]);         // Create a temp strip and store the cell edges in it
+                if(c->faces[f]->strips[i].data[0] != -1)                        // Check there is valid data
+                    o_cellStrips.push_back(c->faces[f]->strips[i]);             // Create a temp strip and store the cell edges in it
             }
         }
-        else if(c->getFaceAt(f)->state == TRANSIT_FACE)                         // For a Transitional Face, we must take the transit segment too as it contains all the data (vertices in between the start and end of strip)
+        else if(c->faces[f]->state == TRANSIT_FACE)                             // For a Transitional Face, we must take the transit segment too as it contains all the data (vertices in between the start and end of strip)
         {
-            if(!c->getFaceAt(f)->twin)                                          // Check if there is a valid twin
+            if(!c->faces[f]->twin)                                              // Check if there is a valid twin
                 break;
 
-            assert(c->getFaceAt(f)->twin->strips.size() == c->getFaceAt(f)->twin->transitSegs.size());
+            assert(c->faces[f]->twin->strips.size() == c->faces[f]->twin->transitSegs.size());
       
-            for(unsigned int i = 0; i < c->getFaceAt(f)->twin->strips.size(); ++i)            
+            for(unsigned int i = 0; i < c->faces[f]->twin->strips.size(); ++i)            
             {
-                if(c->getFaceAt(f)->twin->strips[i].data[0] != -1)              // Push the current strips and transit
+                if(c->faces[f]->twin->strips[i].data[0] != -1)                  // Push the current strips and transit
                 {
-                    o_transitSegs.push_back(c->getFaceAt(f)->twin->transitSegs[i]);
-                    o_cellStrips.push_back(c->getFaceAt(f)->twin->strips[i]);
+                    o_transitSegs.push_back(c->faces[f]->twin->transitSegs[i]);
+                    o_cellStrips.push_back(c->faces[f]->twin->strips[i]);
                 }
             }
         }
@@ -796,7 +790,7 @@ void AlgCMS::collectStrips(Cell* c, std::vector<Strip> &o_cellStrips, std::vecto
     assert(o_cellStrips.size() > 0);                                            // A Leaf cell must have at least 3 strips to form a component unless it is has just a single looping component from a transit face
 }
 
-void AlgCMS::linkStrips(std::vector<unsigned int> &o_comp, std::vector<Strip> &strips, std::vector<std::vector<unsigned int>> &transitSegs)
+void AlgCMS::linkStrips(std::vector<unsigned int>& o_comp, std::vector<strip_t>& strips, std::vector<std::vector<unsigned int>> &transitSegs)
 {
     assert(o_comp.size() == 0);
 
@@ -923,11 +917,11 @@ void AlgCMS::linkStrips(std::vector<unsigned int> &o_comp, std::vector<Strip> &s
     assert(o_comp.size() >= 3);
 }
 
-void AlgCMS::insertDataFromTwin(std::vector<unsigned int>& o_comp, std::vector<std::vector<unsigned int>>& segs, Strip& str, bool& transit, int& addedInIter, const bool& backwards)
+void AlgCMS::insertDataFromTwin(std::vector<unsigned int>& o_comp, std::vector<std::vector<unsigned int>>& segs, strip_t& strip, bool& transit, int& addedInIter, const bool& backwards)
 {
     for(unsigned int i = 0; i < segs.size(); ++i)                               // Loop through all the transitional strips and find the one corresponding to this strip
     {
-        if(compareStripToSeg(str, segs[i]))                                     // Check if the strip's data matches the segment
+        if(compareStripToSeg(strip, segs[i]))                                     // Check if the strip's data matches the segment
         {
             if(backwards)
             {
@@ -948,17 +942,17 @@ void AlgCMS::insertDataFromTwin(std::vector<unsigned int>& o_comp, std::vector<s
     }
 }
 
-bool AlgCMS::compareStripToSeg(Strip& str, std::vector<unsigned int>& seg)
+bool AlgCMS::compareStripToSeg(strip_t& str, std::vector<unsigned int>& seg)
 {
     int s0 = str.data[0];
     int s1 = str.data[1];
     return ((((int)seg.front() == s0) && ((int)seg.back() == s1)) || (((int)seg.front() == s1) && ((int)seg.back() == s0)));
 }
 
-void AlgCMS::createMesh(Mesh& o_mesh)
+void AlgCMS::createMesh(mesh_t& mesh)
 {
-    for(unsigned i=0;i<m_vertices.size();++i)
-        o_mesh.pushVertex(m_vertices[i].position.m_x, m_vertices[i].position.m_y, m_vertices[i].position.m_z);
+    for(unsigned i = 0; i < m_vertices.size(); ++i)
+        mesh.vertices.push_back(glm::vec3(m_vertices[i].position.m_x, m_vertices[i].position.m_y, m_vertices[i].position.m_z));
 }
 
 bool AlgCMS::isInDesired(int _id)
@@ -974,22 +968,22 @@ void AlgCMS::fixDesiredChildren()
     std::vector<int> temp = m_desiredCells;
     for(unsigned i = 0; i < temp.size(); ++i)
     {
-        if(m_octree->getCellAt(temp[i])->getState() == BRANCH)
-            traverseForDesired(m_octree->getCellAt(temp[i]));
+        if(octree->cells[temp[i]]->state == BRANCH)
+            traverseForDesired(octree->cells[temp[i]]);
     }
 }
 
-void AlgCMS::traverseForDesired(Cell* c)
+void AlgCMS::traverseForDesired(cell_t* c)
 {
     if(!c) return;
 
-    if(c->getState() == BRANCH)
+    if(c->state == BRANCH)
     {
         for(int i = 0; i < 8; ++i)
-            traverseForDesired(c->getChild(i));
+            traverseForDesired(c->children[i]);
     }
-    else if(c->getState() == LEAF)
-        m_desiredCells.push_back(c->m_id);
+    else
+        m_desiredCells.push_back(c->id);
 }
 
 } // namespace cms

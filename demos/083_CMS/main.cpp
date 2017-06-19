@@ -108,8 +108,11 @@ struct ExampleClass
         return antiTankFunction(x, y, z);
     }
 
-    glm::vec3 gradient(float x, float y, float z) const
+    glm::vec3 gradient(const glm::vec3& p) const
     {
+        float x = p.x; 
+        float y = p.y;
+        float z = p.z;
         const float gradient_delta = 0.06125;
 
         float f100 = (*this)(x + gradient_delta, y - gradient_delta, z - gradient_delta);
@@ -242,8 +245,9 @@ int main(int argc, char *argv[])
     };
 
     cms::AlgCMS cmsAlg(&iso, container, MIN_OCTREE_RES, MAX_OCTREE_RES);
-    cms::Mesh mesh;
     cmsAlg.setComplexSurfThresh(COMPLEX_SURFACE_THRESHOLD);                 // Set the complex surface threshold
+
+    cms::mesh_t mesh;
     cmsAlg.extractSurface(mesh);                                            // Proceed to extract the surface <runs the algorithm>
 
     GLuint vao_id, vbo_id, nbo_id, ibo_id;
@@ -253,31 +257,29 @@ int main(int argc, char *argv[])
 
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, mesh.m_vertices.size() * sizeof(float), mesh.m_vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(glm::vec3), mesh.vertices.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    for (int i = 0; i < mesh.m_vertices.size() / 3; ++i)
+    for (int i = 0; i < mesh.vertices.size(); ++i)
     {
-        glm::vec3 g = t.gradient(mesh.m_vertices[3 * i + 0], mesh.m_vertices[3 * i + 1], mesh.m_vertices[3 * i + 2]);
-        mesh.m_normals.push_back(g.x);
-        mesh.m_normals.push_back(g.y);
-        mesh.m_normals.push_back(g.z);
+        glm::vec3 g = t.gradient(mesh.vertices[i]);
+        mesh.normals.push_back(g);
     }
 
     glGenBuffers(1, &nbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, nbo_id);
-    glBufferData(GL_ARRAY_BUFFER, mesh.m_normals.size() * sizeof(float), mesh.m_normals.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh.normals.size() * sizeof(glm::vec3), mesh.normals.data(), GL_STATIC_DRAW);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
     glGenBuffers(1, &ibo_id);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.m_indices.size() * sizeof(GLuint), mesh.m_indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(GLuint), mesh.indices.data(), GL_STATIC_DRAW);
 
-    debug_msg("mesh.m_vertices.size() = %u", (unsigned int) mesh.m_vertices.size());
-    debug_msg("mesh.m_normals.size() = %u", (unsigned int) mesh.m_normals.size());
-    debug_msg("mesh.m_indices.size() = %u", (unsigned int) mesh.m_indices.size());
+    debug_msg("mesh.m_vertices.size() = %u", (unsigned int) mesh.vertices.size());
+    debug_msg("mesh.m_normals.size() = %u", (unsigned int) mesh.normals.size());
+    debug_msg("mesh.m_indices.size() = %u", (unsigned int) mesh.indices.size());
 
 
 
@@ -313,7 +315,7 @@ int main(int argc, char *argv[])
         uniform_Ns = 20.0f;
         uniform_bf = 0.2875f;
 
-        glDrawElements(GL_TRIANGLES, mesh.m_indices.size(), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, mesh.indices.size(), GL_UNSIGNED_INT, 0);
 
         window.end_frame();
     }

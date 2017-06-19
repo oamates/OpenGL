@@ -65,35 +65,35 @@ static const uint8_t NEIGHBOUR_ADDRESS_TABLE[3][8] =
 //=======================================================================================================================================================================================================================
 // Basic Octree Generation Functions 
 //=======================================================================================================================================================================================================================
-void Octree::makeStructure()
+void octree_t::makeStructure()
 {
     Index3D c000 = Index3D(0, 0, 0);                                            // Establish Root
     Index3D offsets = m_samples - 1;
-    m_root = new Cell(0, BRANCH, nullptr, 0, c000, offsets, 0);
-    m_cells.push_back(m_root);                                                  // Pushing the root as the first element of the cell array
-    acquireCellInfo(m_root);                                                    // Calculating and storing information about the root cell
-    subdivideCell(m_root);                                                      // Create the rest of the base grid recursively
+    root = new cell_t(0, BRANCH, 0, 0, c000, offsets, 0);
+    cells.push_back(root);                                                      // Pushing the root as the first element of the cell array
+    acquireCellInfo(root);                                                      // Calculating and storing information about the root cell
+    subdivideCell(root);                                                        // Create the rest of the base grid recursively
 }
 
-void Octree::acquireCellInfo(Cell* c)
+void octree_t::acquireCellInfo(cell_t* c)
 {
   
-    Index3D c000 = c->getC000();                                                // Extracting values from cell
-    Index3D offsets = c->getOffsets();
+    Index3D index = c->index;                                                                       // Extracting values from cell
+    Index3D offset = c->offset;
 
   
     Index3D ptIndices[8];                                                                           // Corner information
-    ptIndices[0] = Index3D(c000.m_x,               c000.m_y,               c000.m_z);               // c000
-    ptIndices[1] = Index3D(c000.m_x,               c000.m_y,               c000.m_z + offsets.m_z); // c001
-    ptIndices[2] = Index3D(c000.m_x,               c000.m_y + offsets.m_y, c000.m_z);               // c010
-    ptIndices[3] = Index3D(c000.m_x,               c000.m_y + offsets.m_y, c000.m_z + offsets.m_z); // c011
-    ptIndices[4] = Index3D(c000.m_x + offsets.m_x, c000.m_y,               c000.m_z);               // c100
-    ptIndices[5] = Index3D(c000.m_x + offsets.m_x, c000.m_y,               c000.m_z + offsets.m_z); // c101
-    ptIndices[6] = Index3D(c000.m_x + offsets.m_x, c000.m_y + offsets.m_y, c000.m_z);               // c110
-    ptIndices[7] = Index3D(c000.m_x + offsets.m_x, c000.m_y + offsets.m_y, c000.m_z + offsets.m_z); // c111
+    ptIndices[0] = Index3D(index.m_x,              index.m_y,              index.m_z);              // c000
+    ptIndices[1] = Index3D(index.m_x,              index.m_y,              index.m_z + offset.m_z); // c001
+    ptIndices[2] = Index3D(index.m_x,              index.m_y + offset.m_y, index.m_z);              // c010
+    ptIndices[3] = Index3D(index.m_x,              index.m_y + offset.m_y, index.m_z + offset.m_z); // c011
+    ptIndices[4] = Index3D(index.m_x + offset.m_x, index.m_y,              index.m_z);              // c100
+    ptIndices[5] = Index3D(index.m_x + offset.m_x, index.m_y,              index.m_z + offset.m_z); // c101
+    ptIndices[6] = Index3D(index.m_x + offset.m_x, index.m_y + offset.m_y, index.m_z);              // c110
+    ptIndices[7] = Index3D(index.m_x + offset.m_x, index.m_y + offset.m_y, index.m_z + offset.m_z); // c111
 
-    // Clamp the ends of the samples to avoid garbage
-    for(int i = 0; i < 8; ++i) ///@todo optimize check
+                                                                                                    // Clamp the ends of the samples to avoid garbage
+    for(int i = 0; i < 8; ++i)                                                                      // todo :: optimize check
     {
         if(ptIndices[i].m_x == m_samples.m_x)
             ptIndices[i].m_x -= 1;
@@ -121,36 +121,22 @@ void Octree::acquireCellInfo(Cell* c)
     rangeZ.m_lower = m_sampleData.getPositionAt(ptIndices[0]).m_z;
     rangeZ.m_upper = m_sampleData.getPositionAt(ptIndices[7]).m_z;
     c->m_z = rangeZ;
-    
-    // Dimensions information
-    float w = (rangeX.m_upper-rangeX.m_lower);
-    c->setWidth(w);
-    float h = (rangeY.m_upper-rangeY.m_lower);
-    c->setHeight(h);
-    float d = (rangeZ.m_upper-rangeZ.m_lower);
-    c->setDepth(d);
-    
-    // Define centre of cell
-    Vec3 c000Pos = m_sampleData.getPositionAt(c000);
-    Vec3 centre = Vec3(c000Pos.m_x + 0.5f * w,
-                       c000Pos.m_y + 0.5f * h,
-                       c000Pos.m_z + 0.5f * d);
-    c->setCentre(centre);
 }
 
-void Octree::subdivideCell(Cell *i_parent)
+void octree_t::subdivideCell(cell_t* parent)
 {
-    unsigned int parLvl = i_parent->getSubdivLvl();
-    int thisLvl = parLvl + 1;
+    unsigned int parent_level = parent->level;
+    int this_level = parent_level + 1;
 
     Index3D offsets;
-    offsets[0] = ((m_samples[0] - 1) / util::intPower(2, thisLvl));                             // change because octree starts from 0
-    offsets[1] = ((m_samples[1] - 1) / util::intPower(2, thisLvl));
-    offsets[2] = ((m_samples[2] - 1) / util::intPower(2, thisLvl));
 
-    int parIndX = i_parent->getC000().m_x;
-    int parIndY = i_parent->getC000().m_y;
-    int parIndZ = i_parent->getC000().m_z;
+    offsets[0] = ((m_samples[0] - 1) / util::intPower(2, this_level));                             // change because octree starts from 0
+    offsets[1] = ((m_samples[1] - 1) / util::intPower(2, this_level));
+    offsets[2] = ((m_samples[2] - 1) / util::intPower(2, this_level));
+
+    int parIndX = parent->index.m_x;
+    int parIndY = parent->index.m_y;
+    int parIndZ = parent->index.m_z;
 
     for(int i = 0; i < 8; ++i)
     {
@@ -202,14 +188,14 @@ void Octree::subdivideCell(Cell *i_parent)
 
         assert(m_sampleData.getIndexAt(c000) < m_sampleData.size());
 
-        Cell* c = new Cell(m_cells.size(), BRANCH, i_parent, thisLvl, c000, offsets, i);        // Create new Cell on he heap
-        m_cells.push_back(c);
+        cell_t* c = new cell_t(cells.size(), BRANCH, parent, this_level, c000, offsets, i);     // Create new Cell on he heap
+        cells.push_back(c);
         acquireCellInfo(c);
-        i_parent->pushChild(c, i);
+        parent->children[i] = c;
         
-        if((unsigned int)thisLvl < m_minLvl)                                                    // If base octree level still not reached => subdivide
+        if(this_level < m_minLvl)                                                               // If base octree level still not reached => subdivide
             subdivideCell(c);
-        else if(((unsigned int)thisLvl >= m_minLvl) && ((unsigned int)thisLvl < m_maxLvl))      // If the next level would be the min and max octree levels => check for subdiv
+        else if((this_level >= m_minLvl) && (this_level < m_maxLvl))                            // If the next level would be the min and max octree levels => check for subdiv
         {
             
             if(checkForSubdivision(c))                                                          // Check if the cell should be subdivided due to a complex surface or edge ambiguity
@@ -219,8 +205,8 @@ void Octree::subdivideCell(Cell *i_parent)
                 
                 if(checkForSurface(c))                                                          // If not check whether there is any surface at all
                 {
-                    c->setState(LEAF);
-                    m_leafCells.push_back(c);
+                    c->state = LEAF;
+                    leafs.push_back(c);
                 }
             }
         }
@@ -228,15 +214,15 @@ void Octree::subdivideCell(Cell *i_parent)
         {
             if(checkForSurface(c))
             {
-                c->setState(LEAF);
-                m_leafCells.push_back(c);
+                c->state = LEAF;
+                leafs.push_back(c);
             }
         }
         m_cellAddresses[c->m_address.getFormatted()] = c;                                       // Assigning cells to addresses :: todo  will this work here (recursive) better 
     }
 }
 
-bool Octree::checkForSubdivision(Cell* c)
+bool octree_t::checkForSubdivision(cell_t* c)
 {
     bool edgeAmbiguity = checkForEdgeAmbiguity(c);
     bool complexSurface = checkForComplexSurface(c);
@@ -244,7 +230,7 @@ bool Octree::checkForSubdivision(Cell* c)
     return edgeAmbiguity || complexSurface;                                                     // If either is true, then Subdivide the cell
 }
 
-bool Octree::checkForSurface(Cell* c)
+bool octree_t::checkForSurface(cell_t* c)
 {
     const Index3D *p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
   
@@ -258,7 +244,7 @@ bool Octree::checkForSurface(Cell* c)
     return (inside != 8) && (inside != 0);                                                      // See if cell is inside the function
 }
 
-bool Octree::checkForEdgeAmbiguity(Cell* c)
+bool octree_t::checkForEdgeAmbiguity(cell_t* c)
 {
     bool edgeAmbiguity = false;                                                                 // Initialise return value
     const Index3D *indPtr = c->getPointInds();                                                  // Getting the index of the c000 point of the current cell
@@ -294,11 +280,11 @@ bool Octree::checkForEdgeAmbiguity(Cell* c)
     return edgeAmbiguity;                                                                       // Return result of check for two crossing points on any edge in this cell
 }
 
-bool Octree::checkForComplexSurface(Cell* c)
+bool octree_t::checkForComplexSurface(cell_t* c)
 {
     bool complexSurface = false;                                                                // Initialise return value
   
-    const Index3D *p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
+    const Index3D* p = c->getPointInds();                                                       // Get a pointer to the index of the c000 corner of this point
   
     for(int i = 0; i < 7; ++i)                                                                  // Loop through all the cell points and check current point against all the rest remaining
     {
@@ -321,7 +307,7 @@ bool Octree::checkForComplexSurface(Cell* c)
     return complexSurface;                                                                      // Return result of check for a comples surface in this cell
 }
 
-void Octree::findGradient(Vec3& o_gradient, const Index3D& i_array3dInds)
+void octree_t::findGradient(Vec3& o_gradient, const Index3D& i_array3dInds)
 {
   
     Vec3 pos = m_sampleData.getPositionAt(i_array3dInds);                                       // Finding and storing the xyz position of the sample and it's local bbox
@@ -336,9 +322,9 @@ void Octree::findGradient(Vec3& o_gradient, const Index3D& i_array3dInds)
     o_gradient = Vec3(dx - val, dy - val, dz - val);
 }
 
-void Octree::findNeighbours(Cell* cellA)
+void octree_t::findNeighbours(cell_t* cellA)
 {
-    if(cellA->m_id == 0) return;                                                                // Dismiss the root as it doesn't have neighbours
+    if(cellA->id == 0) return;                                                                  // Dismiss the root as it doesn't have neighbours
     Address tempAddress[6];                                                                     // Create an array of 6 addresses with a size of the max octree depth
     std::vector<uint8_t> tempNeighbourAddress[6];                                               // An array of the six neighbours' addresses, each having an address size equivelent to the maximum octree depth
   
@@ -379,17 +365,16 @@ void Octree::findNeighbours(Cell* cellA)
     for(int i = 0; i < 6; ++i)                                                                  // Actually find and assign the neighbour if such exists at the given address
     {
         unsigned int addressKey = tempAddress[i].getFormatted();
-        Cell* cellB = m_cellAddresses[addressKey];
+        cell_t* cellB = m_cellAddresses[addressKey];
         
         if(cellB)                                                                               // Proceed if there is such a neighbouring cell
         {
             CONTACT contact = (CONTACT)i;
       
             if(i & 1)                                                                           // todo :: Temporary save the neighbours addresses in the order:
-                cellA->m_neighbours[contact - 1] = cellB;
+                cellA->neighbours[contact - 1] = cellB;
             else
-                cellA->m_neighbours[contact + 1] = cellB;
-
+                cellA->neighbours[contact + 1] = cellB;
       
             setFaceTwins(cellB, cellA, contact);                                                // Set face twins of the neighbouring cells based on their contact face
         }
@@ -399,29 +384,25 @@ void Octree::findNeighbours(Cell* cellA)
     // have a bitfield to indicate which neighbours are already set?
 }
 
-void Octree::populateHalfFaces()
+void octree_t::populateHalfFaces()
 {
-#if CMS_DEBUG_LOG
-    debug_msg("Number of cells: %u" << (unsigned int) m_cells.size());
-#endif
-  
-    for(Cell* c : m_cells) findNeighbours(c);                                                   // todo :: optimise because this will set some neighbours twice
+    for(cell_t* cell : cells) findNeighbours(cell);                                             // todo :: optimise because this will set some neighbours twice
 }
 
-void Octree::setFaceTwins(Cell* a, Cell* b, CONTACT contact)
+void octree_t::setFaceTwins(cell_t* a, cell_t* b, CONTACT contact)
 {
     int valA = faceTwinTable[contact][0];                                                       // Assigning each face's twin based on the contact type
     int valB = faceTwinTable[contact][1];
-    b->getFaceAt(valA)->twin = a->getFaceAt(valB);
-    a->getFaceAt(valB)->twin = b->getFaceAt(valA);
-    assert(b->getFaceAt(contact)->id == b->getFaceAt(contact)->twin->twin->id);
+    b->faces[valA]->twin = a->faces[valB];
+    a->faces[valB]->twin = b->faces[valA];
+    assert(b->faces[contact]->id == b->faces[contact]->twin->twin->id);
 }
 
-void Octree::setFaceRelationships()
+void octree_t::setFaceRelationships()
 {
-    for(Cell* cell : m_cells)                                                                   // Loop through all the cells of the octree and assign the face relationship b/n parent and child cells
+    for(cell_t* cell : cells)                                                                   // Loop through all the cells of the octree and assign the face relationship b/n parent and child cells
     {
-        if(cell == nullptr || cell == m_root) continue;                                         // Continue if cell is null
+        if(cell == 0 || cell == root) continue;                                                 // Continue if cell is null
 
         int location = cell->getPosInParent();
 
@@ -430,40 +411,40 @@ void Octree::setFaceRelationships()
             CONTACT con = FACE_RELATIONSHIP_TABLE[location][side];
             uint8_t posOfSubFace = SUB_FACE_TABLE[location][side];
 
-            cell->getFaceAt(con)->parent = cell->getParent()->getFaceAt(con);
+            cell->faces[con]->parent = cell->parent->faces[con];
 
-            cell->getParent()->getFaceAt(con)->children[posOfSubFace] = cell->getFaceAt(con);
+            cell->parent->faces[con]->children[posOfSubFace] = cell->faces[con];
         }
     
-        if(cell->getState() == LEAF)                                                            // If this is a leaf cell then set all its half-faces as LEAFs
+        if(cell->state == LEAF)                                                                 // If this is a leaf cell then set all its half-faces as LEAFs
         {
             for(int i = 0; i < 6; ++i)
-                cell->getFaceAt(i)->state = LEAF_FACE;
+                cell->faces[i]->state = LEAF_FACE;
         }
     }
 }
 
-void Octree::markTransitionalFaces()
+void octree_t::markTransitionalFaces()
 {
     int transCounter = 0;
   
-    for(unsigned int i = 0; i < m_leafCells.size(); ++i)                                        // Loop through all leaf (straddling) cells
+    for(unsigned int i = 0; i < leafs.size(); ++i)                                              // Loop through all leaf (straddling) cells
     {
-        assert(m_leafCells[i]->getState() == LEAF);
+        assert(leafs[i]->state == LEAF);
 
         for(int j = 0; j < 6; ++j)                                                              // Loop through all faces of such a cell
         {
-            Face* f = m_leafCells[i]->getFaceAt(j);
-            assert(f->state == LEAF_FACE);
+            face_t* face = leafs[i]->faces[j];
+            assert(face->state == LEAF_FACE);
       
-            if((f->twin) && (f->twin->children[0]))                                             // Check against null ptr
+            if((face->twin) && (face->twin->children[0]))                                             // Check against null ptr
             {
-                assert(f->twin->children[1]);
-                assert(f->twin->children[2]);
-                assert(f->twin->children[3]);
+                assert(face->twin->children[1]);
+                assert(face->twin->children[2]);
+                assert(face->twin->children[3]);
 
-                m_leafCells[i]->getFaceAt(j)->state = TRANSIT_FACE;
-                assert(m_leafCells[i]->getFaceAt(j)->twin->state != LEAF_FACE);
+                leafs[i]->faces[j]->state = TRANSIT_FACE;
+                assert(leafs[i]->faces[j]->twin->state != LEAF_FACE);
                 ++transCounter;
             }
         }
