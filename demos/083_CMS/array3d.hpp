@@ -53,16 +53,6 @@ template <class T> struct Array3D
     
     int size() const                                                                            // Returns the size of the whole flattened Array3D
         { return m_data.size(); }
-    
-    int sizeX() const                                                                           // Returns the size of the X slab in the Array3D
-        { return m_indices.m_x; }
-    
-    int sizeY() const                                                                           // Returns the size of the Y slab in the Array3D
-        { return m_indices.m_y; }
-    
-    int sizeZ() const                                                                           // Returns the size of the Z slab in the Array3D
-        { return m_indices.m_z; }
-
 
     // Used to set the value at a specific position in the Array3D, params :: three integers denoting the location, and a value of type T
     void setValueAt(int x, int y, int z, T value)

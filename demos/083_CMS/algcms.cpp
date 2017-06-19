@@ -152,55 +152,24 @@ void AlgCMS::setSnapMedian(bool snapMedian)
     m_snapMedian = snapMedian;
 }
 
-bool AlgCMS::extractSurface(Mesh& o_mesh)
+void AlgCMS::extractSurface(Mesh& o_mesh)
 {
-    debug_msg("********************  CMS LOG BEGIN  ********************");
-
-    time_t begin, end;
-    time(&begin);                                                               // Sample the function if it is not already sampled
-
     if(!m_sampled)
     {
         sampleFunction();
         m_sampled = true;
     }
 
-    time(&end);
-    double sampleTime = static_cast<int>(difftime(end, begin));
-    const char* sampleMsg = "Sampling time: ";
-    util::printTime(sampleTime, sampleMsg);
-
-    time(&begin);
-  
     m_octree->buildOctree();                                                    // Calling the function that would recursively generate the octree
-    time(&end);
-    double octreeTime = static_cast<int>(difftime(end, begin));
-    const char* octreeMsg = "Octree build time: ";
-    util::printTime(octreeTime, octreeMsg);
-  
     m_octreeRoot = m_octree->getRoot();                                         // Getting the octree root cell
   
     if(m_desiredCells.size() > 0)                                               // Only mesh certain cells if applicable
         fixDesiredChildren();
 
-    time(&begin);
     cubicalMarchingSquaresAlg();                                                // Traversing the octree and creating components from each leaf cell
     tessellationTraversal(m_octreeRoot, o_mesh);                                // Traversing the tree again and meshing all components
 
-#if CMS_DEBUG_LOG
-    debug_msg("verts :: %u",  << (unsigned int) m_vertices.size());
-#endif
-
-  
     createMesh(o_mesh);                                                         // Loading the vertices onto the mesh
-
-    time(&end);
-    double algorithmTime = static_cast<int>(difftime(end, begin));
-    const char* algorithmMsg = "Algorithm Time: ";
-    util::printTime(algorithmTime, algorithmMsg);
-
-    debug_msg("********************  CMS LOG END  ********************");
-    return true;
 }
 
 bool AlgCMS::sampleFunction()
@@ -416,9 +385,9 @@ void AlgCMS::populateStrip(Strip& o_s, const Index3D inds[], int index)
     bool dupli = false;                                                         // Checking for duplicate vertices on the same edge
     if(m_edgeData.getValueAt(crossingIndex_0).empty == false)                   // check global datastructor edgeblock
     {
-        if(m_edgeData.getValueAt(crossingIndex_0).m_edgeInds[dir] != -1)        // check exact global edge
+        if(m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir] != -1)        // check exact global edge
         {
-            o_s.data[index] = m_edgeData.getValueAt(crossingIndex_0).m_edgeInds[dir];
+            o_s.data[index] = m_edgeData.getValueAt(crossingIndex_0).edge_indices[dir];
             o_s.block[index] = crossingIndex_0;
             o_s.dir[index] = dir;
             dupli = true;
@@ -456,8 +425,8 @@ void AlgCMS::makeVertex(Strip& o_strip, const int& dir, const Index3D& crossingI
     edge_block_t e = m_edgeData.getValueAt(crossingIndex0);                        // Put the data onto the global 3D array of edges
     if(e.empty)
         e.empty = false;
-    assert(e.m_edgeInds[dir] == -1);
-    e.m_edgeInds[dir] = m_vertices.size() - 1;
+    assert(e.edge_indices[dir] == -1);
+    e.edge_indices[dir] = m_vertices.size() - 1;
     m_edgeData.setValueAt(crossingIndex0, e);
 }
 

@@ -65,7 +65,7 @@ struct AlgCMS : public Isosurface
     int getZeroApproximation() const;                                           // Returning the interpolation quality level
     void setComplexSurfThresh(float i_complexSurfThresh);                       // Setting the value which would be used to check for a complex surface in a cell (-1...1)
     float getComplexSurfThresh() const;                                         // Returning the value used for the check of a complex surface
-    bool extractSurface(Mesh& o_mesh);                                          // The main function which would sample the function and extract a surface out of it, saving it into a given mesh object
+    void extractSurface(Mesh& o_mesh);                                          // The main function which would sample the function and extract a surface out of it, saving it into a given mesh object
     bool sampleFunction();                                                      // The sampling function used by the extractSurface function, it could be called separately but not necessary
     bool snapMedian() const;                                                    // Returns the snap to median value
     void setSnapMedian(bool snapMedian);                                        // Sets the snap median to surface value

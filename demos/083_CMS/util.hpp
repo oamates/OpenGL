@@ -24,16 +24,6 @@ namespace util
     inline bool isPowerOfTwo (unsigned int x)                                                      // Checking if the given number is a power of two
         { return ((x != 0) && !(x & (x - 1))); }
 
-    
-    inline void printTime(int totalSeconds, const char* message)                                   // print the exact time in a formatted way hh:mm:ss with a message in the front
-    {
-        int ss = totalSeconds % 60;
-        int mm = (totalSeconds / 60) % 60;
-        int hh = (totalSeconds / 60) / 60;
-
-        printf("\n%s \n%02i:%02i:%02i [hh:mm:ss] \n\n", message, hh, mm, ss);
-    }
-  
 } // namespace util
 
 } // namespace cms
