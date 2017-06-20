@@ -87,6 +87,8 @@ const uint8_t NEIGHBOUR_ADDRESS_TABLE[3][8] =
 //=======================================================================================================================================================================================================================
 template<typename scalar_field_t> struct octree_t
 {
+    int depth;
+
     scalar_field_t scalar_field;
     cell_t* root;
     std::vector<cell_t*> cells;
@@ -94,7 +96,7 @@ template<typename scalar_field_t> struct octree_t
     std::vector<face_t*> faces;
 
     std::map<unsigned int, cell_t*> cell_hash_map;
-    int depth;
+
     Array3D<float>& m_sampleData;
     unsigned int min_level;
     unsigned int max_level;
@@ -115,37 +117,27 @@ template<typename scalar_field_t> struct octree_t
     }
 
     //===================================================================================================================================================================================================================
-    // main function :: creates the root cell and calls subdivideCell function on it, recursively creating the octree
+    // main function :: creates the root cell and calls subdivide function on it, recursively creating the octree
     //===================================================================================================================================================================================================================
-    void buildOctree()
+    cell_t* build()
     {
-        makeStructure();                                                            // create the octree structure by establishing the root and recursing onwards
+        root = new cell_t(0, 0, glm::ivec3(0), depth, 0);                           // establish root
+        cells.push_back(root);                                                      // Pushing the root as the first element of the cell array
+        subdivide(root);                                                            // Create the rest of the base grid recursively
         populateHalfFaces();                                                        // create the half-face structure for all cells
         setFaceRelationships();                                                     // create the Face parent-children relationships
         markTransitionalFaces();                                                    // flag all transitional faces
+        return root;
     }
     
     //===================================================================================================================================================================================================================
-    // basic octree generation function :: creates the root and starts off the tree by calling recursive functions which build it
-    //===================================================================================================================================================================================================================    
-    void makeStructure()
-    {
-        root = new cell_t(0, BRANCH, 0, 0, glm::ivec3(0), depth, 0);              // establish root
-        cells.push_back(root);                                                      // Pushing the root as the first element of the cell array
-        acquireCellInfo(root);                                                      // Calculating and storing information about the root cell
-        subdivideCell(root);                                                        // Create the rest of the base grid recursively
-    }    
-
-    //===================================================================================================================================================================================================================
     // checks if the current cell needs subdivision and recursively does so if necessary
     //===================================================================================================================================================================================================================
-    void subdivideCell(cell_t* parent)
+    void subdivide(cell_t* parent)
     {
-        unsigned int parent_level = parent->level;
-        unsigned int this_level = parent_level + 1;
+        unsigned int level = parent->level + 1;
 
-        int offset = depth >> this_level;
-
+        int offset = depth >> level;
         int iX = parent->index.x;
         int iY = parent->index.y;
         int iZ = parent->index.z;
@@ -164,17 +156,16 @@ template<typename scalar_field_t> struct octree_t
 
         for(int i = 0; i < 8; ++i)
         {
-            cell_t* cell = new cell_t(cells.size(), BRANCH, parent, this_level, cell_corners[i], offset, i);     // Create new Cell on he heap
+            cell_t* cell = new cell_t(parent, level, cell_corners[i], offset, i);     // Create new Cell on he heap
             cells.push_back(cell);
-            acquireCellInfo(cell);
             parent->children[i] = cell;
         
-            if(this_level < min_level)                                                               // If base octree level still not reached => subdivide
-                subdivideCell(cell);
-            else if(this_level < max_level)                                                         // If the next level would be the min and max octree levels => check for subdiv
+            if(level < min_level)                                                               // If base octree level still not reached => subdivide
+                subdivide(cell);
+            else if(level < max_level)                                                         // If the next level would be the min and max octree levels => check for subdiv
             {
-                if(checkForSubdivision(cell))                                                          // Check if the cell should be subdivided due to a complex surface or edge ambiguity
-                    subdivideCell(cell);
+                if(checkForEdgeAmbiguity(cell) || checkForComplexSurface(cell))                                                          // Check if the cell should be subdivided due to a complex surface or edge ambiguity
+                    subdivide(cell);
                 else
                 {
                     if(checkForSurface(cell))                                                          // If not check whether there is any surface at all
@@ -195,23 +186,6 @@ template<typename scalar_field_t> struct octree_t
             cell_hash_map[cell->address.hash()] = cell;                                         // Assigning cells to addresses :: todo  will this work here (recursive) better 
         }
     }
-    //===================================================================================================================================================================================================================
-    // collects aditional cell info, which is stored in the cell : sample point indices at the corners, and dimensions
-    //===================================================================================================================================================================================================================
-    void acquireCellInfo(cell_t* cell)
-    {  
-        glm::ivec3 index0 = cell->index;
-        glm::ivec3 index1 = index0 + cell->offset;
-  
-        cell->point_indices[0] = glm::ivec3(index0.x, index0.y, index0.z);          // c000
-        cell->point_indices[1] = glm::ivec3(index0.x, index0.y, index1.z);          // c001
-        cell->point_indices[2] = glm::ivec3(index0.x, index1.y, index0.z);          // c010
-        cell->point_indices[3] = glm::ivec3(index0.x, index1.y, index1.z);          // c011
-        cell->point_indices[4] = glm::ivec3(index1.x, index0.y, index0.z);          // c100
-        cell->point_indices[5] = glm::ivec3(index1.x, index0.y, index1.z);          // c101
-        cell->point_indices[6] = glm::ivec3(index1.x, index1.y, index0.z);          // c110
-        cell->point_indices[7] = glm::ivec3(index1.x, index1.y, index1.z);          // c111                                                                                                    
-    }
 
     //===================================================================================================================================================================================================================
     // checks if there is a chance for a surface in that cell
@@ -220,31 +194,23 @@ template<typename scalar_field_t> struct octree_t
     {
         int inside = 0;                                                             // Check if all the corners are inside then discard
         for(int i = 0; i < 8; ++i)
-            if(m_sampleData[cell->point_indices[i]] < 0.0f)
+            if(m_sampleData[cell->corners[i]] < 0.0f)
                 ++inside;
                                                                         
         return (inside != 8) && (inside != 0);                                      // See if cell is inside the function
     }
 
     //===================================================================================================================================================================================================================
-    // checks if the cell needs subdivision
-    //===================================================================================================================================================================================================================
-    bool checkForSubdivision(cell_t* cell)                                          
-        { return checkForEdgeAmbiguity(cell) || checkForComplexSurface(cell); }
-
-    //===================================================================================================================================================================================================================
     // checks for more than one sign change on the edge
     //===================================================================================================================================================================================================================
-    bool checkForEdgeAmbiguity(cell_t* cell)
+    bool checkForEdgeAmbiguity(cell_t* cell) const
     {
-        bool edgeAmbiguity = false;                                                                 // Initialise return value
-  
         for(int i = 0; i < 12; ++i)                                                                 // Loop through all the edges of the cell
         {
             int cellPtA = EDGE_VERTICES[i][0];                                                      // Getting the start and end cell points of this edge
             int cellPtB = EDGE_VERTICES[i][1];
-            glm::ivec3 ptA = cell->point_indices[cellPtA];                                          // Getting the start and end sample indices of this edge
-            glm::ivec3 ptB = cell->point_indices[cellPtB];
+            glm::ivec3 ptA = cell->corners[cellPtA];                                          // Getting the start and end sample indices of this edge
+            glm::ivec3 ptB = cell->corners[cellPtB];
             int lastIndex = m_sampleData.linear_index(ptB);
             glm::ivec3 prevIndex = ptA;                                                             // Setting the initial index to the start point index
             int crossingPoints = 0;                                                                 // Resetting the crossing point of this edge to zero
@@ -258,30 +224,29 @@ template<typename scalar_field_t> struct octree_t
                 if(m_sampleData[prevIndex] * m_sampleData[index] < 0.0f)
                     ++crossingPoints;
 
-                if(crossingPoints > 1)
-                    edgeAmbiguity = true;
+                if(crossingPoints > 1) return true;
 
                 prevIndex = index;
                 ++index[edgeDirection];
             }
         }
-        return edgeAmbiguity;                                                                       // Return result of check for two crossing points on any edge in this cell
+        return false;                                                                       // Return result of check for two crossing points on any edge in this cell
     }
 
     //===================================================================================================================================================================================================================
     // checks for complex surface based on the complexSurfaceThreshold
     //===================================================================================================================================================================================================================
-    bool checkForComplexSurface(cell_t* c)
+    bool checkForComplexSurface(cell_t* cell) const
     {
         for(int i = 0; i < 7; ++i)                                                                  // Loop through all the cell points and check current point against all the rest remaining
         {
-            glm::ivec3 indA = c->point_indices[i];
-            glm::vec3 normalA = glm::normalize(gradient(indA));
+            glm::ivec3 indexA = cell->corners[i];
+            glm::vec3 normalA = glm::normalize(gradient(indexA));
 
             for(int j = i + 1; j < 8; ++j)
             {
-                glm::ivec3 indB = c->point_indices[j];
-                glm::vec3 normalB = glm::normalize(gradient(indB));
+                glm::ivec3 indexB = cell->corners[j];
+                glm::vec3 normalB = glm::normalize(gradient(indexB));
 
                 if(glm::dot(normalA, normalB) < complex_surface_threshold)
                     return true;
@@ -293,7 +258,7 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================
     // finds the gradient at any position in space using forward finite difference
     //===================================================================================================================================================================================================================
-    glm::vec3 gradient(const glm::ivec3& index)
+    glm::vec3 gradient(const glm::ivec3& index) const
     {
         glm::vec3 position = glm::vec3(-1.0f) + delta * glm::vec3(index);                                       // Finding and storing the xyz position of the sample and it's local bbox
         float gradient_delta = 0.5f * delta;
@@ -311,7 +276,6 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================
     void findNeighbours(cell_t* cell)
     {
-        if(cell->id == 0) return;                                                                  // Dismiss the root as it doesn't have neighbours
         address_t tempAddress[6];                                                                   // Create an array of 6 addresses with a size of the max octree depth
         std::vector<uint8_t> tempNeighbourAddress[6];                                               // An array of the six neighbours' addresses, each having an address size equivelent to the maximum octree depth
         
@@ -377,7 +341,6 @@ template<typename scalar_field_t> struct octree_t
         int valB = faceTwinTable[contact][1];
         b->faces[valA]->twin = a->faces[valB];
         a->faces[valB]->twin = b->faces[valA];
-        assert(b->faces[contact]->id == b->faces[contact]->twin->twin->id);
     }
     
     //===================================================================================================================================================================================================================

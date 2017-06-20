@@ -8,12 +8,12 @@ namespace cms
 
 struct Range
 {
-    float m_lower;
-    float m_upper;
+    int m_lower;
+    int m_upper;
 
     Range() {}
 
-    Range(float i_lower, float i_upper)
+    Range(int i_lower, int i_upper)
         : m_lower(i_lower), m_upper(i_upper)
     {
         assert(m_lower <= m_upper);

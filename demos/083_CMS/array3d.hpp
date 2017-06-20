@@ -14,21 +14,21 @@ namespace cms
 
 template<typename T> struct Array3D
 {
-    std::vector<T> data;                                                                // The dynamic 1D array of the actual data
-    glm::ivec3 dim;                                                                    // An Index3D storing the size of the 3D array wrapper in X, Y and Z
+    std::vector<T> data;                                                            // The dynamic 1D array of the actual data
+    int size;                                                                       // An Index3D storing the size of the 3D array wrapper in X, Y and Z
     
     Array3D() {}                                                                        
 
     ~Array3D() {}
 
-    void resize(glm::ivec3 dim)
+    void resize(int size)
     {
-        Array3D::dim = dim;
-        data.resize(dim.x * dim.y * dim.z);
+        Array3D::size = size;
+        data.resize(size * size * size);
     }
 
     int linear_index(glm::ivec3 index3d) const
-        { return dim.z * (dim.y * index3d.x + index3d.y) + index3d.z; }
+        { return size * (size * index3d.x + index3d.y) + index3d.z; }
 
     T& operator[] (const glm::ivec3& index3d)
         { return data[linear_index(index3d)]; }

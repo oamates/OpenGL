@@ -53,13 +53,14 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // algorithm data
     //===================================================================================================================================================================================================================
+    int depth;
+
     scalar_field_t scalar_field;
-    Array3D<float> m_sampleData;                                                // The sampling 1D array masked in an Array3D wrapper class
+    Array3D<float> field_values;                                                 // The sampling 1D array masked in an Array3D wrapper class
     Array3D<edge_block_t> m_edgeData;                                           // The edgeblock 1D array masked in an Array3D wrapper class EdgeBlock has 3 edges
     std::vector<vertex_t> vertices;                                             // The vertex array, storing all the vertices in the mesh
     octree_t<scalar_field_t>* octree;                                           // the octree of the current function
 
-    int depth;
     float delta;                                                                // the dimensions of the bbox as a vec3
 
     cell_t* octree_root;                                                        // a pointer to the root of the octree
@@ -80,11 +81,10 @@ template<typename scalar_field_t> struct AlgCMS
         complex_surface_threshold = 0.6f;
         delta = 2.0f / depth;
         
-        glm::ivec3 dimensions = glm::ivec3(depth + 1);
-        m_sampleData.resize(dimensions);                                         // Resizing the samplingData array and proceeding with the sampling
-        m_edgeData.resize(dimensions);
+        field_values.resize(depth + 1);                                         // Resizing the samplingData array and proceeding with the sampling
+        m_edgeData.resize(depth + 1);
 
-        octree = new octree_t<scalar_field_t>(depth, m_sampleData, min_level, max_level, delta, complex_surface_threshold);
+        octree = new octree_t<scalar_field_t>(depth, field_values, min_level, max_level, delta, complex_surface_threshold);
     
         glm::ivec3 index;
         glm::vec3 position;
@@ -98,7 +98,7 @@ template<typename scalar_field_t> struct AlgCMS
                 position.z = -1.0f;
                 for(index.z = 0; index.z <= depth; ++index.z)
                 {
-                    m_sampleData[index] = scalar_field(position);
+                    field_values[index] = scalar_field(position);
                     position.z += delta;
                 }
                 position.y += delta;
@@ -118,8 +118,7 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     void extractSurface(mesh_t& mesh)
     {
-        octree->buildOctree();                                                  // call the function that would recursively generate the octree
-        octree_root = octree->root;                                             // get the octree root cell
+        octree_root = octree->build();                                          // recursively generate the octree and get the octree root cell
         generateSegments(octree_root);                                          // traverse through the octree and generate segments for all LEAF cells
         editTransitionalFaces();                                                // resolve transitional faces
         traceComponent();                                                       // trace the strips into segments and components
@@ -155,10 +154,10 @@ template<typename scalar_field_t> struct AlgCMS
     void makeFaceSegments(const glm::ivec3 inds[], face_t* face)
     {
         const uint8_t edges =                                                   // aquire the index of the edges based on the face corner samples
-            (m_sampleData[inds[0]] < 0 ? 1 : 0) |
-            (m_sampleData[inds[1]] < 0 ? 2 : 0) |
-            (m_sampleData[inds[2]] < 0 ? 4 : 0) |
-            (m_sampleData[inds[3]] < 0 ? 8 : 0);
+            (field_values[inds[0]] < 0 ? 1 : 0) |
+            (field_values[inds[1]] < 0 ? 2 : 0) |
+            (field_values[inds[2]] < 0 ? 4 : 0) |
+            (field_values[inds[3]] < 0 ? 8 : 0);
   
         const int8_t e0a = EDGE_MAP[edges][0][0];                               // the edges of the first strip
         const int8_t e0b = EDGE_MAP[edges][0][1];
@@ -300,10 +299,10 @@ template<typename scalar_field_t> struct AlgCMS
         for(int i = range.m_lower; i < range.m_upper; ++i)
         {
             indexer[dir] = i;
-            float thisValue = m_sampleData[indexer];
+            float thisValue = field_values[indexer];
 
             indexer[dir] = i + 1;                                               // increment the indexer so we get the value of the next pt on the edge
-            float nextValue = m_sampleData[indexer];
+            float nextValue = field_values[indexer];
 
             if(thisValue * nextValue <= 0.0f)                                   // check current value against next one, if negative, edge found return sign change index
                 return i;
@@ -319,11 +318,11 @@ template<typename scalar_field_t> struct AlgCMS
     void makeVertex(strip_t& strip, const int& dir, const glm::ivec3& crossingIndex0, const glm::ivec3& crossingIndex1, int index)
     {
         glm::vec3 pos0 = glm::vec3(-1.0f) + delta * glm::vec3(crossingIndex0);
-        float val0 = m_sampleData[crossingIndex0];
+        float val0 = field_values[crossingIndex0];
         point_t pt0(pos0, val0);
     
         glm::vec3 pos1 = glm::vec3(-1.0f) + delta * glm::vec3(crossingIndex1);
-        float val1 = m_sampleData[crossingIndex1];
+        float val1 = field_values[crossingIndex1];
         point_t pt1(pos1, val1);
     
         glm::vec3 zero_point = find_zero(zero_search_iterations, pt0, pt1);     // find the exact position and normal at the crossing point
@@ -383,7 +382,7 @@ template<typename scalar_field_t> struct AlgCMS
         glm::ivec3 crossingIndex_1 = ind_0;
         crossingIndex_0[dir] = signChange;
         crossingIndex_1[dir] = signChange + 1;
-        assert(m_sampleData[crossingIndex_0] * m_sampleData[crossingIndex_1] <= 0.0f);
+        assert(field_values[crossingIndex_0] * field_values[crossingIndex_1] <= 0.0f);
     
         bool duplicate = false;                                                 // check for duplicate vertices on the same edge
         if(!m_edgeData[crossingIndex_0].empty)                                  // check global datastructor edgeblock
@@ -421,7 +420,7 @@ template<typename scalar_field_t> struct AlgCMS
             for(int v = 0; v < 4; ++v)                                          // convert face vertex index to cell vertex index
             {
                 const uint8_t vindex = FACE_VERTEX[f][v];
-                indices[v] = cell->point_indices[vindex];
+                indices[v] = cell->corners[vindex];
             }
             cell->faces[f]->strips.resize(2);
             makeFaceSegments(indices, cell->faces[f]);

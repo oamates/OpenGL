@@ -20,7 +20,7 @@ enum FaceState
 
 struct face_t
 {
-    int id;                                 // the unique identifier of the face, todo :: only used for debug
+    //int id;                                 // the unique identifier of the face, todo :: only used for debug
     int cell_index;                         // the unique identifier of the face's cell
     bool skip;                              // a flag denoting whether the face has been taken care of
     FaceState state;                        // the state enumerator of the face
@@ -33,8 +33,8 @@ struct face_t
     // a more complex set of strips, it stores them here when it has collected them
     std::vector<std::vector<unsigned int>> transitSegs;
 
-    face_t(int id, int cell_index)
-        : id(id), cell_index(cell_index), 
+    face_t(/*int id,*/ int cell_index)
+        : /*id(id), */cell_index(cell_index), 
           skip(true), state(BRANCH_FACE), twin(0), parent(0)
     {
         for(int i = 0; i < 4; ++i)
