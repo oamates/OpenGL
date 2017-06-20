@@ -59,8 +59,7 @@ template<typename scalar_field_t> struct AlgCMS
     std::vector<vertex_t> vertices;                                             // The vertex array, storing all the vertices in the mesh
     octree_t<scalar_field_t>* octree;                                           // the octree of the current function
 
-    glm::ivec3 dimensions;                                                       // the samples in xyz
-
+    int depth;
     float delta;                                                                // the dimensions of the bbox as a vec3
 
     cell_t* octree_root;                                                        // a pointer to the root of the octree
@@ -76,28 +75,28 @@ template<typename scalar_field_t> struct AlgCMS
     AlgCMS(unsigned int min_level, unsigned int max_level)
         : min_level(min_level), max_level(max_level)
     {
-        int p2 = 1 << max_level;
-        dimensions = glm::ivec3(p2 + 1);    
+        depth = 1 << max_level;
         zero_search_iterations = 5;
         complex_surface_threshold = 0.6f;
-        delta = 2.0f / p2;
+        delta = 2.0f / depth;
         
+        glm::ivec3 dimensions = glm::ivec3(depth + 1);
         m_sampleData.resize(dimensions);                                         // Resizing the samplingData array and proceeding with the sampling
         m_edgeData.resize(dimensions);
 
-        octree = new octree_t<scalar_field_t>(dimensions, m_sampleData, min_level, max_level, delta, complex_surface_threshold);
+        octree = new octree_t<scalar_field_t>(depth, m_sampleData, min_level, max_level, delta, complex_surface_threshold);
     
         glm::ivec3 index;
         glm::vec3 position;
 
         position.x = -1.0f;
-        for(index.x = 0; index.x <= p2; ++index.x)
+        for(index.x = 0; index.x <= depth; ++index.x)
         {
             position.y = -1.0f;
-            for(index.y = 0; index.y <= p2; ++index.y)
+            for(index.y = 0; index.y <= depth; ++index.y)
             {
                 position.z = -1.0f;
-                for(index.z = 0; index.z <= p2; ++index.z)
+                for(index.z = 0; index.z <= depth; ++index.z)
                 {
                     m_sampleData[index] = scalar_field(position);
                     position.z += delta;
@@ -201,7 +200,7 @@ template<typename scalar_field_t> struct AlgCMS
         component.push_back(vertices.size());
         vertices.push_back(median);
 
-        for(unsigned int i = 0; i < component.size() - 1; ++i)                  // -2 because median index is at (size-1) and we stich end to begin later
+        for(unsigned int i = 0; i < component.size() - 2; ++i)                  // -2 because median index is at (size-1) and we stich end to begin later
         {
             mesh.indices.push_back(component[component.size() - 1]);
             mesh.indices.push_back(component[i]);
@@ -235,7 +234,7 @@ template<typename scalar_field_t> struct AlgCMS
     {
         if(!cell) return;                                                       // skip empty nodes
   
-        if(cell->state == BRANCH)                                               // if the node is a BRANCH go deeper
+        if(!cell->leaf)                                               // if the node is a BRANCH go deeper
         {
             for(int i = 0; i < 8; ++i)
                 tessellationTraversal(cell->children[i], mesh);
@@ -409,7 +408,7 @@ template<typename scalar_field_t> struct AlgCMS
     {
         if(!cell) return;                                                       // skip empty nodes
   
-        if(cell->state == BRANCH)                                               // if the node is a BRANCH go deeper
+        if(!cell->leaf)                                               // if the node is a BRANCH go deeper
         {
             for(int i = 0; i < 8; ++i)
                 generateSegments(cell->children[i]);
@@ -664,7 +663,7 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     void resolveTransitionalFace(face_t* face)
     {
-        assert(octree->cells[face->twin->cell_index]->state == BRANCH);             // Check if twin face belongs to a Branch cell as it should!
+        assert(!octree->cells[face->twin->cell_index]->leaf);             // Check if twin face belongs to a Branch cell as it should!
         assert(face->twin->state != TRANSIT_FACE);
   
         std::vector< std::vector<unsigned int> > transitSegs;                       // Get twin and traverse all it's children collecting all non-empty strips
@@ -778,7 +777,7 @@ template<typename scalar_field_t> struct AlgCMS
             for(unsigned int j = 0; j < cells.size(); ++j)                          // loop through all cells and link components for all LEAF cells
                 if(cells[j]->level == max_level - i)
                 {
-                    if(cells[j]->state == LEAF)                                     // trace the segments to form components
+                    if(cells[j]->leaf)                                     // trace the segments to form components
                     {
                         std::vector<strip_t> cellStrips;
                         std::vector<std::vector<unsigned int>> transitSegs;

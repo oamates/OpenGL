@@ -122,7 +122,7 @@ struct ExampleClass
 };
 
 
-static const int MIN_OCTREE_RES = 2;
+static const int MIN_OCTREE_RES = 5;
 static const int MAX_OCTREE_RES = 8;
 static float COMPLEX_SURFACE_THRESHOLD  = 0.85f;
 
@@ -215,8 +215,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
-    //glEnable(GL_CULL_FACE);
-    //glCullFace(GL_FRONT);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
 
 
     //===================================================================================================================================================================================================================

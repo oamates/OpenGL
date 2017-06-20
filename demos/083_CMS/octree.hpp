@@ -6,6 +6,7 @@
 #include "cell.hpp"
 #include "array3d.hpp"
 #include "tables.hpp"
+#include "log.hpp"
 
 namespace cms
 {
@@ -92,17 +93,17 @@ template<typename scalar_field_t> struct octree_t
     std::vector<cell_t*> leafs;
     std::vector<face_t*> faces;
 
-    std::map<unsigned int, cell_t*> m_cellAddresses;
-    glm::ivec3 samples;
+    std::map<unsigned int, cell_t*> cell_hash_map;
+    int depth;
     Array3D<float>& m_sampleData;
     unsigned int min_level;
     unsigned int max_level;
     float delta;
     float complex_surface_threshold;
 
-    octree_t(const glm::ivec3& samples, Array3D<float>& sampleData, unsigned int min_level, unsigned int max_level, 
+    octree_t(int depth, Array3D<float>& sampleData, unsigned int min_level, unsigned int max_level, 
              float delta, float complex_surface_threshold) 
-        : samples(samples), m_sampleData(sampleData), min_level(min_level), max_level(max_level),
+        : depth(depth), m_sampleData(sampleData), min_level(min_level), max_level(max_level),
           delta(delta), complex_surface_threshold(complex_surface_threshold)
     {}
 
@@ -129,8 +130,7 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================    
     void makeStructure()
     {
-        glm::ivec3 offsets = samples - 1;
-        root = new cell_t(0, BRANCH, 0, 0, glm::ivec3(0), offsets, 0);              // establish root
+        root = new cell_t(0, BRANCH, 0, 0, glm::ivec3(0), depth, 0);              // establish root
         cells.push_back(root);                                                      // Pushing the root as the first element of the cell array
         acquireCellInfo(root);                                                      // Calculating and storing information about the root cell
         subdivideCell(root);                                                        // Create the rest of the base grid recursively
@@ -144,95 +144,55 @@ template<typename scalar_field_t> struct octree_t
         unsigned int parent_level = parent->level;
         unsigned int this_level = parent_level + 1;
 
-        glm::ivec3 offsets;
+        int offset = depth >> this_level;
 
-        int p2 = 1 << this_level;
+        int iX = parent->index.x;
+        int iY = parent->index.y;
+        int iZ = parent->index.z;
 
-        offsets[0] = (samples[0] - 1) / p2;
-        offsets[1] = (samples[1] - 1) / p2;
-        offsets[2] = (samples[2] - 1) / p2;
-
-        int parIndX = parent->index.x;
-        int parIndY = parent->index.y;
-        int parIndZ = parent->index.z;
+        glm::ivec3 cell_corners[] =
+        {
+            glm::ivec3(iX,          iY,          iZ),
+            glm::ivec3(iX,          iY,          iZ + offset),
+            glm::ivec3(iX,          iY + offset, iZ),
+            glm::ivec3(iX,          iY + offset, iZ + offset),
+            glm::ivec3(iX + offset, iY,          iZ),
+            glm::ivec3(iX + offset, iY,          iZ + offset),
+            glm::ivec3(iX + offset, iY + offset, iZ),
+            glm::ivec3(iX + offset, iY + offset, iZ + offset)
+        };
 
         for(int i = 0; i < 8; ++i)
         {
-            glm::ivec3 c000;
-
-            switch(i)
-            {
-                case 0:
-                    c000.x = parIndX;
-                    c000.y = parIndY;
-                    c000.z = parIndZ;
-                break;
-                case 1:
-                    c000.x = parIndX;
-                    c000.y = parIndY;
-                    c000.z = parIndZ + offsets[2];
-                break;
-                case 2:
-                    c000.x = parIndX;
-                    c000.y = parIndY + offsets[1];
-                    c000.z = parIndZ;
-                break;
-                case 3:
-                    c000.x = parIndX;
-                    c000.y = parIndY + offsets[1];
-                    c000.z = parIndZ + offsets[2];
-                break;
-                case 4:
-                    c000.x = parIndX + offsets[0];
-                    c000.y = parIndY;
-                    c000.z = parIndZ;
-                break;
-                case 5:
-                    c000.x = parIndX + offsets[0];
-                    c000.y = parIndY;
-                    c000.z = parIndZ + offsets[2];
-                break;
-                case 6:
-                    c000.x = parIndX + offsets[0];
-                    c000.y = parIndY + offsets[1];
-                    c000.z = parIndZ;
-                break;
-                case 7:
-                    c000.x = parIndX + offsets[0];
-                    c000.y = parIndY + offsets[1];
-                    c000.z = parIndZ + offsets[2];
-                break;
-            }
-
-            cell_t* c = new cell_t(cells.size(), BRANCH, parent, this_level, c000, offsets, i);     // Create new Cell on he heap
-            cells.push_back(c);
-            acquireCellInfo(c);
-            parent->children[i] = c;
+            cell_t* cell = new cell_t(cells.size(), BRANCH, parent, this_level, cell_corners[i], offset, i);     // Create new Cell on he heap
+            cells.push_back(cell);
+            acquireCellInfo(cell);
+            parent->children[i] = cell;
         
             if(this_level < min_level)                                                               // If base octree level still not reached => subdivide
-                subdivideCell(c);
+                subdivideCell(cell);
             else if(this_level < max_level)                                                         // If the next level would be the min and max octree levels => check for subdiv
             {
-                if(checkForSubdivision(c))                                                          // Check if the cell should be subdivided due to a complex surface or edge ambiguity
-                    subdivideCell(c);
+                if(checkForSubdivision(cell))                                                          // Check if the cell should be subdivided due to a complex surface or edge ambiguity
+                    subdivideCell(cell);
                 else
                 {
-                    if(checkForSurface(c))                                                          // If not check whether there is any surface at all
+                    if(checkForSurface(cell))                                                          // If not check whether there is any surface at all
                     {
-                        c->state = LEAF;
-                        leafs.push_back(c);
+                        cell->leaf = true;
+                        leafs.push_back(cell);
                     }
                 }
             }
             else
             {
-                if(checkForSurface(c))
+                if(checkForSurface(cell))
                 {
-                    c->state = LEAF;
-                    leafs.push_back(c);
+                    cell->leaf = true;
+                    leafs.push_back(cell);
                 }
             }
-            m_cellAddresses[c->address.hash()] = c;                                         // Assigning cells to addresses :: todo  will this work here (recursive) better 
+            cell_hash_map[cell->address.hash()] = cell;                                         // Assigning cells to addresses :: todo  will this work here (recursive) better 
         }
     }
     //===================================================================================================================================================================================================================
@@ -241,12 +201,7 @@ template<typename scalar_field_t> struct octree_t
     void acquireCellInfo(cell_t* cell)
     {  
         glm::ivec3 index0 = cell->index;
-        glm::ivec3 offset = cell->offset;
-        glm::ivec3 index1 = index0 + offset;
-
-        if(index1.x == samples.x) --index1.x;
-        if(index1.y == samples.y) --index1.y;
-        if(index1.z == samples.z) --index1.z;
+        glm::ivec3 index1 = index0 + cell->offset;
   
         cell->point_indices[0] = glm::ivec3(index0.x, index0.y, index0.z);          // c000
         cell->point_indices[1] = glm::ivec3(index0.x, index0.y, index1.z);          // c001
@@ -394,8 +349,8 @@ template<typename scalar_field_t> struct octree_t
         
         for(int i = 0; i < 6; ++i)                                                                  // Actually find and assign the neighbour if such exists at the given address
         {
-            unsigned int addressKey = tempAddress[i].hash();
-            cell_t* neighbour_cell = m_cellAddresses[addressKey];
+            unsigned int hash = tempAddress[i].hash();
+            cell_t* neighbour_cell = cell_hash_map[hash];
             
             if(neighbour_cell)                                                                      // Proceed if there is such a neighbouring cell
             {
@@ -444,7 +399,7 @@ template<typename scalar_field_t> struct octree_t
                 cell->parent->faces[con]->children[posOfSubFace] = cell->faces[con];
             }
     
-            if(cell->state == LEAF)                                                         // if this is a leaf cell then set all its half-faces as LEAFs
+            if(cell->leaf)                                                         // if this is a leaf cell then set all its half-faces as LEAFs
             {
                 for(int i = 0; i < 6; ++i)
                     cell->faces[i]->state = LEAF_FACE;
@@ -461,7 +416,7 @@ template<typename scalar_field_t> struct octree_t
   
         for(unsigned int i = 0; i < leafs.size(); ++i)                                              // Loop through all leaf (straddling) cells
         {
-            assert(leafs[i]->state == LEAF);
+            assert(leafs[i]->leaf);
 
             for(int j = 0; j < 6; ++j)                                                              // Loop through all faces of such a cell
             {

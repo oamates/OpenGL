@@ -22,7 +22,8 @@ enum CellState
 struct cell_t
 {
     int id;
-    enum CellState state;                                                                           // the state of the current cell - based on State enumerator
+    bool leaf;                                                                                      // flag indicating whether the cell is a leaf
+//    enum CellState state;                                                                           // the state of the current cell - based on State enumerator
 
     cell_t* parent;                                                                                 // pointer to this cell's parent cell
     cell_t* children[8];                                                                            // pointer array of the branching cells
@@ -34,7 +35,7 @@ struct cell_t
     address_t address;                                                                              // the address of the cell
 
     glm::ivec3 index;                                                                               // the index of the point at the 000 corner of the cell
-    glm::ivec3 offset;                                                                              // the discrete dimensions of the cell based on the samples
+    int offset;                                                                                     // the discrete dimensions of the cell based on the samples
     glm::ivec3 point_indices[8];                                                                    // indices of the samples at the corners of the cell
     int8_t position_in_parent;                                                                      // position within the parent
     
@@ -44,9 +45,8 @@ struct cell_t
     // constructor and destructor
     //===================================================================================================================================================================================================================
     
-    cell_t(int id, CellState state, cell_t* parent, uint8_t level, const glm::ivec3& index, const glm::ivec3& offset, int8_t position_in_parent)
-        : id(id), state(state), parent(parent), level(level),
-          index(index), offset(offset), position_in_parent(position_in_parent)
+    cell_t(int id, bool leaf, cell_t* parent, uint8_t level, const glm::ivec3& index, int offset, int8_t position_in_parent)
+        : id(id), leaf(leaf), parent(parent), level(level), index(index), offset(offset), position_in_parent(position_in_parent)
     {
         for(int i = 0; i < 8; ++i)                                                                  // initialise the 8 octree children to 0
             children[i] = 0;
