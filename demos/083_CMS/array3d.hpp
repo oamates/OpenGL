@@ -6,7 +6,6 @@
 
 #include <glm/glm.hpp>
 
-#include "range.hpp"
 #include "edge.hpp"
 
 namespace cms

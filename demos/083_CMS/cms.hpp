@@ -6,7 +6,6 @@
 #include <glm/glm.hpp>
 
 #include "edge.hpp"
-#include "range.hpp"
 #include "cell.hpp"
 #include "array3d.hpp"
 #include "octree.hpp"
@@ -122,7 +121,7 @@ template<typename scalar_field_t> struct AlgCMS
         generateSegments(octree_root);                                          // traverse through the octree and generate segments for all LEAF cells
         editTransitionalFaces();                                                // resolve transitional faces
         traceComponent();                                                       // trace the strips into segments and components
-        tessellationTraversal(octree_root, mesh);                               // traverse the tree again meshing all the components
+        tessellate_cell(octree_root, mesh);                               // traverse the tree again meshing all the components
         mesh.vertices = vertices;                                               // copy the vertices onto the mesh
     }
 
@@ -153,62 +152,31 @@ template<typename scalar_field_t> struct AlgCMS
   
     void makeFaceSegments(const glm::ivec3 inds[], face_t* face)
     {
-        const uint8_t edges =                                                   // aquire the index of the edges based on the face corner samples
-            (field_values[inds[0]] < 0 ? 1 : 0) |
-            (field_values[inds[1]] < 0 ? 2 : 0) |
-            (field_values[inds[2]] < 0 ? 4 : 0) |
-            (field_values[inds[3]] < 0 ? 8 : 0);
+        const uint8_t edges =                                                       // aquire the index of the edges based on the face corner field values
+            (field_values[inds[0]] < 0 ? 1 : 0) | (field_values[inds[1]] < 0 ? 2 : 0) |
+            (field_values[inds[2]] < 0 ? 4 : 0) | (field_values[inds[3]] < 0 ? 8 : 0);
   
-        const int8_t e0a = EDGE_MAP[edges][0][0];                               // the edges of the first strip
-        const int8_t e0b = EDGE_MAP[edges][0][1];
-  
-        if (e0a != -1)                                                          // if edge has data generate primary strip
-            makeStrip(e0a, e0b, inds, face, 0);
-  
-        const int8_t e1a = EDGE_MAP[edges][1][0];                               // the edges of the second strip
-        const int8_t e1b = EDGE_MAP[edges][1][1];
-  
-        if (e1a != -1)                                                          // if both strips are on a face
-            makeStrip(e1a, e1b, inds, face, 1);
-    }
-
-    void tessellateComponent(mesh_t& mesh, std::vector<unsigned int>& component)
-    {
-        int numOfInds = component.size();
-        assert(numOfInds >= 3);
-    
-        if(numOfInds == 3)                                                      // three vertices - just output a plain triangle
+        const int8_t e0a = EDGE_MAP[edges][0][0];                                   // the edges of the first strip  
+        if (e0a != -1)                                                              // if edge has data generate primary strip
         {
-            for(int i = 0; i < 3; ++i)
-                mesh.indices.push_back(component[i]);
-            return;
-        }                                                          
-
-        vertex_t median;                                                        // more than three vertices - find the median and make a fan
-        median.position = glm::vec3(0.0f);
-
-        for(unsigned int i = 0; i < component.size(); ++i)
-            median.position += vertices[component[i]].position;
-
-        median.position /= float(numOfInds);
-        
-        float value = scalar_field(median.position);
-        median.normal = glm::normalize(gradient(median.position, value));
-        median.position -= value * median.normal;
-
-        component.push_back(vertices.size());
-        vertices.push_back(median);
-
-        for(unsigned int i = 0; i < component.size() - 2; ++i)                  // -2 because median index is at (size-1) and we stich end to begin later
-        {
-            mesh.indices.push_back(component[component.size() - 1]);
-            mesh.indices.push_back(component[i]);
-            mesh.indices.push_back(component[i + 1]);
+            const int8_t e0b = EDGE_MAP[edges][0][1];
+            strip_t strip(false, e0a, e0b);
+            populate_strip(strip, inds, 0);                                         // 1st edge of first strip - e0a
+            populate_strip(strip, inds, 1);                                         // 2nd edge of first strip - e0b
+            face->strips[0] = strip;                                                // populate current face with the created strip
+            face->skip = false;
         }
-  
-        mesh.indices.push_back(component[component.size() - 1]);                // Connecting the last and the first
-        mesh.indices.push_back(component[component.size() - 2]);
-        mesh.indices.push_back(component[0]);
+
+        const int8_t e1a = EDGE_MAP[edges][1][0];                                   // the edges of the second strip
+        if (e1a != -1)                                                              // if both strips are on a face
+        {
+            const int8_t e1b = EDGE_MAP[edges][1][1];
+            strip_t strip(false, e1a, e1b);
+            populate_strip(strip, inds, 0);                                         // 1st edge of second strip - e0a
+            populate_strip(strip, inds, 1);                                         // 2nd edge of second Strip - e0b
+            face->strips[1] = strip;                                                // populate current face with the created strip
+            face->skip = false;
+        }
     }
 
     //===================================================================================================================================================================================================================
@@ -229,74 +197,99 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // traverses the octree and tessellates all the components on each LEAF cell
     //===================================================================================================================================================================================================================
-    void tessellationTraversal(cell_t* cell, mesh_t& mesh)
+    void tessellate_cell(cell_t* cell, mesh_t& mesh)
     {
         if(!cell) return;                                                       // skip empty nodes
   
         if(!cell->leaf)                                               // if the node is a BRANCH go deeper
         {
             for(int i = 0; i < 8; ++i)
-                tessellationTraversal(cell->children[i], mesh);
+                tessellate_cell(cell->children[i], mesh);
             return;
         }
         
         for(unsigned int i = 0; i < cell->components.size(); ++i)               // the node is a leaf, tessellate segment
-            tessellateComponent(mesh, cell->components[i]);
+        {
+            std::vector<unsigned int>& component = cell->components[i];
+
+            int size = component.size();
+            if(size == 3)                                                      // three vertices - just output a plain triangle
+            {
+                for(int i = 0; i < 3; ++i)
+                    mesh.indices.push_back(component[i]);
+                return;
+            }                                    
+
+            glm::vec3 position = glm::vec3(0.0f);
+            for(unsigned int i = 0; i < component.size(); ++i)
+                position += vertices[component[i]].position;
+
+            position /= float(size);
+        
+            float value = scalar_field(position);
+            glm::vec3 normal = glm::normalize(gradient(position, value));
+            position -= value * normal;
+
+            component.push_back(vertices.size());
+            vertices.push_back(vertex_t(position, normal));
+
+            for(unsigned int i = 0; i < component.size() - 2; ++i)                  // -2 because median index is at (size-1) and we stich end to begin later
+            {
+                mesh.indices.push_back(component[component.size() - 1]);
+                mesh.indices.push_back(component[i]);
+                mesh.indices.push_back(component[i + 1]);
+            }
+    
+            mesh.indices.push_back(component[component.size() - 1]);                // Connecting the last and the first
+            mesh.indices.push_back(component[component.size() - 2]);
+            mesh.indices.push_back(component[0]);
+        }
     }
 
     //===================================================================================================================================================================================================================
     // finds all the edges that are located inbetween the two given points, stores them in the provided vector
     // returns value of the direction in which they advance 0 - right(x), 1 - up(y), 2 - front(z)
     //===================================================================================================================================================================================================================
-    int getEdgesBetwixt(Range& o_range, const glm::ivec3& pt0, const glm::ivec3& pt1) const
+    int getEdgesBetwixt(glm::ivec2& range, const glm::ivec3& pt0, const glm::ivec3& pt1) const
     {
-        int direction = -1;                                                     // 0 - right(x), 1 - up(y), 2 - front(z)
-        int diffX = abs(pt0.x - pt1.x);
-        int diffY = abs(pt0.y - pt1.y);
-        int diffZ = abs(pt0.z - pt1.z);
-    
-        if(diffX > 0)
+        if(pt0.x != pt1.x)
         {
             int first = std::min(pt0.x, pt1.x);
             int last = std::max(pt0.x, pt1.x);
-            o_range = Range(first, last);
-            direction = 0;
+            range = glm::ivec2(first, last);
+            return 0;
         }
-        else if(diffY > 0)
+
+        if(pt0.y != pt1.y)
         {
             int first = std::min(pt0.y, pt1.y);
             int last = std::max(pt0.y, pt1.y);
-            o_range = Range(first, last);
-            direction = 1;
+            range = glm::ivec2(first, last);
+            return 1;
         }
-        else if(diffZ > 0)
-        {
-            int first = std::min(pt0.z, pt1.z);
-            int last = std::max(pt0.z, pt1.z);
-            o_range = Range(first, last);
-            direction = 2;
-        }
-    
-        assert((direction >= 0) && (direction <= 2));
-        return direction;
+
+        int first = std::min(pt0.z, pt1.z);
+        int last = std::max(pt0.z, pt1.z);
+        range = glm::ivec2(first, last);
+        return 2;
     }
 
     //===================================================================================================================================================================================================================
     // finds the exact place of the isovalue crossing point by tracking down the sign change, returning the index of the first point (smaller)
     //===================================================================================================================================================================================================================
-    int exactSignChangeIndex(const Range& range, int& dir, glm::ivec3& ind0, glm::ivec3& ind1) const
+    int exactSignChangeIndex(const glm::ivec2& range, int& dir, glm::ivec3& ind0, glm::ivec3& ind1) const
     {
         glm::ivec3 firstIndex;                                                  // check for going from smaller to higher
-        if(ind0[dir] == range.m_lower)
+        if(ind0[dir] == range.x)
             firstIndex = ind0;
-        else if(ind1[dir] == range.m_lower)
+        else if(ind1[dir] == range.x)
             firstIndex = ind1;
   
-        if(fabs(range.m_lower - range.m_upper) == 1)                            // if there are only two indices, return the first one
+        if(range.x + 1 == range.y)                            // if there are only two indices, return the first one
             return firstIndex[dir];
 
         glm::ivec3 indexer = firstIndex;                                        // loop through all samples on the cell edge and find the sign change
-        for(int i = range.m_lower; i < range.m_upper; ++i)
+        for(int i = range.x; i < range.y; ++i)
         {
             indexer[dir] = i;
             float thisValue = field_values[indexer];
@@ -307,9 +300,6 @@ template<typename scalar_field_t> struct AlgCMS
             if(thisValue * nextValue <= 0.0f)                                   // check current value against next one, if negative, edge found return sign change index
                 return i;
         }
-
-        assert(true);
-        return -1;                                                              // returns error value (no sign change found)
     }
 
     //===================================================================================================================================================================================================================
@@ -339,25 +329,9 @@ template<typename scalar_field_t> struct AlgCMS
         edge_block_t edge_block = m_edgeData[crossingIndex0];                   // put the data onto the global 3D array of edges
         if(edge_block.empty)
             edge_block.empty = false;
-        assert(edge_block.edge_indices[dir] == -1);
+
         edge_block.edge_indices[dir] = vertices.size() - 1;
         m_edgeData[crossingIndex0] = edge_block;
-    }
-
-    //===================================================================================================================================================================================================================
-    // creates a strip and populates both of it's sides by calling populate strip
-    //===================================================================================================================================================================================================================
-    void makeStrip(int edge0, int edge1, const glm::ivec3 inds[], face_t* face, int strip_index)
-    {
-        assert((edge0 != -1) && (edge1 != -1));
-        strip_t strip(false, edge0, edge1);
-        populate_strip(strip, inds, 0);                                         // 1st edge of First Strip - e0a
-        populate_strip(strip, inds, 1);                                         // 2nd edge of First Strip - e0b
-
-        // todo :: Check for face sharp features here
-
-        face->strips[strip_index] = strip;                                      // populate current face with the created strip
-        face->skip = false;
     }
 
     //===================================================================================================================================================================================================================
@@ -369,35 +343,28 @@ template<typename scalar_field_t> struct AlgCMS
         glm::ivec3 ind_0 = inds[VERTEX_MAP[faceEdge][0]];
         glm::ivec3 ind_1 = inds[VERTEX_MAP[faceEdge][1]];
     
-        Range range;                                                            // get the range and the direction (of an edge block) which the edge represents
+        glm::ivec2 range;                                                            // get the range and the direction (of an edge block) which the edge represents
         int dir = getEdgesBetwixt(range, ind_0, ind_1);
-        assert(abs(ind_0[dir] - ind_1[dir]) > 0);
-        assert((ind_0[dir] == range.m_lower) || (ind_0[dir] == range.m_upper));
-        assert((ind_1[dir] == range.m_lower) || (ind_1[dir] == range.m_upper));
     
         int signChange = exactSignChangeIndex(range, dir, ind_0, ind_1);        // find the exact sign change on that bigger edge range, getting the index of the sample, just before the sign change = edge of change
-        assert((signChange >= range.m_lower) && (signChange < range.m_upper));
     
         glm::ivec3 crossingIndex_0 = ind_0;                                     // set the exact two point indices between the zero crossing
         glm::ivec3 crossingIndex_1 = ind_0;
         crossingIndex_0[dir] = signChange;
         crossingIndex_1[dir] = signChange + 1;
-        assert(field_values[crossingIndex_0] * field_values[crossingIndex_1] <= 0.0f);
     
-        bool duplicate = false;                                                 // check for duplicate vertices on the same edge
-        if(!m_edgeData[crossingIndex_0].empty)                                  // check global datastructor edgeblock
+        if(!m_edgeData[crossingIndex_0].empty)                                  // check for duplicate vertices on the same edge, if found we are done
         {
             if(m_edgeData[crossingIndex_0].edge_indices[dir] != -1)             // check exact global edge
             {
                 strip.data[index] = m_edgeData[crossingIndex_0].edge_indices[dir];
                 strip.block[index] = crossingIndex_0;
                 strip.dir[index] = dir;
-                duplicate = true;
+                return;
             }
         }
     
-        if(!duplicate)                                                          // if there is no previous vertex registered to that edge, proceed to find it.
-            makeVertex(strip, dir, crossingIndex_0, crossingIndex_1, index);
+        makeVertex(strip, dir, crossingIndex_0, crossingIndex_1, index);
     }
 
     //===================================================================================================================================================================================================================
@@ -445,27 +412,24 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     void segmentFromTwin(face_t* face, std::vector<unsigned int>& component, int lastData, int& currentEdge)
     {
-        assert(face->twin->state == BRANCH_FACE);
-        assert(face->twin->transitSegs.size() > 0);
-  
-        for(unsigned int i = 0; i < face->twin->transitSegs.size(); ++i)        // Looping through all transitional Face separate segments
+        for(unsigned int i = 0; i < face->twin->transit_segments.size(); ++i)        // Looping through all transitional Face separate segments
         {
-            if(face->twin->strips[i].skip == false)
+            if(!face->twin->strips[i].skip)
             {
                 if(lastData == face->twin->strips[i].data[0])
                 {
-                    assert((face->twin->transitSegs[i][0] == (unsigned)face->twin->strips[i].data[0]) ||
-                           (face->twin->transitSegs[i][0] == (unsigned)face->twin->strips[i].data[1]));
+                    assert((face->twin->transit_segments[i][0] == (unsigned)face->twin->strips[i].data[0]) ||
+                           (face->twin->transit_segments[i][0] == (unsigned)face->twin->strips[i].data[1]));
 
-                    for(unsigned int s = 1; s < face->twin->transitSegs[i].size(); ++s)
-                        component.push_back(face->twin->transitSegs[i][s]);
+                    for(unsigned int s = 1; s < face->twin->transit_segments[i].size(); ++s)
+                        component.push_back(face->twin->transit_segments[i][s]);
                     currentEdge = face->twin->strips[i].edge[1];
                     face->twin->strips[i].skip = true;
                 }
                 else if(lastData == face->twin->strips[i].data[1])
                 {
-                    for(unsigned s=face->twin->transitSegs[i].size() - 1; s > 0; --s)
-                        component.push_back(face->twin->transitSegs[i][s - 1]);
+                    for(unsigned int s = face->twin->transit_segments[i].size() - 1; s > 0; --s)
+                        component.push_back(face->twin->transit_segments[i][s - 1]);
                     currentEdge = face->twin->strips[i].edge[0];
                     face->twin->strips[i].skip = true;
                 }
@@ -476,7 +440,7 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // collects all the strips of a cell into a single array, populates another array with transitional segments in case the cell has transitional faces
     //===================================================================================================================================================================================================================
-    void collectStrips(cell_t* c, std::vector<strip_t>& o_cellStrips, std::vector<std::vector<unsigned int>>& o_transitSegs)
+    void collectStrips(cell_t* c, std::vector<strip_t>& o_cellStrips, std::vector<std::vector<unsigned int>>& transit_segments)
     {
         for(int f = 0; f < 6; ++f)                                              // Looping through all faces of the cell
         {
@@ -490,34 +454,26 @@ template<typename scalar_field_t> struct AlgCMS
             }
             else if(c->faces[f]->state == TRANSIT_FACE)                         // For a Transitional Face, we must take the transit segment too as it contains all the data (vertices in between the start and end of strip)
             {
-                if(!c->faces[f]->twin)                                          // Check if there is a valid twin
-                    break;
+                if(!c->faces[f]->twin) break;                                   // Check if there is a valid twin
     
-                assert(c->faces[f]->twin->strips.size() == c->faces[f]->twin->transitSegs.size());
-          
                 for(unsigned int i = 0; i < c->faces[f]->twin->strips.size(); ++i)            
                 {
                     if(c->faces[f]->twin->strips[i].data[0] != -1)              // Push the current strips and transit
                     {
-                        o_transitSegs.push_back(c->faces[f]->twin->transitSegs[i]);
+                        transit_segments.push_back(c->faces[f]->twin->transit_segments[i]);
                         o_cellStrips.push_back(c->faces[f]->twin->strips[i]);
                     }
                 }
             }
         }
-        assert(o_cellStrips.size() > 0);                                        // A Leaf cell must have at least 3 strips to form a component unless it is has just a single looping component from a transit face
     }
-
 
     //===================================================================================================================================================================================================================
     // takes all the strips of a given cell and links them together to form components
     //===================================================================================================================================================================================================================
-    void linkStrips(std::vector<unsigned int>& components, std::vector<strip_t>& strips, std::vector<std::vector<unsigned int>>& transitSegs)
+    void linkStrips(std::vector<unsigned int>& components, std::vector<strip_t>& strips, std::vector<std::vector<unsigned int>>& transit_segments)
     {
-        assert(components.size() == 0);
-
         int addedInIteration;
-        bool backwards;
     
         components.push_back(strips[0].data[0]);                                // add a new value to the beginning
 
@@ -532,11 +488,10 @@ template<typename scalar_field_t> struct AlgCMS
     
                 if(components.back() == s_d0)
                 {
-                    backwards = false;
                     bool transit = false;
               
-                    if(transitSegs.size() > 0)                              // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, backwards);
+                    if(transit_segments.size())                              // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transit_segments, strips[i], transit, addedInIteration, false);
               
                     if(!transit)                                            // If the strip does not belong to a transitional face just get the next value from the strip
                     {
@@ -546,11 +501,10 @@ template<typename scalar_field_t> struct AlgCMS
                 }
                 else if(components.back() == s_d1)
                 {
-                    backwards = true;
                     bool transit = false;
               
-                    if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, backwards); 
+                    if(transit_segments.size())                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transit_segments, strips[i], transit, addedInIteration, true); 
               
                     if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
@@ -567,7 +521,7 @@ template<typename scalar_field_t> struct AlgCMS
             if(components.front() == components.back())                                     // Check whether the component closes on itself
                 components.erase(components.begin());                                       // delete first vertex as it is duplex with last
         }
-        while(addedInIteration > 0);
+        while(addedInIteration);
     
         do
         {
@@ -582,8 +536,8 @@ template<typename scalar_field_t> struct AlgCMS
                 {
                     bool transit = false;
     
-                    if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, checks for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, false);
+                    if(transit_segments.size())                                  // If there are no transitSegs, no point in checking, checks for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transit_segments, strips[i], transit, addedInIteration, false);
     
                     if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
@@ -595,8 +549,8 @@ template<typename scalar_field_t> struct AlgCMS
                 {
                     bool transit = false;
     
-                    if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, true);
+                    if(transit_segments.size())                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transit_segments, strips[i], transit, addedInIteration, true);
               
                     if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
@@ -614,9 +568,7 @@ template<typename scalar_field_t> struct AlgCMS
             if(components.front() == components.back())                                     // check whether the component closes on itself
                 components.erase(components.begin());                                       // delete first vertex as it is duplex with last    
         }
-        while(addedInIteration > 0);
-    
-        assert(components.size() >= 3);
+        while(addedInIteration);
     }
 
     //===================================================================================================================================================================================================================
@@ -662,12 +614,9 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     void resolveTransitionalFace(face_t* face)
     {
-        assert(!octree->cells[face->twin->cell_index]->leaf);             // Check if twin face belongs to a Branch cell as it should!
-        assert(face->twin->state != TRANSIT_FACE);
-  
-        std::vector< std::vector<unsigned int> > transitSegs;                       // Get twin and traverse all it's children collecting all non-empty strips
+        std::vector< std::vector<unsigned int>> transit_segments;                       // Get twin and traverse all it's children collecting all non-empty strips
         std::vector<strip_t> allStrips;                                             // todo :: get only addresses??
-        traverseFace(face->twin, allStrips);
+        traverse_face(face->twin, allStrips);
       
         if(allStrips.size() == 0)                                                   // If there are no strips on twin face
         {
@@ -678,10 +627,10 @@ template<typename scalar_field_t> struct AlgCMS
         do
         {
             std::vector<unsigned int> vertInds;
-            strip_t longStrip;
+            strip_t long_strip;
             vertInds.push_back(allStrips[0].data[0]);
             vertInds.push_back(allStrips[0].data[1]);
-            longStrip = allStrips[0];
+            long_strip = allStrips[0];
             allStrips.erase(allStrips.begin());
             int addedInIteration;
     
@@ -690,16 +639,16 @@ template<typename scalar_field_t> struct AlgCMS
                 addedInIteration = 0;
                 for(unsigned int i = 0; i < allStrips.size(); ++i)                  // Checking Forward
                 {
-                    if(vertInds[vertInds.size()-1] == (unsigned int) allStrips[i].data[0])
+                    if(vertInds[vertInds.size() - 1] == allStrips[i].data[0])
                     {
                         vertInds.push_back(allStrips[i].data[1]);
-                        longStrip.changeBack(allStrips[i], 1);                      // adding info to longStrip end
+                        long_strip.changeBack(allStrips[i], 1);                      // adding info to longStrip end
                         ++addedInIteration;
                     }
-                    else if(vertInds[vertInds.size()-1] == (unsigned int) allStrips[i].data[1])
+                    else if(vertInds[vertInds.size() - 1] == allStrips[i].data[1])
                     {
                         vertInds.push_back(allStrips[i].data[0]);
-                        longStrip.changeBack(allStrips[i], 0);                      // adding info to longStrip end
+                        long_strip.changeBack(allStrips[i], 0);                      // adding info to longStrip end
                         ++addedInIteration;
                     }
                     else
@@ -710,14 +659,14 @@ template<typename scalar_field_t> struct AlgCMS
                     if(vertInds[0] == vertInds[vertInds.size()-1])
                     {
                         vertInds.erase(vertInds.begin());                           // delete last vertex as it is duplex
-                        longStrip.loop = true;
+                        long_strip.loop = true;
                     }
                 }
     
             }
-            while((allStrips.size() > 0) && (addedInIteration > 0) && (longStrip.loop == false));
+            while(allStrips.size() && addedInIteration && !long_strip.loop);
             
-            if((longStrip.loop == false)&&(allStrips.size() > 0))                   // Continue if it is a full or looping strip
+            if(!long_strip.loop && allStrips.size())                   // Continue if it is a full or looping strip
             {
                 do                                                                  // Check Backward
                 {
@@ -725,44 +674,41 @@ template<typename scalar_field_t> struct AlgCMS
     
                     for(unsigned int i = 0; i < allStrips.size(); ++i)
                     {
-                        if(vertInds[0] == (unsigned) allStrips[i].data[0])
+                        if(vertInds[0] == allStrips[i].data[0])
                         {
                             vertInds.insert(vertInds.begin(), allStrips[i].data[1]);
-                            longStrip.changeFront(allStrips[i], 1);                 // adding info to longStrip beginning
+                            long_strip.changeFront(allStrips[i], 1);                 // adding info to longStrip beginning
                             ++addedInIteration;
                         }
-                        else if(vertInds[0] == (unsigned) allStrips[i].data[1])
+                        else if(vertInds[0] == allStrips[i].data[1])
                         {
                             vertInds.insert(vertInds.begin(), allStrips[i].data[0]);
-                            longStrip.changeFront(allStrips[i], 0);                 // adding info to longStrip beginning
+                            long_strip.changeFront(allStrips[i], 0);                 // adding info to longStrip beginning
                             ++addedInIteration;
                         }
                         else
                             continue;
     
-                        allStrips.erase(allStrips.begin()+i);                       // delete the currently added strip
+                        allStrips.erase(allStrips.begin() + i);                       // delete the currently added strip
     
                         if(vertInds[0] == vertInds[vertInds.size() - 1])
                         {
                             vertInds.erase(vertInds.begin());                       // delete last vertex as it is duplex
-                            longStrip.loop = true;
+                            long_strip.loop = true;
                         }
                     }
                 }
-                while((allStrips.size() > 0) && (addedInIteration > 0) && (longStrip.loop == false));
+                while(allStrips.size() && addedInIteration && !long_strip.loop);
             }
         
-            longStrip.skip = false;                                                 // Push the segment onto the face seg array
-            face->twin->strips.push_back(longStrip);
-            transitSegs.push_back(vertInds);
+            long_strip.skip = false;                                                 // Push the segment onto the face seg array
+            face->twin->strips.push_back(long_strip);
+            transit_segments.push_back(vertInds);
         }
         while(allStrips.size() != 0);
       
-        if(transitSegs.size() != 0)                                                 // Load them segments onto the twin face
-            face->twin->transitSegs = transitSegs;
-    
-        transitSegs.clear();                                                        // Clear the vectors
-        allStrips.clear();
+        if(transit_segments.size())                                                 // Load them segments onto the twin face
+            face->twin->transit_segments = transit_segments;
     }
 
     //===================================================================================================================================================================================================================
@@ -794,15 +740,14 @@ template<typename scalar_field_t> struct AlgCMS
                 }
     }
 
-    void traverseFace(face_t* face, std::vector<strip_t>& transitStrips)
+    void traverse_face(face_t* face, std::vector<strip_t>& transitStrips)
     {
         if(!face) return;
-        assert(face->state != TRANSIT_FACE);
     
         if(face->state == BRANCH_FACE)                                              // if it is a BRANCH face, traverse through all it's children
         {
             for(int i= 0; i < 4; ++i)
-                traverseFace(face->children[i], transitStrips);
+                traverse_face(face->children[i], transitStrips);
             return;
         }
 

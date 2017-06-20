@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 
 #include "address.hpp"
-#include "range.hpp"
 #include "face.hpp"
 
 namespace cms
@@ -44,7 +43,7 @@ struct cell_t
             children[i] = 0;
         
         for(int i = 0; i < 6; ++i)                                                                  // allocate 6 cell faces on heap
-            faces[i] = new face_t(i/*, id*/);
+            faces[i] = new face_t();
         
         if(parent)                                                                                  // initialise the address
             address.set(parent->address.m_rawAddress, position_in_parent + 1);

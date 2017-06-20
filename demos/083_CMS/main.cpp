@@ -15,7 +15,7 @@
 #include <vector>
 #include <math.h>
 
-#include "algcms.hpp"
+#include "cms.hpp"
 
 struct ExampleClass
 {
@@ -99,7 +99,7 @@ struct ExampleClass
 
     float operator()(const glm::vec3& p) const
     {
-        return antiTankFunction(p);
+        return heartFunction(p);
     }
 
     
@@ -215,8 +215,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
+    //glEnable(GL_CULL_FACE);
+    //glCullFace(GL_FRONT);
 
 
     //===================================================================================================================================================================================================================
