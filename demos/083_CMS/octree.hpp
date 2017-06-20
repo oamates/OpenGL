@@ -86,6 +86,7 @@ const uint8_t NEIGHBOUR_ADDRESS_TABLE[3][8] =
 //=======================================================================================================================================================================================================================
 template<typename scalar_field_t> struct octree_t
 {
+    scalar_field_t scalar_field;
     cell_t* root;
     std::vector<cell_t*> cells;
     std::vector<cell_t*> leafs;
@@ -94,15 +95,15 @@ template<typename scalar_field_t> struct octree_t
     std::map<unsigned int, cell_t*> m_cellAddresses;
     glm::ivec3 samples;
     Array3D<float>& m_sampleData;
-    unsigned int m_minLvl;
-    unsigned int m_maxLvl;
-    glm::vec3 offsets;
+    unsigned int min_level;
+    unsigned int max_level;
+    float delta;
     float complex_surface_threshold;
 
-    octree_t(const glm::ivec3& samples, Array3D<float>& sampleData, unsigned int minLvl, unsigned int maxLvl, 
-             const glm::vec3& offsets, float complex_surface_threshold) 
-        : samples(samples), m_sampleData(sampleData), m_minLvl(minLvl), m_maxLvl(maxLvl),
-          offsets(offsets), complex_surface_threshold(complex_surface_threshold)
+    octree_t(const glm::ivec3& samples, Array3D<float>& sampleData, unsigned int min_level, unsigned int max_level, 
+             float delta, float complex_surface_threshold) 
+        : samples(samples), m_sampleData(sampleData), min_level(min_level), max_level(max_level),
+          delta(delta), complex_surface_threshold(complex_surface_threshold)
     {}
 
     ~octree_t()
@@ -208,9 +209,9 @@ template<typename scalar_field_t> struct octree_t
             acquireCellInfo(c);
             parent->children[i] = c;
         
-            if(this_level < m_minLvl)                                                               // If base octree level still not reached => subdivide
+            if(this_level < min_level)                                                               // If base octree level still not reached => subdivide
                 subdivideCell(c);
-            else if((this_level >= m_minLvl) && (this_level < m_maxLvl))                            // If the next level would be the min and max octree levels => check for subdiv
+            else if(this_level < max_level)                                                         // If the next level would be the min and max octree levels => check for subdiv
             {
                 if(checkForSubdivision(c))                                                          // Check if the cell should be subdivided due to a complex surface or edge ambiguity
                     subdivideCell(c);
@@ -239,26 +240,22 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================
     void acquireCellInfo(cell_t* cell)
     {  
-        glm::ivec3 index = cell->index;                                             // extracting values from cell
+        glm::ivec3 index0 = cell->index;
         glm::ivec3 offset = cell->offset;
+        glm::ivec3 index1 = index0 + offset;
+
+        if(index1.x == samples.x) --index1.x;
+        if(index1.y == samples.y) --index1.y;
+        if(index1.z == samples.z) --index1.z;
   
-        glm::ivec3 indices[8];                                                               // Corner information
-        indices[0] = glm::ivec3(index.x,            index.y,            index.z);            // c000
-        indices[1] = glm::ivec3(index.x,            index.y,            index.z + offset.z); // c001
-        indices[2] = glm::ivec3(index.x,            index.y + offset.y, index.z);            // c010
-        indices[3] = glm::ivec3(index.x,            index.y + offset.y, index.z + offset.z); // c011
-        indices[4] = glm::ivec3(index.x + offset.x, index.y,            index.z);            // c100
-        indices[5] = glm::ivec3(index.x + offset.x, index.y,            index.z + offset.z); // c101
-        indices[6] = glm::ivec3(index.x + offset.x, index.y + offset.y, index.z);            // c110
-        indices[7] = glm::ivec3(index.x + offset.x, index.y + offset.y, index.z + offset.z); // c111
-                                                                                                    
-        for(int i = 0; i < 8; ++i)                                                  // clamp the ends of the samples to avoid garbage
-        {
-            if(indices[i].x == samples.x) indices[i].x -= 1;
-            if(indices[i].y == samples.y) indices[i].y -= 1;
-            if(indices[i].z == samples.z) indices[i].z -= 1;
-            cell->point_indices[i] = indices[i];
-        }
+        cell->point_indices[0] = glm::ivec3(index0.x, index0.y, index0.z);          // c000
+        cell->point_indices[1] = glm::ivec3(index0.x, index0.y, index1.z);          // c001
+        cell->point_indices[2] = glm::ivec3(index0.x, index1.y, index0.z);          // c010
+        cell->point_indices[3] = glm::ivec3(index0.x, index1.y, index1.z);          // c011
+        cell->point_indices[4] = glm::ivec3(index1.x, index0.y, index0.z);          // c100
+        cell->point_indices[5] = glm::ivec3(index1.x, index0.y, index1.z);          // c101
+        cell->point_indices[6] = glm::ivec3(index1.x, index1.y, index0.z);          // c110
+        cell->point_indices[7] = glm::ivec3(index1.x, index1.y, index1.z);          // c111                                                                                                    
     }
 
     //===================================================================================================================================================================================================================
@@ -293,7 +290,7 @@ template<typename scalar_field_t> struct octree_t
             int cellPtB = EDGE_VERTICES[i][1];
             glm::ivec3 ptA = cell->point_indices[cellPtA];                                          // Getting the start and end sample indices of this edge
             glm::ivec3 ptB = cell->point_indices[cellPtB];
-            int lastIndex = m_sampleData.getIndexAt(ptB);
+            int lastIndex = m_sampleData.linear_index(ptB);
             glm::ivec3 prevIndex = ptA;                                                             // Setting the initial index to the start point index
             int crossingPoints = 0;                                                                 // Resetting the crossing point of this edge to zero
             uint8_t edgeDirection = EDGE_DIRECTION[i];                                              // Get the edge direction from the static table
@@ -301,7 +298,7 @@ template<typename scalar_field_t> struct octree_t
 
             while(index[edgeDirection] <= ptB[edgeDirection])
             {
-                assert(m_sampleData.getIndexAt(index) <= lastIndex);
+                assert(m_sampleData.linear_index(index) <= lastIndex);
 
                 if(m_sampleData[prevIndex] * m_sampleData[index] < 0.0f)
                     ++crossingPoints;
@@ -321,8 +318,6 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================
     bool checkForComplexSurface(cell_t* c)
     {
-        bool complexSurface = false;                                                                // Initialise return value
-  
         for(int i = 0; i < 7; ++i)                                                                  // Loop through all the cell points and check current point against all the rest remaining
         {
             glm::ivec3 indA = c->point_indices[i];
@@ -334,10 +329,10 @@ template<typename scalar_field_t> struct octree_t
                 glm::vec3 normalB = glm::normalize(gradient(indB));
 
                 if(glm::dot(normalA, normalB) < complex_surface_threshold)
-                    complexSurface = true;
+                    return true;
             }
         }
-        return complexSurface;                                                                      // Return result of check for a comples surface in this cell
+        return false;                                                                           
     }
 
     //===================================================================================================================================================================================================================
@@ -345,13 +340,12 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================
     glm::vec3 gradient(const glm::ivec3& index)
     {
-        glm::vec3 pos = m_sampleData.getPositionAt(index);                                       // Finding and storing the xyz position of the sample and it's local bbox
-        glm::vec3 dimensions = 0.5f * offsets;
-        scalar_field_t scalar_field;
+        glm::vec3 position = glm::vec3(-1.0f) + delta * glm::vec3(index);                                       // Finding and storing the xyz position of the sample and it's local bbox
+        float gradient_delta = 0.5f * delta;
                                                                                                 // Calculating the Forward Difference
-        float dx = scalar_field(glm::vec3(pos.x + dimensions.x, pos.y, pos.z));
-        float dy = scalar_field(glm::vec3(pos.x, pos.y + dimensions.y, pos.z));
-        float dz = scalar_field(glm::vec3(pos.x, pos.y, pos.z + dimensions.z));
+        float dx = scalar_field(glm::vec3(position.x + gradient_delta, position.y, position.z));
+        float dy = scalar_field(glm::vec3(position.x, position.y + gradient_delta, position.z));
+        float dz = scalar_field(glm::vec3(position.x, position.y, position.z + gradient_delta));
 
         float val = m_sampleData[index];
         return glm::vec3(dx - val, dy - val, dz - val);
@@ -367,12 +361,12 @@ template<typename scalar_field_t> struct octree_t
         std::vector<uint8_t> tempNeighbourAddress[6];                                               // An array of the six neighbours' addresses, each having an address size equivelent to the maximum octree depth
         
         for(unsigned int i = 0; i < 6; ++i)                                                         // Fill with zeros up to the size of the addresses
-            tempNeighbourAddress[i].resize(m_maxLvl);
+            tempNeighbourAddress[i].resize(max_level);
         
         for(int i = 0; i < 6; ++i)                                                                  // Looping through possible neighbours
         {
             bool sameParent = false;
-            for(int slot = m_maxLvl - 1; slot >= 0; --slot)                                         // Looping through every address space because [grandfather, father, child...]
+            for(int slot = max_level - 1; slot >= 0; --slot)                                         // Looping through every address space because [grandfather, father, child...]
             {
           
                 if(sameParent)                                                                      // If the same parent has been detected, copy the rest of the address from cellA

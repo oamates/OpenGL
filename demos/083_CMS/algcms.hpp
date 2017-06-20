@@ -56,21 +56,16 @@ template<typename scalar_field_t> struct AlgCMS
     scalar_field_t scalar_field;
     Array3D<float> m_sampleData;                                                // The sampling 1D array masked in an Array3D wrapper class
     Array3D<edge_block_t> m_edgeData;                                           // The edgeblock 1D array masked in an Array3D wrapper class EdgeBlock has 3 edges
-    std::vector<vertex_t> m_vertices;                                           // The vertex array, storing all the vertices in the mesh-to-be
+    std::vector<vertex_t> vertices;                                             // The vertex array, storing all the vertices in the mesh
     octree_t<scalar_field_t>* octree;                                           // the octree of the current function
 
-    glm::ivec3 m_samples;                                                       // the samples in xyz
-    Range m_container[3];                                                       // the bbox of the function
+    glm::ivec3 dimensions;                                                       // the samples in xyz
 
-    float m_xMax, m_xMin,
-          m_yMax, m_yMin,
-          m_zMax, m_zMin;
-    
-    glm::vec3 m_offsets;                                                        // the dimensions of the bbox as a vec3
+    float delta;                                                                // the dimensions of the bbox as a vec3
+
     cell_t* octree_root;                                                        // a pointer to the root of the octree
 
-    unsigned int m_octMinLvl;                                                   // The level to which the base grid is to be subdivided (foundation of the octree)
-    unsigned int m_octMaxLvl;                                                   // The maximum level (depth) of the octree
+    unsigned int min_level, max_level;                                          // base grid subdivision level and maximum octree depth/level
     
     float complex_surface_threshold;                                            // The user defined threshold of what should be regarded as a complex surface within a cell
     unsigned int zero_search_iterations;                                        // the linear interpolation quality, e.g. the maximum number of recursions
@@ -78,60 +73,38 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // constructor
     //===================================================================================================================================================================================================================
-    AlgCMS(const Range i_container[], unsigned int min_level, unsigned int max_level)
+    AlgCMS(unsigned int min_level, unsigned int max_level)
+        : min_level(min_level), max_level(max_level)
     {
-        m_octMinLvl = min_level;
-        m_octMaxLvl = max_level;
-    
-        for(int i = 0; i < 3; ++i)
-            m_container[i] = i_container[i];
-    
-        int numOfSamples = (1 << m_octMaxLvl) + 1;
-        m_samples[0] = numOfSamples;
-        m_samples[1] = numOfSamples;
-        m_samples[2] = numOfSamples;
-    
+        int p2 = 1 << max_level;
+        dimensions = glm::ivec3(p2 + 1);    
         zero_search_iterations = 5;
         complex_surface_threshold = 0.6f;
-    
-        m_xMax = m_container[0].m_upper;
-        m_xMin = m_container[0].m_lower;
-        m_yMax = m_container[1].m_upper;
-        m_yMin = m_container[1].m_lower;
-        m_zMax = m_container[2].m_upper;
-        m_zMin = m_container[2].m_lower;
-    
-        m_offsets[0] = fabs(m_xMax - m_xMin) / static_cast<float>(m_samples[0] - 1);
-        m_offsets[1] = fabs(m_yMax - m_yMin) / static_cast<float>(m_samples[1] - 1);
-        m_offsets[2] = fabs(m_zMax - m_zMin) / static_cast<float>(m_samples[2] - 1);
+        delta = 2.0f / p2;
         
-        m_sampleData.resize(m_samples);                                         // Resizing the samplingData array and proceeding with the sampling
-        m_sampleData.setBBox(m_container);
-    
-        m_edgeData.resize(m_samples);
-        m_edgeData.setBBox(m_container);
+        m_sampleData.resize(dimensions);                                         // Resizing the samplingData array and proceeding with the sampling
+        m_edgeData.resize(dimensions);
 
-        octree = new octree_t<scalar_field_t>(m_samples, m_sampleData, m_octMinLvl, m_octMaxLvl, m_offsets, complex_surface_threshold);
+        octree = new octree_t<scalar_field_t>(dimensions, m_sampleData, min_level, max_level, delta, complex_surface_threshold);
     
-        for(int i = 0; i < m_samples.x; ++i)
+        glm::ivec3 index;
+        glm::vec3 position;
+
+        position.x = -1.0f;
+        for(index.x = 0; index.x <= p2; ++index.x)
         {
-            const float tx = static_cast<float>(i) / static_cast<float>(m_samples.x - 1);
-            const float xPos = m_xMin + (m_xMax - m_xMin) * tx;
-    
-            for(int j = 0; j < m_samples.y; ++j)
+            position.y = -1.0f;
+            for(index.y = 0; index.y <= p2; ++index.y)
             {
-                const float ty = static_cast<float>(j) / static_cast<float>(m_samples.y - 1);
-                const float yPos = m_yMin + (m_yMax - m_yMin) * ty;
-    
-                for(int k = 0; k < m_samples.z; ++k)
+                position.z = -1.0f;
+                for(index.z = 0; index.z <= p2; ++index.z)
                 {
-                    const float tz = static_cast<float>(k) / static_cast<float>(m_samples.z - 1);
-                    const float zPos = m_zMin + (m_zMax - m_zMin) * tz;
-    
-                    float val = scalar_field(glm::vec3(xPos, yPos, zPos));
-                    m_sampleData[glm::ivec3(i, j, k)] = val;
+                    m_sampleData[index] = scalar_field(position);
+                    position.z += delta;
                 }
+                position.y += delta;
             }
+            position.x += delta;
         }
     }    
                         
@@ -152,7 +125,7 @@ template<typename scalar_field_t> struct AlgCMS
         editTransitionalFaces();                                                // resolve transitional faces
         traceComponent();                                                       // trace the strips into segments and components
         tessellationTraversal(octree_root, mesh);                               // traverse the tree again meshing all the components
-        mesh.vertices = m_vertices;                                             // copy the vertices onto the mesh
+        mesh.vertices = vertices;                                               // copy the vertices onto the mesh
     }
 
     glm::vec3 find_zero(unsigned int quality, const point_t& p0, const point_t& p1)
@@ -217,16 +190,16 @@ template<typename scalar_field_t> struct AlgCMS
         median.position = glm::vec3(0.0f);
 
         for(unsigned int i = 0; i < component.size(); ++i)
-            median.position += m_vertices[component[i]].position;
+            median.position += vertices[component[i]].position;
 
         median.position /= float(numOfInds);
         
         float value = scalar_field(median.position);
-        median.normal = glm::normalize(gradient(0.5f * m_offsets, median.position, value));
+        median.normal = glm::normalize(gradient(median.position, value));
         median.position -= value * median.normal;
 
-        m_vertices.push_back(median);
-        component.push_back(m_vertices.size() - 1);
+        component.push_back(vertices.size());
+        vertices.push_back(median);
 
         for(unsigned int i = 0; i < component.size() - 1; ++i)                  // -2 because median index is at (size-1) and we stich end to begin later
         {
@@ -243,14 +216,15 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // gradient of the field function
     //===================================================================================================================================================================================================================
-    glm::vec3 gradient(const glm::vec3& dimensions, const glm::vec3& position)
-        { return gradient(dimensions, position, scalar_field(position)); }
+    glm::vec3 gradient(const glm::vec3& position)
+        { return gradient(position, scalar_field(position)); }
 
-    glm::vec3 gradient(const glm::vec3& dimensions, const glm::vec3& position, const float& value)
+    glm::vec3 gradient(const glm::vec3& position, const float& value)
     {
-        float dx = scalar_field(glm::vec3(position.x + dimensions.x, position.y, position.z));
-        float dy = scalar_field(glm::vec3(position.x, position.y + dimensions.y, position.z));
-        float dz = scalar_field(glm::vec3(position.x, position.y, position.z + dimensions.z));
+        float gradient_delta = 0.5f * delta;
+        float dx = scalar_field(glm::vec3(position.x + gradient_delta, position.y, position.z));
+        float dy = scalar_field(glm::vec3(position.x, position.y + gradient_delta, position.z));
+        float dz = scalar_field(glm::vec3(position.x, position.y, position.z + gradient_delta));
         return glm::vec3(dx - value, dy - value, dz - value);
     }
     
@@ -345,29 +319,30 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     void makeVertex(strip_t& strip, const int& dir, const glm::ivec3& crossingIndex0, const glm::ivec3& crossingIndex1, int index)
     {
-        glm::vec3 pos0 = m_sampleData.getPositionAt(crossingIndex0);            // recover two points and find the surface zero between them
+        glm::vec3 pos0 = glm::vec3(-1.0f) + delta * glm::vec3(crossingIndex0);
         float val0 = m_sampleData[crossingIndex0];
         point_t pt0(pos0, val0);
     
-        glm::vec3 pos1 = m_sampleData.getPositionAt(crossingIndex1);
+        glm::vec3 pos1 = glm::vec3(-1.0f) + delta * glm::vec3(crossingIndex1);
         float val1 = m_sampleData[crossingIndex1];
         point_t pt1(pos1, val1);
     
         glm::vec3 zero_point = find_zero(zero_search_iterations, pt0, pt1);     // find the exact position and normal at the crossing point
-        glm::vec3 normal = glm::normalize(gradient(m_offsets, zero_point));
+        glm::vec3 normal = glm::normalize(gradient(zero_point));
     
         vertex_t vert(zero_point, normal);                                      // create a vertex
-        m_vertices.push_back(vert);
     
-        strip.data[index] = m_vertices.size() - 1;                              // place the data onto the currect strip
+        strip.data[index] = vertices.size();                              // place the data onto the currect strip
         strip.block[index] = crossingIndex0;
         strip.dir[index] = dir;
+
+        vertices.push_back(vert);
     
         edge_block_t edge_block = m_edgeData[crossingIndex0];                   // put the data onto the global 3D array of edges
         if(edge_block.empty)
             edge_block.empty = false;
         assert(edge_block.edge_indices[dir] == -1);
-        edge_block.edge_indices[dir] = m_vertices.size() - 1;
+        edge_block.edge_indices[dir] = vertices.size() - 1;
         m_edgeData[crossingIndex0] = edge_block;
     }
 
@@ -539,14 +514,14 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // takes all the strips of a given cell and links them together to form components
     //===================================================================================================================================================================================================================
-    void linkStrips(std::vector<unsigned int>& o_comp, std::vector<strip_t>& strips, std::vector<std::vector<unsigned int>>& transitSegs)
+    void linkStrips(std::vector<unsigned int>& components, std::vector<strip_t>& strips, std::vector<std::vector<unsigned int>>& transitSegs)
     {
-        assert(o_comp.size() == 0);
+        assert(components.size() == 0);
 
         int addedInIteration;
         bool backwards;
     
-        o_comp.push_back(strips[0].data[0]);                                    // add a new value to the beginning
+        components.push_back(strips[0].data[0]);                                // add a new value to the beginning
 
         do
         {
@@ -554,40 +529,35 @@ template<typename scalar_field_t> struct AlgCMS
         
             for(unsigned int i = 0; i < strips.size(); ++i)                     // Loop through all current strips
             {
-                int s_d0 = strips[i].data[0];
-                int s_d1 = strips[i].data[1];
+                unsigned int s_d0 = strips[i].data[0];
+                unsigned int s_d1 = strips[i].data[1];
     
-                // todo :: add a check for front and back like above?
-    
-                if(((int)o_comp.back() == s_d0) || ((int)o_comp.back() == s_d1))
+                if(components.back() == s_d0)
                 {
-                    if((int)o_comp.back() == s_d0)
+                    backwards = false;
+                    bool transit = false;
+              
+                    if(transitSegs.size() > 0)                              // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, backwards);
+              
+                    if(!transit)                                            // If the strip does not belong to a transitional face just get the next value from the strip
                     {
-                        backwards = false;
-                        bool transit = false;
-              
-                        if(transitSegs.size() > 0)                              // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                            insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards);
-              
-                        if(!transit)                                            // If the strip does not belong to a transitional face just get the next value from the strip
-                        {
-                            o_comp.push_back(s_d1);
-                            ++addedInIteration;
-                        }
+                        components.push_back(s_d1);
+                        ++addedInIteration;
                     }
-                    else if((int)o_comp.back() == s_d1)
+                }
+                else if(components.back() == s_d1)
+                {
+                    backwards = true;
+                    bool transit = false;
+              
+                    if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, backwards); 
+              
+                    if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
-                        backwards = true;
-                        bool transit = false;
-              
-                        if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                            insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards); 
-              
-                        if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
-                        {
-                            o_comp.push_back(s_d0);
-                            ++addedInIteration;
-                        }
+                        components.push_back(s_d0);
+                        ++addedInIteration;
                     }
                 }
                 else
@@ -596,12 +566,8 @@ template<typename scalar_field_t> struct AlgCMS
                 strips.erase(strips.begin() + i);                                   // Delete the currently added strip
             }
         
-            if(o_comp.front() == o_comp.back())                                     // Check whether the component closes on itself
-                o_comp.erase(o_comp.begin());                                       // delete first vertex as it is duplex with last
-    
-    
-            for(unsigned int i = 0; i < o_comp.size(); ++i)
-                assert(o_comp[i] < m_vertices.size());
+            if(components.front() == components.back())                                     // Check whether the component closes on itself
+                components.erase(components.begin());                                       // delete first vertex as it is duplex with last
         }
         while(addedInIteration > 0);
     
@@ -609,42 +575,35 @@ template<typename scalar_field_t> struct AlgCMS
         {
             addedInIteration = 0;
     
-        
             for(unsigned int i = 0; i < strips.size(); ++i)                         // Loop through all current strips
             {
-                int s_d0 = strips[i].data[0];
-                int s_d1 = strips[i].data[1];
+                unsigned int s_d0 = strips[i].data[0];
+                unsigned int s_d1 = strips[i].data[1];
     
-          
-                if(((int)o_comp.front() == s_d0) || ((int)o_comp.front() == s_d1))  // Check Adding to Front
+                if(components.front() == s_d0)
                 {
-                    if((int)o_comp.front() == s_d0)
+                    bool transit = false;
+    
+                    if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, checks for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, false);
+    
+                    if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
-                        backwards = false;
-                        bool transit = false;
-    
-                        if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, checks for matching segment and insert from twin if found
-                            insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards);
-    
-                        if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
-                        {
-                            o_comp.insert(o_comp.begin(), s_d1);
-                            ++addedInIteration;
-                        }
+                        components.insert(components.begin(), s_d1);
+                        ++addedInIteration;
                     }
-                    else if((int)o_comp.front() == s_d1)
-                    {
-                        backwards = true;
-                        bool transit = false;
+                }
+                else if(components.front() == s_d1)
+                {
+                    bool transit = false;
     
-                        if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                            insertDataFromTwin(o_comp, transitSegs, strips[i], transit, addedInIteration, backwards);
+                    if(transitSegs.size() > 0)                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
+                        insertDataFromTwin(components, transitSegs, strips[i], transit, addedInIteration, true);
               
-                        if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
-                        {
-                            o_comp.insert(o_comp.begin(), s_d0);
-                            ++addedInIteration;
-                        }
+                    if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
+                    {
+                        components.insert(components.begin(), s_d0);
+                        ++addedInIteration;
                     }
                 }
                 else
@@ -654,16 +613,12 @@ template<typename scalar_field_t> struct AlgCMS
             }
     
         
-            if(o_comp.front() == o_comp.back())                                     // check whether the component closes on itself
-                o_comp.erase(o_comp.begin());                                       // delete first vertex as it is duplex with last
-    
-            for(unsigned i=0;i<o_comp.size();++i)
-                assert(o_comp[i] < m_vertices.size());
+            if(components.front() == components.back())                                     // check whether the component closes on itself
+                components.erase(components.begin());                                       // delete first vertex as it is duplex with last    
         }
         while(addedInIteration > 0);
     
-        assert(o_comp.front() != o_comp.back());
-        assert(o_comp.size() >= 3);
+        assert(components.size() >= 3);
     }
 
     //===================================================================================================================================================================================================================
@@ -679,7 +634,7 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // inserts data from twin of a transitional face using provided segments
     //===================================================================================================================================================================================================================
-    void insertDataFromTwin(std::vector<unsigned int>& component, std::vector<std::vector<unsigned int>>& segments, strip_t& strip, bool& transit, int& addedInIter, const bool& backwards)
+    void insertDataFromTwin(std::vector<unsigned int>& components, std::vector<std::vector<unsigned int>>& segments, strip_t& strip, bool& transit, int& addedInIter, bool backwards)
     {
         for(unsigned int i = 0; i < segments.size(); ++i)                           // loop through all the transitional strips and find the one corresponding to this strip
         {
@@ -688,12 +643,12 @@ template<typename scalar_field_t> struct AlgCMS
                 if(backwards)
                 {
                     for(int j = segments[i].size() - 1; j > 0; --j)
-                        component.push_back(segments[i][j - 1]);
+                        components.push_back(segments[i][j - 1]);
                 }
                 else
                 {
                     for(unsigned int j = 1; j < segments[i].size(); ++j)
-                        component.push_back(segments[i][j]);
+                        components.push_back(segments[i][j]);
                 }
 
                 segments.erase(segments.begin() + i);
@@ -819,9 +774,9 @@ template<typename scalar_field_t> struct AlgCMS
     {
         std::vector<cell_t*> cells = octree->cells;
     
-        for(unsigned int i = 0; i < m_octMaxLvl; ++i)                               // trace the strips into segments and components
+        for(unsigned int i = 0; i < max_level; ++i)                                 // trace the strips into segments and components
             for(unsigned int j = 0; j < cells.size(); ++j)                          // loop through all cells and link components for all LEAF cells
-                if(cells[j]->level == m_octMaxLvl - i)
+                if(cells[j]->level == max_level - i)
                 {
                     if(cells[j]->state == LEAF)                                     // trace the segments to form components
                     {

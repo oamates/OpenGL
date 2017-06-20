@@ -122,9 +122,8 @@ struct ExampleClass
 };
 
 
-static float BBOX_SIZE                  = 2.0f;
-static const int MIN_OCTREE_RES               = 2;
-static const int MAX_OCTREE_RES               = 8;
+static const int MIN_OCTREE_RES = 2;
+static const int MAX_OCTREE_RES = 8;
 static float COMPLEX_SURFACE_THRESHOLD  = 0.85f;
 
 const int ADDRESS_SIZE = MAX_OCTREE_RES;
@@ -223,16 +222,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // run CMS algorithm and generate iso-surface
     //===================================================================================================================================================================================================================
-    float halfSize = 0.5f * BBOX_SIZE;
-
-    cms::Range container[3] = 
-    {
-        cms::Range(-halfSize, halfSize),
-        cms::Range(-halfSize, halfSize),
-        cms::Range(-halfSize, halfSize)
-    };
-
-    cms::AlgCMS<ExampleClass> cmsAlg(container, MIN_OCTREE_RES, MAX_OCTREE_RES);
+    cms::AlgCMS<ExampleClass> cmsAlg(MIN_OCTREE_RES, MAX_OCTREE_RES);
     cmsAlg.complex_surface_threshold = COMPLEX_SURFACE_THRESHOLD;                 // Set the complex surface threshold
 
     cms::mesh_t mesh;
