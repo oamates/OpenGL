@@ -14,7 +14,7 @@ namespace cms
 //=======================================================================================================================================================================================================================
 // possible types of cell-cell intersection, the name is the face of the second cell which is in contact (-z, +z, -y, +y, -x, +x)
 //=======================================================================================================================================================================================================================
-enum CONTACT
+enum
 {
     BACK    = 0,
     FRONT   = 1,
@@ -42,7 +42,7 @@ const int8_t faceTwinTable[7][2] =
 //=======================================================================================================================================================================================================================
 // face relationship table :: given the position of a cell within its parent returns the 3 faces of that cell that touch the parent
 //=======================================================================================================================================================================================================================
-const CONTACT FACE_RELATIONSHIP_TABLE[8][3] = 
+const int8_t FACE_RELATIONSHIP_TABLE[8][3] = 
 {
     {BACK,  BOTTOM, LEFT },
     {FRONT, BOTTOM, LEFT },
@@ -318,13 +318,12 @@ template<typename scalar_field_t> struct octree_t
             
             if(neighbour_cell)                                                                      // Proceed if there is such a neighbouring cell
             {
-                CONTACT contact = (CONTACT)i; 
                 if(i & 1)                                                                           // todo :: Temporary save the neighbours addresses in the order:
-                    cell->neighbours[contact - 1] = neighbour_cell;
+                    cell->neighbours[i - 1] = neighbour_cell;
                 else
-                    cell->neighbours[contact + 1] = neighbour_cell;
+                    cell->neighbours[i + 1] = neighbour_cell;
           
-                setFaceTwins(neighbour_cell, cell, contact);                                        // Set face twins of the neighbouring cells based on their contact face
+                setFaceTwins(neighbour_cell, cell, i);                                        // Set face twins of the neighbouring cells based on their contact face
             }
         }
         
@@ -335,7 +334,7 @@ template<typename scalar_field_t> struct octree_t
     //===================================================================================================================================================================================================================
     // sets the half-face structure of Cell A and Cell B where the contact variable names the face of Cell B into contact!
     //===================================================================================================================================================================================================================
-    void setFaceTwins(cell_t* a, cell_t* b, CONTACT contact)                                   
+    void setFaceTwins(cell_t* a, cell_t* b, int contact)                                   
     {
         int valA = faceTwinTable[contact][0];                                               // assigning each face's twin based on the contact type
         int valB = faceTwinTable[contact][1];
@@ -356,7 +355,7 @@ template<typename scalar_field_t> struct octree_t
 
             for(int side = 0; side < 3; ++side)
             {
-                CONTACT con = FACE_RELATIONSHIP_TABLE[location][side];
+                int8_t con = FACE_RELATIONSHIP_TABLE[location][side];
                 uint8_t posOfSubFace = SUB_FACE_TABLE[location][side];
                 cell->faces[con]->parent = cell->parent->faces[con];
                 cell->parent->faces[con]->children[posOfSubFace] = cell->faces[con];
