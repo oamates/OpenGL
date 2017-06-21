@@ -514,12 +514,7 @@ template<typename scalar_field_t> struct AlgCMS
     
                 if(components.back() == s_d0)
                 {
-                    bool transit = false;
-              
-                    if(transit_segments.size())                              // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transit_segments, strips[i], transit, added, false);
-              
-                    if(!transit)                                            // If the strip does not belong to a transitional face just get the next value from the strip
+                    if(!insert_twin_data(components, transit_segments, strips[i], added, false))                                            // If the strip does not belong to a transitional face just get the next value from the strip
                     {
                         components.push_back(s_d1);
                         ++added;
@@ -527,12 +522,7 @@ template<typename scalar_field_t> struct AlgCMS
                 }
                 else if(components.back() == s_d1)
                 {
-                    bool transit = false;
-              
-                    if(transit_segments.size())                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transit_segments, strips[i], transit, added, true); 
-              
-                    if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
+                    if(!insert_twin_data(components, transit_segments, strips[i], added, true))                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
                         components.push_back(s_d0);
                         ++added;
@@ -560,12 +550,7 @@ template<typename scalar_field_t> struct AlgCMS
     
                 if(components.front() == s_d0)
                 {
-                    bool transit = false;
-    
-                    if(transit_segments.size())                                  // If there are no transitSegs, no point in checking, checks for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transit_segments, strips[i], transit, added, false);
-    
-                    if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
+                    if(!insert_twin_data(components, transit_segments, strips[i], added, false))                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
                         components.insert(components.begin(), s_d1);
                         ++added;
@@ -573,12 +558,7 @@ template<typename scalar_field_t> struct AlgCMS
                 }
                 else if(components.front() == s_d1)
                 {
-                    bool transit = false;
-    
-                    if(transit_segments.size())                                  // If there are no transitSegs, no point in checking, check for matching segment and insert from twin if found
-                        insertDataFromTwin(components, transit_segments, strips[i], transit, added, true);
-              
-                    if(!transit)                                                // If the strip does not belong to a transitional face just get the next value from the strip
+                    if(!insert_twin_data(components, transit_segments, strips[i], added, true))                                                // If the strip does not belong to a transitional face just get the next value from the strip
                     {
                         components.insert(components.begin(), s_d0);
                         ++added;
@@ -600,7 +580,7 @@ template<typename scalar_field_t> struct AlgCMS
     //===================================================================================================================================================================================================================
     // inserts data from twin of a transitional face using provided segments
     //===================================================================================================================================================================================================================
-    void insertDataFromTwin(std::vector<unsigned int>& components, std::vector<std::vector<unsigned int>>& segments, const strip_t& strip, bool& transit, int& added, bool backwards)
+    bool insert_twin_data(std::vector<unsigned int>& components, std::vector<std::vector<unsigned int>>& segments, const strip_t& strip, int& added, bool backwards)
     {
         unsigned int s0 = strip.data[0];
         unsigned int s1 = strip.data[1];
@@ -622,10 +602,10 @@ template<typename scalar_field_t> struct AlgCMS
 
                 segments.erase(segments.begin() + i);
                 ++added;
-                transit = true;
-                break;
+                return true;
             }
         }
+        return false;
     }
 
     //===================================================================================================================================================================================================================

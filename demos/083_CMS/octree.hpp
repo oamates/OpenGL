@@ -97,15 +97,15 @@ template<typename scalar_field_t> struct octree_t
 
     std::map<unsigned int, cell_t*> cell_hash_map;
 
-    Array3D<float>& m_sampleData;
+    Array3D<float>& field_values;
     unsigned int min_level;
     unsigned int max_level;
     float delta;
     float complex_surface_threshold;
 
-    octree_t(int depth, Array3D<float>& sampleData, unsigned int min_level, unsigned int max_level, 
+    octree_t(int depth, Array3D<float>& field_values, unsigned int min_level, unsigned int max_level, 
              float delta, float complex_surface_threshold) 
-        : depth(depth), m_sampleData(sampleData), min_level(min_level), max_level(max_level),
+        : depth(depth), field_values(field_values), min_level(min_level), max_level(max_level),
           delta(delta), complex_surface_threshold(complex_surface_threshold)
     {}
 
@@ -194,7 +194,7 @@ template<typename scalar_field_t> struct octree_t
     {
         int inside = 0;                                                             // Check if all the corners are inside then discard
         for(int i = 0; i < 8; ++i)
-            if(m_sampleData[cell->corners[i]] < 0.0f)
+            if(field_values[cell->corners[i]] < 0.0f)
                 ++inside;
                                                                         
         return (inside != 8) && (inside != 0);                                      // See if cell is inside the function
@@ -211,7 +211,7 @@ template<typename scalar_field_t> struct octree_t
             int cellPtB = EDGE_VERTICES[i][1];
             glm::ivec3 ptA = cell->corners[cellPtA];                                          // Getting the start and end sample indices of this edge
             glm::ivec3 ptB = cell->corners[cellPtB];
-            int lastIndex = m_sampleData.linear_index(ptB);
+            int lastIndex = field_values.linear_index(ptB);
             glm::ivec3 prevIndex = ptA;                                                             // Setting the initial index to the start point index
             int crossingPoints = 0;                                                                 // Resetting the crossing point of this edge to zero
             uint8_t edgeDirection = EDGE_DIRECTION[i];                                              // Get the edge direction from the static table
@@ -219,9 +219,7 @@ template<typename scalar_field_t> struct octree_t
 
             while(index[edgeDirection] <= ptB[edgeDirection])
             {
-                assert(m_sampleData.linear_index(index) <= lastIndex);
-
-                if(m_sampleData[prevIndex] * m_sampleData[index] < 0.0f)
+                if(field_values[prevIndex] * field_values[index] < 0.0f)
                     ++crossingPoints;
 
                 if(crossingPoints > 1) return true;
@@ -267,7 +265,7 @@ template<typename scalar_field_t> struct octree_t
         float dy = scalar_field(glm::vec3(position.x, position.y + gradient_delta, position.z));
         float dz = scalar_field(glm::vec3(position.x, position.y, position.z + gradient_delta));
 
-        float val = m_sampleData[index];
+        float val = field_values[index];
         return glm::vec3(dx - val, dy - val, dz - val);
     }
     
@@ -300,10 +298,9 @@ template<typename scalar_field_t> struct octree_t
                     else
                         tempNeighbourAddress[i][slot] = NEIGHBOUR_ADDRESS_TABLE[axis][slotVal - 1]; // Beware neigh slots start at 1 and not 0 thus the -1? !!!
                     
-                    // if searching for right(+X), top(+Y) or front(+Z) neighbour it should always have a greater slot value
-                    // if searching for left(-X), bottom(-Y) or back(-Z) neighbour the neightbour should always have a smaller slot value,
-                    // OTHERWISE it means it belongs to a different parent
-                    //                 front(+Z) top(+Y) right(+X)                                  back(-Z) bottom(-Y) left(-X)
+                    // if searching for +X, +Y or +Z neighbour it should always have a greater slot value
+                    // if searching for -X, -Y or -Z neighbour it should always have a smaller slot value,
+                    // otherwise it means it belongs to a different parent
                     if(((i & 1) && (slotVal < tempNeighbourAddress[i][slot])) || ((!(i & 1)) && (slotVal > tempNeighbourAddress[i][slot])))    
                         sameParent = true;                                                          // if it has the same parent then proceed and copy the remaining address slots from the current address as they will be the same
                 }
@@ -322,26 +319,16 @@ template<typename scalar_field_t> struct octree_t
                     cell->neighbours[i - 1] = neighbour_cell;
                 else
                     cell->neighbours[i + 1] = neighbour_cell;
-          
-                setFaceTwins(neighbour_cell, cell, i);                                        // Set face twins of the neighbouring cells based on their contact face
+
+                int valA = faceTwinTable[i][0];                                               // assigning each face's twin based on the contact type
+                int valB = faceTwinTable[i][1];
+                cell->faces[valA]->twin = neighbour_cell->faces[valB];
+                neighbour_cell->faces[valB]->twin = cell->faces[valA];
+
             }
         }
-        
-        // todo :: Consider duplicates if all the cells are in a loop ? Propagating?
-        // have a bitfield to indicate which neighbours are already set?
     }
 
-    //===================================================================================================================================================================================================================
-    // sets the half-face structure of Cell A and Cell B where the contact variable names the face of Cell B into contact!
-    //===================================================================================================================================================================================================================
-    void setFaceTwins(cell_t* a, cell_t* b, int contact)                                   
-    {
-        int valA = faceTwinTable[contact][0];                                               // assigning each face's twin based on the contact type
-        int valB = faceTwinTable[contact][1];
-        b->faces[valA]->twin = a->faces[valB];
-        a->faces[valB]->twin = b->faces[valA];
-    }
-    
     //===================================================================================================================================================================================================================
     // Parent-Children face relationship function : loops through all the cells and establishes face relationships between parent and child cells
     //===================================================================================================================================================================================================================
@@ -355,10 +342,10 @@ template<typename scalar_field_t> struct octree_t
 
             for(int side = 0; side < 3; ++side)
             {
-                int8_t con = FACE_RELATIONSHIP_TABLE[location][side];
-                uint8_t posOfSubFace = SUB_FACE_TABLE[location][side];
-                cell->faces[con]->parent = cell->parent->faces[con];
-                cell->parent->faces[con]->children[posOfSubFace] = cell->faces[con];
+                int8_t c = FACE_RELATIONSHIP_TABLE[location][side];
+                uint8_t sub_face = SUB_FACE_TABLE[location][side];
+                cell->faces[c]->parent = cell->parent->faces[c];
+                cell->parent->faces[c]->children[sub_face] = cell->faces[c];
             }
     
             if(cell->leaf)                                                         // if this is a leaf cell then set all its half-faces as LEAFs
@@ -378,21 +365,13 @@ template<typename scalar_field_t> struct octree_t
   
         for(unsigned int i = 0; i < leafs.size(); ++i)                                              // Loop through all leaf (straddling) cells
         {
-            assert(leafs[i]->leaf);
-
             for(int j = 0; j < 6; ++j)                                                              // Loop through all faces of such a cell
             {
                 face_t* face = leafs[i]->faces[j];
-                assert(face->state == LEAF_FACE);
       
                 if((face->twin) && (face->twin->children[0]))                                             // Check against null ptr
                 {
-                    assert(face->twin->children[1]);
-                    assert(face->twin->children[2]);
-                    assert(face->twin->children[3]);
-
                     leafs[i]->faces[j]->state = TRANSIT_FACE;
-                    assert(leafs[i]->faces[j]->twin->state != LEAF_FACE);
                     ++transCounter;
                 }
             }
