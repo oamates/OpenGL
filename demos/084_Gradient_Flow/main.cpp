@@ -65,10 +65,13 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // create programs : one for particle compute, the other for render
     //===================================================================================================================================================================================================================
-    glsl_program_t particle_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/particle.cs"));
+    glsl_program_t particle_generator(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/particle_generator.cs"));
+
+    glsl_program_t particle_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/particle_compute.cs"));
     particle_compute.enable();
     uniform_t uniform_dt = particle_compute["dt"];
     uniform_t uniform_time = particle_compute["time"];
+
 
     glsl_program_t particle_render(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/particle_render.vs"),
                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/particle_render.fs"));
@@ -82,35 +85,54 @@ int main(int argc, char *argv[])
     // point data initialization 
     //===================================================================================================================================================================================================================
     const int PARTICLE_GROUP_SIZE  = 128;
-    const int PARTICLE_GROUP_COUNT = 16384;
+    const int PARTICLE_GROUP_COUNT = 8192 * 2;
     const int PARTICLE_COUNT = PARTICLE_GROUP_SIZE * PARTICLE_GROUP_COUNT;
 
-    GLuint vao_id, position_buffer;
+    GLuint vao_id, pbo_id, nbo_id;
 
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
-    glGenBuffers(1, &position_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
+
+    glGenBuffers(1, &pbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, pbo_id);
     glBufferData(GL_ARRAY_BUFFER, PARTICLE_COUNT * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
 
     glm::vec4* positions = (glm::vec4*) glMapBufferRange(GL_ARRAY_BUFFER, 0, PARTICLE_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
     for (int i = 0; i < PARTICLE_COUNT; i++)
-        positions[i] = glm::vec4(glm::gaussRand(0.0f, 1.0f), glm::gaussRand(0.0f, 1.0f), glm::gaussRand(0.0f, 1.0f), glm::gaussRand(0.0f, 1.0f));
-
+        positions[i] = glm::vec4(glm::linearRand(-1.0f, 1.0f), glm::linearRand(-1.0f, 1.0f), glm::linearRand(-1.0f, 1.0f), glm::linearRand(-1.0f, 1.0f));
     glUnmapBuffer(GL_ARRAY_BUFFER);
+
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    GLuint position_tbo;
-    glGenTextures(1, &position_tbo);
-    glBindTexture(GL_TEXTURE_BUFFER, position_tbo);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, position_buffer);
-    glBindImageTexture(0, position_tbo, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glGenBuffers(1, &nbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, nbo_id);
+    glBufferData(GL_ARRAY_BUFFER, PARTICLE_COUNT * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+    GLuint position_tbo_id;
+    glGenTextures(1, &position_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, position_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, pbo_id);
+    glBindImageTexture(0, position_tbo_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+    GLuint normal_tbo_id;
+    glGenTextures(1, &normal_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, normal_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, nbo_id);
+    glBindImageTexture(1, normal_tbo_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 
     glActiveTexture(GL_TEXTURE0);
     GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
+    //===================================================================================================================================================================================================================
+    // generate initial point distribution
+    //===================================================================================================================================================================================================================
+    particle_generator.enable();
+    glDispatchCompute(PARTICLE_GROUP_COUNT, 1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : 

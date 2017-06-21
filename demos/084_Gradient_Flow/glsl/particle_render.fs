@@ -1,7 +1,7 @@
 #version 430 core
 
 in vec3 position_ws;
-in float intensity;
+in vec3 normal_ws;
 
 uniform sampler2D tb_tex2d;
 
@@ -26,13 +26,13 @@ vec3 tri(in vec3 x)
 }
 
 float sdf(vec3 p)
-{    
+{   
+    p *= 8.75; 
     vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
-    float ground = p.z + 3.5 + dot(op, vec3(0.067));
     p += (op - 0.25) * 0.3;
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
-    return min(ground, canyon);
+    return canyon;
 }
 
 //==============================================================================================================================================================
@@ -76,7 +76,6 @@ vec3 bump_normal(in vec3 p, in vec3 n)
 
 void main(void)
 {
-	vec3 normal_ws = grad(position_ws);
   	vec3 view = camera_ws - position_ws;
   	vec3 light = light_ws - position_ws;
 
