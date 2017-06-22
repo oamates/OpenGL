@@ -2,6 +2,7 @@
 
 in vec3 position_ws;
 in vec3 normal_ws;
+in vec2 uv;
 
 uniform sampler2D tb_tex2d;
 
@@ -56,7 +57,7 @@ vec3 tex2d(vec2 uv)
 
 vec3 tex3d(in vec3 p, in vec3 n)
 {
-    p *= 0.04875;
+    p *= 4.875;
     vec3 w = max(abs(n) - 0.317f, 0.0f);
     w /= dot(w, vec3(1.0f));
     mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
@@ -76,6 +77,8 @@ vec3 bump_normal(in vec3 p, in vec3 n)
 
 void main(void)
 {
+    if (length(uv) > 0.707) discard;
+
   	vec3 view = camera_ws - position_ws;
   	vec3 light = light_ws - position_ws;
 

@@ -74,6 +74,7 @@ int main(int argc, char *argv[])
 
 
     glsl_program_t particle_render(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/particle_render.vs"),
+                                   glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/particle_render.gs"),
                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/particle_render.fs"));
     particle_render.enable();
     uniform_t uni_pr_pv_matrix = particle_render["projection_view_matrix"];
