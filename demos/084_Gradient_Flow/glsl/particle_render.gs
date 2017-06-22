@@ -8,7 +8,7 @@ layout(max_vertices = 4) out;
 in vec3 position_ws_gs[];
 in vec3 normal_ws_gs[];
 
-const float size = 0.00625f;
+const float size = 0.0125f;
 uniform mat4 projection_view_matrix;
 
 out vec3 position_ws;

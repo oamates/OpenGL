@@ -25,7 +25,7 @@ struct demo_window_t : public glfw_window_t
     bool position_changed = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -50,13 +50,6 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-const int CUBE_SIZE = 0x08;
-const int HOLE_SIZE = 0x04;
-
-const int POINT_COUNT = (2 * CUBE_SIZE + 1) * (2 * CUBE_SIZE + 1) * (2 * CUBE_SIZE + 1) - 
-                        (2 * HOLE_SIZE + 1) * (2 * HOLE_SIZE + 1) * (2 * HOLE_SIZE + 1);
-
-
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -70,72 +63,108 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Alpha Blending", 8, 3, 3, 1920, 1080, true);
+    demo_window_t window("Alpha Blending", 8, 4, 3, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // creating shaders and uniforms
-    //===================================================================================================================================================================================================================
-    glsl_program_t cubes_program(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/cubes.vs"),
-                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/cubes.gs"),
-                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/cubes.fs"));
+    //=======================(============================================================================================================================================================================================
+    glsl_program_t sorter0(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter0.cs"));
+    sorter0.enable();
+    uniform_t uni_s0_camera_ws = sorter0["camera_ws"];
 
-    cubes_program.enable();
+    glsl_program_t sorter1(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter1.cs"));
+    sorter1.enable();
+    uniform_t uni_s1_camera_ws = sorter0["camera_ws"];
 
-    uniform_t uniform_projection_matrix = cubes_program["projection_matrix"];
-    uniform_t uniform_view_matrix       = cubes_program["view_matrix"];      
-    uniform_t uniform_texture_sampler   = cubes_program["texture_sampler"];  
-    uniform_t uniform_global_time       = cubes_program["global_time"];      
+    glsl_program_t alpha_blender(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ab.vs"),
+                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ab.gs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ab.fs"));
+
+    alpha_blender.enable();
+
+    uniform_t uni_ab_pv_matrix = alpha_blender["projection_view_matrix"];
+    uniform_t uni_ab_camera_ws = alpha_blender["camera_ws"];
+    uniform_t uni_ab_light_ws  = alpha_blender["light_ws"];
+
+    alpha_blender["diffuse_tex"] = 0;
+    alpha_blender["bump_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // point data initialization 
     //===================================================================================================================================================================================================================
-
-    GLuint vao_id, vbo_id, ibo_id;
-    
-    std::vector<glm::mat4> points;
-    std::vector<GLushort> indices;
-    points.reserve(POINT_COUNT);
-    indices.reserve(POINT_COUNT);
-
-    GLushort index = 0;
-    for (int i = -CUBE_SIZE; i <= CUBE_SIZE; ++i)
-    for (int j = -CUBE_SIZE; j <= CUBE_SIZE; ++j)
-    for (int k = -CUBE_SIZE; k <= CUBE_SIZE; ++k)
-    {
-        if ((abs(i) > HOLE_SIZE) || (abs(j) > HOLE_SIZE) || (abs(k) > HOLE_SIZE))
-        {
-            glm::vec3 axis_z = glm::sphericalRand(1.0f);
-            glm::vec3 axis_x = glm::normalize(glm::cross(axis_z, glm::sphericalRand(1.0f)));
-            glm::vec3 axis_y = glm::cross(axis_z, axis_x);
-            points.push_back(glm::mat4(glm::vec4(axis_x, 0.0f),
-                                       glm::vec4(axis_y, 0.0f),
-                                       glm::vec4(axis_z, 0.0f),
-                                       glm::vec4(6.0f * glm::vec3(i, j, k), 1.0f)));
-            indices.push_back(index++);
-        }
-    }
- 
+    GLuint vao_id, pbo_id, vbo_id, ibo_id;
 
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
+
+    GLuint GROUP_SIZE = 128;
+    GLuint GROUP_COUNT = 16;
+    GLuint POINT_COUNT = GROUP_SIZE * GROUP_COUNT;
+    
+    std::vector<glm::mat3> point_frame;
+    std::vector<glm::vec4> point_positions;
+
+    for(GLuint i = 0; i < POINT_COUNT; ++i)
+    {
+        point_positions.push_back(glm::vec4(32.0f * glm::sphericalRand(1.0f), 1.0f));
+
+        glm::vec3 axis_z = glm::sphericalRand(1.0f);
+        glm::vec3 axis_x = glm::normalize(glm::cross(axis_z, glm::sphericalRand(1.0f)));
+        glm::vec3 axis_y = glm::cross(axis_z, axis_x);
+        point_frame.push_back(glm::mat3(axis_x, axis_y, axis_z));
+    }
+
+    glGenBuffers(1, &pbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, pbo_id);
+    glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::vec4), point_positions.data(), GL_STATIC_DRAW);
+
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+    GLuint position_tbo_id;
+    glGenTextures(1, &position_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, position_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, pbo_id);
+    glBindImageTexture(1, position_tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);    
+
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::mat4), glm::value_ptr(points[0]), GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
+    glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::mat3), point_frame.data(), GL_STATIC_DRAW);
+
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
     glEnableVertexAttribArray(3);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 64, (void*)(0));
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 64, (void*)(16));
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 64, (void*)(32));
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 64, (void*)(48));
 
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3), (const GLvoid*) 0);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3), (const GLvoid*) 12);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3), (const GLvoid*) 24);
+
+    //===================================================================================================================================================================================================================
+    // prepare position buffer texture
+    //===================================================================================================================================================================================================================
 
     glGenBuffers(1, &ibo_id);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, POINT_COUNT * sizeof(GLushort), &indices[0], GL_DYNAMIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, POINT_COUNT * sizeof(GLuint), 0, GL_DYNAMIC_COPY);
 
+    GLuint* indices = (GLuint*) glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, POINT_COUNT * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    for (GLuint i = 0; i < POINT_COUNT; i++) indices[i] = i; 
+    glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+/*
+    GLuint indices_tbo_id;
+    glGenTextures(1, &indices_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, indices_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, ibo_id);
+    glBindImageTexture(0, indices_tbo_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);    
+*/
+    //===================================================================================================================================================================================================================
+    // Load diffuse texture
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
+    GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube.png");
+
+    glActiveTexture(GL_TEXTURE1);
+    GLuint bump_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_bump.png");
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : 
@@ -148,15 +177,6 @@ int main(int argc, char *argv[])
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
 
-    unsigned int frame = 0;
-    double startup_time = glfwGetTime();                                                                                    // set the time uniform
-    uniform_global_time = (float) startup_time;
-
-    glActiveTexture(GL_TEXTURE0);
-    GLuint cube_texture_id = image::png::texture2d("../../../resources/plato_tex2d/cube.png");
-    glBindTexture(GL_TEXTURE_2D, cube_texture_id);
-    uniform_texture_sampler = 0;                                                                                            // set our "texture_sampler" to use texture unit 0
-
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
@@ -166,49 +186,34 @@ int main(int argc, char *argv[])
         window.new_frame();
 
         float time = window.frame_ts;
-        float angle = 0.01 * time;
-        glm::vec4 light_direction = glm::vec4(cos(angle), sin(angle), 0.0f, 0.0f);
+        float angle = 0.125 * time;
+        glm::vec3 light_ws = 15.0f * glm::vec3(glm::cos(angle), glm::sin(angle), 0.0f);
+        glm::vec3 camera_ws = window.camera.position();
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
-        uniform_projection_matrix = window.camera.projection_matrix;
-        uniform_view_matrix = window.camera.view_matrix;
-        glDrawElements(GL_POINTS, POINT_COUNT, GL_UNSIGNED_SHORT, 0);        
-        window.swap_buffers();
+        uni_ab_pv_matrix = projection_view_matrix;
+        uni_ab_camera_ws = camera_ws;
+        uni_ab_light_ws = light_ws;
 
-        uniform_global_time = time;
+        glDrawElements(GL_POINTS, POINT_COUNT, GL_UNSIGNED_INT, 0);
 
         if (window.position_changed)
         {
-            glm::vec4 position = glm::vec4(window.camera.position(), 1.0f);
-            bool index_order_changed = false;
-            bool done = false;
-            unsigned int iteration = 0;
-            while (!done)
-            {
-                done = true;
-                float norm1 = glm::length2(window.camera.view_matrix * points[indices[0]][3]);
+            /*
+            sorter0.enable();
+            uni_s0_camera_ws = camera_ws;
+            glDispatchCompute(GROUP_COUNT / 2, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);            
 
-                for(unsigned int i = 1; i < POINT_COUNT - iteration; ++i)
-                {
-                    float norm2 = glm::length2(window.camera.view_matrix * points[indices[i]][3]);
-                    if ((norm2 - norm1) > 0.01)
-                    {
-                        GLushort q = indices[i - 1];
-                        indices[i - 1] = indices[i];
-                        indices[i] = q;
-                        done = false;
-                    }
-                    else
-                        norm1 = norm2;
-                    
-                }
-                index_order_changed |= (!done);
-                ++iteration;
-            }
-            debug_msg("Sorted after %u iterations", iteration);
-            if (index_order_changed)
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER, POINT_COUNT * sizeof(GLushort), &indices[0], GL_DYNAMIC_DRAW);
+            sorter1.enable();
+            uni_s1_camera_ws = camera_ws;
+            glDispatchCompute(GROUP_COUNT / 2, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
             window.position_changed = false;
+            */
         }
+
         window.end_frame();
     }
      
