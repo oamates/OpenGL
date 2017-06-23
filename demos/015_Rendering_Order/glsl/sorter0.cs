@@ -21,7 +21,7 @@ void main(void)
     float d0 = length(position_ws0 - camera_ws); 
     float d1 = length(position_ws1 - camera_ws); 
 
-    if (d1 < d0)
+    if (d1 > d0)
     {
         imageStore(index_buffer, id0, ivec4(index1, 0, 0, 0));
         imageStore(index_buffer, id1, ivec4(index0, 0, 0, 0));

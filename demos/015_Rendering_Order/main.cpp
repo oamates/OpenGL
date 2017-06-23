@@ -9,6 +9,7 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/random.hpp>
 #include <glm/gtx/norm.hpp>
+#include <glm/ext.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -68,7 +69,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // creating shaders and uniforms
     //=======================(============================================================================================================================================================================================
-/*
+
     glsl_program_t sorter0(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter0.cs"));
     sorter0.enable();
     uniform_t uni_s0_camera_ws = sorter0["camera_ws"];
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
     glsl_program_t sorter1(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter1.cs"));
     sorter1.enable();
     uniform_t uni_s1_camera_ws = sorter1["camera_ws"];
-*/
+
     glsl_program_t alpha_blender(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ab.vs"),
                                  glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ab.gs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ab.fs"));
@@ -90,7 +91,6 @@ int main(int argc, char *argv[])
     uniform_t uni_ab_time      = alpha_blender["time"];
 
     alpha_blender["diffuse_tex"] = 0;
-    alpha_blender["bump_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // point data initialization 
@@ -100,16 +100,26 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    GLuint GROUP_SIZE = 2;
-    GLuint GROUP_COUNT = 1;
+    GLuint GROUP_SIZE = 128;
+    GLuint GROUP_COUNT = 8;
     GLuint POINT_COUNT = GROUP_SIZE * GROUP_COUNT;
     
     std::vector<glm::mat3> point_frame;
     std::vector<glm::vec4> point_positions;
 
+    int pX = 41, pY = 43, pZ = 47; // 41 * 43 * 47 = 82861
+    int seed = 31337;
+
     for(GLuint i = 0; i < POINT_COUNT; ++i)
     {
-        point_positions.push_back(glm::vec4(4.75f * glm::sphericalRand(1.0f), glm::gaussRand(0.0f, 0.25f)));
+        seed += 7919;
+        glm::ivec3 q = glm::ivec3(seed % pX, seed % pY, seed % pZ);
+
+        float r = glm::gaussRand(0.0f, 1.0f);
+        float radius = 0.125f / (1.0f + r * r);
+        glm::vec3 center = glm::vec3(q) - 0.5f * glm::vec3(pX - 1, pY - 1, pZ - 1) + glm::sphericalRand(radius);
+
+        point_positions.push_back(glm::vec4(1.75f * center, glm::gaussRand(0.0f, 0.25f)));
 
         glm::vec3 axis_x = glm::sphericalRand(1.0f);
         glm::vec3 axis_y = glm::normalize(glm::cross(axis_x, glm::sphericalRand(1.0f)));
@@ -123,13 +133,13 @@ int main(int argc, char *argv[])
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-/*
+
     GLuint position_tbo_id;
     glGenTextures(1, &position_tbo_id);
     glBindTexture(GL_TEXTURE_BUFFER, position_tbo_id);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, pbo_id);
     glBindImageTexture(1, position_tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);    
-*/
+
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
     glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::mat3), point_frame.data(), GL_STATIC_DRAW);
@@ -153,21 +163,17 @@ int main(int argc, char *argv[])
     for (GLuint i = 0; i < POINT_COUNT; i++) indices[i] = i; 
     glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 
-/*
     GLuint indices_tbo_id;
     glGenTextures(1, &indices_tbo_id);
     glBindTexture(GL_TEXTURE_BUFFER, indices_tbo_id);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, ibo_id);
     glBindImageTexture(0, indices_tbo_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);    
-*/
+
     //===================================================================================================================================================================================================================
     // Load diffuse texture
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm.png");
-
-    glActiveTexture(GL_TEXTURE1);
-    GLuint bump_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm.png");
+    GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm_alpha.png");
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : 
@@ -177,7 +183,7 @@ int main(int argc, char *argv[])
     glClearColor(0.01f, 0.00f, 0.05f, 1.0f);                                                                                // dark blue background
     glEnable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, /* GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, */ GL_ONE, GL_ZERO);
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -206,7 +212,7 @@ int main(int argc, char *argv[])
 
         if (window.position_changed)
         {
-            /*
+
             sorter0.enable();
             uni_s0_camera_ws = camera_ws;
             glDispatchCompute(GROUP_COUNT / 2, 1, 1);
@@ -218,7 +224,6 @@ int main(int argc, char *argv[])
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
             window.position_changed = false;
-            */
         }
 
         window.end_frame();

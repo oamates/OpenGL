@@ -32,9 +32,9 @@ const vec2[4] square = vec2[]
 
 const int faces[24] = int[]
 (
-    7, 2, 1, 4,   // FACE -X
-    7, 0, 2, 5,   // FACE -Y
     7, 1, 0, 6,   // FACE -Z
+    7, 0, 2, 5,   // FACE -Y
+    7, 2, 1, 4,   // FACE -X
     3, 5, 6, 0,   // FACE  X
     3, 6, 4, 1,   // FACE  Y
     3, 4, 5, 2    // FACE  Z
@@ -47,7 +47,7 @@ out vec3 view;
 out vec3 light;
 out vec2 uv;
 
-const float cube_size = 1.0;
+const float cube_size = 1.25;
 
 void main()
 {
@@ -60,43 +60,23 @@ void main()
 
     vec3 axis_X = cs * axis_x[0] + (1 - cs) * dot(axis_z[0], axis_x[0]) * axis_z[0] + sn * cross(axis_z[0], axis_x[0]);
     vec3 axis_Y = cs * axis_y[0] + (1 - cs) * dot(axis_z[0], axis_y[0]) * axis_z[0] + sn * cross(axis_z[0], axis_y[0]);
-
-    float pX = dot(camera_z, axis_X);
-    float pY = dot(camera_z, axis_Y);
-
-    if (pX < 0.0) { axis_X = -axis_X; pX = -pX; }
-    if (pY < 0.0) { axis_Y = -axis_Y; pY = -pY; }
-
     vec3 axis_Z = cross(axis_X, axis_Y);
-    float pZ = dot(camera_z, axis_Z);
 
-    if (pZ < 0.0)
-    {
-        axis_Z = -axis_Z;
-        vec3 t = axis_X;
-        axis_X = axis_Y;
-        axis_Y = t;
-        pZ = -pZ;
-    }
+    ivec3 idx_f = ivec3(3, 4, 5);
+    vec3 dp = vec3(dot(camera_z, axis_X), dot(camera_z, axis_Y), dot(camera_z, axis_Z));
 
-    if ((pY < pX) && (pY < pZ))
-    {
-        vec3 t = axis_X;
-        axis_X = axis_Y;
-        axis_Y = axis_Z;
-        axis_Z = t;
-    }
-    else if ((pZ < pX) && (pZ < pY))
-    {
-        vec3 t = axis_X;
-        axis_X = axis_Z;
-        axis_Z = axis_Y;
-        axis_Y = t;
-    }
+    idx_f = ivec3(3, 4, 5) - ivec3(lessThan(dp, vec3(0.0))) * ivec3(1, 3, 5);       // indices of three front faces
+    dp = abs(dp);
 
-    mat3 model_matrix = mat3(axis_X, axis_Y, axis_Z);
+    if (dp.x > dp.y) { dp.xy = dp.yx; idx_f.xy = idx_f.yx; }
+    if (dp.y > dp.z) { dp.yz = dp.zy; idx_f.yz = idx_f.zy; }
+    if (dp.x > dp.y) { dp.xy = dp.yx; idx_f.xy = idx_f.yx; }
 
-    mat4x3 simplex_ws = model_matrix * simplex_ms; 
+    ivec3 idx_b = 5 - idx_f.zyx;                                                    // indices of three back faces, in sorted order
+
+    int face_idx[6] = int[] (idx_b.x, idx_b.y, idx_b.z, idx_f.x, idx_f.y, idx_f.z);
+
+    mat4x3 simplex_ws = mat3(axis_X, axis_Y, axis_Z) * simplex_ms; 
 
     vec3 positions[8] = vec3[]
     (
@@ -114,22 +94,20 @@ void main()
     vec3 tangents_x[6] = vec3[]( axis_Z,  axis_X,  axis_Y, axis_Y, axis_Z, axis_X);
     vec3 tangents_y[6] = vec3[]( axis_Y,  axis_Z,  axis_X, axis_Z, axis_X, axis_Y);
 
-    int index = 0;    
-
     for (int i = 0; i < 6; ++i)
     {
+        int f = face_idx[i];
         for (int j = 0; j < 4; ++j)
         {
-            vec3 position = positions[faces[index]];
+            vec3 position = positions[faces[4 * f + j]];
             view = camera_ws - position;
             light = light_ws - position;
             uv = square[j];
-            normal = normals_ws[i];
-            tangent_x = tangents_x[i];
-            tangent_y = tangents_y[i];
+            normal = normals_ws[f];
+            tangent_x = tangents_x[f];
+            tangent_y = tangents_y[f];
             gl_Position = projection_view_matrix * vec4(position, 1.0f);
             EmitVertex();
-            ++index;
         }
         EndPrimitive();
     }
