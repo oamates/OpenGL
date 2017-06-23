@@ -46,15 +46,17 @@ out vec3 tangent_y;
 out vec3 view;
 out vec3 light;
 out vec2 uv;
+out float hue;
 
-const float cube_size = 1.25;
+const float cube_size = 2.75;
 
 void main()
 {
     vec3 rotation_axis = axis_z[0];
     vec3 shift = position_ws[0].xyz;
 
-    float angle = position_ws[0].w * time;
+    float angular_rate = position_ws[0].w;
+    float angle = angular_rate * time;
     float cs = cos(angle);
     float sn = sin(angle);
 
@@ -107,6 +109,7 @@ void main()
             tangent_x = tangents_x[f];
             tangent_y = tangents_y[f];
             gl_Position = projection_view_matrix * vec4(position, 1.0f);
+            hue = angular_rate;
             EmitVertex();
         }
         EndPrimitive();

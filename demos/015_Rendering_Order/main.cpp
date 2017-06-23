@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
     uniform_t uni_ab_time      = alpha_blender["time"];
 
     alpha_blender["diffuse_tex"] = 0;
+    alpha_blender["bump_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // point data initialization 
@@ -101,13 +102,13 @@ int main(int argc, char *argv[])
     glBindVertexArray(vao_id);
 
     GLuint GROUP_SIZE = 128;
-    GLuint GROUP_COUNT = 8;
+    GLuint GROUP_COUNT = 4;
     GLuint POINT_COUNT = GROUP_SIZE * GROUP_COUNT;
     
     std::vector<glm::mat3> point_frame;
     std::vector<glm::vec4> point_positions;
 
-    int pX = 41, pY = 43, pZ = 47; // 41 * 43 * 47 = 82861
+    int pX = 59, pY = 61, pZ = 67;
     int seed = 31337;
 
     for(GLuint i = 0; i < POINT_COUNT; ++i)
@@ -119,7 +120,7 @@ int main(int argc, char *argv[])
         float radius = 0.125f / (1.0f + r * r);
         glm::vec3 center = glm::vec3(q) - 0.5f * glm::vec3(pX - 1, pY - 1, pZ - 1) + glm::sphericalRand(radius);
 
-        point_positions.push_back(glm::vec4(1.75f * center, glm::gaussRand(0.0f, 0.25f)));
+        point_positions.push_back(glm::vec4(1.75f * center, glm::linearRand(0.0f, 1.0f)));
 
         glm::vec3 axis_x = glm::sphericalRand(1.0f);
         glm::vec3 axis_y = glm::normalize(glm::cross(axis_x, glm::sphericalRand(1.0f)));
@@ -175,6 +176,9 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE0);
     GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm_alpha.png");
 
+    glActiveTexture(GL_TEXTURE1);
+    GLuint bump_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm_bump.png");
+
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : 
     // * background color -- dark blue
@@ -183,7 +187,7 @@ int main(int argc, char *argv[])
     glClearColor(0.01f, 0.00f, 0.05f, 1.0f);                                                                                // dark blue background
     glEnable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
-    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, /* GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, */ GL_ONE, GL_ZERO);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA /* GL_ONE, GL_ZERO */);
 
     //===================================================================================================================================================================================================================
     // The main loop
