@@ -1,6 +1,5 @@
 #version 330 core
 
-in vec3 position;
 in vec3 normal;
 in vec3 tangent_x;
 in vec3 tangent_y;
@@ -26,15 +25,15 @@ void main()
     float distance = length(light);
     vec3 l = light / distance;
 
-    vec3 ambient_color = texture(diffuse_tex, uv).xyz;
+    vec3 ambient_color = texture(diffuse_tex, uv).rgb;
     vec3 specular_color = vec3(1.0f);
 
-    float cos_theta = max(dot(n, l), 0.0f);
+    float cos_theta = 1.0f; //max(0.5f + 0.5f * dot(n, l), 0.0f);
 
     vec3 h = normalize(l + v);
-    float cos_alpha = max(dot(h, n), 0.0f);
+    float cos_alpha = max(0.5f + 0.5f * dot(h, n), 0.0f);
 
-    vec3 color = ambient_color * cos_alpha + specular_color * pow(cos_alpha, 20);
-    FragmentColor = vec4(color, 0.5);
+    vec3 color = 0.5f * ambient_color * cos_theta;// + 0.85f * specular_color * pow(cos_alpha, 40);
+    FragmentColor = vec4(color, 1.0);
 }
 

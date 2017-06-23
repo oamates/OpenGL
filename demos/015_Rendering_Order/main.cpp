@@ -27,7 +27,7 @@ struct demo_window_t : public glfw_window_t
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
@@ -68,14 +68,15 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // creating shaders and uniforms
     //=======================(============================================================================================================================================================================================
+/*
     glsl_program_t sorter0(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter0.cs"));
     sorter0.enable();
     uniform_t uni_s0_camera_ws = sorter0["camera_ws"];
 
     glsl_program_t sorter1(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter1.cs"));
     sorter1.enable();
-    uniform_t uni_s1_camera_ws = sorter0["camera_ws"];
-
+    uniform_t uni_s1_camera_ws = sorter1["camera_ws"];
+*/
     glsl_program_t alpha_blender(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ab.vs"),
                                  glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ab.gs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ab.fs"));
@@ -83,8 +84,10 @@ int main(int argc, char *argv[])
     alpha_blender.enable();
 
     uniform_t uni_ab_pv_matrix = alpha_blender["projection_view_matrix"];
+    uniform_t uni_ab_camera_z  = alpha_blender["camera_z"];
     uniform_t uni_ab_camera_ws = alpha_blender["camera_ws"];
     uniform_t uni_ab_light_ws  = alpha_blender["light_ws"];
+    uniform_t uni_ab_time      = alpha_blender["time"];
 
     alpha_blender["diffuse_tex"] = 0;
     alpha_blender["bump_tex"] = 1;
@@ -97,8 +100,8 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    GLuint GROUP_SIZE = 128;
-    GLuint GROUP_COUNT = 16;
+    GLuint GROUP_SIZE = 2;
+    GLuint GROUP_COUNT = 1;
     GLuint POINT_COUNT = GROUP_SIZE * GROUP_COUNT;
     
     std::vector<glm::mat3> point_frame;
@@ -106,11 +109,11 @@ int main(int argc, char *argv[])
 
     for(GLuint i = 0; i < POINT_COUNT; ++i)
     {
-        point_positions.push_back(glm::vec4(32.0f * glm::sphericalRand(1.0f), 1.0f));
+        point_positions.push_back(glm::vec4(4.75f * glm::sphericalRand(1.0f), glm::gaussRand(0.0f, 0.25f)));
 
+        glm::vec3 axis_x = glm::sphericalRand(1.0f);
+        glm::vec3 axis_y = glm::normalize(glm::cross(axis_x, glm::sphericalRand(1.0f)));
         glm::vec3 axis_z = glm::sphericalRand(1.0f);
-        glm::vec3 axis_x = glm::normalize(glm::cross(axis_z, glm::sphericalRand(1.0f)));
-        glm::vec3 axis_y = glm::cross(axis_z, axis_x);
         point_frame.push_back(glm::mat3(axis_x, axis_y, axis_z));
     }
 
@@ -120,13 +123,13 @@ int main(int argc, char *argv[])
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
+/*
     GLuint position_tbo_id;
     glGenTextures(1, &position_tbo_id);
     glBindTexture(GL_TEXTURE_BUFFER, position_tbo_id);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, pbo_id);
     glBindImageTexture(1, position_tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);    
-
+*/
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
     glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::mat3), point_frame.data(), GL_STATIC_DRAW);
@@ -142,7 +145,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // prepare position buffer texture
     //===================================================================================================================================================================================================================
-
     glGenBuffers(1, &ibo_id);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, POINT_COUNT * sizeof(GLuint), 0, GL_DYNAMIC_COPY);
@@ -150,6 +152,7 @@ int main(int argc, char *argv[])
     GLuint* indices = (GLuint*) glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, POINT_COUNT * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
     for (GLuint i = 0; i < POINT_COUNT; i++) indices[i] = i; 
     glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+
 /*
     GLuint indices_tbo_id;
     glGenTextures(1, &indices_tbo_id);
@@ -161,10 +164,10 @@ int main(int argc, char *argv[])
     // Load diffuse texture
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube.png");
+    GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm.png");
 
     glActiveTexture(GL_TEXTURE1);
-    GLuint bump_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_bump.png");
+    GLuint bump_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm.png");
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : 
@@ -176,7 +179,6 @@ int main(int argc, char *argv[])
     glDisable(GL_DEPTH_TEST);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
-
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
@@ -187,13 +189,18 @@ int main(int argc, char *argv[])
 
         float time = window.frame_ts;
         float angle = 0.125 * time;
+        glm::mat4& view_matrix = window.camera.view_matrix; 
         glm::vec3 light_ws = 15.0f * glm::vec3(glm::cos(angle), glm::sin(angle), 0.0f);
+        glm::vec3 camera_z = glm::vec3(view_matrix[0][2], view_matrix[1][2], view_matrix[2][2]);
         glm::vec3 camera_ws = window.camera.position();
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
+        alpha_blender.enable();
         uni_ab_pv_matrix = projection_view_matrix;
+        uni_ab_camera_z = camera_z;
         uni_ab_camera_ws = camera_ws;
         uni_ab_light_ws = light_ws;
+        uni_ab_time = time;
 
         glDrawElements(GL_POINTS, POINT_COUNT, GL_UNSIGNED_INT, 0);
 
