@@ -56,54 +56,40 @@ struct demo_window_t : public glfw_window_t
 //========================================================================================================================================================================================================================
 // bitonic sort algorithm implementation
 //========================================================================================================================================================================================================================
-template<typename T> void bitonic_sort(T* input, const unsigned int length)
+template<typename T> void bitonic_sort(T* a, const int length)
 {
-    const unsigned int halfLength = length / 2;
+    int half_length = length >> 1;
+    int l = half_length;
+    int stage = 0;
 
-    for(unsigned int i = 2; i <= length; i += i)
+    while(l)
     {
-        for(unsigned int j = i; j > 1; j /= 2)
+        int pair_distance = 1 << stage;
+
+        for(int pass = 0; pass <= stage; ++pass)
         {
-            bool order = true;
-
-            const unsigned int half_j = j / 2;
-
-            for(unsigned int k = 0; k < length; k += j)
+            for(int id = 0; id < half_length; ++id)
             {
-                const unsigned int k_plus_half_j = k + half_j;
-                unsigned int l;
+                int l = id + (id & (-pair_distance));
+                int r = l + pair_distance;
 
-                if(i < length)
-                {
-                    if((k == i) || ((k % i) == 0) && (k != halfLength))
-                    {
-                        order = !order;
-                    }
-                }
+                T l_elem = a[l];
+                T r_elem = a[r];
 
-                for(l = k; l < k_plus_half_j; ++l)
+                bool correct_order = ((id >> stage) & 1) == 0;
+                bool actual_order = l_elem < r_elem;
+
+                if (actual_order ^ correct_order)
                 {
-                    if(order)
-                    {
-                        if (input[l] > input[l + half_j])
-                        {
-                            T tmp = input[l];
-                            input[l] = input[l + half_j];
-                            input[l + half_j] = tmp;
-                        }
-                    }
-                    else
-                    {
-                        if(input[l + half_j] > input[l])
-                        {
-                            T tmp = input[l + half_j];
-                            input[l + half_j] = input[l];
-                            input[l] = tmp;
-                        }
-                    }
+                    a[l] = r_elem;
+                    a[r] = l_elem;
                 }
             }
+            pair_distance >>= 1;
         }
+
+        stage++;
+        l >>= 1;
     }
 }
 
@@ -125,6 +111,9 @@ int main(int argc, char *argv[])
     const unsigned int GROUP_SIZE = 128;
     const unsigned int GROUP_COUNT = 512;
     const unsigned int ARRAY_SIZE = GROUP_SIZE * GROUP_COUNT;
+    int stages = 0;
+    for(unsigned int temp = ARRAY_SIZE; temp > 1; temp >>= 1) ++stages;
+
 
     int* integral_data = (int*) malloc(ARRAY_SIZE * sizeof(int)); 
 
@@ -155,6 +144,10 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     bitonic_sort(integral_data, ARRAY_SIZE);
 
+    FILE* res_cpu = fopen("res_cpu.txt", "w");
+    for(unsigned int i = 0; i < ARRAY_SIZE; ++i)
+        fprintf(res_cpu, "%d\n", integral_data[i]);
+    fclose(res_cpu);
 
     //===================================================================================================================================================================================================================
     // create CS to do the same on GPU
@@ -162,36 +155,10 @@ int main(int argc, char *argv[])
     glsl_program_t bitonic_sorter(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/bitonic_sort.cs"));
 
     bitonic_sorter.enable();
-    uniform_t uni_bs_stage     = bitonic_sorter["stage"];
-    uniform_t uni_bs_pass      = bitonic_sorter["pass"];
+    uniform_t uni_bs_stage = bitonic_sorter["stage"];
+    uniform_t uni_bs_pass = bitonic_sorter["pass"];
 
-
-    // This algorithm is run as NS stages. Each stage has NP passes.
-    // so the total number of times the kernel call is enqueued is NS * NP.
-    // 
-    // For every stage S, we have S + 1 passes.
-    // eg: For stage S = 0, we have 1 pass.
-    //     For stage S = 1, we have 2 passes.
-    // 
-    // if length is 2^N, then the number of stages (numStages) is N.
-    // Do keep in mind the fact that the algorithm only works for
-    // arrays whose size is a power of 2.
-    // 
-    // here, numStages is N.
-    // 
-    // For an explanation of how the algorithm works, please go through
-    // the documentation of this sample.
-    // 
-    // 2^numStages should be equal to length.
-    // i.e the number of times you halve length to get 1 should be numStages
-
-    int numStages = 0;
-    for(unsigned int temp = ARRAY_SIZE; temp > 1; temp >>= 1)
-    {
-        ++numStages;
-    }
-
-    for(int stage = 0; stage < numStages; ++stage)
+    for(int stage = 0; stage < stages; ++stage)
     {
         uni_bs_stage = stage;
         for(int pass = 0; pass < stage + 1; ++pass)
@@ -202,21 +169,18 @@ int main(int argc, char *argv[])
         }
     }
 
+    int* sorted_data = (int*) glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
+    FILE* res_gpu = fopen("res_gpu.txt", "w");
+    for(unsigned int i = 0; i < ARRAY_SIZE; ++i)
+        fprintf(res_gpu, "%d\n", sorted_data[i]);
+    fclose(res_gpu);
 
-    //===================================================================================================================================================================================================================
-    // The main loop
-    //===================================================================================================================================================================================================================
-    while(!window.should_close())
-    {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        window.new_frame();
-
-        window.end_frame();
-    }
+    glUnmapBuffer(GL_ARRAY_BUFFER);
 
     //===================================================================================================================================================================================================================
     // terminate the program and exit
     //===================================================================================================================================================================================================================
+    free(integral_data);
     glfw::terminate();
     return 0;
 }
