@@ -102,13 +102,13 @@ int main(int argc, char *argv[])
     glBindVertexArray(vao_id);
 
     GLuint GROUP_SIZE = 128;
-    GLuint GROUP_COUNT = 4;
+    GLuint GROUP_COUNT = 16;
     GLuint POINT_COUNT = GROUP_SIZE * GROUP_COUNT;
     
     std::vector<glm::mat3> point_frame;
     std::vector<glm::vec4> point_positions;
 
-    int pX = 59, pY = 61, pZ = 67;
+    int pX = 79, pY = 83, pZ = 89;
     int seed = 31337;
 
     for(GLuint i = 0; i < POINT_COUNT; ++i)
@@ -188,6 +188,29 @@ int main(int argc, char *argv[])
     glEnable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA /* GL_ONE, GL_ZERO */);
+
+    //===================================================================================================================================================================================================================
+    // create and run CS to do the initial index buffer sorting w.r.t distance to camera
+    //===================================================================================================================================================================================================================
+    glsl_program_t bitonic_sorter(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/bitonic_sort.cs"));
+
+    bitonic_sorter.enable();
+    uniform_t uni_bs_stage = bitonic_sorter["stage"];
+    uniform_t uni_bs_pass  = bitonic_sorter["pass"];
+
+    int stages = 0;
+    for(unsigned int t = POINT_COUNT; t > 1; t >>= 1) ++stages;
+
+    for(int stage = 0; stage < stages; ++stage)
+    {
+        uni_bs_stage = stage;
+        for(int pass = 0; pass < stage + 1; ++pass)
+        {
+            uni_bs_pass = pass;
+            glDispatchCompute(GROUP_COUNT / 2, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+    }
 
     //===================================================================================================================================================================================================================
     // The main loop
