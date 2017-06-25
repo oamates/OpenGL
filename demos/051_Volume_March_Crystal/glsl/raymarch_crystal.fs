@@ -21,10 +21,9 @@ vec3 tex2d(vec2 uv)
 
 vec3 tex3d(in vec3 p)
 {
-    p *= 1.4875;
-    vec3 w = vec3(0.577);
+    vec3 w = vec3(0.331);
     mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
-    return sqrt(rgb_samples * w);
+    return pow(rgb_samples * w, vec3(1.5));
 }
 
 float csZ(float depth)
@@ -48,7 +47,7 @@ vec2 csqr(vec2 a)
     return vec2(a.x * a.x - a.y * a.y, 2.0f * a.x * a.y); 
 }
 
-float map(in vec3 p)
+float map(vec3 p)
 {    
     float res = 0.0f;    
     vec3 c = p;
@@ -72,20 +71,19 @@ vec3 raymarch(in vec3 front, in vec3 back)
     dir = dir / l;
     l = min(l, 2.0f);
 
-    const float step = 0.02;
-    float t = 0.0f;
+    const float step = 0.03125;
+    float t = step * (fract(l / step) - 1.01);
 
-    while(t < l)
+    while(t <= l)
     {
         vec3 p = back + t * dir;
-        float c = map(p);
-        float d = abs(c) - 0.67f;
+        float c = map(0.641 * p);
+        float d = abs(c) - 0.7f;
 
         float q = smoothstep(0.0, 1.0, d);
         q *= q;
-        q *= q;
 
-        vec3 b = tex3d(1.341 * p);
+        vec3 b = tex3d(0.66 * p);
         col = mix(col, b, q);
         t += step;
     }
@@ -109,8 +107,8 @@ void main()
     vec3 diffuse = (0.8 + 0.2 * dot(n, l)) * color;
 
     vec3 h = normalize(l + v);  
-    const float Ks = 1.15f;
-    const float Ns = 64.0f;
+    const float Ks = 0.85f;
+    const float Ns = 70.0f;
     float specular = Ks * pow(max(dot(n, h), 0.0), Ns);
 
     vec3 c = diffuse + vec3(specular);
