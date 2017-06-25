@@ -11,11 +11,13 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/norm.hpp>
 #include <glm/gtc/random.hpp>
+#include <glm/gtx/transform.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
 #include "gl_info.hpp"
 #include "glfw_window.hpp"
+#include "glsl_noise.hpp"
 #include "plato.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
@@ -166,7 +168,7 @@ int main(int argc, char *argv[])
 
     crystal_raymarch["backface_depth_tex"] = 0;
     crystal_raymarch["tb_tex"] = 1;
-
+    crystal_raymarch["value_tex"] = 2;
     crystal_raymarch["inv_resolution"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     crystal_raymarch["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
 
@@ -189,7 +191,10 @@ int main(int argc, char *argv[])
     glEnable(GL_DEPTH_TEST);
 
     glActiveTexture(GL_TEXTURE1);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/sapphire.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+    glActiveTexture(GL_TEXTURE2);
+    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
@@ -204,7 +209,7 @@ int main(int argc, char *argv[])
 
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::mat3 camera_matrix = glm::inverse(glm::mat3(view_matrix));
-        glm::vec3 camera_ws = glm::vec3(view_matrix[3]);
+        glm::vec3 camera_ws = -camera_matrix * glm::vec3(view_matrix[3]);
         glm::vec3 light_ws = 7.0f * glm::vec3(glm::cos(time), 0.0f, glm::sin(time));
 
         //===============================================================================================================================================================================================================

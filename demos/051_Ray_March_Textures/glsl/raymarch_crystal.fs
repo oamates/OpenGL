@@ -63,25 +63,34 @@ float map(in vec3 p)
     return 0.5f * res;
 }
 
-vec3 raymarch(in vec3 b, in vec3 e)
+vec3 raymarch(in vec3 front, in vec3 back)
 {
     vec3 col = vec3(0.0f);
-    const int iterations = 80;
-    for(int i = 0; i <= iterations; ++i)
-    {
-        vec3 p = mix(e, b, float(i) / float(iterations));
-        float c = map(p);
+    vec3 dir = front - back;
+    float l = length(dir);
 
-        float d = abs(c) - 0.65f;
-        if (d > 0.0f)
-        {
-            vec3 q = tex3d(0.341 * p);
-            col = mix(1.05 * col, q, 0.041 * d);
-        }
+    dir = dir / l;
+    l = min(l, 2.0f);
+
+    const float step = 0.02;
+    float t = 0.0f;
+
+    while(t < l)
+    {
+        vec3 p = back + t * dir;
+        float c = map(p);
+        float d = abs(c) - 0.67f;
+
+        float q = smoothstep(0.0, 1.0, d);
+        q *= q;
+        q *= q;
+
+        vec3 b = tex3d(1.341 * p);
+        col = mix(col, b, q);
+        t += step;
     }
 
-    //return log(1.0f + 1.175 * col);
-    return pow(col, vec3(0.22f));
+    return pow(col, vec3(0.82f));
 }
 
 void main()
