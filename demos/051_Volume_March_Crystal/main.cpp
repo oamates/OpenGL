@@ -152,6 +152,7 @@ int main(int argc, char *argv[])
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/geometry.fs"));
     geometry_pass.enable();
     uniform_t uni_gp_pv_matrix = geometry_pass["projection_view_matrix"];
+    uniform_t uni_gp_model_matrix = geometry_pass["model_matrix"];
 
     //===================================================================================================================================================================================================================
     // crystal raymarch shader
@@ -163,14 +164,32 @@ int main(int argc, char *argv[])
 
     uniform_t uni_cm_pv_matrix     = crystal_raymarch["projection_view_matrix"];
     uniform_t uni_cm_camera_matrix = crystal_raymarch["camera_matrix"];
+    uniform_t uni_cm_model_matrix  = crystal_raymarch["model_matrix"];
     uniform_t uni_cm_camera_ws     = crystal_raymarch["camera_ws"];         
     uniform_t uni_cm_light_ws      = crystal_raymarch["light_ws"];
 
     crystal_raymarch["backface_depth_tex"] = 0;
     crystal_raymarch["tb_tex"] = 1;
-    crystal_raymarch["value_tex"] = 2;
     crystal_raymarch["inv_resolution"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     crystal_raymarch["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
+
+    //===================================================================================================================================================================================================================
+    // standard lighting shader
+    //===================================================================================================================================================================================================================
+    glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lighting.vs"), 
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lighting.fs"));
+    lighting_pass.enable();
+    lighting_pass["tb_tex"]           = 2;
+
+    uniform_t uni_lp_pvm_matrix       = lighting_pass["pvm_matrix"];
+    uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
+    uniform_t uni_lp_normal_matrix    = lighting_pass["normal_matrix"];
+    uniform_t uni_lp_camera_ws        = lighting_pass["camera_ws"];
+    uniform_t uni_lp_light_ws         = lighting_pass["light_ws"];
+    uniform_t uni_lp_Ks               = lighting_pass["Ks"];
+    uniform_t uni_lp_Ns               = lighting_pass["Ns"];
+    uniform_t uni_lp_bf               = lighting_pass["bf"];
+    uniform_t uni_lp_tex_scale        = lighting_pass["tex_scale"];
 
     //===================================================================================================================================================================================================================
     // create dodecahecron buffer
@@ -184,6 +203,16 @@ int main(int argc, char *argv[])
     fbo_depth_t backface_fbo(res_x, res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE0);
 
     //===================================================================================================================================================================================================================
+    // load demon model
+    //===================================================================================================================================================================================================================
+    vao_t demon_model;
+    demon_model.init("../../../resources/models/vao/demon.vao");
+
+    glm::mat4 demon_model_matrix = glm::scale(glm::translate(glm::vec3(0.0f, 0.51f, 0.0f)), glm::vec3(0.705f));
+    glm::mat3 demon_normal_matrix = glm::mat3(1.0f);
+    glm::mat4 crystal_model_matrix = glm::scale(glm::vec3(3.0f));
+
+    //===================================================================================================================================================================================================================
     // light variables
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -191,17 +220,16 @@ int main(int argc, char *argv[])
     glEnable(GL_DEPTH_TEST);
 
     glActiveTexture(GL_TEXTURE1);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/ice2.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     glActiveTexture(GL_TEXTURE2);
-    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
+    GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
         float time = window.frame_ts;
@@ -218,11 +246,17 @@ int main(int argc, char *argv[])
         backface_fbo.bind();
 
         glClear(GL_DEPTH_BUFFER_BIT);
-        glCullFace(GL_FRONT);
 
         geometry_pass.enable();
         uni_gp_pv_matrix = projection_view_matrix;
+
+        glCullFace(GL_FRONT);
+        uni_gp_model_matrix = crystal_model_matrix;
         dodecahedron.render();
+
+        glCullFace(GL_BACK);
+        uni_gp_model_matrix = demon_model_matrix;
+        demon_model.render();
 
         //===============================================================================================================================================================================================================
         // use depth texture to raymarch through polyhedron
@@ -231,14 +265,33 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glCullFace(GL_BACK);
 
+        lighting_pass.enable();
+
+        glm::mat4 demon_pvm_matrix = projection_view_matrix * demon_model_matrix;
+        uni_lp_Ks = 1.02f;
+        uni_lp_Ns = 44.0f;
+        uni_lp_bf = 0.0127f;
+        uni_lp_tex_scale = 1.1275f;
+        uni_lp_pvm_matrix = demon_pvm_matrix;
+        uni_lp_normal_matrix = demon_normal_matrix;
+        uni_lp_model_matrix = demon_model_matrix;
+        uni_lp_camera_ws = camera_ws;
+        uni_lp_light_ws = light_ws;
+        demon_model.render();
+
         crystal_raymarch.enable();
 
         uni_cm_pv_matrix = projection_view_matrix;
+        uni_cm_model_matrix = crystal_model_matrix;
         uni_cm_camera_matrix = camera_matrix;
         uni_cm_camera_ws = camera_ws;
         uni_cm_light_ws = light_ws;
 
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
         dodecahedron.render();
+        glDisable(GL_BLEND);
 
         window.end_frame();
     }
