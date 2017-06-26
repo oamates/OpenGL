@@ -1,0 +1,185 @@
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/svn/!svn/ver/1396/trunk/src/nvimage
+END
+ErrorMetric.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/!svn/ver/1382/trunk/src/nvimage/ErrorMetric.cpp
+END
+ColorBlock.h
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/1394/trunk/src/nvimage/ColorBlock.h
+END
+ColorSpace.h
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/1133/trunk/src/nvimage/ColorSpace.h
+END
+PixelFormat.h
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/!svn/ver/1304/trunk/src/nvimage/PixelFormat.h
+END
+Quantize.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/1353/trunk/src/nvimage/Quantize.cpp
+END
+DirectDrawSurface.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/!svn/ver/1394/trunk/src/nvimage/DirectDrawSurface.cpp
+END
+ErrorMetric.h
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/!svn/ver/1372/trunk/src/nvimage/ErrorMetric.h
+END
+Quantize.h
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/!svn/ver/1304/trunk/src/nvimage/Quantize.h
+END
+KtxFile.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/1247/trunk/src/nvimage/KtxFile.cpp
+END
+DirectDrawSurface.h
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/!svn/ver/1305/trunk/src/nvimage/DirectDrawSurface.h
+END
+FloatImage.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/!svn/ver/1394/trunk/src/nvimage/FloatImage.cpp
+END
+BlockDXT.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/1396/trunk/src/nvimage/BlockDXT.cpp
+END
+ImageIO.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/1394/trunk/src/nvimage/ImageIO.cpp
+END
+KtxFile.h
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/1247/trunk/src/nvimage/KtxFile.h
+END
+ValveTextureFormat.h
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/!svn/ver/1323/trunk/src/nvimage/ValveTextureFormat.h
+END
+FloatImage.h
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/!svn/ver/1351/trunk/src/nvimage/FloatImage.h
+END
+BlockDXT.h
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/!svn/ver/1394/trunk/src/nvimage/BlockDXT.h
+END
+ImageIO.h
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/1304/trunk/src/nvimage/ImageIO.h
+END
+TgaFile.h
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/1304/trunk/src/nvimage/TgaFile.h
+END
+Image.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/1394/trunk/src/nvimage/Image.cpp
+END
+Filter.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/!svn/ver/1304/trunk/src/nvimage/Filter.cpp
+END
+NormalMap.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/!svn/ver/1381/trunk/src/nvimage/NormalMap.cpp
+END
+Image.h
+K 25
+svn:wc:ra_dav:version-url
+V 44
+/svn/!svn/ver/1394/trunk/src/nvimage/Image.h
+END
+ColorBlock.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/!svn/ver/1394/trunk/src/nvimage/ColorBlock.cpp
+END
+Filter.h
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/!svn/ver/1304/trunk/src/nvimage/Filter.h
+END
+ColorSpace.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/!svn/ver/1394/trunk/src/nvimage/ColorSpace.cpp
+END
+NormalMap.h
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/!svn/ver/1304/trunk/src/nvimage/NormalMap.h
+END
+nvimage.h
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/1295/trunk/src/nvimage/nvimage.h
+END
+PsdFile.h
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/!svn/ver/1304/trunk/src/nvimage/PsdFile.h
+END
+CMakeLists.txt
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/!svn/ver/1396/trunk/src/nvimage/CMakeLists.txt
+END
