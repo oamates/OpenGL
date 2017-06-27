@@ -24,7 +24,7 @@ struct demo_window_t : public glfw_window_t
     camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -60,7 +60,7 @@ vertex_pnt3_t minkowski_L4_support_func(const glm::vec3& uvw)
     float inv_norm = 1.0f / sqrt(glm::length(uvw2));
     float inv_der_norm = 1.0f / glm::length(uvw3);
 
-    vertex.position = 4.0f * uvw * inv_norm;
+    vertex.position = 0.5f * uvw * inv_norm;
     vertex.normal = glm::normalize(uvw3);
 
     return vertex;
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 
     scene_renderer.enable();
     uniform_t uni_sr_pv_matrix = scene_renderer["projection_view_matrix"];
-    scene_renderer["base_size"] = 15.0f;
+    scene_renderer["base_size"] = 1.0f;
 
     glsl_program_t resolver(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/blit.vs"), 
                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blit.fs"));
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     glBindTexture(GL_TEXTURE_2D, counter_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexStorage2D(GL_TEXTURE_2D, 0, GL_R32UI, res_x, res_y);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32UI, res_x, res_y);
     glBindImageTexture(0, counter_tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
     //===================================================================================================================================================================================================================
@@ -114,11 +114,16 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // VAO to render
     //===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // create dodecahecron buffer
+    //===================================================================================================================================================================================================================
+
     sphere_t minkowski_L4_ball;
     minkowski_L4_ball.generate_vao_mt<vertex_pnt3_t>(minkowski_L4_support_func, 4);
 
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex(minkowski_L4_ball.vao.ibo.pri);
+
     glDisable(GL_DEPTH_TEST);
     glClearColor(0.03f, 0.01f, 0.09f, 1.0f);
 
@@ -127,24 +132,23 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
-        glClear(GL_COLOR_BUFFER_BIT);
         window.new_frame();
+        glClear(GL_COLOR_BUFFER_BIT);
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
         GLuint zero = 0;
-        glClearTexImage(counter_tex, 0, GL_R32UI, GL_UNSIGNED_INT, &zero);
-
+        glClearTexImage(counter_tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
         scene_renderer.enable();
         uni_sr_pv_matrix = projection_view_matrix;
 
         minkowski_L4_ball.instanced_render(16 * 16 * 16);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        
+
         resolver.enable();
         glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-        window.new_frame();
+        window.end_frame();
     }
      
     //===================================================================================================================================================================================================================

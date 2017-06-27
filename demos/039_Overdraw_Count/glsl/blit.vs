@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 
 const vec2 uvs[4] = vec2[4] 
 (
