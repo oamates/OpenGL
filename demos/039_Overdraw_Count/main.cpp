@@ -19,9 +19,6 @@
 #include "vertex.hpp"
 #include "sphere.hpp"
 
-#define MAX_FRAMEBUFFER_WIDTH 2048
-#define MAX_FRAMEBUFFER_HEIGHT 2048
-
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
@@ -74,6 +71,8 @@ vertex_pnt3_t minkowski_L4_support_func(const glm::vec3& uvw)
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+    int res_x = 1920;
+    int res_y = 1080;
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
@@ -81,14 +80,13 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Overdraw Count", 4, 4, 3, 1920, 1080, true);
+    demo_window_t window("Overdraw Count", 4, 4, 4, res_x, res_y, true);
 
     glsl_program_t scene_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/overdraw_count.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/overdraw_count.fs"));
 
-    uniform_t view_matrix       = scene_renderer["view_matrix"];
-    uniform_t projection_matrix = scene_renderer["projection_matrix"];
     scene_renderer.enable();
+    uniform_t uni_sr_pv_matrix = scene_renderer["projection_view_matrix"];
     scene_renderer["base_size"] = 15.0f;
 
     glsl_program_t resolver(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/blit.vs"), 
@@ -97,51 +95,28 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Create overdraw counter texture
     //===================================================================================================================================================================================================================
-    GLuint overdraw_count_buffer;
-    glGenTextures(1, &overdraw_count_buffer);
-    glBindTexture(GL_TEXTURE_2D, overdraw_count_buffer);
+    glActiveTexture(GL_TEXTURE0);
+
+    GLuint counter_tex;
+    glGenTextures(1, &counter_tex);
+    glBindTexture(GL_TEXTURE_2D, counter_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, MAX_FRAMEBUFFER_WIDTH, MAX_FRAMEBUFFER_HEIGHT, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glTexStorage2D(GL_TEXTURE_2D, 0, GL_R32UI, res_x, res_y);
+    glBindImageTexture(0, counter_tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
     //===================================================================================================================================================================================================================
-    // Create buffer for clearing the head pointer texture
+    // fake VAO for quad rendering
     //===================================================================================================================================================================================================================
-    GLuint overdraw_count_clear_buffer;
-    glGenBuffers(1, &overdraw_count_clear_buffer);
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, overdraw_count_clear_buffer);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, MAX_FRAMEBUFFER_WIDTH * MAX_FRAMEBUFFER_HEIGHT * sizeof(GLuint), 0, GL_STATIC_DRAW);
-
-    void* unpack_buffer_data = glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-    memset(unpack_buffer_data, 0x00, MAX_FRAMEBUFFER_WIDTH * MAX_FRAMEBUFFER_HEIGHT * sizeof(GLuint));
-    glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
 
     //===================================================================================================================================================================================================================
-    // Create VAO containing quad for the final blit
+    // VAO to render
     //===================================================================================================================================================================================================================
-    GLuint  quad_vbo;
-    GLuint  quad_vao;
-
-    glGenVertexArrays(1, &quad_vao);
-    glBindVertexArray(quad_vao);
-
-    static const GLfloat quad_verts[] =
-    {
-        -1.0f, -1.0f,
-         1.0f, -1.0f,
-        -1.0f,  1.0f,
-         1.0f,  1.0f,
-    };
-
-    glGenBuffers(1, &quad_vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_verts), quad_verts, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-
     sphere_t minkowski_L4_ball;
     minkowski_L4_ball.generate_vao_mt<vertex_pnt3_t>(minkowski_L4_support_func, 4);
+
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex(minkowski_L4_ball.vao.ibo.pri);
     glDisable(GL_DEPTH_TEST);
@@ -154,24 +129,19 @@ int main(int argc, char *argv[])
     {
         glClear(GL_COLOR_BUFFER_BIT);
         window.new_frame();
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, overdraw_count_clear_buffer);
-        glBindTexture(GL_TEXTURE_2D, overdraw_count_buffer);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window.res_x, window.res_y, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        
-        glBindImageTexture(0, overdraw_count_buffer, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
+        GLuint zero = 0;
+        glClearTexImage(counter_tex, 0, GL_R32UI, GL_UNSIGNED_INT, &zero);
 
         scene_renderer.enable();
-        view_matrix = window.camera.view_matrix;
-        projection_matrix = window.camera.projection_matrix;
+        uni_sr_pv_matrix = projection_view_matrix;
 
         minkowski_L4_ball.instanced_render(16 * 16 * 16);
-
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         
         resolver.enable();
-        glBindVertexArray(quad_vao);
+        glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         window.new_frame();
