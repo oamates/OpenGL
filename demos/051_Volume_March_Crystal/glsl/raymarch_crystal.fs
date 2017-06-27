@@ -5,6 +5,7 @@ in vec3 normal_ws;
 
 uniform sampler2D backface_depth_tex;
 uniform sampler2D tb_tex;
+uniform sampler2D value_tex;
 
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
@@ -14,6 +15,53 @@ uniform vec2 inv_resolution;
 
 out vec4 FragmentColor;
 
+//==============================================================================================================================================================
+// 3D Value noise function
+//==============================================================================================================================================================
+
+const float TEXEL_SIZE = 1.0 / 256.0;
+const float HALF_TEXEL = 0.5 * TEXEL_SIZE;
+
+vec3 hermite5(vec3 x)
+{
+    return x * x * x * (10.0 + x * (6.0 * x - 15.0));
+}
+
+float vnoise(vec3 x)
+{
+    vec3 p = floor(x);
+    vec3 f = x - p;
+    f = hermite5(f);
+    vec2 uv = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
+    vec2 rg = texture(value_tex, TEXEL_SIZE * uv + HALF_TEXEL).rg;
+    return mix(rg.g, rg.r, f.z);
+}
+
+float tri(float x)
+{
+    return abs(fract(x) - 0.5);
+}
+
+float noise_map(vec3 x)
+{
+    float q = tri(vnoise(x));
+    q *= tri(vnoise(2.12 * x + vec3(3.41)));
+    q *= tri(vnoise(4.41 * x - vec3(7.11)));
+    q += 0.015 * tri(vnoise(6.41 * x));
+    return 14.1 * q;
+}
+
+vec4 noise_map_bump(in vec3 p)
+{
+    vec3 e = vec3(0.03, -0.03, 0.25);
+    vec4 b = e.xyyz * noise_map(p + e.xyy) + e.yyxz * noise_map(p + e.yyx) + e.yxyz * noise_map(p + e.yxy) + e.xxxz * noise_map(p + e.xxx);
+    b.xyz = normalize(b.xyz);
+    return b;
+}
+
+//==============================================================================================================================================================
+// trilinear blend
+//==============================================================================================================================================================
 vec3 tex2d(vec2 uv)
 {
     return texture(tb_tex, uv).rgb;
@@ -73,60 +121,38 @@ vec4 map_bump(in vec3 p)
     b.xyz = normalize(b.xyz);
     return b;
 }
+
 vec4 raymarch(in vec3 front, in vec3 back)
 {
     float alpha = 0.25;
     vec3 col = vec3(0.0f);
     vec3 dir = front - back;
-    float l = length(dir);
+    float l = min(length(dir), 6.0f);
 
     dir = dir / l;
-    l = min(2.75, l);
+    
+    int iterations = 40;
+    float step = l / iterations;
 
-    const float step = 0.05725;
-    float t = step * (fract(l / step) - 1.01);
-
-    while(t <= l)
+    for(int i = 0; i <= iterations; ++i)
     {
-        vec3 p = back + t * dir;
-        //float c = map(p);
-        vec4 c = map_bump(p);
-        float d = (abs(c.w) - 0.75f);
-        vec3 l = normalize(light_ws - p);
-        vec3 h = normalize(dir - l);
-        float s = abs(dot(c.xyz, h));
+        vec3 p = back + i * step * dir;
+        float c = noise_map(4.67 * p);
+        float d = abs(c) - 0.117f;
 
         if (d > 0.0)
         {
             float q = smoothstep(0.0, 1.0, d);
-            q *= q;
+            q = pow(q, 0.41);
+            vec3 b = sqrt(sqrt(tex3d(p)));
 
-            vec3 b = tex3d(p);
-
-
-
-            b += 2.13 * pow(s, 20.0);
             col = mix(col, b, q);
             alpha = max(alpha, q);
 
         }
-        else if(d > -0.25) 
-        {
-            float q = smoothstep(0.0, 1.0, 2.41 * (d + 0.25));
-            q *= q;
-
-            vec3 b = vec3(0.475, 0.561, 0.783);
-            b += 2.13 * pow(s, 20.0);
-            col = mix(col, b, q);
-            alpha = max(alpha, q);
-
-
-
-        }
-        t += step;
     }
 
-    return vec4(pow(col, vec3(0.92f, 0.67f, 0.51f)), alpha);
+    return vec4(col, alpha);
 }
 
 void main()
@@ -142,7 +168,7 @@ void main()
     vec3 backface_ws = camera_ws + camera_matrix * position_cs(uv);
 
     vec4 color = raymarch(position_ws, backface_ws);
-    vec3 diffuse = (0.8 + 0.2 * dot(n, l)) * color.rgb;
+    vec3 diffuse = (0.6 + 0.4 * dot(n, l)) * color.rgb;
 
     vec3 h = normalize(l + v);  
     const float Ks = 0.85f;

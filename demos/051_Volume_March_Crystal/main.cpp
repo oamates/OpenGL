@@ -170,6 +170,7 @@ int main(int argc, char *argv[])
 
     crystal_raymarch["backface_depth_tex"] = 0;
     crystal_raymarch["tb_tex"] = 1;
+    crystal_raymarch["value_tex"] = 2;
     crystal_raymarch["inv_resolution"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     crystal_raymarch["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
 
@@ -179,7 +180,7 @@ int main(int argc, char *argv[])
     glsl_program_t lighting_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lighting.vs"), 
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lighting.fs"));
     lighting_pass.enable();
-    lighting_pass["tb_tex"]           = 2;
+    lighting_pass["tb_tex"] = 3;
 
     uniform_t uni_lp_pvm_matrix       = lighting_pass["pvm_matrix"];
     uniform_t uni_lp_model_matrix     = lighting_pass["model_matrix"];
@@ -220,9 +221,12 @@ int main(int argc, char *argv[])
     glEnable(GL_DEPTH_TEST);
 
     glActiveTexture(GL_TEXTURE1);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/ice2.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/emerald.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    
     glActiveTexture(GL_TEXTURE2);
+    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
+
+    glActiveTexture(GL_TEXTURE3);
     GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
