@@ -110,7 +110,7 @@ vec4 map_bump(vec3 p)
 
 float alpha_func(vec3 p, vec3 color)
 {
-    return max(1.0 - 0.5 * dot(color, vec3(1.0)), 0.0);
+    return max(1.0 - 0.61 * dot(color, vec3(1.0)), 0.0);
 }
 
 vec4 crystal_march(vec3 front, vec3 back)
@@ -118,7 +118,7 @@ vec4 crystal_march(vec3 front, vec3 back)
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
     vec3 ray = front - back;
 
-    const int iterations = 8;
+    const int iterations = 16;
     const float inv_iterations = 1.0 / iterations;
 
     vec3 position = back;

@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 
     glActiveTexture(GL_TEXTURE3);
-    GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint demon_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
