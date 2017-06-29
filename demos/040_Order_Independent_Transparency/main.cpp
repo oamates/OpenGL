@@ -94,7 +94,7 @@ GLuint generate_fractal_shifts(const glm::vec3* shift, int count, float scale, i
         }
         q *= count;
     }
-    for (int i = 0; i < l; ++i) fractal_shift[i].w = 0.33f; //glm::linearRand(0.33f, 0.66f);
+    for (int i = 0; i < l; ++i) fractal_shift[i].w = 0.33f;
 
     GLuint ssbo_id;
     glGenBuffers(1, &ssbo_id);
@@ -102,7 +102,7 @@ GLuint generate_fractal_shifts(const glm::vec3* shift, int count, float scale, i
     glBufferData(GL_SHADER_STORAGE_BUFFER, l * sizeof(glm::vec4), glm::value_ptr(fractal_shift[0]), GL_STATIC_DRAW);
     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, ssbo_id, 0, l * sizeof(glm::vec4));
 
-    delete fractal_shift;
+    free(fractal_shift);
     return l;
 }
 
@@ -121,100 +121,77 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // shader that creates list of fragments covering the given one and shader that sorts that list
     //===================================================================================================================================================================================================================
-
     glsl_program_t list_builder(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/list_builder.vs"),
                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/list_builder.fs"));
 
-    uniform_t uniform_time                   = list_builder["time"];
+    list_builder.enable();
     uniform_t uniform_light_ws               = list_builder["light_ws"];
     uniform_t uniform_camera_ws              = list_builder["camera_ws"];
     uniform_t uniform_projection_view_matrix = list_builder["projection_view_matrix"];
+    list_builder["tb_tex"] = 2;
 
     glsl_program_t list_sorter(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/list_sorter.vs"),
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/list_sorter.fs"));
 
-
-    GLuint head_pointer_texture, head_pointer_clear_buffer, atomic_counter_buffer, linked_list_buffer, linked_list_texture;
+    //===================================================================================================================================================================================================================
+    // create the atomic counter buffer with 1 element
+    //===================================================================================================================================================================================================================
+    GLuint acbo_id;
+    glGenBuffers(1, &acbo_id);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, acbo_id);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
 
     //===================================================================================================================================================================================================================
     // clear list root pointers texture and bind it to texture unit 0
     //===================================================================================================================================================================================================================
-    glGenTextures(1, &head_pointer_texture);
-    glBindTexture(GL_TEXTURE_2D, head_pointer_texture);
+    glActiveTexture(GL_TEXTURE0);
+    GLuint hpointer_tex_id;
+    glGenTextures(1, &hpointer_tex_id);
+    glBindTexture(GL_TEXTURE_2D, hpointer_tex_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, window.res_x, window.res_y, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-    glBindImageTexture(0, head_pointer_texture, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R32UI);
-
-    //===================================================================================================================================================================================================================
-    // create buffer for clearing the head pointer texture
-    //===================================================================================================================================================================================================================
-    glGenBuffers(1, &head_pointer_clear_buffer);
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, head_pointer_clear_buffer);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, window.res_x * window.res_y * sizeof(GLuint), 0, GL_STATIC_DRAW);
-    GLuint* data = (GLuint*) glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-    memset(data, 0x00, window.res_x * window.res_y * sizeof(GLuint));
-    glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-
-    //===================================================================================================================================================================================================================
-    // create the atomic counter buffer with 1 element
-    //===================================================================================================================================================================================================================
-    glGenBuffers(1, &atomic_counter_buffer);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, atomic_counter_buffer);
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32UI, window.res_x, window.res_y);
+    glBindImageTexture(0, hpointer_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
     //===================================================================================================================================================================================================================
     // create the linked list storage buffer and bind it to a texture for use as a TBO
     //===================================================================================================================================================================================================================
-    glGenBuffers(1, &linked_list_buffer);
-    glBindBuffer(GL_TEXTURE_BUFFER, linked_list_buffer);
+    GLuint linked_list_buffer_id;
+    glGenBuffers(1, &linked_list_buffer_id);
+    glBindBuffer(GL_TEXTURE_BUFFER, linked_list_buffer_id);
     glBufferData(GL_TEXTURE_BUFFER, window.res_x * window.res_y * 32 * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
-    glGenTextures(1, &linked_list_texture);
-    glBindTexture(GL_TEXTURE_BUFFER, linked_list_texture);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, linked_list_buffer);
-    glBindImageTexture(1, linked_list_texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32UI);
+
+    //===================================================================================================================================================================================================================
+    // buffer texture
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE1);
+    GLuint linked_list_text_id;
+    glGenTextures(1, &linked_list_text_id);
+    glBindTexture(GL_TEXTURE_BUFFER, linked_list_text_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, linked_list_buffer_id);
+    glBindImageTexture(1, linked_list_text_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32UI);
 
     //===================================================================================================================================================================================================================
     // generate dodecahedron model and SSBO buffer filled with shift vectors, the fourth component will encode object transparency
     //===================================================================================================================================================================================================================
-    //polyhedron tetrahedron;
-    //tetrahedron.regular_pnt2_vao(4, 4, plato::tetrahedron::vertices, plato::tetrahedron::normals, plato::tetrahedron::faces);
-    polyhedron tetrahedron;
-    tetrahedron.regular_pnt2_vao(plato::dodecahedron::V, plato::dodecahedron::F, plato::dodecahedron::vertices, plato::dodecahedron::normals, plato::dodecahedron::faces);
-//    int fractal_size = generate_fractal_shifts(plato::tetrahedron::vertices, 4, 0.5f, 5);
+    polyhedron dodecahedron;
+    dodecahedron.regular_pnt2_vao(plato::dodecahedron::V, plato::dodecahedron::F, plato::dodecahedron::vertices, plato::dodecahedron::normals, plato::dodecahedron::faces);
     int fractal_size = generate_fractal_shifts(plato::dodecahedron::vertices, plato::dodecahedron::V, 0.40f, 2);
-    debug_msg("fractal_size = %d", fractal_size);
 
     //===================================================================================================================================================================================================================
-    // create full-screen quad buffer
+    // create fake vao for full-screen quad rendering
     //===================================================================================================================================================================================================================
-    GLuint quad_vao_id, quad_vbo_id;
-
-    glGenVertexArrays(1, &quad_vao_id);
-    glBindVertexArray(quad_vao_id);
-
-    const glm::vec2 quad[] =
-    {
-        glm::vec2(-1.0f, -1.0f),
-        glm::vec2( 1.0f, -1.0f),
-        glm::vec2( 1.0f,  1.0f),
-        glm::vec2(-1.0f,  1.0f)
-    };
-
-    glGenBuffers(1, &quad_vbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, quad_vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
 
     //===================================================================================================================================================================================================================
     // Global OpenGL state : since there are no depth writes, depth buffer needs not be cleared
     //===================================================================================================================================================================================================================
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glDisable(GL_DEPTH_TEST);   
     glDisable(GL_CULL_FACE);
-    glDisable(GL_BLEND);
-    const float light_radius = 200.0f; 
+
+    glActiveTexture(GL_TEXTURE2);
+    GLuint marble_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -222,49 +199,38 @@ int main(int argc, char *argv[])
     while(!window.should_close())
     {
         window.new_frame();
+
         float time = window.frame_ts;
-        glm::vec4 light_ws = glm::vec4(light_radius * cos(0.5f * time), light_radius * sin(0.5f * time), 0.0f, 1.0f);
-        glm::vec4 camera_ws = glm::vec4(window.camera.position(), 1.0f);
+        glm::vec3 light_ws = 15.0f * glm::vec3(cos(0.5f * time), sin(0.5f * time), 0.0f);
+        glm::vec3 camera_ws = window.camera.position();
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        //===============================================================================================================================================================================================================
+        // reset atomic counter and clear head pointers texture
+        //===============================================================================================================================================================================================================
+        GLuint zero = 0;
+        glClearBufferData(GL_ATOMIC_COUNTER_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+        glClearTexImage(hpointer_tex_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
 
         //===============================================================================================================================================================================================================
-        // reset atomic counter 
-        //===============================================================================================================================================================================================================
-        glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, atomic_counter_buffer);
-        GLuint* data = (GLuint*) glMapBuffer(GL_ATOMIC_COUNTER_BUFFER, GL_WRITE_ONLY);
-        *data = 0;
-        glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
-
-        //===============================================================================================================================================================================================================
-        // clear list root pointers texture, head_pointer_clear_buffer is currently bound to GL_PIXEL_UNPACK_BUFFER target
-        //===============================================================================================================================================================================================================
-        glBindTexture(GL_TEXTURE_2D, head_pointer_texture);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, window.res_x, window.res_y, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-
-        //===============================================================================================================================================================================================================
-        // root pointers image and linked-list buffer texture are currently bound to image units
+        // head pointers image and linked-list buffer texture are currently bound to image units 0 and 1
         //===============================================================================================================================================================================================================
         list_builder.enable();
-        uniform_time = time;
         uniform_light_ws = light_ws;
         uniform_camera_ws = camera_ws;
         uniform_projection_view_matrix = projection_view_matrix;
-        tetrahedron.instanced_render(fractal_size);
+        dodecahedron.instanced_render(fractal_size);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         //===============================================================================================================================================================================================================
         // bind full screen quad vao and process results with linked-list sorter-blender
         //===============================================================================================================================================================================================================
-        glBindVertexArray(quad_vao_id);
+        glBindVertexArray(vao_id);
         list_sorter.enable();
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         window.end_frame();
     }
-
-    glDeleteBuffers(1, &quad_vbo_id);
-    glDeleteVertexArrays(1, &quad_vao_id);
 
     //===================================================================================================================================================================================================================
     // terminate the program and exit
