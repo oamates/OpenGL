@@ -15,10 +15,11 @@ uniform vec2 inv_resolution;
 
 out vec4 FragmentColor;
 
+const float diameter = 6.0f;
+
 //==============================================================================================================================================================
 // 3D Value noise function
 //==============================================================================================================================================================
-
 const float TEXEL_SIZE = 1.0 / 256.0;
 const float HALF_TEXEL = 0.5 * TEXEL_SIZE;
 
@@ -67,11 +68,15 @@ vec3 tex2d(vec2 uv)
     return texture(tb_tex, uv).rgb;
 }
 
-vec3 tex3d(in vec3 p)
+vec3 tex3d(vec3 p)
 {
-    vec3 w = vec3(0.331);
-    mat3 rgb_samples = mat3(tex2d(p.yz), tex2d(p.zx), tex2d(p.xy));
-    return pow(rgb_samples * w, vec3(1.5));
+    p *= 0.75;
+    vec3 q = max(abs(normalize(p)) - 0.35, 0.0);
+    q /= dot(q, vec3(1.0));
+    vec3 tx = tex2d(p.zy);
+    vec3 ty = tex2d(p.xz);
+    vec3 tz = tex2d(p.xy);
+    return tx * tx * q.x + ty * ty * q.y + tz * tz * q.z;
 }
 
 float csZ(float depth)
@@ -90,69 +95,46 @@ vec3 position_cs(vec2 uv)
     return p;
 }
 
-vec2 csqr(vec2 a)
-{
-    return vec2(a.x * a.x - a.y * a.y, 2.0f * a.x * a.y); 
-}
-
-float map(vec3 p)
-{
-    p *= 0.341;
-    float res = 0.0f;    
-    vec3 c = p;
-    for (int i = 0; i < 4; ++i)
-    {
-        p = 0.7f * abs(p) / dot(p, p) - 0.7f;
-        p.yz = csqr(p.yz);
-        p = p.zxy;
-        res += exp(-18.0f * abs(dot(p, c)));
-        
-    }
-    return 0.5f * res;
-}
-
+/*
 //==============================================================================================================================================================
 // Tetrahedral normal
 //==============================================================================================================================================================
-vec4 map_bump(in vec3 p)
+vec4 map_bump(vec3 p)
 {
     vec3 e = vec3(0.001, -0.001, 0.25);
     vec4 b = e.xyyz * map(p + e.xyy) + e.yyxz * map(p + e.yyx) + e.yxyz * map(p + e.yxy) + e.xxxz * map(p + e.xxx);
     b.xyz = normalize(b.xyz);
     return b;
 }
+*/
 
-vec4 raymarch(in vec3 front, in vec3 back)
+float alpha_func(vec3 p, vec3 color)
 {
-    float alpha = 0.25;
-    vec3 col = vec3(0.0f);
-    vec3 dir = front - back;
-    float l = min(length(dir), 6.0f);
+    return max(1.0 - 0.5 * dot(color, vec3(1.0)), 0.0);
+}
 
-    dir = dir / l;
-    
-    int iterations = 40;
-    float step = l / iterations;
+vec4 crystal_march(vec3 front, vec3 back)
+{
+    vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+    vec3 ray = front - back;
+
+    const int iterations = 8;
+    const float inv_iterations = 1.0 / iterations;
+
+    vec3 position = back;
+    vec3 step = inv_iterations * ray;
 
     for(int i = 0; i <= iterations; ++i)
     {
-        vec3 p = back + i * step * dir;
-        float c = noise_map(4.67 * p);
-        float d = abs(c) - 0.117f;
-
-        if (d > 0.0)
-        {
-            float q = smoothstep(0.0, 1.0, d);
-            q = pow(q, 0.41);
-            vec3 b = sqrt(sqrt(tex3d(p)));
-
-            col = mix(col, b, q);
-            alpha = max(alpha, q);
-
-        }
+        vec3 medium_color = tex3d(position);
+        float alpha = alpha_func(position, medium_color);
+        color.rgb = mix(color.rgb, medium_color, alpha);
+        color.a *= 1.0 - alpha;
+        position += step;
     }
 
-    return vec4(col, alpha);
+    color.a = 1.0 - color.a;
+    return color;
 }
 
 void main()
@@ -167,7 +149,7 @@ void main()
 
     vec3 backface_ws = camera_ws + camera_matrix * position_cs(uv);
 
-    vec4 color = raymarch(position_ws, backface_ws);
+    vec4 color = crystal_march(position_ws, backface_ws);
     vec3 diffuse = (0.6 + 0.4 * dot(n, l)) * color.rgb;
 
     vec3 h = normalize(l + v);  
