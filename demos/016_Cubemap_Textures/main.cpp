@@ -194,14 +194,17 @@ int main(int argc, char *argv[])
     glsl_program_t skybox_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/skybox.vs"),
                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/skybox.fs"));
 
-    uniform_t uniform_projection_view_matrix = skybox_renderer["projection_view_matrix"];
+    skybox_renderer.enable();
+    uniform_t uni_sbox_pv_matrix = skybox_renderer["projection_view_matrix"];
+    skybox_renderer["environment_tex"] = 0;
 
     glsl_program_t envmap_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/envmap.vs"),
-                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/envmap.fs"));
+                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/envmap.fs"));
 
-    uniform_t env_projection_view_matrix = envmap_renderer["projection_view_matrix"];
-    uniform_t env_view_matrix            = envmap_renderer["view_matrix"];
-    uniform_t env_camera_ws              = envmap_renderer["camera_ws"];
+    envmap_renderer.enable();
+    uniform_t uni_env_pv_matrix = envmap_renderer["projection_view_matrix"];
+    uniform_t uni_env_camera_ws = envmap_renderer["camera_ws"];
+    envmap_renderer["environment_tex"] = 0;
 
     //===================================================================================================================================================================================================================
     // Initialize cube buffer : vertices + indices
@@ -210,8 +213,6 @@ int main(int argc, char *argv[])
 
     glGenVertexArrays(1, &cube_vao_id);
     glBindVertexArray(cube_vao_id);
-    glGenBuffers(1, &cube_vbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo_id);
 
     static const GLfloat cube_vertices[] =
     {
@@ -231,6 +232,8 @@ int main(int argc, char *argv[])
         2, 6, 0, 4, 1, 5, 3, 7
     };
 
+    glGenBuffers(1, &cube_vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo_id);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -266,6 +269,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Loading DDS cubemap texture
     //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
     image::dds::image_t image;
     GLuint tex = image::dds::vglLoadTexture("res/cube.dds", 0, &image);
     image::dds::vglUnloadImage(&image);
@@ -279,7 +283,7 @@ int main(int argc, char *argv[])
     glDepthFunc(GL_LEQUAL);
     glEnable(GL_CULL_FACE);
     glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
+    glPrimitiveRestartIndex(0x0000FFFF);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 
@@ -295,17 +299,15 @@ int main(int argc, char *argv[])
 
         skybox_renderer.enable();
         glCullFace(GL_FRONT);
-        uniform_projection_view_matrix = projection_view_matrix;
+        uni_sbox_pv_matrix = projection_view_matrix;
         glBindVertexArray(cube_vao_id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ibo_id);
         glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_SHORT, 0);
         glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_SHORT, (void *)(8 * sizeof(GLushort)));
 
         envmap_renderer.enable();
         glCullFace(GL_BACK);
-        env_camera_ws = camera_ws;
-        env_view_matrix = window.camera.view_matrix;
-        env_projection_view_matrix = projection_view_matrix;
+        uni_env_pv_matrix = projection_view_matrix;
+        uni_env_camera_ws = camera_ws;
 
         torus1.render();
         minkowski_L4_ball.render();

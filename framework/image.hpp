@@ -82,7 +82,7 @@ struct image_t                                  // vglImageData
 
 void vglLoadImage(const char* file_name, image_t* image);
 void vglUnloadImage(image_t* image);
-GLuint vglLoadTexture(const char* filename, GLuint texture, image_t* image);
+GLuint vglLoadTexture(const char* filename, image_t* image);
 void vglLoadDDS(const char* filename, image_t* image);
 
 } // namespace dds

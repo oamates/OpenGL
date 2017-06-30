@@ -73,6 +73,52 @@ int main(int argc, char *argv[])
     demo_window_t window("Crystal RayMarch", 4, 3, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
+    // skybox and environment map shader initialization
+    //===================================================================================================================================================================================================================
+    glsl_program_t skybox_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/skybox.vs"),
+                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/skybox.fs"));
+
+    skybox_renderer.enable();
+    uniform_t uni_sbox_pv_matrix = skybox_renderer["projection_view_matrix"];
+    skybox_renderer["environment_tex"] = 0;
+
+    //===================================================================================================================================================================================================================
+    // Initialize cube buffer : vertices + indices
+    //===================================================================================================================================================================================================================
+    GLuint cube_vao_id, cube_vbo_id, cube_ibo_id;
+
+    glGenVertexArrays(1, &cube_vao_id);
+    glBindVertexArray(cube_vao_id);
+    glGenBuffers(1, &cube_vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo_id);
+
+    static const GLfloat cube_vertices[] =
+    {
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f,  1.0f
+    };
+
+    static const GLushort cube_indices[] =
+    {
+        0, 1, 2, 3, 6, 7, 4, 5,
+        2, 6, 0, 4, 1, 5, 3, 7
+    };
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glGenBuffers(1, &cube_ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ibo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_indices), cube_indices, GL_STATIC_DRAW);
+
+    //===================================================================================================================================================================================================================
     // volume raymarch shader
     //===================================================================================================================================================================================================================
     glsl_program_t crystal_raymarch(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/raymarch_crystal.vs"),
@@ -95,7 +141,7 @@ int main(int argc, char *argv[])
     dodecahedron.regular_pnt2_vao(20, 12, plato::dodecahedron::vertices, plato::dodecahedron::normals, plato::dodecahedron::faces);
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/ice.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     
     glActiveTexture(GL_TEXTURE1);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
@@ -108,11 +154,19 @@ int main(int argc, char *argv[])
     glEnable(GL_DEPTH_TEST);
 
     //===================================================================================================================================================================================================================
+    // Loading DDS cubemap texture
+    //===================================================================================================================================================================================================================
+    image::dds::image_t image;
+    GLuint tex = image::dds::vglLoadTexture("../../../resources/cubemap/cube.dds", &image);
+    image::dds::vglUnloadImage(&image);
+
+    //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
         window.new_frame();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float time = window.frame_ts;
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
@@ -120,9 +174,19 @@ int main(int argc, char *argv[])
         glm::vec3 light_ws = 7.0f * glm::vec3(glm::cos(time), 0.0f, glm::sin(time));
 
         //===============================================================================================================================================================================================================
-        // use depth texture to raymarch through polyhedron
+        // render skybox
         //===============================================================================================================================================================================================================
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        skybox_renderer.enable();
+        glCullFace(GL_FRONT);
+        uni_sbox_pv_matrix = projection_view_matrix;
+        glBindVertexArray(cube_vao_id);
+        glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_SHORT, 0);
+        glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_SHORT, (void *)(8 * sizeof(GLushort)));
+
+        //===============================================================================================================================================================================================================
+        // raymarch through polyhedron
+        //===============================================================================================================================================================================================================
+        crystal_raymarch.enable();
 
         uni_cm_pv_matrix = projection_view_matrix;
         uni_cm_camera_ws = camera_ws;

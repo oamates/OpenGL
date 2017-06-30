@@ -39,6 +39,7 @@ float tri(float x)
 //==============================================================================================================================================================
 vec3 tex3d(vec3 p)
 {
+    //return texture(tb_tex, p.zy).rgb;
     p *= 0.75;
     vec3 q = max(abs(normalize(p)) - 0.35, 0.0);
     q /= dot(q, vec3(1.0));
@@ -46,6 +47,27 @@ vec3 tex3d(vec3 p)
     vec3 ty = texture(tb_tex, p.xz).rgb;
     vec3 tz = texture(tb_tex, p.xy).rgb;
     return tx * tx * q.x + ty * ty * q.y + tz * tz * q.z;
+}
+
+//==============================================================================================================================================================
+// volume marcher/blender function
+//==============================================================================================================================================================
+vec2 csqr(vec2 a)
+    { return vec2(a.x * a.x - a.y * a.y, 2.0f * a.x * a.y); }
+
+float map(in vec3 p) 
+{
+    float res = 0.0f;    
+    vec3 c = p;
+    for (int i = 0; i < 6; ++i) 
+    {
+        p = 0.7f * abs(p) / dot(p, p) - 0.7f;
+        p.yz = csqr(p.yz);
+        p = p.zxy;
+        res += exp(-19.0f * abs(dot(p,c)));
+        
+    }
+    return 0.5f * res;
 }
 
 //==============================================================================================================================================================
@@ -79,7 +101,7 @@ vec3 crystal_march(vec3 front, vec3 view_ray)
     vec3 p = front;
     do
     {
-        vec3 c = tex3d(0.85 * p);
+        vec3 c = tex3d(0.15 * p);
         float a = alpha_func(p, c);
         float dt = 0.025f * exp(-1.2f * a);
         p = p + dt * view_ray;
@@ -90,6 +112,25 @@ vec3 crystal_march(vec3 front, vec3 view_ray)
     return pow(color, vec3(0.56, 0.67, 0.92));
 }
 
+vec3 crystal_march2(in vec3 ro, vec3 rd)
+{
+    float t = 0.0f;
+    float dt = 0.02f;
+    vec3 color = vec3(0.0f);
+    float c = 0.0f;
+    for(int i = 0; i < 32; i++)
+    {
+        t += dt * exp(-2.0f * c);
+        vec3 p = ro + t * rd; 
+        if (distance_field(p) > 0.0)
+            break;        
+        float q = 2.4 * length(p);
+        c = q * q * map(1.25 * p);
+        color = 0.97f * color + 0.09f * tex3d(p) * pow(vec3(c), vec3(0.95, 1.47, 2.61));
+    }    
+    return log(1.0 + 2.0 * color);
+}
+
 void main()
 {
     vec3 n = normalize(normal_ws);
@@ -98,9 +139,9 @@ void main()
     vec3 l = normalize(light);
     vec3 v = normalize(view);
 
-    vec3 color = crystal_march(position_ws, -v);
-    //vec3 color = raymarch(position_ws, -v);
-    //FragmentColor = vec4(color, 1.0);
+    //vec3 color = crystal_march(position_ws, -v);
+    vec3 color = crystal_march2(position_ws, -v);
+    //FragmentColor = vec4(color, 1.0); return;
 
     vec3 diffuse = (0.6 + 0.4 * dot(n, l)) * color;
 

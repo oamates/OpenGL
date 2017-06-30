@@ -6,6 +6,8 @@
 #include <GL/glew.h>
 #include "image.hpp"
 
+#include "log.hpp"
+
 namespace image { 
 namespace dds {
 
@@ -194,7 +196,7 @@ struct DDS_HEADER
     uint32_t                flags;
     uint32_t                height;
     uint32_t                width;
-    uint32_t                pitch_or_linear_size;
+    uint32_t                pitch;
     uint32_t                depth;
     uint32_t                mip_levels;
     uint32_t                reserved[11];
@@ -378,7 +380,7 @@ void vglUnloadImage(image_t* image)
     free(image->mips[0].data);
 }
 
-GLuint vglLoadTexture(const char* file_name, GLuint texture, image_t* image)
+GLuint vglLoadTexture(const char* file_name, image_t* image)
 {
     image_t local_image;
 
@@ -386,7 +388,8 @@ GLuint vglLoadTexture(const char* file_name, GLuint texture, image_t* image)
 
     vglLoadDDS(file_name, image);
 
-    if (texture == 0) glGenTextures(1, &texture);
+    GLuint texture;
+    glGenTextures(1, &texture);
     glBindTexture(image->target, texture);
 
     GLubyte* ptr = (GLubyte *)image->mips[0].data;
@@ -413,12 +416,17 @@ GLuint vglLoadTexture(const char* file_name, GLuint texture, image_t* image)
             break;
 
         case GL_TEXTURE_CUBE_MAP:
+            debug_msg("GL_TEXTURE_CUBE_MAP");
+            debug_msg("GL_TEXTURE_CUBE_MAP :: image->levels = %u", image->levels);
             for (int level = 0; level < image->levels; ++level)
             {
                 ptr = (GLubyte*) image->mips[level].data;
                 for (int face = 0; face < 6; face++)
+                {
                     glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, level, image->internal_format, image->mips[level].width, image->mips[level].height, 0, image->format, image->type, ptr + image->stride * face);
-            };
+                    debug_msg("Invoking glTexImage2D :: level = %u, face = %u, width = %u, height = %u", level, face, image->mips[level].width, image->mips[level].height);
+                }
+            }
             break;
 
         case GL_TEXTURE_2D_ARRAY:
@@ -436,15 +444,16 @@ GLuint vglLoadTexture(const char* file_name, GLuint texture, image_t* image)
             for (int level = 0; level < image->levels; ++level)
             {
                 glTexSubImage3D(GL_TEXTURE_3D, level, 0, 0, 0, image->mips[level].width, image->mips[level].height, image->mips[level].depth, image->format, image->type, image->mips[level].data);
-            };
+            }
             break;
 
-        default: break;
-    };
+        default:
+            break;
+    }
     glTexParameteriv(image->target, GL_TEXTURE_SWIZZLE_RGBA, reinterpret_cast<const GLint *>(image->swizzle));
     if (image == &local_image) vglUnloadImage(image);
     return texture;
-};
+}
 
 
 static bool vgl_DDSHeaderToImageDataHeader(const DDS_FILE_HEADER& header, image_t* image)
@@ -552,7 +561,7 @@ static GLsizei vgl_GetDDSStride(const DDS_FILE_HEADER& header, GLsizei width)
         {
             const DDS_FORMAT_GL_INFO& format = gl_info_table[header.dxt10_header.format];
             return (format.bits_per_texel * width + 7) / 8;
-        };
+        }
     }
     else
     {
@@ -563,8 +572,8 @@ static GLsizei vgl_GetDDSStride(const DDS_FILE_HEADER& header, GLsizei width)
             case (DDS_DDPF_RGB | DDS_DDPF_ALPHAPIXELS): return width * 4;
             case DDS_DDPF_ALPHA: return width;
             default: break;
-        };
-    };
+        }
+    }
 
     return 0;
 }
@@ -587,7 +596,7 @@ static GLenum vgl_GetTargetFromDDSHeader(const DDS_FILE_HEADER& header)
                 {
                     if (header.dxt10_header.array_size > 1) return GL_TEXTURE_CUBE_MAP_ARRAY;
                     return GL_TEXTURE_CUBE_MAP;
-                };
+                }
                 if (header.dxt10_header.array_size > 1) return GL_TEXTURE_2D_ARRAY;
                 return GL_TEXTURE_2D;
             // 3D should always be a volume texture
@@ -608,51 +617,84 @@ static GLenum vgl_GetTargetFromDDSHeader(const DDS_FILE_HEADER& header)
             return GL_TEXTURE_CUBE_MAP_ARRAY;
         else
             return GL_TEXTURE_CUBE_MAP;
-    };
+    }
 
     // Alright, if there's no height, guess 1D
     if (header.std_header.height <= 1) return GL_TEXTURE_1D;
 
     // Last ditch, probably 2D
     return GL_TEXTURE_2D;
-};
+}
+
+void dump_dds_file_header_info(const DDS_FILE_HEADER& header)
+{
+    debug_msg("DDS file header information :: magic = %x, DDS_MAGIC = %x\n", header.magic, DDS_MAGIC);
+
+    debug_msg("\tstd_header.size = %u", header.std_header.size);
+    debug_msg("\tstd_header.flags = %u", header.std_header.flags);
+    debug_msg("\tstd_header.height = %u", header.std_header.height);
+    debug_msg("\tstd_header.width = %u", header.std_header.width);
+    debug_msg("\tstd_header.pitch = %u", header.std_header.pitch);
+    debug_msg("\tstd_header.depth = %u", header.std_header.depth);
+    debug_msg("\tstd_header.mip_levels = %u", header.std_header.mip_levels);
+
+    debug_msg("\tstd_header.ddspf.dwSize = %u", header.std_header.ddspf.dwSize);
+    debug_msg("\tstd_header.ddspf.dwFlags = %u", header.std_header.ddspf.dwFlags);
+    debug_msg("\tstd_header.ddspf.dwFourCC = %u", header.std_header.ddspf.dwFourCC);
+    debug_msg("\tstd_header.ddspf.dwRGBBitCount = %u", header.std_header.ddspf.dwRGBBitCount);
+    debug_msg("\tstd_header.ddspf.dwRBitMask = %u", header.std_header.ddspf.dwRBitMask);
+    debug_msg("\tstd_header.ddspf.dwGBitMask = %u", header.std_header.ddspf.dwGBitMask);
+    debug_msg("\tstd_header.ddspf.dwBBitMask = %u", header.std_header.ddspf.dwBBitMask);
+    debug_msg("\tstd_header.ddspf.dwABitMask = %u\n", header.std_header.ddspf.dwABitMask);
+
+
+    if (header.std_header.ddspf.dwFourCC == DDS_FOURCC_DX10)
+    {
+        debug_msg("\tdxt10_header.size = %u", header.dxt10_header.format);
+        debug_msg("\tdxt10_header.flags = %u", header.dxt10_header.dimension);
+        debug_msg("\tdxt10_header.height = %u", header.dxt10_header.misc_flag);
+        debug_msg("\tdxt10_header.width = %u\n", header.dxt10_header.array_size);
+    }    
+}
 
 void vglLoadDDS(const char* filename, image_t* image)
 {
-    FILE* f;
+    memset(image, 0, sizeof(image_t));
 
-    memset(image, 0, sizeof(*image));
-
-    f = fopen(filename, "rb");
+    FILE* f = fopen(filename, "rb");
 
     if (f == 0) return;
 
-    DDS_FILE_HEADER file_header = { 0, };
-
+    DDS_FILE_HEADER file_header;
     fread(&file_header, sizeof(file_header.magic) + sizeof(file_header.std_header), 1, f);
 
     if (file_header.magic != DDS_MAGIC)
     {
         fclose(f);
         return;        
-    };
+    }
 
     if (file_header.std_header.ddspf.dwFourCC == DDS_FOURCC_DX10)
         fread(&file_header.dxt10_header, sizeof(file_header.dxt10_header), 1, f);
+    else
+        memset(&file_header.dxt10_header, 0, sizeof(file_header.dxt10_header));
+
+    dump_dds_file_header_info(file_header);
 
     if (!vgl_DDSHeaderToImageDataHeader(file_header, image))
     {
         fclose(f);
         return;        
-    };
+    }
 
     image->target = vgl_GetTargetFromDDSHeader(file_header);
+    debug_msg("Target = %u", image->target);
 
     if (image->target == GL_NONE)
     {
         fclose(f);
         return;        
-    };
+    }
 
     size_t current_pos = ftell(f);
     size_t file_size;
@@ -666,7 +708,6 @@ void vglLoadDDS(const char* filename, image_t* image)
     fread(image->mips[0].data, file_size - current_pos, 1, f);
 
     int level;
-//    GLubyte* ptr = reinterpret_cast<GLubyte*>(image->mip[0].data);
     GLubyte* ptr = (GLubyte*) image->mips[0].data;
 
     int width = file_header.std_header.width;
@@ -691,7 +732,7 @@ void vglLoadDDS(const char* filename, image_t* image)
         depth >>= 1;
     }
     fclose(f);
-};
+}
 
 } // namespace dds
 } // namespace texture
