@@ -4,7 +4,9 @@
 #include <cstdlib>
 
 #include <GL/glew.h>
+
 #include "image.hpp"
+#include "log.hpp"
 
 #include "log.hpp"
 
@@ -383,14 +385,12 @@ void vglUnloadImage(image_t* image)
 GLuint vglLoadTexture(const char* file_name, image_t* image)
 {
     image_t local_image;
-
-    if (image == 0) image = &local_image;
-
+    if (!image) image = &local_image;
     vglLoadDDS(file_name, image);
 
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(image->target, texture);
+    GLuint texture_id;
+    glGenTextures(1, &texture_id);
+    glBindTexture(image->target, texture_id);
 
     GLubyte* ptr = (GLubyte *)image->mips[0].data;
 
@@ -416,16 +416,25 @@ GLuint vglLoadTexture(const char* file_name, image_t* image)
             break;
 
         case GL_TEXTURE_CUBE_MAP:
-            debug_msg("GL_TEXTURE_CUBE_MAP");
-            debug_msg("GL_TEXTURE_CUBE_MAP :: image->levels = %u", image->levels);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+            if (image->levels > 1)
+            {
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BASE_LEVEL, 0);
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, image->levels - 1);
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+            }
+            else
+                glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
             for (int level = 0; level < image->levels; ++level)
             {
                 ptr = (GLubyte*) image->mips[level].data;
                 for (int face = 0; face < 6; face++)
-                {
                     glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, level, image->internal_format, image->mips[level].width, image->mips[level].height, 0, image->format, image->type, ptr + image->stride * face);
-                    debug_msg("Invoking glTexImage2D :: level = %u, face = %u, width = %u, height = %u", level, face, image->mips[level].width, image->mips[level].height);
-                }
             }
             break;
 
@@ -452,7 +461,7 @@ GLuint vglLoadTexture(const char* file_name, image_t* image)
     }
     glTexParameteriv(image->target, GL_TEXTURE_SWIZZLE_RGBA, reinterpret_cast<const GLint *>(image->swizzle));
     if (image == &local_image) vglUnloadImage(image);
-    return texture;
+    return texture_id;
 }
 
 
@@ -482,21 +491,12 @@ static bool vgl_DDSHeaderToImageDataHeader(const DDS_FILE_HEADER& header, image_
         image->swizzle[3] = GL_ALPHA;
         image->levels = header.std_header.mip_levels;
 
-        switch (header.std_header.ddspf.dwFourCC)
+        if (header.std_header.ddspf.dwFourCC == 116)
         {
-            case 116:
-                image->format = GL_RGBA;
-                image->type = GL_FLOAT;
-                image->internal_format = GL_RGBA32F;
-                /*
-                image->swizzle[0] = GL_ALPHA;
-                image->swizzle[1] = GL_BLUE;
-                image->swizzle[2] = GL_GREEN;
-                image->swizzle[3] = GL_RED;
-                */
-                return true;
-            default:
-                break;
+            image->format = GL_RGBA;
+            image->type = GL_FLOAT;
+            image->internal_format = GL_RGBA32F;
+            return true;
         }
     }
     else
@@ -639,14 +639,13 @@ void dump_dds_file_header_info(const DDS_FILE_HEADER& header)
     debug_msg("\tstd_header.mip_levels = %u", header.std_header.mip_levels);
 
     debug_msg("\tstd_header.ddspf.dwSize = %u", header.std_header.ddspf.dwSize);
-    debug_msg("\tstd_header.ddspf.dwFlags = %u", header.std_header.ddspf.dwFlags);
-    debug_msg("\tstd_header.ddspf.dwFourCC = %u", header.std_header.ddspf.dwFourCC);
+    debug_msg("\tstd_header.ddspf.dwFlags = %x", header.std_header.ddspf.dwFlags);
+    debug_msg("\tstd_header.ddspf.dwFourCC = %x", header.std_header.ddspf.dwFourCC);
     debug_msg("\tstd_header.ddspf.dwRGBBitCount = %u", header.std_header.ddspf.dwRGBBitCount);
-    debug_msg("\tstd_header.ddspf.dwRBitMask = %u", header.std_header.ddspf.dwRBitMask);
-    debug_msg("\tstd_header.ddspf.dwGBitMask = %u", header.std_header.ddspf.dwGBitMask);
-    debug_msg("\tstd_header.ddspf.dwBBitMask = %u", header.std_header.ddspf.dwBBitMask);
-    debug_msg("\tstd_header.ddspf.dwABitMask = %u\n", header.std_header.ddspf.dwABitMask);
-
+    debug_msg("\tstd_header.ddspf.dwRBitMask = %x", header.std_header.ddspf.dwRBitMask);
+    debug_msg("\tstd_header.ddspf.dwGBitMask = %x", header.std_header.ddspf.dwGBitMask);
+    debug_msg("\tstd_header.ddspf.dwBBitMask = %x", header.std_header.ddspf.dwBBitMask);
+    debug_msg("\tstd_header.ddspf.dwABitMask = %x\n", header.std_header.ddspf.dwABitMask);
 
     if (header.std_header.ddspf.dwFourCC == DDS_FOURCC_DX10)
     {
@@ -663,7 +662,7 @@ void vglLoadDDS(const char* filename, image_t* image)
 
     FILE* f = fopen(filename, "rb");
 
-    if (f == 0) return;
+    if (!f) return;
 
     DDS_FILE_HEADER file_header;
     fread(&file_header, sizeof(file_header.magic) + sizeof(file_header.std_header), 1, f);
@@ -671,7 +670,7 @@ void vglLoadDDS(const char* filename, image_t* image)
     if (file_header.magic != DDS_MAGIC)
     {
         fclose(f);
-        return;        
+        return;
     }
 
     if (file_header.std_header.ddspf.dwFourCC == DDS_FOURCC_DX10)
@@ -679,12 +678,10 @@ void vglLoadDDS(const char* filename, image_t* image)
     else
         memset(&file_header.dxt10_header, 0, sizeof(file_header.dxt10_header));
 
-    dump_dds_file_header_info(file_header);
-
     if (!vgl_DDSHeaderToImageDataHeader(file_header, image))
     {
         fclose(f);
-        return;        
+        return;
     }
 
     image->target = vgl_GetTargetFromDDSHeader(file_header);
@@ -693,13 +690,14 @@ void vglLoadDDS(const char* filename, image_t* image)
     if (image->target == GL_NONE)
     {
         fclose(f);
-        return;        
+        return;
     }
 
+    dump_dds_file_header_info(file_header);
+
     size_t current_pos = ftell(f);
-    size_t file_size;
     fseek(f, 0, SEEK_END);
-    file_size = ftell(f);
+    size_t file_size = ftell(f);
     fseek(f, (long)current_pos, SEEK_SET);
 
     image->size = file_size - current_pos;

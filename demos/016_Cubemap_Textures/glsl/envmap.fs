@@ -1,7 +1,7 @@
 #version 330 core
 
-in vec3 normal_ws;
 in vec3 position_ws;
+in vec3 normal_ws;
 in vec3 view;
 
 layout (location = 0) out vec4 FragmentColor;

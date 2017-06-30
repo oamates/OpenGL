@@ -270,9 +270,7 @@ int main(int argc, char *argv[])
     // Loading DDS cubemap texture
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    image::dds::image_t image;
-    GLuint tex = image::dds::vglLoadTexture("res/cube.dds", 0, &image);
-    image::dds::vglUnloadImage(&image);
+    GLuint tex = image::dds::vglLoadTexture("../../../resources/cubemap/cube.dds", 0);
 
     //===================================================================================================================================================================================================================
     // Global GL settings
@@ -283,7 +281,6 @@ int main(int argc, char *argv[])
     glDepthFunc(GL_LEQUAL);
     glEnable(GL_CULL_FACE);
     glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(0x0000FFFF);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 
@@ -306,15 +303,22 @@ int main(int argc, char *argv[])
 
         envmap_renderer.enable();
         glCullFace(GL_BACK);
-        uni_env_pv_matrix = projection_view_matrix;
         uni_env_camera_ws = camera_ws;
+        uni_env_pv_matrix = projection_view_matrix;
 
+        glPrimitiveRestartIndex(torus1.vao.ibo.pri);
         torus1.render();
+        glPrimitiveRestartIndex(minkowski_L4_ball.vao.ibo.pri);
         minkowski_L4_ball.render();
+        glPrimitiveRestartIndex(minkowski_L6_ball.vao.ibo.pri);
         minkowski_L6_ball.render();
+        glPrimitiveRestartIndex(minkowski_L8_ball.vao.ibo.pri);
         minkowski_L8_ball.render();
+        glPrimitiveRestartIndex(ellipsoid.vao.ibo.pri);
         ellipsoid.render();
+        glPrimitiveRestartIndex(smooth_dodecahedron.vao.ibo.pri);
         smooth_dodecahedron.render();
+        glPrimitiveRestartIndex(smooth_icosahedron.vao.ibo.pri);
         smooth_icosahedron.render();
 
         window.end_frame();
