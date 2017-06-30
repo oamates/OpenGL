@@ -148,12 +148,12 @@ int main(int argc, char *argv[])
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ibo_id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_indices), cube_indices, GL_STATIC_DRAW);
 
-    const char * galaxy_files[6] = {"../../../resources/cubemap/galaxy_positive_x.png",
-                                    "../../../resources/cubemap/galaxy_negative_x.png",
-                                    "../../../resources/cubemap/galaxy_positive_y.png",
-                                    "../../../resources/cubemap/galaxy_negative_y.png",
-                                    "../../../resources/cubemap/galaxy_positive_z.png",
-                                    "../../../resources/cubemap/galaxy_negative_z.png"};
+    const char * galaxy_files[6] = {"../../../resources/cubemap/galaxy/positive_x.png",
+                                    "../../../resources/cubemap/galaxy/negative_x.png",
+                                    "../../../resources/cubemap/galaxy/positive_y.png",
+                                    "../../../resources/cubemap/galaxy/negative_y.png",
+                                    "../../../resources/cubemap/galaxy/positive_z.png",
+                                    "../../../resources/cubemap/galaxy/negative_z.png"};
     glActiveTexture(GL_TEXTURE0);
     GLuint galaxy_cubemap = image::png::cubemap(galaxy_files);
 

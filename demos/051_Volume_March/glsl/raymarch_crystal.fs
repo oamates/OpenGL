@@ -112,8 +112,9 @@ vec3 crystal_march(vec3 front, vec3 view_ray)
     return pow(color, vec3(0.56, 0.67, 0.92));
 }
 
-vec3 crystal_march2(in vec3 ro, vec3 rd)
+vec4 crystal_march2(in vec3 ro, vec3 rd)
 {
+    float alpha = 0.0;
     float t = 0.0f;
     float dt = 0.02f;
     vec3 color = vec3(0.0f);
@@ -126,9 +127,10 @@ vec3 crystal_march2(in vec3 ro, vec3 rd)
             break;        
         float q = 2.4 * length(p);
         c = q * q * map(1.25 * p);
-        color = 0.97f * color + 0.09f * tex3d(p) * pow(vec3(c), vec3(0.95, 1.47, 2.61));
+        color = 0.97f * color + 0.09f * normalize(pow(vec3(c), vec3(0.95, 1.47, 2.61)));
+        alpha = max(alpha, q);
     }    
-    return log(1.0 + 2.0 * color);
+    return vec4(log(1.0 + 1.0 * color), alpha);
 }
 
 void main()
@@ -140,10 +142,10 @@ void main()
     vec3 v = normalize(view);
 
     //vec3 color = crystal_march(position_ws, -v);
-    vec3 color = crystal_march2(position_ws, -v);
+    vec4 color = crystal_march2(position_ws, -v);
     //FragmentColor = vec4(color, 1.0); return;
 
-    vec3 diffuse = (0.6 + 0.4 * dot(n, l)) * color;
+    vec3 diffuse = (0.6 + 0.4 * dot(n, l)) * color.rgb;
 
     vec3 h = normalize(l + v);  
     const float Ks = 0.85f;
@@ -151,6 +153,6 @@ void main()
     float specular = Ks * pow(max(dot(n, h), 0.0), Ns);
 
     vec3 c = diffuse + vec3(specular);
-    FragmentColor = vec4(c, 1.0);
+    FragmentColor = vec4(c, color.a);
 
 }

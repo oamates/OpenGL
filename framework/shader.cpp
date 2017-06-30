@@ -250,3 +250,74 @@ GLenum binary_format = GL_NONE;
 glGetProgramBinary(program, binary_size, NULL, &binary_format, program_binary);
 
 */
+/*
+void glsl_program_t::dump_interface()
+{
+    std::cout << "--------------------" << name << " Interface------------------------" << std::endl; 
+    GLint outputs = 0;
+    glGetProgramInterfaceiv(program, GL_PROGRAM_INPUT,  GL_ACTIVE_RESOURCES, &outputs);
+    static const GLenum props[] = {GL_TYPE, GL_LOCATION};
+    GLint params[2];
+    GLchar name[64];
+    const char *type_name;
+
+    if (outputs > 0)
+       std::cout << "----------Input-----------" << std::endl;
+    std::cout << std::endl;
+    for (int i = 0; i != outputs; ++i)
+    {
+        glGetProgramResourceName(program, GL_PROGRAM_INPUT, i, sizeof(name), NULL, name);
+        glGetProgramResourceiv(program, GL_PROGRAM_INPUT, i, 2, props, 2, NULL, params);
+        type_name = name;
+        //std::cout << "Index " << i << std::endl;
+        std::cout <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
+    }
+
+    glGetProgramInterfaceiv(program, GL_PROGRAM_OUTPUT,  GL_ACTIVE_RESOURCES, &outputs);
+    if (outputs > 0)
+       std::cout << "----------Onput-----------" << std::endl;
+    std::cout << std::endl;
+
+    for (int i = 0; i != outputs; ++i)
+    {
+        glGetProgramResourceName(program, GL_PROGRAM_OUTPUT, i, sizeof(name), NULL, name);
+        glGetProgramResourceiv(program, GL_PROGRAM_OUTPUT, i, 2, props, 2, NULL, params);
+
+        type_name = name;
+        //std::cout << "Index " << i << std::endl;
+        std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
+    }
+    
+    glGetProgramInterfaceiv(program, GL_UNIFORM_BLOCK,  GL_ACTIVE_RESOURCES, &outputs);
+    if (outputs > 0)
+      std::cout << "------Uniform Block-------" << std::endl;
+    std::cout << std::endl;
+    for (int i = 0; i != outputs; ++i)
+    {
+        glGetProgramResourceName(program, GL_UNIFORM_BLOCK, i, sizeof(name), NULL, name);
+        glGetProgramResourceiv(program, GL_UNIFORM_BLOCK, i, 2, props, 2, NULL, params);
+
+        type_name = name;
+        //std::cout << "Index " << i << std::endl;
+        std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
+    }
+
+
+    glGetProgramInterfaceiv(program, GL_UNIFORM,  GL_ACTIVE_RESOURCES, &outputs);
+    if (outputs > 0)
+        std::cout << "----------Uniform---------" << std::endl;
+
+    if (outputs > 10)
+        return ;
+    for (int i = 0; i != outputs; ++i)
+    {
+        glGetProgramResourceName(program, GL_UNIFORM, i, sizeof(name), NULL, name);
+        glGetProgramResourceiv(program, GL_UNIFORM, i, 2, props, 2, NULL, params);
+
+        type_name = name;
+        //std::cout << "Index " << i << std::endl;
+        std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
+    }
+
+}
+*/

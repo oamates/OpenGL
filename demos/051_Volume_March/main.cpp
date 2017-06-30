@@ -80,17 +80,15 @@ int main(int argc, char *argv[])
 
     skybox_renderer.enable();
     uniform_t uni_sbox_pv_matrix = skybox_renderer["projection_view_matrix"];
-    skybox_renderer["environment_tex"] = 0;
+    skybox_renderer["environment_tex"] = 2;
 
     //===================================================================================================================================================================================================================
     // Initialize cube buffer : vertices + indices
     //===================================================================================================================================================================================================================
-    GLuint cube_vao_id, cube_vbo_id, cube_ibo_id;
+    GLuint vao_id, vbo_id, ibo_id;
 
-    glGenVertexArrays(1, &cube_vao_id);
-    glBindVertexArray(cube_vao_id);
-    glGenBuffers(1, &cube_vbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo_id);
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
 
     static const GLfloat cube_vertices[] =
     {
@@ -110,12 +108,14 @@ int main(int argc, char *argv[])
         2, 6, 0, 4, 1, 5, 3, 7
     };
 
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glGenBuffers(1, &cube_ibo_id);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ibo_id);
+    glGenBuffers(1, &ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_indices), cube_indices, GL_STATIC_DRAW);
 
     //===================================================================================================================================================================================================================
@@ -145,20 +145,29 @@ int main(int argc, char *argv[])
     
     glActiveTexture(GL_TEXTURE1);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
-    //===================================================================================================================================================================================================================
-    // light variables
-    //===================================================================================================================================================================================================================
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-    glEnable(GL_DEPTH_TEST);
 
     //===================================================================================================================================================================================================================
     // Loading DDS cubemap texture
     //===================================================================================================================================================================================================================
-    image::dds::image_t image;
-    GLuint tex = image::dds::vglLoadTexture("../../../resources/cubemap/cube.dds", &image);
-    image::dds::vglUnloadImage(&image);
+    glActiveTexture(GL_TEXTURE2);
+
+    const char* sunset_files[6] = {"../../../resources/cubemap/sunset/positive_x.png",       // positive_x
+                                   "../../../resources/cubemap/sunset/negative_x.png",       // negative_x
+                                   "../../../resources/cubemap/sunset/positive_y.png",       // positive_y
+                                   "../../../resources/cubemap/sunset/negative_y.png",       // negative_y
+                                   "../../../resources/cubemap/sunset/positive_z.png",       // positive_z
+                                   "../../../resources/cubemap/sunset/negative_z.png"};      // negative_z
+    GLuint env_tex_id = image::png::cubemap(sunset_files);
+
+    //===================================================================================================================================================================================================================
+    // light variables
+    //===================================================================================================================================================================================================================
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearDepth(1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);    
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
@@ -172,26 +181,28 @@ int main(int argc, char *argv[])
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
         glm::vec3 light_ws = 7.0f * glm::vec3(glm::cos(time), 0.0f, glm::sin(time));
-/*
+
         //===============================================================================================================================================================================================================
         // render skybox
         //===============================================================================================================================================================================================================
-        skybox_renderer.enable();
+        glDisable(GL_BLEND);
         glCullFace(GL_FRONT);
+        skybox_renderer.enable();
         uni_sbox_pv_matrix = projection_view_matrix;
-        glBindVertexArray(cube_vao_id);
+        glBindVertexArray(vao_id);
         glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_SHORT, 0);
         glDrawElements(GL_TRIANGLE_STRIP, 8, GL_UNSIGNED_SHORT, (void *)(8 * sizeof(GLushort)));
-*/
+
         //===============================================================================================================================================================================================================
         // raymarch through polyhedron
         //===============================================================================================================================================================================================================
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glCullFace(GL_BACK);
         crystal_raymarch.enable();
-
         uni_cm_pv_matrix = projection_view_matrix;
         uni_cm_camera_ws = camera_ws;
         uni_cm_light_ws = light_ws;
-
         dodecahedron.render();
 
         window.end_frame();
