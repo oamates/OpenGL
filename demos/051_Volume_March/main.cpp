@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
     uniform_t uni_cm_camera_ws = crystal_raymarch["camera_ws"];         
     uniform_t uni_cm_light_ws  = crystal_raymarch["light_ws"];
 
-    crystal_raymarch["scale"] = 0.5f;                                                             
+    crystal_raymarch["scale"] = 3.0f;                                                             
     crystal_raymarch["tb_tex"] = 0;
     crystal_raymarch["value_tex"] = 1;
 
@@ -147,16 +147,16 @@ int main(int argc, char *argv[])
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 
     //===================================================================================================================================================================================================================
-    // Loading DDS cubemap texture
+    // load skybox cubemap texture
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE2);
 
-    const char* sunset_files[6] = {"../../../resources/cubemap/sunset/positive_x.png",       // positive_x
-                                   "../../../resources/cubemap/sunset/negative_x.png",       // negative_x
-                                   "../../../resources/cubemap/sunset/positive_y.png",       // positive_y
-                                   "../../../resources/cubemap/sunset/negative_y.png",       // negative_y
-                                   "../../../resources/cubemap/sunset/positive_z.png",       // positive_z
-                                   "../../../resources/cubemap/sunset/negative_z.png"};      // negative_z
+    const char* sunset_files[6] = {"../../../resources/cubemap/sunset/positive_x.png",
+                                   "../../../resources/cubemap/sunset/negative_x.png",
+                                   "../../../resources/cubemap/sunset/positive_y.png",
+                                   "../../../resources/cubemap/sunset/negative_y.png",
+                                   "../../../resources/cubemap/sunset/positive_z.png",
+                                   "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
     //===================================================================================================================================================================================================================
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);    
 
     //===================================================================================================================================================================================================================
-    // main program loop : just clear the buffer in a loop
+    // main program loop
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
         float time = window.frame_ts;
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
-        glm::vec3 light_ws = 7.0f * glm::vec3(glm::cos(time), 0.0f, glm::sin(time));
+        glm::vec3 light_ws = glm::vec3(10.0f, 2.0f * glm::cos(time), 3.0f * glm::sin(time));
 
         //===============================================================================================================================================================================================================
         // render skybox
