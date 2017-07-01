@@ -178,8 +178,19 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float time = window.frame_ts;
-        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
-        glm::vec3 camera_ws = window.camera.position();
+
+        float radius = 9.0f + 2.55f * glm::cos(0.25f * time);
+        float z = 1.45f * glm::sin(0.25f * time);
+
+        glm::vec3 camera_ws = glm::vec3(radius * glm::cos(0.3f * time), z, radius * glm::sin(0.3f * time));
+        glm::vec3 up = glm::normalize(glm::vec3(glm::cos(0.41 * time), -6.0f, glm::sin(0.41 * time)));
+        glm::mat4 view_matrix = glm::lookAt(camera_ws, glm::vec3(0.0f), up);
+
+        glm::mat4 projection_view_matrix = window.camera.projection_matrix * view_matrix;
+
+
+        // glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+        // glm::vec3 camera_ws = window.camera.position();
         glm::vec3 light_ws = glm::vec3(10.0f, 2.0f * glm::cos(time), 3.0f * glm::sin(time));
 
         //===============================================================================================================================================================================================================
