@@ -1,42 +1,42 @@
 #version 330 core
 
-layout (points) in;
-layout (triangle_strip, max_vertices = 24) out; 
+layout (triangles) in;
+layout (points, max_vertices = 24) out; 
+
+in vec3 position_ws[];
  
-uniform mat4 projection_matrix;
-uniform mat4 view_matrix;
+uniform float sigma;
 
-const mat4 simplex_ms = mat4
-( 
-    vec4(-1.0f, -1.0f,  1.0f, 0.0f),
-    vec4( 1.0f, -1.0f, -1.0f, 0.0f),
-    vec4(-1.0f,  1.0f, -1.0f, 0.0f),
-    vec4( 1.0f,  1.0f,  1.0f, 0.0f)
-);
+out vec3 internal_cloud;
+out vec3 external_cloud;
 
-const vec2[4] square = vec2[] (vec2(0.0f, 0.0f), vec2(1.0f, 0.0f), vec2(0.0f, 1.0f), vec2(1.0f, 1.0f));
-
-const int faces[24] = int[]
-(
-    7, 1, 0, 6, 
-    1, 4, 6, 3, 
-    3, 5, 6, 0, 
-    4, 2, 3, 5, 
-    1, 7, 4, 2, 
-    0, 5, 7, 2
-);
-
-in mat4 model_matrix[];
-
-out vec4 color;
-out vec4 normal;
-out vec4 tangent_x;
-out vec4 tangent_y;
-out vec4 view_direction;
-out vec2 texture_coord;
 
 void main()
 {
+    vec3 A = position_ws[0];
+    vec3 B = position_ws[1];
+    vec3 C = position_ws[2];
+
+    vec3 AB = B - A;
+    vec3 BC = C - B; 
+    vec3 CA = C - B; 
+
+    float lAB = length(AB);
+    float lBC = length(BC);
+    float lCA = length(CA);
+
+    //=========================================================
+    // determine the number of tesselation points on each edge
+    //=========================================================
+
+    int mAB = ...
+    int mBC = ...
+    int mCD = ...
+
+    for (int i = 0; i < 3; i++)
+    {
+        internal_cloud = 
+
     mat4 frame = model_matrix[0];
     mat4 simplex_ws = frame * simplex_ms;  
 
