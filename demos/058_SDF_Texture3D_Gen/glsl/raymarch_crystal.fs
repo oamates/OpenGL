@@ -5,10 +5,10 @@ in vec3 normal_ws;
 
 uniform sampler2D tb_tex;
 uniform sampler2D value_tex;
+uniform sampler3D distance_tex;
 
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
-uniform float scale;
 
 out vec4 FragmentColor;
 
@@ -73,9 +73,7 @@ const float psi = 1.511522628152341460960267404050002785276889577787122118459; /
 
 float distance_field(vec3 p)
 {
-    vec3 q = abs(p);
-    vec3 l = q + phi * q.yzx;
-    return max(l.x, max(l.y, l.z)) - scale * psi;
+    return texture(distance_tex, p).x;
 }
 
 vec4 crystal_march(vec3 position, vec3 ray)

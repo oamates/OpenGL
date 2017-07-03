@@ -107,23 +107,23 @@ struct skybox_t
     }
 };
 
-struct sdf_header_t
+struct tex3d_header_t
 {
     glm::ivec3 size;
     GLenum internal_format;
     GLuint data_size;    
 };
 
-struct sdf_texture_t
+struct texture3d_t
 {
     glm::ivec3 size;
 	GLuint texture_id;
     GLenum texture_unit;
     GLenum internal_format;
 
-    sdf_texture_t() {}
+    texture3d_t() {}
 
-    sdf_texture_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
+    texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
         : size(size), texture_unit(texture_unit), internal_format(internal_format)
     {
     	glActiveTexture(texture_unit);
@@ -142,7 +142,6 @@ struct sdf_texture_t
     void bind_as_image(GLuint image_unit, GLenum access = GL_READ_WRITE)
         { glBindImageTexture(image_unit, texture_id, 0, GL_TRUE, 0, access, internal_format); }
 
-    // ;
     GLenum format2type(GLenum format)
         { return GL_UNSIGNED_INT; }
 
@@ -155,14 +154,14 @@ struct sdf_texture_t
     void store(const char* file_name)
     {
         FILE* f = fopen(file_name, "wb");
-        sdf_header_t header = 
+        tex3d_header_t header = 
         {
             .size = size,
             .internal_format = internal_format,
             .data_size = data_size()
         };
 
-        fwrite(&header, sizeof(sdf_header_t), 1, f);
+        fwrite(&header, sizeof(tex3d_header_t), 1, f);
 
         GLuint pixel_data_size = data_size();
         GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
@@ -177,26 +176,26 @@ struct sdf_texture_t
         free(pixels);
     }
 
-    static sdf_texture_t load(GLenum texture_unit, const char* file_name)
+    static texture3d_t load(GLenum texture_unit, const char* file_name)
     {
         FILE* f = fopen(file_name, "rb");
 
-        sdf_header_t header;
-        fread(&header, sizeof(sdf_header_t), 1, f);
+        tex3d_header_t header;
+        fread(&header, sizeof(tex3d_header_t), 1, f);
 
         GLvoid* pixels = (GLvoid*) malloc(header.data_size);
         fread(pixels, header.data_size, 1, f);
         fclose(f);
 
-        sdf_texture_t sdf_texture;
+        texture3d_t texture3d;
 
-        sdf_texture.size = header.size;
-        sdf_texture.texture_unit = texture_unit;
-        sdf_texture.internal_format = header.internal_format;
+        texture3d.size = header.size;
+        texture3d.texture_unit = texture_unit;
+        texture3d.internal_format = header.internal_format;
 
         glActiveTexture(texture_unit);
-        glGenTextures(1, &sdf_texture.texture_id);
-        glBindTexture(GL_TEXTURE_3D, sdf_texture.texture_id);
+        glGenTextures(1, &texture3d.texture_id);
+        glBindTexture(GL_TEXTURE_3D, texture3d.texture_id);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -204,14 +203,149 @@ struct sdf_texture_t
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-        glTexStorage3D(GL_TEXTURE_3D, 1, sdf_texture.internal_format, sdf_texture.size.x, sdf_texture.size.y, sdf_texture.size.z);
+        glTexStorage3D(GL_TEXTURE_3D, 1, texture3d.internal_format, texture3d.size.x, texture3d.size.y, texture3d.size.z);
 
         free(pixels);
+        return texture3d;
+    }
+
+    ~texture3d_t()
+        { glDeleteTextures(1, &texture_id); }
+};
+
+struct sdf_compute_t
+{
+    int size;
+
+    glsl_program_t compute_shader;
+    uniform_t uni_udf_size;
+
+    glsl_program_t march_shader;
+    glsl_program_t combine_shader;
+
+    sdf_compute_t(int size)
+    {
+        //===============================================================================================================================================================================================================
+        // 1. compute shader that generates unsigned distance field from initial cloud
+        // 2. compute shader that marches and extends unsigned distance field to the whole texture
+        // 3. compute shader that combines external and internal unsigned distance fields into a single (signed) distance field function
+        //===============================================================================================================================================================================================================
+        compute_shader = glsl_program_t(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_compute.cs"));
+        uni_udf_size = compute_shader["cloud_size"];
+
+        march_shader = glsl_program_t(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_march.cs"));
+        combine_shader = glsl_program_t(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_combine.cs"));
+    }
+
+    texture3d_t compute(GLuint tbo_id, int cloud_size)
+    {
+        debug_msg("sdf_compute_t::compute begin");
+
+        texture3d_t udf_texture(glm::ivec3(size), GL_TEXTURE0, GL_R32UI);
+        udf_texture.clear(0xFFFFFFFF);
+        udf_texture.bind_as_image(0, GL_WRITE_ONLY);
+        uni_udf_size = cloud_size;
+        glDispatchCompute(cloud_size >> 8, 1, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        debug_msg("sdf_compute_t::compute end");
+
+        return udf_texture;
+    }
+
+    void march(texture3d_t& udf_texture, GLuint iterations)
+    {
+        debug_msg("sdf_compute_t::march begin");
+
+        udf_texture.bind_as_image(0, GL_READ_WRITE);
+        for(int i = 0; i < iterations; ++i)
+        {
+            glDispatchCompute(size >> 3, size >> 3, size >> 3);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+
+        debug_msg("sdf_compute_t::march end");
+
+    }
+
+    texture3d_t combine(texture3d_t& external, texture3d_t& internal, GLenum texture_unit)
+    {
+        debug_msg("sdf_compute_t::combine begin");
+
+        combine_shader.enable();
+
+        external.bind_as_image(0, GL_READ_ONLY);
+        internal.bind_as_image(1, GL_READ_ONLY);
+
+        texture3d_t sdf_texture(glm::ivec3(size), texture_unit, GL_R32F);
+        sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
+
+        glDispatchCompute(size >> 3, size >> 3, size >> 3);
+
+        debug_msg("sdf_compute_t::combine end");
+
         return sdf_texture;
     }
 
-    ~sdf_texture_t()
-        { glDeleteTextures(1, &texture_id); }
+};
+
+struct cloud_gen_t
+{
+    glsl_program_t program;
+    uniform_t uni_sigma;
+    uniform_t uni_inv_max_edge;
+
+    cloud_gen_t()
+    {
+        //===============================================================================================================================================================================================================
+        // tesselator + geometry shader that generates point cloud at a given (signed) distance around a model
+        //===============================================================================================================================================================================================================
+        program = glsl_program_t(glsl_shader_t(GL_VERTEX_SHADER,          "glsl/cloud_gen.vs"),
+                                 glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/cloud_gen.tcs"),
+                                 glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/cloud_gen.tes"),
+                                 glsl_shader_t(GL_GEOMETRY_SHADER,        "glsl/cloud_gen.gs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER,        "glsl/cloud_gen.fs"));
+
+        const char* varyings[] = {"cloud_point"};
+        glTransformFeedbackVaryings(program.id, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+        program.link();
+        program.dump_info();
+        program.enable();
+        uni_sigma = program["sigma"];
+        uni_inv_max_edge = program["inv_max_edge"];
+    }
+
+    void enable()
+        { program.enable(); }
+
+    GLuint process(vao_t& model, GLuint max_size, GLuint& actual_size)
+    {
+        GLuint tfb_id;
+        glGenBuffers(1, &tfb_id);
+        glBindBuffer(GL_ARRAY_BUFFER, tfb_id);
+        glBufferData(GL_ARRAY_BUFFER, max_size * sizeof(glm::vec3), 0, GL_STATIC_READ);
+
+        GLuint query_id;
+        glGenQueries(1, &query_id);
+
+        glEnable(GL_RASTERIZER_DISCARD);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tfb_id);
+        glPatchParameteri(GL_PATCH_VERTICES, 3);
+
+        glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query_id);
+        glBeginTransformFeedback(GL_POINTS);
+        model.render(GL_PATCHES);
+        glEndTransformFeedback();
+        glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+
+        glDisable(GL_RASTERIZER_DISCARD);
+        glFinish();
+        glGetQueryObjectuiv(query_id, GL_QUERY_RESULT, &actual_size);
+
+        debug_msg("Point cloud generated. Size = %u", actual_size);
+        return tfb_id;
+    }
+
 };
 
 //=======================================================================================================================================================================================================================
@@ -232,101 +366,61 @@ int main(int argc, char *argv[])
 
     demo_window_t window("SDF Texture 3D generator", 4, 4, 3, res_x, res_y, true);
 
-    //===================================================================================================================================================================================================================
-    // step 1 :: geometry shader that generates point cloud at a given (signed) distance around a model
-    //===================================================================================================================================================================================================================
-    glsl_program_t cloud_gen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/cloud_gen.vs"),
-                             glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/cloud_gen.tcs"),
-                             glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/cloud_gen.tes"),
-                             glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/cloud_gen.gs"),
-                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/cloud_gen.fs"));
-
-    const char* varyings[] = {"cloud_point"};
-    glTransformFeedbackVaryings(cloud_gen.id, 1, varyings, GL_INTERLEAVED_ATTRIBS);
-    cloud_gen.link();
-    cloud_gen.dump_info();
-    cloud_gen.enable();
-    cloud_gen["sigma"] = 0.03125f;
-    cloud_gen["inv_max_edge"] = 1.0f / 0.0125f;
 
     //===================================================================================================================================================================================================================
     // step 2 :: load demon model
     //===================================================================================================================================================================================================================
     vao_t model;
     model.init("../../../resources/models/vao/demon.vao");
-    GLuint size = 16 * model.ibo.size;
 
     debug_msg("Model loaded :: index buffer size = %u", model.ibo.size);
     debug_msg("Model primitive type = %u", model.ibo.mode);
     debug_msg("GL_TRIANGLES = %u, GL_TRIANGLE_STRIP = %u", GL_TRIANGLES, GL_TRIANGLE_STRIP);
 
     //===================================================================================================================================================================================================================
-    // step 3 :: create transform feedback buffer
+    // step 3 :: create cloud generator and get two transform feedback cloud point buffers
+    //           create GL_TEXTURE_BUFFER for each generated tfb to fetch data to compute shader
     //===================================================================================================================================================================================================================
-    GLuint tfb_id;
-    glGenBuffers(1, &tfb_id);
-    glBindBuffer(GL_ARRAY_BUFFER, tfb_id);
-    glBufferData(GL_ARRAY_BUFFER, size * sizeof(glm::vec3), 0, GL_STATIC_READ);
+
+    cloud_gen_t generator;
+    generator.enable();
+    generator.uni_inv_max_edge = 1.0f / 0.0125f;
+
+    GLuint max_size = 16 * model.ibo.size;
+    GLuint external_cloud_size, internal_cloud_size;
+
+    generator.uni_sigma =  0.03125f;
+    GLuint external_tfb_id = generator.process(model, max_size, external_cloud_size);
+
+    GLuint external_tbo_id;
+    glGenTextures(1, &external_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, external_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, external_tfb_id);
+
+    generator.uni_sigma = -0.03125f;
+    GLuint internal_tfb_id = generator.process(model, max_size, internal_cloud_size);
+
+    GLuint internal_tbo_id;
+    glGenTextures(1, &internal_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, internal_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, internal_tfb_id);
 
     //===================================================================================================================================================================================================================
-    // step 4 :: create query object to collect the number of output vertices and perform feedback transform
+    // step 4 :: compile three compute shaders for cloud processing, process the data
+    //           and store the resulting signed distance texture in a file
     //===================================================================================================================================================================================================================
-    GLuint query_id;
-    glGenQueries(1, &query_id);
+    sdf_compute_t sdf_tex3d_generator(256);
 
-    glEnable(GL_RASTERIZER_DISCARD);
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tfb_id);
-    glPatchParameteri(GL_PATCH_VERTICES, 3);
+    sdf_tex3d_generator.compute_shader.enable();
 
-    glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query_id);
-    glBeginTransformFeedback(GL_POINTS);
-    model.render(GL_PATCHES);
-    glEndTransformFeedback();
-    glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+    texture3d_t external_udf = sdf_tex3d_generator.compute(external_tbo_id, external_cloud_size);
+    sdf_tex3d_generator.march(external_udf, 64);
 
-    glDisable(GL_RASTERIZER_DISCARD);
+    texture3d_t internal_udf = sdf_tex3d_generator.compute(internal_tbo_id, internal_cloud_size);
+    sdf_tex3d_generator.march(internal_udf, 64);
 
-    glFinish();
-    GLuint cloud_size;
-    glGetQueryObjectuiv(query_id, GL_QUERY_RESULT, &cloud_size);
-
-    debug_msg("Point cloud generated. Size = %u", cloud_size);
-
-    //===================================================================================================================================================================================================================
-    // step 5 :: done! buffer tbo_id contains the point cloud and cloud_size is the number of points in it
-    // now create 3D texture of unsigned integral internal format (GL_R32UI) -- we are going to use imageAtomicMin a lot
-    //===================================================================================================================================================================================================================
-    const int TEXTURE_SIZE = 256;
-    sdf_texture_t sdf_tex(glm::ivec3(TEXTURE_SIZE), GL_TEXTURE0, GL_R32UI);
-
-    //===================================================================================================================================================================================================================
-    // step 6 :: create GL_TEXTURE_BUFFER to fetch the output of transform feedback to compute shader
-    //===================================================================================================================================================================================================================
-    GLuint tbo_id;
-    glGenTextures(1, &tbo_id);
-    glBindTexture(GL_TEXTURE_BUFFER, tbo_id);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tfb_id);
-    glBindImageTexture(1, tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGB32F);    
-
-    //===================================================================================================================================================================================================================
-    // step 7 :: compile unsigned sdf compute shader and 
-    // compute shader that combines external and internal unsigned fields into a single signed (float) 
-    // 3D distance field texture
-    //===================================================================================================================================================================================================================
-    glsl_program_t sdf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_compute.cs"));
-    sdf_compute.enable();
-    sdf_compute["cloud_size"] = (int) cloud_size;
-    sdf_tex.clear(-1);
-    glDispatchCompute(cloud_size >> 8, 1, 1);
-
-    glsl_program_t sdf_combine(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_combine.cs"));
-    sdf_combine.enable();
-    glDispatchCompute(TEXTURE_SIZE >> 3, TEXTURE_SIZE >> 3, TEXTURE_SIZE >> 3);
-
-    //===================================================================================================================================================================================================================
-    // done! save the generated sdf texture into a file
-    //===================================================================================================================================================================================================================
-    sdf_tex.store("demon.sdf");
+    texture3d_t sdf_texture = sdf_tex3d_generator.combine(external_udf, internal_udf, GL_TEXTURE2);
+    sdf_texture.store("demon.t3d");
 
     //===================================================================================================================================================================================================================
     // now show the raymarched result
@@ -336,7 +430,7 @@ int main(int argc, char *argv[])
 
     skybox_renderer.enable();
     uniform_t uni_sbox_pv_matrix = skybox_renderer["projection_view_matrix"];
-    skybox_renderer["environment_tex"] = 2;
+    skybox_renderer["environment_tex"] = 3;
 
     //===================================================================================================================================================================================================================
     // volume raymarch shader
@@ -350,9 +444,9 @@ int main(int argc, char *argv[])
     uniform_t uni_cm_camera_ws = crystal_raymarch["camera_ws"];         
     uniform_t uni_cm_light_ws  = crystal_raymarch["light_ws"];
 
-    crystal_raymarch["scale"] = 3.0f;                                                             
     crystal_raymarch["tb_tex"] = 0;
     crystal_raymarch["value_tex"] = 1;
+    crystal_raymarch["distance_tex"] = 2;
 
     //===================================================================================================================================================================================================================
     // create dodecahecron buffer
@@ -367,7 +461,7 @@ int main(int argc, char *argv[])
     // create skybox buffer and load skybox cubemap texture
     //===================================================================================================================================================================================================================
     skybox_t skybox;
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE3);
 
     const char* sunset_files[6] = {"../../../resources/cubemap/sunset/positive_x.png",
                                    "../../../resources/cubemap/sunset/negative_x.png",

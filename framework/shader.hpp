@@ -55,6 +55,9 @@ struct glsl_program_t
     glsl_program_t(const glsl_shader_t& vs, const glsl_shader_t& tcs, const glsl_shader_t& tes, const glsl_shader_t& fs);
     glsl_program_t(const glsl_shader_t& vs, const glsl_shader_t& tcs, const glsl_shader_t& tes, const glsl_shader_t& gs, const glsl_shader_t& fs);
 
+    glsl_program_t(glsl_program_t&& other);
+    glsl_program_t& operator = (glsl_program_t&& other);
+
     void attach(GLint shader_id);
     void attach(const glsl_shader_t& shader);
 

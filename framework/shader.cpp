@@ -81,7 +81,7 @@ GLint glsl_shader_t::compile_from_string(GLenum shader_type, const char* source_
 // program methods implementation
 //=======================================================================================================================================================================================================================
 
-glsl_program_t::glsl_program_t() 
+glsl_program_t::glsl_program_t() : id(0)
     { }
 
 glsl_program_t::glsl_program_t(const glsl_shader_t& cs)
@@ -99,6 +99,14 @@ glsl_program_t::glsl_program_t(const glsl_shader_t& vs, const glsl_shader_t& tcs
 glsl_program_t::glsl_program_t(const glsl_shader_t& vs, const glsl_shader_t& tcs, const glsl_shader_t& tes, const glsl_shader_t& gs, const glsl_shader_t& fs)
     { link(vs, tcs, tes, gs, fs); }
 
+glsl_program_t::glsl_program_t(glsl_program_t&& other)
+    { std::swap (id, other.id); }
+
+glsl_program_t& glsl_program_t::operator = (glsl_program_t&& other)
+{
+    std::swap (id, other.id);
+    return *this;
+}
 
 void glsl_program_t::link(const glsl_shader_t& cs)
     { id = glCreateProgram(); attach(cs.id); link(); };
@@ -153,7 +161,7 @@ glsl_program_t::~glsl_program_t()
     { glDeleteProgram(id); }
 
 uniform_t glsl_program_t::operator[] (const char* name)
-    { return uniform_t(*this, name); }
+    { return uniform_t(this, name); }
 
 GLint glsl_program_t::uniform_id(const char * name) 
     { return glGetUniformLocation(id, name); }
