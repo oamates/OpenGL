@@ -65,6 +65,10 @@ struct ibo_t
     void render()
         { glDrawElements(mode, size, type, 0); }
 
+    // to be able to render the same data as GL_POINTS or GL_PATCHES
+    void render(GLenum override_mode)
+        { glDrawElements(override_mode, size, type, 0); }
+
     void render(GLsizei count, const GLvoid* offset)
         { glDrawElements(mode, count, type, offset); }
 
@@ -315,6 +319,13 @@ struct vao_t
     {
         bind();
         ibo.render();
+    }
+
+    // to be able to render the same data as GL_POINTS or GL_PATCHES
+    void render(GLenum override_mode)
+    {
+        bind();
+        ibo.render(override_mode);
     }
 
     void render(GLsizei count, const GLvoid* offset)

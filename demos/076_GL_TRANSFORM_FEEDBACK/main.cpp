@@ -77,6 +77,8 @@ int main(int argc, char *argv[])
     // geometry shader that generates point cloud at a given (signed) distance around a model
     //===================================================================================================================================================================================================================
     glsl_program_t cloud_gen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/cloud_gen.vs"),
+                             glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/cloud_gen.tcs"),
+                             glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/cloud_gen.tes"),
                              glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/cloud_gen.gs"),
                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/cloud_gen.fs"));
 
@@ -86,6 +88,7 @@ int main(int argc, char *argv[])
     cloud_gen.dump_info();
     cloud_gen.enable();
     cloud_gen["sigma"] = 0.03125f;
+    cloud_gen["inv_max_edge"] = 1.0f / 0.0125f;
 
     //===================================================================================================================================================================================================================
     // load demon model
@@ -94,7 +97,10 @@ int main(int argc, char *argv[])
     model.init("../../../resources/models/vao/demon.vao");
     GLuint size = 16 * model.ibo.size;
 
+
     debug_msg("Model loaded :: index buffer size = %u", model.ibo.size);
+    debug_msg("Model primitive type = %u", model.ibo.mode);
+    debug_msg("GL_TRIANGLES = %u, GL_TRIANGLE_STRIP = %u", GL_TRIANGLES, GL_TRIANGLE_STRIP);
 
     //===================================================================================================================================================================================================================
     // create transform feedback buffer
@@ -112,10 +118,11 @@ int main(int argc, char *argv[])
 
     glEnable(GL_RASTERIZER_DISCARD);
     glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo_id);
+    glPatchParameteri(GL_PATCH_VERTICES, 3);
 
     glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query_id);
     glBeginTransformFeedback(GL_POINTS);
-    model.render();
+    model.render(GL_PATCHES);
     glEndTransformFeedback();
     glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
 

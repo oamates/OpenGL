@@ -8,6 +8,6 @@ out vec3 normal_ws;
 
 void main()
 {
-    position_ws = scale * position_in;
+    position_ws = position_in;
     normal_ws = normal_in;
 }

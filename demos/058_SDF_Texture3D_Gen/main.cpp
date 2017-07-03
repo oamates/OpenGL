@@ -142,14 +142,15 @@ struct sdf_texture_t
     void bind_as_image(GLuint image_unit, GLenum access = GL_READ_WRITE)
         { glBindImageTexture(image_unit, texture_id, 0, GL_TRUE, 0, access, internal_format); }
 
-    // glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+    // ;
     GLenum format2type(GLenum format)
         { return GL_UNSIGNED_INT; }
 
     GLuint data_size()
-    {
-        return 100;
-    }
+        { return size.x * size.y * size.z * sizeof(GLuint); }
+
+    void clear(GLuint value)
+        { glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &value); }
 
     void store(const char* file_name)
     {
@@ -168,7 +169,7 @@ struct sdf_texture_t
 
         glActiveTexture(texture_unit);
         glBindTexture(GL_TEXTURE_3D, texture_id);
-        glGetTexImage(GL_TEXTURE_3D, level, internal_format, format2type(internal_format), pixels);
+        glGetTexImage(GL_TEXTURE_3D, 0, internal_format, format2type(internal_format), pixels);
 
         fwrite(pixels, pixel_data_size, 1, f);
         fclose(f);
@@ -189,7 +190,7 @@ struct sdf_texture_t
 
         sdf_texture_t sdf_texture;
 
-        glm::ivec3 sdf_texture.size = header.size;
+        sdf_texture.size = header.size;
         sdf_texture.texture_unit = texture_unit;
         sdf_texture.internal_format = header.internal_format;
 
@@ -203,7 +204,7 @@ struct sdf_texture_t
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-        glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, sdf_texture.size.x, sdf_texture.size.y, sdf_texture.size.z);
+        glTexStorage3D(GL_TEXTURE_3D, 1, sdf_texture.internal_format, sdf_texture.size.x, sdf_texture.size.y, sdf_texture.size.z);
 
         free(pixels);
         return sdf_texture;
@@ -222,7 +223,7 @@ int main(int argc, char *argv[])
     int res_y = 1080;
 
     //===================================================================================================================================================================================================================
-    // initialize GLFW library
+    // step 0 :: initialize GLFW library
     // create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080
     //===================================================================================================================================================================================================================
@@ -232,79 +233,95 @@ int main(int argc, char *argv[])
     demo_window_t window("SDF Texture 3D generator", 4, 4, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
-	// step 1 :: create 3d image texture to be used for the GL_COMPUTE_SHADER
-    // integer internal format because we are going to use imageAtomicMin
+    // step 1 :: geometry shader that generates point cloud at a given (signed) distance around a model
     //===================================================================================================================================================================================================================
-    const int TEXTURE_SIZE = 256;
-    sdf_texture_t sdf_tex(glm::ivec3(TEXTURE_SIZE), GL_TEXTURE3, GL_R32I);
+    glsl_program_t cloud_gen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/cloud_gen.vs"),
+                             glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/cloud_gen.tcs"),
+                             glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/cloud_gen.tes"),
+                             glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/cloud_gen.gs"),
+                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/cloud_gen.fs"));
 
-    //===================================================================================================================================================================================================================
-    // geometry shader that generates external or internal point cloud
-    //===================================================================================================================================================================================================================
-    glsl_program_t cloud_gen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/cloud.vs"),
-                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/cloud.fs"));
-
+    const char* varyings[] = {"cloud_point"};
+    glTransformFeedbackVaryings(cloud_gen.id, 1, varyings, GL_INTERLEAVED_ATTRIBS);
+    cloud_gen.link();
+    cloud_gen.dump_info();
     cloud_gen.enable();
-    uniform_t uni_sbox_pv_matrix = skybox_renderer["projection_view_matrix"];
-    cloud_gen["sigma"] = 0.03125;
+    cloud_gen["sigma"] = 0.03125f;
+    cloud_gen["inv_max_edge"] = 1.0f / 0.0125f;
 
     //===================================================================================================================================================================================================================
-    // create transform feedback buffer
-    //===================================================================================================================================================================================================================
-    GLuint tbo_id;
-    glGenBuffers(1, &tbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, tbo_id);
-    glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(data), 0, GL_STATIC_READ);
-
-    //===================================================================================================================================================================================================================
-    // load demon model
+    // step 2 :: load demon model
     //===================================================================================================================================================================================================================
     vao_t model;
     model.init("../../../resources/models/vao/demon.vao");
+    GLuint size = 16 * model.ibo.size;
+
+    debug_msg("Model loaded :: index buffer size = %u", model.ibo.size);
+    debug_msg("Model primitive type = %u", model.ibo.mode);
+    debug_msg("GL_TRIANGLES = %u, GL_TRIANGLE_STRIP = %u", GL_TRIANGLES, GL_TRIANGLE_STRIP);
 
     //===================================================================================================================================================================================================================
-    // create query object to collect the number of output vertices and perform feedback transform
+    // step 3 :: create transform feedback buffer
+    //===================================================================================================================================================================================================================
+    GLuint tfb_id;
+    glGenBuffers(1, &tfb_id);
+    glBindBuffer(GL_ARRAY_BUFFER, tfb_id);
+    glBufferData(GL_ARRAY_BUFFER, size * sizeof(glm::vec3), 0, GL_STATIC_READ);
+
+    //===================================================================================================================================================================================================================
+    // step 4 :: create query object to collect the number of output vertices and perform feedback transform
     //===================================================================================================================================================================================================================
     GLuint query_id;
     glGenQueries(1, &query_id);
 
     glEnable(GL_RASTERIZER_DISCARD);
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tbo_id);
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, tfb_id);
+    glPatchParameteri(GL_PATCH_VERTICES, 3);
 
     glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, query_id);
-        glBeginTransformFeedback(GL_TRIANGLES);
-            model.render();
-        glEndTransformFeedback();
+    glBeginTransformFeedback(GL_POINTS);
+    model.render(GL_PATCHES);
+    glEndTransformFeedback();
     glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
 
     glDisable(GL_RASTERIZER_DISCARD);
 
-    glFlush();
+    glFinish();
     GLuint cloud_size;
     glGetQueryObjectuiv(query_id, GL_QUERY_RESULT, &cloud_size);
 
-    debug_msg("External and internal point clouds generated. Size = %u", cloud_size);
-
-
-    //===================================================================================================================================================================================================================
-    // create GL_TEXTURE_BUFFER to fetch the output of transform feedback to compute shader
-    // internal and external cloud points are interleaved
-    //===================================================================================================================================================================================================================
-    GLuint position_tbo_id;
-    glGenTextures(1, &position_tbo_id);
-    glBindTexture(GL_TEXTURE_BUFFER, position_tbo_id);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, pbo_id);
-    glBindImageTexture(1, position_tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F);    
+    debug_msg("Point cloud generated. Size = %u", cloud_size);
 
     //===================================================================================================================================================================================================================
-    // sdf internal and external unsigned distance field generator
+    // step 5 :: done! buffer tbo_id contains the point cloud and cloud_size is the number of points in it
+    // now create 3D texture of unsigned integral internal format (GL_R32UI) -- we are going to use imageAtomicMin a lot
+    //===================================================================================================================================================================================================================
+    const int TEXTURE_SIZE = 256;
+    sdf_texture_t sdf_tex(glm::ivec3(TEXTURE_SIZE), GL_TEXTURE0, GL_R32UI);
+
+    //===================================================================================================================================================================================================================
+    // step 6 :: create GL_TEXTURE_BUFFER to fetch the output of transform feedback to compute shader
+    //===================================================================================================================================================================================================================
+    GLuint tbo_id;
+    glGenTextures(1, &tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tfb_id);
+    glBindImageTexture(1, tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGB32F);    
+
+    //===================================================================================================================================================================================================================
+    // step 7 :: compile unsigned sdf compute shader and 
+    // compute shader that combines external and internal unsigned fields into a single signed (float) 
+    // 3D distance field texture
     //===================================================================================================================================================================================================================
     glsl_program_t sdf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_compute.cs"));
+    sdf_compute.enable();
+    sdf_compute["cloud_size"] = (int) cloud_size;
+    sdf_tex.clear(-1);
+    glDispatchCompute(cloud_size >> 8, 1, 1);
 
-    //===================================================================================================================================================================================================================
-    // compute shader that combines results of the previous step and creates final sdf 3d texture
-    //===================================================================================================================================================================================================================
     glsl_program_t sdf_combine(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_combine.cs"));
+    sdf_combine.enable();
+    glDispatchCompute(TEXTURE_SIZE >> 3, TEXTURE_SIZE >> 3, TEXTURE_SIZE >> 3);
 
     //===================================================================================================================================================================================================================
     // done! save the generated sdf texture into a file
@@ -404,7 +421,7 @@ int main(int argc, char *argv[])
         skybox.render();
 
         //===============================================================================================================================================================================================================
-        // raymarch through polyhedron
+        // raymarch through sdf
         //===============================================================================================================================================================================================================
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -413,7 +430,7 @@ int main(int argc, char *argv[])
         uni_cm_pv_matrix = projection_view_matrix;
         uni_cm_camera_ws = camera_ws;
         uni_cm_light_ws = light_ws;
-        dodecahedron.render();
+        model.render();
 
         window.end_frame();
     }
@@ -424,6 +441,3 @@ int main(int argc, char *argv[])
     glfw::terminate();
     return 0;
 }
-
-
-
