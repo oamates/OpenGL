@@ -44,8 +44,8 @@ void main()
     // compute and store the sdf
     //==========================================================================================================================================================
     float sd = (e < i) ? 
-                min(sqrt(i) - sigma, 0.0): // the point is outside the model
-               -min(sqrt(e) - sigma, 0.0); // the point is  inside the model
+                max(sqrt(i) - sigma, 0.0): // the point is outside the model
+               -max(sqrt(e) - sigma, 0.0); // the point is  inside the model
 
     imageStore(sdf, id, vec4(sd, 0.0, 0.0, 0.0));
 }

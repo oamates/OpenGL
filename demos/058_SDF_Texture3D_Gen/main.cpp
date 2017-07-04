@@ -226,6 +226,7 @@ struct sdf_compute_t
 
     glsl_program_t march_shader;
     glsl_program_t combine_shader;
+    uniform_t uni_combine_sigma;
 
     sdf_compute_t(int size) 
         : size(size)
@@ -240,6 +241,7 @@ struct sdf_compute_t
 
         march_shader = glsl_program_t(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_march.cs"));
         combine_shader = glsl_program_t(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sdf_combine.cs"));
+        uni_combine_sigma = combine_shader["sigma"];
     }
 
     texture3d_t compute(GLuint tbo_id, int cloud_size)
@@ -268,15 +270,22 @@ struct sdf_compute_t
         }
     }
 
-    texture3d_t combine(texture3d_t& external, texture3d_t& internal, GLenum texture_unit)
+    texture3d_t combine(texture3d_t& external, texture3d_t& internal, float sigma, GLenum texture_unit)
     {
         combine_shader.enable();
+debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 1");
+        uni_combine_sigma = sigma;
+debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 2");
         external.bind_as_image(0, GL_READ_ONLY);
         internal.bind_as_image(1, GL_READ_ONLY);
+debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 3");
 
         texture3d_t sdf_texture(glm::ivec3(size), texture_unit, GL_R32F);
+debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 4");
         sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
+debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 5");
         glDispatchCompute(size >> 3, size >> 3, size >> 3);
+debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 6");
 
         return sdf_texture;
     }
@@ -507,6 +516,8 @@ int main(int argc, char *argv[])
     //           create GL_TEXTURE_BUFFER for each generated tfb to fetch data to compute shader
     //===================================================================================================================================================================================================================
 
+    const float sigma = 0.03125f;
+
     cloud_gen_t generator;
     generator.enable();
     generator.uni_inv_max_edge = 1.0f / 0.0125f;
@@ -514,7 +525,7 @@ int main(int argc, char *argv[])
     GLuint max_size = 8 * model.ibo.size;
     GLuint external_cloud_size, internal_cloud_size;
 
-    generator.uni_sigma =  0.03125f;
+    generator.uni_sigma = sigma;
     GLuint external_tfb_id = generator.process(model, max_size, external_cloud_size);
 
     GLuint external_tbo_id;
@@ -522,7 +533,7 @@ int main(int argc, char *argv[])
     glBindTexture(GL_TEXTURE_BUFFER, external_tbo_id);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, external_tfb_id);
 
-    generator.uni_sigma = -0.03125f;
+    generator.uni_sigma = -sigma;
     GLuint internal_tfb_id = generator.process(model, max_size, internal_cloud_size);
 
     GLuint internal_tbo_id;
@@ -536,11 +547,12 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     sdf_compute_t sdf_tex3d_generator(256);
 
+
     sdf_tex3d_generator.compute_shader.enable();
 
     texture3d_t external_udf = sdf_tex3d_generator.compute(external_tbo_id, external_cloud_size);
 
-
+/*
 
     GLuint pixel_data_size = 4 * 256 * 256 * 256;
     GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
@@ -562,16 +574,16 @@ int main(int argc, char *argv[])
     debug_msg("Testing compute shader results :: done");
 
     free(pixels);
+*/
 
 
 
-
-    sdf_tex3d_generator.march(external_udf, 1);
+    sdf_tex3d_generator.march(external_udf, 8);
     glDeleteTextures(1, &external_tbo_id);
     glDeleteBuffers(1, &external_tfb_id);
 
     texture3d_t internal_udf = sdf_tex3d_generator.compute(internal_tbo_id, internal_cloud_size);
-    sdf_tex3d_generator.march(internal_udf, 1);
+    sdf_tex3d_generator.march(internal_udf, 8);
     glDeleteTextures(1, &internal_tbo_id);
     glDeleteBuffers(1, &internal_tfb_id);
 
@@ -579,7 +591,34 @@ int main(int argc, char *argv[])
 
 
 
-    texture3d_t sdf_texture = sdf_tex3d_generator.combine(external_udf, internal_udf, GL_TEXTURE2);
+    texture3d_t sdf_texture = sdf_tex3d_generator.combine(external_udf, internal_udf, sigma, GL_TEXTURE2);
+
+
+
+    GLuint pixel_data_size = 4 * 256 * 256 * 256;
+    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, sdf_texture.texture_id);
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, pixels);
+
+    debug_msg("Testing combine shader results :: begin");
+    for (int i0 = 64; i0 < 192; ++i0)
+    for (int i1 = 64; i1 < 192; ++i1)
+    for (int i2 = 64; i2 < 192; ++i2)
+    {
+        int index = i0 + 256 * i1 + 65536 * i2;
+        float value = ((float *) pixels)[index];
+//        if (value != -1)
+            debug_msg("sdf[%u, %u, %u] = %f", i0, i1, i2, value);
+    }
+    debug_msg("Testing combine shader results :: done");
+
+    free(pixels);
+
+
+
+
     //sdf_texture.store("demon.t3d", GL_RED, GL_FLOAT);
 
     //===================================================================================================================================================================================================================

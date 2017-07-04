@@ -50,14 +50,14 @@ void main()
     // index in the input buffer this invocation will work with
     //==========================================================================================================================================================
     int id = int(gl_GlobalInvocationID.x);
-    if (id < cloud_size) return;
+    if (id >= cloud_size) return;
 
     vec3 point = imageLoad(cloud_buffer, id).xyz;
 
     //==========================================================================================================================================================
     // determine the nearest lattice point
     //==========================================================================================================================================================
-    vec3 Pf = floor(clamp(128.0 + 128.0 * point, 0.0, 0.9990234375));
+    vec3 Pf = floor(clamp(128.0 + 128.0 * point, 0.0, 255.875));
     ivec3 Pi = ivec3(Pf);
     Pf = TEXEL_SIZE * Pf - TEXEL_SHIFT;
 
@@ -76,7 +76,7 @@ void main()
         {
             float l = norm + 2.0 * dot(delta, vec3(shift.xyz)) + TEXEL_SIZE * float(shift.w);
             uint il = uint(integral_scale * l);
-            imageAtomicMin(sdf_tex, idx3d, il);
+            imageStore(sdf_tex, idx3d, uvec4(il, 0, 0, 0));
         }
     }
 }
