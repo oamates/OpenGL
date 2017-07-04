@@ -214,7 +214,9 @@ struct texture3d_t
     }
 
     ~texture3d_t()
-        { glDeleteTextures(1, &texture_id); }
+        { 
+            debug_msg("Texture 3D destructor called !!!!!!!!!!!!!!!!!!!!! ");
+            /*glDeleteTextures(1, &texture_id); */}
 };
 
 struct sdf_compute_t
@@ -253,6 +255,8 @@ struct sdf_compute_t
         glClearTexImage(udf_texture.texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &UINT32_0xFFFFFFFF);
 
         udf_texture.bind_as_image(0, GL_WRITE_ONLY);
+
+
         uni_udf_size = cloud_size;
         glDispatchCompute(cloud_size >> 8, 1, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -273,19 +277,28 @@ struct sdf_compute_t
     texture3d_t combine(texture3d_t& external, texture3d_t& internal, float sigma, GLenum texture_unit)
     {
         combine_shader.enable();
-debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 1");
         uni_combine_sigma = sigma;
-debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 2");
-        external.bind_as_image(0, GL_READ_ONLY);
-        internal.bind_as_image(1, GL_READ_ONLY);
-debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 3");
+        //external.bind_as_image(0, GL_READ_ONLY);
+        //internal.bind_as_image(1, GL_READ_ONLY);
 
         texture3d_t sdf_texture(glm::ivec3(size), texture_unit, GL_R32F);
-debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 4");
-        sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
-debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 5");
+
+//        sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
+
+        if(glIsTexture(sdf_texture.texture_id))
+        {
+            debug_msg("Sir, seems like %u is a texture", sdf_texture.texture_id);
+        }
+        else
+            debug_msg("Sir, seems like %u is not a texture", sdf_texture.texture_id);
+
+        glBindImageTexture(2, sdf_texture.texture_id, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
+
+        debug_msg("size >> 3 = %u", size >> 3);
         glDispatchCompute(size >> 3, size >> 3, size >> 3);
-debug_msg("QQQQQQQQQQQQQQQQQQQQQQQ 6");
+
+        debug_msg("size >> 3 = %u", size >> 3);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         return sdf_texture;
     }
@@ -482,6 +495,50 @@ vao_t normalize_model(const char* file_name, double max_bound = 0.96875)
     return model;
 }
 
+void print_texture(texture3d_t& texture, int w = 80)
+{
+    GLenum format, type;
+
+    if (texture.internal_format == GL_R32UI)
+    {
+        format = GL_RED_INTEGER;
+        type = GL_UNSIGNED_INT;
+    }
+    else
+    {
+        format = GL_RED;
+        type = GL_FLOAT;
+    }
+
+    GLuint pixel_data_size = 4 * 256 * 256 * 256;
+    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, texture.texture_id);
+    glGetTexImage(GL_TEXTURE_3D, 0, format, type, pixels);
+
+    if (texture.internal_format == GL_R32UI)
+    {
+        debug_msg("Printing integral texture");
+        for (int i0 = w; i0 < 256 - w; ++i0) for (int i1 = w; i1 < 256 - w; ++i1) for (int i2 = w; i2 < 256 - w; ++i2)
+        {
+            int index = i0 + 256 * i1 + 65536 * i2;
+            GLuint value = ((GLuint *) pixels)[index];
+            debug_msg("texture[%u, %u, %u] = %u.", i0, i1, i2, value);
+        }
+    }
+    else
+    {
+        debug_msg("Printing float texture");
+        for (int i0 = w; i0 < 256 - w; ++i0) for (int i1 = w; i1 < 256 - w; ++i1) for (int i2 = w; i2 < 256 - w; ++i2)
+        {
+            int index = i0 + 256 * i1 + 65536 * i2;
+            GLfloat value = ((GLfloat *) pixels)[index];
+            debug_msg("texture[%u, %u, %u] = %f.", i0, i1, i2, value);
+        }
+    }
+    free(pixels);
+}
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -551,70 +608,25 @@ int main(int argc, char *argv[])
     sdf_tex3d_generator.compute_shader.enable();
 
     texture3d_t external_udf = sdf_tex3d_generator.compute(external_tbo_id, external_cloud_size);
+    texture3d_t internal_udf = sdf_tex3d_generator.compute(internal_tbo_id, internal_cloud_size);
 
-/*
-
-    GLuint pixel_data_size = 4 * 256 * 256 * 256;
-    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_3D, external_udf.texture_id);
-    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, pixels);
-
-    debug_msg("Testing compute shader results :: begin");
-    for (int i0 = 0; i0 < 256; ++i0)
-    for (int i1 = 0; i1 < 256; ++i1)
-    for (int i2 = 0; i2 < 256; ++i2)
-    {
-        int index = i0 + 256 * i1 + 65536 * i2;
-        unsigned int value = ((unsigned int *) pixels)[index];
-        if (value != -1)
-            debug_msg("sdf[%u, %u, %u] = %u", i0, i1, i2, value);
-    }
-    debug_msg("Testing compute shader results :: done");
-
-    free(pixels);
-*/
-
-
-
-    sdf_tex3d_generator.march(external_udf, 8);
+    sdf_tex3d_generator.march_shader.enable();
+    sdf_tex3d_generator.march(external_udf, 32);
     glDeleteTextures(1, &external_tbo_id);
     glDeleteBuffers(1, &external_tfb_id);
 
-    texture3d_t internal_udf = sdf_tex3d_generator.compute(internal_tbo_id, internal_cloud_size);
-    sdf_tex3d_generator.march(internal_udf, 8);
+
+    sdf_tex3d_generator.march(internal_udf, 32);
     glDeleteTextures(1, &internal_tbo_id);
     glDeleteBuffers(1, &internal_tfb_id);
-
-
-
-
 
     texture3d_t sdf_texture = sdf_tex3d_generator.combine(external_udf, internal_udf, sigma, GL_TEXTURE2);
 
 
 
-    GLuint pixel_data_size = 4 * 256 * 256 * 256;
-    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_3D, sdf_texture.texture_id);
-    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, pixels);
+print_texture(sdf_texture);
 
-    debug_msg("Testing combine shader results :: begin");
-    for (int i0 = 64; i0 < 192; ++i0)
-    for (int i1 = 64; i1 < 192; ++i1)
-    for (int i2 = 64; i2 < 192; ++i2)
-    {
-        int index = i0 + 256 * i1 + 65536 * i2;
-        float value = ((float *) pixels)[index];
-//        if (value != -1)
-            debug_msg("sdf[%u, %u, %u] = %f", i0, i1, i2, value);
-    }
-    debug_msg("Testing combine shader results :: done");
-
-    free(pixels);
 
 
 

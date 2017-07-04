@@ -6,7 +6,7 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 // input  :: point cloud stored in GL_TEXTURE_BUFFER bound to image unit 0
 // output :: unsigned integral SDF texture bound to image unit 1
 //==============================================================================================================================================================
-layout (r32ui, binding = 0) uniform uimage3D sdf_tex;
+layout (r32ui, binding = 0) uniform uimage3D udf_tex;
 layout (rgba32f, binding = 1) uniform imageBuffer cloud_buffer;
 
 uniform int cloud_size;
@@ -40,9 +40,13 @@ const ivec4 LATTICE_SHIFT[125] = ivec4[]
     ivec4(-2,  2,  2, 0xC), ivec4(-1,  2,  2, 0x9), ivec4( 0,  2,  2, 0x8), ivec4( 1,  2,  2, 0x9), ivec4( 2,  2,  2, 0xC)
 );
 
-const float integral_scale = 268435456.0;    // = 2^28
-const float TEXEL_SIZE     = 0.0078125;      //   1.0 / 128.0
-const float TEXEL_SHIFT    = 0.99609375;     // 255.0 / 256.0
+const float INTEGRAL_SCALE    = 268435456.0;
+const float TEXTURE_SIZE      = 256.0;
+const float HALF_TEXTURE_SIZE = 0.5 * TEXTURE_SIZE;
+const float TEXEL_SIZE        = 2.0 / TEXTURE_SIZE;
+const float TEXEL_SIZE_DBL    = 2.0 * TEXEL_SIZE;
+const float TEXEL_SHIFT       = (TEXTURE_SIZE - 1.0) / TEXTURE_SIZE;
+const float TEXEL_SIZE_SQR    = 1.0 / (TEXTURE_SIZE * TEXTURE_SIZE);
 
 void main()
 {
@@ -57,7 +61,7 @@ void main()
     //==========================================================================================================================================================
     // determine the nearest lattice point
     //==========================================================================================================================================================
-    vec3 Pf = floor(clamp(128.0 + 128.0 * point, 0.0, 255.875));
+    vec3 Pf = floor(clamp(HALF_TEXTURE_SIZE + HALF_TEXTURE_SIZE * point, 0.0, TEXTURE_SIZE));
     ivec3 Pi = ivec3(Pf);
     Pf = TEXEL_SIZE * Pf - TEXEL_SHIFT;
 
@@ -74,9 +78,9 @@ void main()
 
         if (all(greaterThanEqual(idx3d, ivec3(0))) && all(lessThanEqual(idx3d, ivec3(255))))
         {
-            float l = norm + 2.0 * dot(delta, vec3(shift.xyz)) + TEXEL_SIZE * float(shift.w);
-            uint il = uint(integral_scale * l);
-            imageStore(sdf_tex, idx3d, uvec4(il, 0, 0, 0));
+            float l = norm + TEXEL_SIZE_DBL * dot(delta, vec3(shift.xyz)) + TEXEL_SIZE_SQR * float(shift.w);
+            uint il = uint(INTEGRAL_SCALE * l);
+            imageStore(udf_tex, idx3d, uvec4(il, 0, 0, 0));
         }
     }
 }

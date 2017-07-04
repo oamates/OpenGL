@@ -6,8 +6,8 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 // input  :: point cloud stored in GL_TEXTURE_BUFFER bound to image unit 0
 // output :: unsigned integral SDF texture bound to image unit 1
 //==============================================================================================================================================================
-layout (r32ui, binding = 0) uniform uimage3D sdf_external;
-layout (r32ui, binding = 1) uniform uimage3D sdf_internal;
+//layout (r32ui, binding = 0) uniform uimage3D sdf_external;
+//layout (r32ui, binding = 1) uniform uimage3D sdf_internal;
 
 layout (r32f, binding = 2) uniform image3D sdf;
 
@@ -31,21 +31,21 @@ void main()
     //==========================================================================================================================================================
     // read the input unsigned int distances
     //==========================================================================================================================================================
-    uint external_distance = imageLoad(sdf_external, id).x;
-    uint internal_distance = imageLoad(sdf_internal, id).x;
+//    uint external_distance = imageLoad(sdf_external, id).x;
+//    uint internal_distance = imageLoad(sdf_internal, id).x;
 
     //==========================================================================================================================================================
     // convert to float and normalize
     //==========================================================================================================================================================
-    float e = inv_scale * float(external_distance);
-    float i = inv_scale * float(internal_distance);
+//    float e = inv_scale * float(external_distance);
+//    float i = inv_scale * float(internal_distance);
 
     //==========================================================================================================================================================
     // compute and store the sdf
     //==========================================================================================================================================================
-    float sd = (e < i) ? 
-                max(sqrt(i) - sigma, 0.0): // the point is outside the model
-               -max(sqrt(e) - sigma, 0.0); // the point is  inside the model
+    float sd = 1.0f; //max(e, i); //(e < i) ? 
+//                max(sqrt(i) - sigma, 0.0): // the point is outside the model
+//               -max(sqrt(e) - sigma, 0.0); // the point is  inside the model
 
     imageStore(sdf, id, vec4(sd, 0.0, 0.0, 0.0));
 }
