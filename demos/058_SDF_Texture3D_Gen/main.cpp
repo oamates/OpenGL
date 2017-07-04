@@ -23,6 +23,8 @@
 #include "camera.hpp"
 #include "polyhedron.hpp"
 #include "image.hpp"
+#include "vertex.hpp"
+#include "momenta.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
@@ -114,6 +116,8 @@ struct tex3d_header_t
     GLuint data_size;    
 };
 
+#include <random>
+
 struct texture3d_t
 {
     glm::ivec3 size;
@@ -129,6 +133,7 @@ struct texture3d_t
     	glActiveTexture(texture_unit);
 	    glGenTextures(1, &texture_id);
 	    glBindTexture(GL_TEXTURE_3D, texture_id);
+
 	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -142,16 +147,10 @@ struct texture3d_t
     void bind_as_image(GLuint image_unit, GLenum access = GL_READ_WRITE)
         { glBindImageTexture(image_unit, texture_id, 0, GL_TRUE, 0, access, internal_format); }
 
-    GLenum format2type(GLenum format)
-        { return GL_UNSIGNED_INT; }
-
     GLuint data_size()
         { return size.x * size.y * size.z * sizeof(GLuint); }
 
-    void clear(GLuint value)
-        { glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &value); }
-
-    void store(const char* file_name)
+    void store(const char* file_name, GLenum format, GLenum type)
     {
         FILE* f = fopen(file_name, "wb");
         tex3d_header_t header = 
@@ -168,11 +167,16 @@ struct texture3d_t
 
         glActiveTexture(texture_unit);
         glBindTexture(GL_TEXTURE_3D, texture_id);
-        glGetTexImage(GL_TEXTURE_3D, 0, internal_format, format2type(internal_format), pixels);
+        glGetTexImage(GL_TEXTURE_3D, 0, format, type, pixels);
+
+        for (int i = 0; i < 256; ++i)
+        {
+            int index = i + 256 * i + 65536 * i;
+            printf("sdf[...] = %f", ((float*) pixels)[index]);
+        }
 
         fwrite(pixels, pixel_data_size, 1, f);
         fclose(f);
-
         free(pixels);
     }
 
@@ -223,7 +227,8 @@ struct sdf_compute_t
     glsl_program_t march_shader;
     glsl_program_t combine_shader;
 
-    sdf_compute_t(int size)
+    sdf_compute_t(int size) 
+        : size(size)
     {
         //===============================================================================================================================================================================================================
         // 1. compute shader that generates unsigned distance field from initial cloud
@@ -239,50 +244,39 @@ struct sdf_compute_t
 
     texture3d_t compute(GLuint tbo_id, int cloud_size)
     {
-        debug_msg("sdf_compute_t::compute begin");
-
+        glBindImageTexture(1, tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
         texture3d_t udf_texture(glm::ivec3(size), GL_TEXTURE0, GL_R32UI);
-        udf_texture.clear(0xFFFFFFFF);
+
+        GLuint UINT32_0xFFFFFFFF = 0xFFFFFFFF;
+        glClearTexImage(udf_texture.texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &UINT32_0xFFFFFFFF);
+
         udf_texture.bind_as_image(0, GL_WRITE_ONLY);
         uni_udf_size = cloud_size;
         glDispatchCompute(cloud_size >> 8, 1, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-        debug_msg("sdf_compute_t::compute end");
 
         return udf_texture;
     }
 
     void march(texture3d_t& udf_texture, GLuint iterations)
     {
-        debug_msg("sdf_compute_t::march begin");
-
         udf_texture.bind_as_image(0, GL_READ_WRITE);
         for(int i = 0; i < iterations; ++i)
         {
             glDispatchCompute(size >> 3, size >> 3, size >> 3);
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
-
-        debug_msg("sdf_compute_t::march end");
-
     }
 
     texture3d_t combine(texture3d_t& external, texture3d_t& internal, GLenum texture_unit)
     {
-        debug_msg("sdf_compute_t::combine begin");
-
         combine_shader.enable();
-
         external.bind_as_image(0, GL_READ_ONLY);
         internal.bind_as_image(1, GL_READ_ONLY);
 
         texture3d_t sdf_texture(glm::ivec3(size), texture_unit, GL_R32F);
         sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
-
         glDispatchCompute(size >> 3, size >> 3, size >> 3);
-
-        debug_msg("sdf_compute_t::combine end");
 
         return sdf_texture;
     }
@@ -348,6 +342,138 @@ struct cloud_gen_t
 
 };
 
+vao_t normalize_model(const char* file_name, double max_bound = 0.96875)
+{
+    vao_t model;
+    //====================================================================================================================================================================================================================
+    // Load PN - model from file. First, read buffer params
+    //====================================================================================================================================================================================================================
+    debug_msg("Loading model :: %s ... \n", file_name);
+    vao_t::header_t header;
+
+    FILE* f = fopen(file_name, "rb");
+    fread (&header, sizeof(vao_t::header_t), 1, f);
+
+    glGenVertexArrays(1, &model.id);
+    glBindVertexArray(model.id);
+
+    if (header.layout != vertex_pn_t::layout)
+        exit_msg("File %s does not contain a valid PN - model. Layout = %d", file_name, header.layout);
+
+    //================================================================================================================================================================================================================
+    // check that the input is valid PN - vao file and set up vertex attributes layout in buffer
+    //================================================================================================================================================================================================================
+    model.vbo.size = header.vbo_size;
+    model.vbo.layout = header.layout;
+
+    glGenBuffers(1, &model.vbo.id);
+    glBindBuffer(GL_ARRAY_BUFFER, model.vbo.id);
+    GLsizei stride = vertex_pn_t::total_dimension * sizeof(GLfloat);        
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (const GLfloat*) offsetof(vertex_pn_t, position));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (const GLfloat*) offsetof(vertex_pn_t, normal));
+
+    //====================================================================================================================================================================================================================
+    // load buffer to memory and normalize the model, e.g put its center of mass to the origin and align
+    // principal momenta axes with coordinate axes
+    //====================================================================================================================================================================================================================
+    vertex_pn_t* vbo_ptr = (vertex_pn_t*) malloc(header.vbo_size * stride);
+    fread(vbo_ptr, stride, header.vbo_size, f);
+
+    int V = header.vbo_size;
+
+    glm::dvec3 mass_center;
+    glm::dmat3 covariance_matrix;
+
+    momenta::calculate(vbo_ptr, V, mass_center, covariance_matrix);
+
+    debug_msg("model mass center = %s", glm::to_string(mass_center).c_str());
+    debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
+
+    
+    glm::dquat q = diagonalizer(covariance_matrix);
+    glm::dmat3 Q = mat3_cast(q);
+    glm::dmat3 Qt = glm::transpose(Q);
+
+    //====================================================================================================================================================================================================================
+    // after position --> Q * (position - mass_center) transform this (diagonal !) matrix will be the new covariance
+    // matrix of the new point cloud
+    //====================================================================================================================================================================================================================
+    glm::dvec3 bbox = glm::dvec3(0.0);
+
+    //====================================================================================================================================================================================================================
+    // find the model bbox after position --> Q * (position - mass_center) transform this (diagonal !) matrix will be the new covariance
+    // matrix of the new point cloud, to normalize it remains to apply scale transform position --> position / sqrt(max momenta) 
+    //====================================================================================================================================================================================================================
+    for (int i = 0; i < V; ++i)
+    {
+        glm::dvec3 position = Q * (glm::dvec3(vbo_ptr[i].position) - mass_center);
+        bbox = glm::max(bbox, glm::abs(position));
+    }
+
+    double max_bbox = glm::max(bbox.x, glm::max(bbox.y, bbox.z));
+    double scale = max_bound / max_bbox;
+
+    debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
+    debug_msg("maximum = %f", max_bbox);
+    debug_msg("scale = %f", scale);
+
+    for (int i = 0; i < V; ++i)
+    {
+        vertex_pn_t& vertex = vbo_ptr[i];        
+        vertex.position = glm::vec3(scale * Q * (glm::dvec3(vertex.position) - mass_center));
+        vertex.position.y = -vertex.position.y;
+        vertex.position.z = -vertex.position.z;
+        vertex.normal = glm::vec3(Qt * vertex.normal);
+        vertex.normal.y = -vertex.normal.y;
+        vertex.normal.z = -vertex.normal.z;
+    }
+
+    covariance_matrix = (scale * scale) * (Q * covariance_matrix * Qt);
+    debug_msg("model covariance matrix after normalization = %s", glm::to_string(covariance_matrix).c_str());
+
+    debug_msg("Verification :: ");
+
+    bbox = glm::dvec3(0.0);
+    momenta::calculate(vbo_ptr, V, mass_center, covariance_matrix);
+    for (int i = 0; i < V; ++i)
+    {
+        glm::dvec3 position = glm::dvec3(vbo_ptr[i].position);
+        bbox = glm::max(bbox, glm::abs(position));
+    }
+
+    debug_msg("model mass center = %s", glm::to_string(mass_center).c_str());
+    debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
+    debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
+
+    glBufferData(GL_ARRAY_BUFFER, header.vbo_size * stride, vbo_ptr, GL_STATIC_DRAW);
+    free(vbo_ptr);
+        
+    //====================================================================================================================================================================================================================
+    // map index buffer to memory and read file data directly to it
+    //====================================================================================================================================================================================================================
+    model.ibo.size = header.ibo_size;
+    model.ibo.mode = header.mode;
+    model.ibo.type = header.type;
+    unsigned int index_size = (header.type == GL_UNSIGNED_INT) ? sizeof(GLuint) : (header.type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);    
+    glGenBuffers(1, &model.ibo.id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, model.ibo.id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_size * header.ibo_size, 0, GL_STATIC_DRAW);
+
+    GLvoid* ibo_ptr = ibo_t::map(GL_WRITE_ONLY);
+    fread(ibo_ptr, index_size, header.ibo_size, f);
+    ibo_t::unmap();
+    fclose(f);
+
+    debug_msg("VAO Loaded :: \n\tvertex_count = %d. \n\tvertex_layout = %d. \n\tindex_type = %d. \n\tprimitive_mode = %d. \n\tindex_count = %d\n\n\n", 
+        model.vbo.size, model.vbo.layout, model.ibo.type, model.ibo.mode, model.ibo.size);
+
+    return model;
+}
+
+
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -366,12 +492,11 @@ int main(int argc, char *argv[])
 
     demo_window_t window("SDF Texture 3D generator", 4, 4, 3, res_x, res_y, true);
 
-
     //===================================================================================================================================================================================================================
     // step 2 :: load demon model
     //===================================================================================================================================================================================================================
-    vao_t model;
-    model.init("../../../resources/models/vao/demon.vao");
+    vao_t model = normalize_model("../../../resources/models/vao/demon.vao");
+    //model.init("../../../resources/models/vao/demon.vao");
 
     debug_msg("Model loaded :: index buffer size = %u", model.ibo.size);
     debug_msg("Model primitive type = %u", model.ibo.mode);
@@ -386,7 +511,7 @@ int main(int argc, char *argv[])
     generator.enable();
     generator.uni_inv_max_edge = 1.0f / 0.0125f;
 
-    GLuint max_size = 16 * model.ibo.size;
+    GLuint max_size = 8 * model.ibo.size;
     GLuint external_cloud_size, internal_cloud_size;
 
     generator.uni_sigma =  0.03125f;
@@ -395,7 +520,7 @@ int main(int argc, char *argv[])
     GLuint external_tbo_id;
     glGenTextures(1, &external_tbo_id);
     glBindTexture(GL_TEXTURE_BUFFER, external_tbo_id);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, external_tfb_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, external_tfb_id);
 
     generator.uni_sigma = -0.03125f;
     GLuint internal_tfb_id = generator.process(model, max_size, internal_cloud_size);
@@ -403,7 +528,7 @@ int main(int argc, char *argv[])
     GLuint internal_tbo_id;
     glGenTextures(1, &internal_tbo_id);
     glBindTexture(GL_TEXTURE_BUFFER, internal_tbo_id);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, internal_tfb_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, internal_tfb_id);
 
     //===================================================================================================================================================================================================================
     // step 4 :: compile three compute shaders for cloud processing, process the data
@@ -414,13 +539,48 @@ int main(int argc, char *argv[])
     sdf_tex3d_generator.compute_shader.enable();
 
     texture3d_t external_udf = sdf_tex3d_generator.compute(external_tbo_id, external_cloud_size);
-    sdf_tex3d_generator.march(external_udf, 64);
+
+
+
+    GLuint pixel_data_size = 4 * 256 * 256 * 256;
+    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, external_udf.texture_id);
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, pixels);
+
+    debug_msg("Testing compute shader results :: begin");
+    for (int i0 = 0; i0 < 256; ++i0)
+    for (int i1 = 0; i1 < 256; ++i1)
+    for (int i2 = 0; i2 < 256; ++i2)
+    {
+        int index = i0 + 256 * i1 + 65536 * i2;
+        unsigned int value = ((unsigned int *) pixels)[index];
+        if (value != -1)
+            debug_msg("sdf[%u, %u, %u] = %u", i0, i1, i2, value);
+    }
+    debug_msg("Testing compute shader results :: done");
+
+    free(pixels);
+
+
+
+
+    sdf_tex3d_generator.march(external_udf, 1);
+    glDeleteTextures(1, &external_tbo_id);
+    glDeleteBuffers(1, &external_tfb_id);
 
     texture3d_t internal_udf = sdf_tex3d_generator.compute(internal_tbo_id, internal_cloud_size);
-    sdf_tex3d_generator.march(internal_udf, 64);
+    sdf_tex3d_generator.march(internal_udf, 1);
+    glDeleteTextures(1, &internal_tbo_id);
+    glDeleteBuffers(1, &internal_tfb_id);
+
+
+
+
 
     texture3d_t sdf_texture = sdf_tex3d_generator.combine(external_udf, internal_udf, GL_TEXTURE2);
-    sdf_texture.store("demon.t3d");
+    //sdf_texture.store("demon.t3d", GL_RED, GL_FLOAT);
 
     //===================================================================================================================================================================================================================
     // now show the raymarched result
@@ -492,10 +652,10 @@ int main(int argc, char *argv[])
         float time = window.frame_ts;
         glm::vec3 light_ws = glm::vec3(10.0f, 2.0f * glm::cos(time), 3.0f * glm::sin(time));
 
-        /* automatic camera */
         float radius = 9.0f + 2.55f * glm::cos(0.25f * time);
         float z = 1.45f * glm::sin(0.25f * time);
 
+        /* automatic camera */
         glm::vec3 camera_ws = glm::vec3(radius * glm::cos(0.3f * time), z, radius * glm::sin(0.3f * time));
         glm::vec3 up = glm::normalize(glm::vec3(glm::cos(0.41 * time), -6.0f, glm::sin(0.41 * time)));
         glm::mat4 view_matrix = glm::lookAt(camera_ws, glm::vec3(0.0f), up);
@@ -532,6 +692,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // terminate the program and exit
     //===================================================================================================================================================================================================================
+
     glfw::terminate();
     return 0;
 }

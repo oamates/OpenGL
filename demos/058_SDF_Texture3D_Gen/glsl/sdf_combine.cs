@@ -6,8 +6,8 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 // input  :: point cloud stored in GL_TEXTURE_BUFFER bound to image unit 0
 // output :: unsigned integral SDF texture bound to image unit 1
 //==============================================================================================================================================================
-layout (r32ui, binding = 0) uniform uimage3D sdf_internal;
-layout (r32ui, binding = 1) uniform uimage3D sdf_external;
+layout (r32ui, binding = 0) uniform uimage3D sdf_external;
+layout (r32ui, binding = 1) uniform uimage3D sdf_internal;
 
 layout (r32f, binding = 2) uniform image3D sdf;
 

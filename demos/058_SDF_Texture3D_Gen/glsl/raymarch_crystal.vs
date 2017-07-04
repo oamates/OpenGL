@@ -13,7 +13,7 @@ void main()
     position_ws = position_in;
     normal_ws = normal_in;
 
-    gl_Position = projection_view_matrix * vec4(position_ws, 1.0f);
+    gl_Position = projection_view_matrix * vec4(4.5 * position_ws, 1.0f);
 }
 
 
