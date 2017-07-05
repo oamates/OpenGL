@@ -60,8 +60,8 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // unsigned integral vectors
     //===================================================================================================================================================================================================================
-    // void operator = (const unsigned int arg) { glUniform1ui(location, arg); }
-
+    void operator = (const unsigned int arg)
+        { glUniform1ui(location, arg); }
     void operator = (const glm::uvec2& arg)
         { glUniform2uiv(location, 1, glm::value_ptr(arg)); }
     void operator = (const glm::uvec3& arg)

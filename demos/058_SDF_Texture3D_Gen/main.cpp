@@ -56,6 +56,35 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
+float dot2(const glm::vec3& v) 
+    { return glm::dot(v, v); }
+
+float udTriangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
+{
+    glm::vec3 ba = b - a; glm::vec3 pa = p - a;
+    glm::vec3 cb = c - b; glm::vec3 pb = p - b;
+    glm::vec3 ac = a - c; glm::vec3 pc = p - c;
+    glm::vec3 n = glm::cross(ba, ac);
+
+    float q = glm::sign(glm::dot(glm::cross(ba, n), pa)) + 
+              glm::sign(glm::dot(glm::cross(cb, n), pb)) + 
+              glm::sign(glm::dot(glm::cross(ac, n), pc));
+
+    if (q >= 2.0f) 
+        return glm::sqrt(glm::dot(n, pa) * glm::dot(n, pa) / dot2(n));
+
+    return glm::sqrt(
+        glm::min(
+            glm::min(
+                dot2(ba * glm::clamp(glm::dot(ba, pa) / dot2(ba), 0.0f, 1.0f) - pa),
+                dot2(cb * glm::clamp(glm::dot(cb, pb) / dot2(cb), 0.0f, 1.0f) - pb)
+            ), 
+            dot2(ac * glm::clamp(glm::dot(ac, pc) / dot2(ac), 0.0f, 1.0f) - pc)
+        )
+    );
+}
+
+
 struct skybox_t
 {
     GLuint vao_id, vbo_id, ibo_id;
@@ -283,21 +312,12 @@ struct sdf_compute_t
 
         texture3d_t sdf_texture(glm::ivec3(size), texture_unit, GL_R32F);
 
-//        sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
-
-        if(glIsTexture(sdf_texture.texture_id))
-        {
-            debug_msg("Sir, seems like %u is a texture", sdf_texture.texture_id);
-        }
-        else
-            debug_msg("Sir, seems like %u is not a texture", sdf_texture.texture_id);
+        sdf_texture.bind_as_image(2, GL_WRITE_ONLY);
 
         glBindImageTexture(2, sdf_texture.texture_id, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-        debug_msg("size >> 3 = %u", size >> 3);
         glDispatchCompute(size >> 3, size >> 3, size >> 3);
 
-        debug_msg("size >> 3 = %u", size >> 3);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         return sdf_texture;

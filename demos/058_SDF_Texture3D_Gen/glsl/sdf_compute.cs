@@ -11,6 +11,34 @@ layout (rgba32f, binding = 1) uniform imageBuffer cloud_buffer;
 
 uniform int cloud_size;
 
+float dot2(vec3 v) 
+    { return dot(v, v); }
+
+float triangle_udf(vec3 p, vec3 a, vec3 b, vec3 c)
+{
+    vec3 ba = b - a; vec3 pa = p - a;
+    vec3 cb = c - b; vec3 pb = p - b;
+    vec3 ac = a - c; vec3 pc = p - c;
+    vec3 n = cross(ba, ac);
+
+    float q = sign(dot(cross(ba, n), pa)) + 
+              sign(dot(cross(cb, n), pb)) + 
+              sign(dot(cross(ac, n), pc));
+
+    if (q >= 2.0f) 
+        return sqrt(dot(n, pa) * dot(n, pa) / dot2(n));
+
+    return sqrt(
+        min(
+            min(
+                dot2(ba * clamp(dot(ba, pa) / dot2(ba), 0.0f, 1.0f) - pa),
+                dot2(cb * clamp(dot(cb, pb) / dot2(cb), 0.0f, 1.0f) - pb)
+            ), 
+            dot2(ac * clamp(dot(ac, pc) / dot2(ac), 0.0f, 1.0f) - pc)
+        )
+    );
+}
+
 const ivec4 LATTICE_SHIFT[125] = ivec4[]
 (
     ivec4(-2, -2, -2, 0xC), ivec4(-1, -2, -2, 0x9), ivec4( 0, -2, -2, 0x8), ivec4( 1, -2, -2, 0x9), ivec4( 2, -2, -2, 0xC), 
