@@ -116,6 +116,43 @@ void calculate(const vertex_t* vertices, int N, glm::dvec3& mass_center, glm::dm
 
 }
 
+template<> 
+void calculate<glm::dvec3>(const glm::dvec3* vertices, int N, glm::dvec3& mass_center, glm::dmat3& covariance_matrix)
+{
+    mass_center = glm::dvec3(0.0);
+    double sxx = 0.0, sxy = 0.0, sxz = 0.0,
+           syy = 0.0, syz = 0.0, szz = 0.0;
+
+    for (int i = 0; i < N; ++i)
+    {
+        glm::dvec3 position = vertices[i];
+        mass_center += position;
+        
+        sxx += position.x * position.x;
+        sxy += position.x * position.y;
+        sxz += position.x * position.z;
+        syy += position.y * position.y;
+        syz += position.y * position.z;
+        szz += position.z * position.z;
+    }
+
+    double inv_n = 1.0 / N;
+    
+    mass_center *= inv_n;
+
+    double mxx = inv_n * sxx - mass_center.x * mass_center.x;
+    double mxy = inv_n * sxy - mass_center.x * mass_center.y;
+    double mxz = inv_n * sxz - mass_center.x * mass_center.z;
+    double myy = inv_n * syy - mass_center.y * mass_center.y;
+    double myz = inv_n * syz - mass_center.y * mass_center.z;
+    double mzz = inv_n * szz - mass_center.z * mass_center.z;
+    
+    covariance_matrix = glm::dmat3(mxx, mxy, mxz,
+                                   mxy, myy, myz,
+                                   mxz, myz, mzz);
+
+}
+
 template<typename vertex_t> 
 void calculate(const std::vector<vertex_t>& points, glm::dvec3& mass_center, glm::dmat3& covariance_matrix)
 {
