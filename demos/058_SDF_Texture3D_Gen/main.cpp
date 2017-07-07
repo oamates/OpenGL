@@ -150,7 +150,7 @@ struct tex3d_header_t
 struct texture3d_t
 {
     glm::ivec3 size;
-	GLuint texture_id;
+    GLuint texture_id;
     GLenum texture_unit;
     GLenum internal_format;
 
@@ -159,16 +159,16 @@ struct texture3d_t
     texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
         : size(size), texture_unit(texture_unit), internal_format(internal_format)
     {
-    	glActiveTexture(texture_unit);
-	    glGenTextures(1, &texture_id);
-	    glBindTexture(GL_TEXTURE_3D, texture_id);
+        glActiveTexture(texture_unit);
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_3D, texture_id);
 
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
         glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, size.x, size.y, size.z);
     }

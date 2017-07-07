@@ -422,11 +422,11 @@ int main(int argc, char *argv[])
 
     glsl_program_t udf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/udf_compute.cs"));
 
-    //===================================================================================================================================================================================================================
+    //=========================================================================================================     ==========================================================================================================
     // step 2 :: load demon model
     //===================================================================================================================================================================================================================
     sdf_compute_t sdf_compute;
-    sdf_compute.load_model("../../../resources/models/vao/demon.vao", 0.984375);
+    sdf_compute.load_model("../../../resources/models/vao/trefoil.vao", 0.984375);
     sdf_compute.calculate_statistics();
     debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for original model after normalization. !!!!!!!!!!!!\n\n");
 
@@ -441,6 +441,128 @@ int main(int argc, char *argv[])
     sdf_compute.compute_angle_weighted_normals();
     sdf_compute.test_original_degeneracy();
     debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for angle-weighted normals. !!!!!!!!!!!!\n\n");
+
+
+
+    //===================================================================================================================================================================================================================
+    // 1. index buffer
+    //===================================================================================================================================================================================================================
+    GLuint ibo_id;
+    int F = sdf_compute.F;
+
+    glGenBuffers(1, &ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * sizeof(GLuint) * F, sdf_compute.indices, GL_STATIC_DRAW);
+
+    GLuint ibo_tex_id;
+    glGenTextures(1, &ibo_tex_id);
+    glBindTexture(GL_TEXTURE_BUFFER, ibo_tex_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, ibo_id);
+
+    glBindImageTexture(0, ibo_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32UI);
+
+    //===================================================================================================================================================================================================================
+    // 2. vertex positions buffer
+    //===================================================================================================================================================================================================================
+    int V = sdf_compute.V;
+    glm::vec4* positions = (glm::vec4*) malloc(sizeof(glm::vec4) * V);
+
+    for(int v = 0; v < V; ++v)
+        positions[v] = glm::vec4(glm::vec3(sdf_compute.positions[v]), 0.0f);
+
+    GLuint vbo_id;
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(glm::vec4) * V, positions, GL_STATIC_DRAW);
+
+    GLuint vbo_tex_id;
+    glGenTextures(1, &vbo_tex_id);
+    glBindTexture(GL_TEXTURE_BUFFER, vbo_tex_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, vbo_id);
+
+    glBindImageTexture(1, vbo_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+
+    //===================================================================================================================================================================================================================
+    // 3. 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152 + 16777216 octree buffer;
+    //===================================================================================================================================================================================================================
+    GLuint octree_size = 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152;
+
+    GLuint octree_buf_id;
+    glGenBuffers(1, &octree_buf_id);
+    glBindBuffer(GL_ARRAY_BUFFER, octree_buf_id);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLuint) * octree_size, 0, GL_STATIC_DRAW);
+
+    GLuint octree_tex_id;
+    glGenTextures(1, &octree_tex_id);
+    glBindTexture(GL_TEXTURE_BUFFER, octree_tex_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, octree_buf_id);
+
+    GLuint minus1 = 0xFFFFFFFF;
+    GLuint zero = 0;
+    glClearBufferData(GL_ARRAY_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+    glBindImageTexture(2, octree_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32UI);
+
+    //===================================================================================================================================================================================================================
+    // 4. create the atomic counter buffer with 1 element
+    //===================================================================================================================================================================================================================
+    GLuint acbo_id;
+    glGenBuffers(1, &acbo_id);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, acbo_id);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
+    glClearBufferData(GL_ATOMIC_COUNTER_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+
+
+
+    //===================================================================================================================================================================================================================
+    // 5. 256x256x256 GL_TEXTURE_3D
+    //===================================================================================================================================================================================================================
+
+    GLuint texture_id;
+    GLuint size = 256;
+
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &texture_id);
+    glBindTexture(GL_TEXTURE_3D, texture_id);
+
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32UI, size, size, size);
+
+    glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &minus1);
+    glBindImageTexture(3, texture_id, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA32F);
+
+
+    udf_compute.enable();
+    udf_compute["triangles"] = (unsigned int) F;
+    glDispatchCompute(1, 1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);    
+
+    debug_msg("Computation done ...");
+
+
+    GLuint pixel_data_size = sizeof(GLuint) * 256 * 256 * 256;
+    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, texture_id);
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, pixels);
+
+    int w = 112;
+
+    debug_msg("Printing integral texture");
+    for (int i0 = w; i0 < 256 - w; ++i0) for (int i1 = w; i1 < 256 - w; ++i1) for (int i2 = w; i2 < 256 - w; ++i2)
+    {
+        int index = i0 + 256 * i1 + 65536 * i2;
+        GLuint value = ((GLuint *) pixels)[index];
+        debug_msg("texture[%u, %u, %u] = %u.", i0, i1, i2, value);
+    }
+
+    free(pixels);    
 
     //===================================================================================================================================================================================================================
     // main program loop
