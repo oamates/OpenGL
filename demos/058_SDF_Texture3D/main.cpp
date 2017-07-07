@@ -62,6 +62,11 @@ struct demo_window_t : public glfw_window_t
 const double INTEGRAL_SCALE = 268435456.0;
 const double INV_INT_SCALE = 1.0 / INTEGRAL_SCALE;
 
+
+//=======================================================================================================================================================================================================================
+// unsigned distance-to-triangle function
+// has been tested a lot, works for non-degenerate triangles
+//=======================================================================================================================================================================================================================
 template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& p, const glm::tvec3<real_t>& a, const glm::tvec3<real_t>& b, const glm::tvec3<real_t>& c)
 {
     glm::tvec3<real_t> ba = b - a; glm::tvec3<real_t> pa = p - a;
@@ -262,6 +267,63 @@ struct sdf_compute_t
         debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
         debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
 
+        /**/
+
+        debug_msg("\n\n\nTesting distance-to-triangle function\n\n\n");
+
+        for(int i = 0; i < 65536; ++i)
+        {
+            int base_index = 3 * (i % F);
+            glm::dvec3 vA = positions[indices[base_index + 0]];
+            glm::dvec3 vB = positions[indices[base_index + 1]];
+            glm::dvec3 vC = positions[indices[base_index + 2]];
+
+            glm::dvec3 vP = glm::dvec3(glm::linearRand(-1.0, 1.0), glm::linearRand(-1.0, 1.0), glm::linearRand(-1.0, 1.0));
+
+            double distanceABC = triangle_udf(vP, vA, vB, vC);
+            double distanceBCA = triangle_udf(vP, vB, vC, vA);
+            double distanceCAB = triangle_udf(vP, vC, vA, vB);
+
+            double distanceAP = glm::length(vP - vA);
+            double distanceBP = glm::length(vP - vB);
+            double distanceCP = glm::length(vP - vC);
+
+            if ((distanceABC < 0.0) || (distanceBCA < 0.0) || (distanceCAB < 0.0))
+            {
+                debug_msg("Error !!!!! Negative distance returned !!!!");
+                debug_msg("\tdistanceABC = %f, distanceBCA = %f, distanceCAB = %f", distanceABC, distanceBCA, distanceCAB);
+            }
+
+            if (distanceAP < distanceABC)
+                debug_msg("distanceAP > distanceABC :: %f < %f", distanceAP, distanceABC);
+            if (distanceAP < distanceBCA)
+                debug_msg("distanceAP > distanceBCA :: %f < %f", distanceAP, distanceBCA);
+            if (distanceAP < distanceCAB)
+                debug_msg("distanceAP > distanceCAB :: %f < %f", distanceAP, distanceCAB);
+
+            if (distanceBP < distanceABC)
+                debug_msg("distanceBP > distanceABC :: %f < %f", distanceBP, distanceABC);
+            if (distanceBP < distanceBCA)
+                debug_msg("distanceBP > distanceBCA :: %f < %f", distanceBP, distanceBCA);
+            if (distanceBP < distanceCAB)
+                debug_msg("distanceBP > distanceCAB :: %f < %f", distanceBP, distanceCAB);
+
+            if (distanceCP < distanceABC)
+                debug_msg("distanceCP > distanceABC :: %f < %f", distanceCP, distanceABC);
+            if (distanceCP < distanceBCA)
+                debug_msg("distanceCP > distanceBCA :: %f < %f", distanceCP, distanceBCA);
+            if (distanceCP < distanceCAB)
+                debug_msg("distanceCP > distanceCAB :: %f < %f", distanceCP, distanceCAB);
+
+            const double eps = 0.00001;
+
+            if ((glm::abs(distanceABC - distanceBCA) > eps) || 
+                (glm::abs(distanceBCA - distanceCAB) > eps) || 
+                (glm::abs(distanceCAB - distanceABC) > eps))
+                debug_msg("Distances not equal ABC = %f, BCA = %f, CAB = %f", distanceABC, distanceBCA, distanceCAB);
+        }
+
+
         free(vertices);
     }
 
@@ -307,7 +369,6 @@ struct sdf_compute_t
             double qA = glm::sqrt(1.0 + dot(CA, AB));
             double qB = glm::sqrt(1.0 + dot(AB, BC));
             double qC = glm::sqrt(1.0 + dot(BC, CA));
-
 
             normals[indices[3 * f + 0]] += qA * n;
             normals[indices[3 * f + 1]] += qB * n;
@@ -427,7 +488,7 @@ struct sdf_compute_t
         std::atomic_uint* udf_texture;
     };
 
-    template<int threads> void udf_compute(int max_level)
+    template<int threads> GLuint udf_compute(int max_level, GLenum texture_unit)
     {
         udf_compute_info_t compute_info;
 
@@ -437,6 +498,7 @@ struct sdf_compute_t
         compute_info.triangles = F;
         compute_info.triangle_index = 0;
 
+        unsigned int p2 = 1 << max_level;
         unsigned int texture_size = 1 << (3 * max_level);
 
         unsigned int octree_size = 0;
@@ -468,6 +530,7 @@ struct sdf_compute_t
             debug_msg("Thread #%u joined the main thread.", thread_id);
         }
 
+        /*
         FILE* f = fopen("tex3d.txt", "w");
         for(unsigned int i = 0; i < texture_size; ++i)
         {
@@ -476,10 +539,39 @@ struct sdf_compute_t
             fprintf(f, "texture[%u] = %u (%f)\n", i, texel_value, value);
         }
         fclose(f);
+        */
+
+        int* udf_data = (int*) compute_info.udf_texture;
+
+        //===============================================================================================================================================================================================================
+        // create 3d texture of the type GL_R32F
+        //===============================================================================================================================================================================================================
+        GLuint texture_id;
+        glActiveTexture(texture_unit);
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_3D, texture_id);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        //glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, p2, p2, p2);
+
+        GLfloat* texture_data = (GLfloat*) malloc(texture_size * sizeof(GLfloat));
+
+        for(unsigned int p = 0; p < texture_size; ++p)
+            texture_data[p] = (float) (double(udf_data[p]) * INV_INT_SCALE);
+
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
 
         free(compute_info.octree);
         free(compute_info.udf_texture);
+        free(texture_data);
 
+        return texture_id;
     }
 
 
@@ -526,7 +618,7 @@ struct sdf_compute_t
             double inv_dAC = 1.0 / dAC;
 
             glm::dvec3 normal = glm::cross(BA, AC);
-            double inv_area = glm::length(normal);
+            double inv_area = 1.0 / glm::length(normal);
 
             //===========================================================================================================================================================================================================
             // our position in the octree and corresponding index into octree buffer
@@ -832,7 +924,23 @@ int main(int argc, char *argv[])
     free(pixels);    
 */
 
-    sdf_compute.udf_compute<4>(7);
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+
+    sdf_compute.udf_compute<8>(7, GL_TEXTURE0);
+
+    glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
+                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/udf_visualize.fs"));
+
+    udf_visualizer.enable();
+    uniform_t uni_uv_pv_matrix = udf_visualizer["projection_view_matrix"];
+    udf_visualizer["mask"] = (int) 127;
+    udf_visualizer["shift"] = (int) 7;
+
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -841,6 +949,11 @@ int main(int argc, char *argv[])
     {
         window.new_frame();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+        uni_uv_pv_matrix = projection_view_matrix;
+
+        glDrawArrays(GL_POINTS, 0, 128 * 128 * 128);
 
 
         window.end_frame();
