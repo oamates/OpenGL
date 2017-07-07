@@ -3,6 +3,9 @@
 //========================================================================================================================================================================================================================
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
+
+#include <atomic>
+#include <thread>
  
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -56,33 +59,53 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-float dot2(const glm::vec3& v) 
-    { return glm::dot(v, v); }
+const double INTEGRAL_SCALE = 268435456.0;
+const double INV_INT_SCALE = 1.0 / INTEGRAL_SCALE;
 
-float triangle_udf(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
+template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& p, const glm::tvec3<real_t>& a, const glm::tvec3<real_t>& b, const glm::tvec3<real_t>& c)
 {
-    glm::vec3 ba = b - a; glm::vec3 pa = p - a;
-    glm::vec3 cb = c - b; glm::vec3 pb = p - b;
-    glm::vec3 ac = a - c; glm::vec3 pc = p - c;
-    glm::vec3 n = glm::cross(ba, ac);
+    glm::tvec3<real_t> ba = b - a; glm::tvec3<real_t> pa = p - a;
+    glm::tvec3<real_t> cb = c - b; glm::tvec3<real_t> pb = p - b;
+    glm::tvec3<real_t> ac = a - c; glm::tvec3<real_t> pc = p - c;
+    glm::tvec3<real_t> n = glm::cross(ba, ac);
 
-    float q = glm::sign(glm::dot(glm::cross(ba, n), pa)) + 
-              glm::sign(glm::dot(glm::cross(cb, n), pb)) + 
-              glm::sign(glm::dot(glm::cross(ac, n), pc));
+    real_t q = glm::sign(glm::dot(glm::cross(ba, n), pa)) + 
+               glm::sign(glm::dot(glm::cross(cb, n), pb)) + 
+               glm::sign(glm::dot(glm::cross(ac, n), pc));
 
-    if (q >= 2.0f) 
-        return glm::sqrt(glm::dot(n, pa) * glm::dot(n, pa) / dot2(n));
+    if (q >= (real_t) 2.0) 
+        return glm::sqrt(glm::dot(n, pa) * glm::dot(n, pa) / glm::length2(n));
 
     return glm::sqrt(
         glm::min(
             glm::min(
-                dot2(ba * glm::clamp(glm::dot(ba, pa) / dot2(ba), 0.0f, 1.0f) - pa),
-                dot2(cb * glm::clamp(glm::dot(cb, pb) / dot2(cb), 0.0f, 1.0f) - pb)
+                glm::length2(ba * glm::clamp(glm::dot(ba, pa) / glm::length2(ba), (real_t) 0.0, (real_t) 1.0) - pa),
+                glm::length2(cb * glm::clamp(glm::dot(cb, pb) / glm::length2(cb), (real_t) 0.0, (real_t) 1.0) - pb)
             ), 
-            dot2(ac * glm::clamp(glm::dot(ac, pc) / dot2(ac), 0.0f, 1.0f) - pc)
+            glm::length2(ac * glm::clamp(glm::dot(ac, pc) / glm::length2(ac), (real_t) 0.0, (real_t) 1.0) - pc)
         )
     );
 }
+
+unsigned int atomic_min(std::atomic_uint& atomic_var, unsigned int value)
+{
+    unsigned int previous_value = atomic_var;
+    while(previous_value > value && !atomic_var.compare_exchange_weak(previous_value, value));
+    return previous_value;
+}
+
+const glm::dvec3 shift[8] =
+{
+    glm::dvec3(-1.0, -1.0, -1.0),
+    glm::dvec3( 1.0, -1.0, -1.0),
+    glm::dvec3(-1.0,  1.0, -1.0),
+    glm::dvec3( 1.0,  1.0, -1.0),
+    glm::dvec3(-1.0, -1.0,  1.0),
+    glm::dvec3( 1.0, -1.0,  1.0),
+    glm::dvec3(-1.0,  1.0,  1.0),
+    glm::dvec3( 1.0,  1.0,  1.0)
+};
+
 
 struct texture3d_t
 {
@@ -123,6 +146,7 @@ struct texture3d_t
 
 struct sdf_compute_t
 {
+
     vao_t::header_t header;
 
     GLuint V;
@@ -182,14 +206,7 @@ struct sdf_compute_t
                 debug_msg("Normal degeneracy at triangle %u ::", f);
                 //debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
             }
-        }        
-
-
-
-
-
-
-
+        }
 
         sdf_compute_t::bbox_max = bbox_max;
         debug_msg("Normalizing the model :: bbox_max = %f.", bbox_max);
@@ -397,16 +414,266 @@ struct sdf_compute_t
         }        
     }
 
+    struct udf_compute_info_t
+    {
+        unsigned int max_level;
 
+        glm::dvec3* positions;
+        GLuint* indices;
+        GLuint triangles;
+
+        std::atomic_uint triangle_index;
+        std::atomic_uint* octree;
+        std::atomic_uint* udf_texture;
+    };
+
+    template<int threads> void udf_compute(int max_level)
+    {
+        udf_compute_info_t compute_info;
+
+        compute_info.max_level = max_level;
+        compute_info.positions = positions;
+        compute_info.indices = indices;
+        compute_info.triangles = F;
+        compute_info.triangle_index = 0;
+
+        unsigned int texture_size = 1 << (3 * max_level);
+
+        unsigned int octree_size = 0;
+        unsigned int mip_size = 8;
+        for(unsigned int i = 0; i < max_level - 1; ++i)
+        {
+            octree_size += mip_size;
+            mip_size <<= 3;
+        }
+
+        unsigned int diameter = 929887697;        // = 2^28 * 2sqrt(3)
+
+        compute_info.octree      = (std::atomic_uint*) malloc( octree_size * sizeof(unsigned int));
+        compute_info.udf_texture = (std::atomic_uint*) malloc(texture_size * sizeof(unsigned int));
+
+        for(unsigned int i = 0; i < octree_size; ++i) compute_info.octree[i] = diameter;
+        for(unsigned int i = 0; i < texture_size; ++i) compute_info.udf_texture[i] = diameter;
+
+        std::thread computation_thread[threads];
+
+        for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+            computation_thread[thread_id] = std::thread(sdf_compute_t::udf_compute_thread_func, &compute_info);
+
+        udf_compute_thread_func(&compute_info);
+
+        for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+        {
+            computation_thread[thread_id].join();
+            debug_msg("Thread #%u joined the main thread.", thread_id);
+        }
+
+        FILE* f = fopen("tex3d.txt", "w");
+        for(unsigned int i = 0; i < texture_size; ++i)
+        {
+            unsigned int texel_value = compute_info.udf_texture[i].load();
+            double value = double(texel_value) * INV_INT_SCALE;
+            fprintf(f, "texture[%u] = %u (%f)\n", i, texel_value, value);
+        }
+        fclose(f);
+
+        free(compute_info.octree);
+        free(compute_info.udf_texture);
+
+    }
+
+
+    static void udf_compute_thread_func(udf_compute_info_t* compute_data)
+    {
+        const unsigned int MAX_LEVEL = 10;
+        unsigned int max_level = compute_data->max_level;
+        unsigned int p2 = 1 << max_level;
+        double p2m1 = double(1 << (max_level - 1));
+        double inv_p2 = 1.0 / p2;
+        double cube_diameter = 2.0 * constants::sqrt3_d;
+
+        //===============================================================================================================================================================================================================
+        // get the index of the triangle this invocation will work on 
+        //===============================================================================================================================================================================================================
+        unsigned int triangle = compute_data->triangle_index++;
+
+        while (triangle < compute_data->triangles)
+        {
+            debug_msg("Processing triangle #%u", triangle);
+            //===========================================================================================================================================================================================================
+            // get the indices and the vertices of the triangle
+            //===========================================================================================================================================================================================================
+            unsigned int base_index = 3 * triangle;
+
+            unsigned int iA = compute_data->indices[base_index + 0];
+            unsigned int iB = compute_data->indices[base_index + 1];
+            unsigned int iC = compute_data->indices[base_index + 2];
+
+            glm::dvec3 vA = compute_data->positions[iA];
+            glm::dvec3 vB = compute_data->positions[iB];
+            glm::dvec3 vC = compute_data->positions[iC];
+
+            glm::dvec3 BA = vB - vA; double dBA = glm::length2(BA);
+            glm::dvec3 CB = vC - vB; double dCB = glm::length2(CB);
+            glm::dvec3 AC = vA - vC; double dAC = glm::length2(AC);
+
+            //===========================================================================================================================================================================================================
+            // calculate triangle diameter
+            //===========================================================================================================================================================================================================
+            double triangle_diameter = glm::max(glm::max(glm::sqrt(dBA), glm::sqrt(dCB)), glm::sqrt(dAC));
+            double inv_dBA = 1.0 / dBA;
+            double inv_dCB = 1.0 / dCB;
+            double inv_dAC = 1.0 / dAC;
+
+            glm::dvec3 normal = glm::cross(BA, AC);
+            double inv_area = glm::length(normal);
+
+            //===========================================================================================================================================================================================================
+            // our position in the octree and corresponding index into octree buffer
+            //===========================================================================================================================================================================================================
+            unsigned int octree_digit[MAX_LEVEL];
+            unsigned int node_index = 0;
+            octree_digit[0] = 0;
+            octree_digit[1] = 0;
+
+            //===========================================================================================================================================================================================================
+            // the algorithm starts with jumping from level 0 to level 1 and recursively going down/up
+            // when we come back to the level 0, distance octree will be traversed and updated
+            //===========================================================================================================================================================================================================
+            unsigned int level = 1;
+            double scale = 0.5;
+
+            glm::dvec3 node_position[MAX_LEVEL];
+            node_position[0] = glm::dvec3(0.0);
+
+            while(level)
+            {
+                //=======================================================================================================================================================================================================
+                // update the current position of the node and calculate the distance from the triangle to it
+                //=======================================================================================================================================================================================================
+                node_position[level] = node_position[level - 1] + scale * shift[octree_digit[level]];
+                glm::dvec3 p = node_position[level];
+
+                glm::dvec3 pA = p - vA;
+                glm::dvec3 pB = p - vB;
+                glm::dvec3 pC = p - vC;
+
+                double q = glm::sign(glm::dot(glm::cross(BA, normal), pA)) + glm::sign(glm::dot(glm::cross(CB, normal), pB)) + glm::sign(glm::dot(glm::cross(AC, normal), pC));
+
+                double distance_to_node = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) : 
+                    glm::sqrt(
+                        glm::min(
+                            glm::min(
+                                glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
+                                glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
+                            ), 
+                                glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
+                        )
+                    );
+
+                unsigned int idistance_to_node = (unsigned int)(distance_to_node * INTEGRAL_SCALE);
+
+                unsigned int icurrent_distance = atomic_min(compute_data->octree[node_index], idistance_to_node);
+                float current_distance = float(icurrent_distance) * INV_INT_SCALE;
+                double node_diameter = (scale - inv_p2) * cube_diameter;
+
+                //=======================================================================================================================================================================================================
+                // compare the distance with the distance currently stored in octree
+                //=======================================================================================================================================================================================================
+
+                if (distance_to_node >= node_diameter + current_distance + triangle_diameter)
+                {
+                    //===================================================================================================================================================================================================
+                    // current_distance is small enough, the node can be skipped completely
+                    // either stay on the same level or go up if octree_digit[level] == 7
+                    //===================================================================================================================================================================================================
+                    while(octree_digit[level] == 7)
+                    {
+                        scale += scale;
+                        node_index = (node_index >> 3) - 1;
+                        level--;
+                    }
+                    octree_digit[level]++;
+                    node_index++;
+                }
+                else
+                {
+                    //===================================================================================================================================================================================================
+                    // must process this node
+                    //===================================================================================================================================================================================================
+                    if (level == max_level - 1)
+                    {
+                        //===============================================================================================================================================================================================
+                        // we came to 8 octree leafs, compute the 8 distances and do atomic_min
+                        //===============================================================================================================================================================================================
+                        glm::dvec3 leaf_node = node_position[compute_data->max_level - 1];
+                        for(unsigned int v = 0; v < 8; ++v)
+                        {
+                            glm::dvec3 leaf_position = leaf_node + inv_p2 * shift[v];
+                            glm::ivec3 uvw = glm::ivec3(glm::floor(p2m1 + p2m1 * leaf_position));
+                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x; 
+
+                            glm::dvec3 pA = leaf_position - vA;
+                            glm::dvec3 pB = leaf_position - vB;
+                            glm::dvec3 pC = leaf_position - vC;
+
+                            double q = glm::sign(glm::dot(glm::cross(BA, normal), pA)) + glm::sign(glm::dot(glm::cross(CB, normal), pB)) + glm::sign(glm::dot(glm::cross(AC, normal), pC));
+                            double distance_to_leaf = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) : 
+                                glm::sqrt(
+                                    glm::min(
+                                        glm::min(
+                                            glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
+                                            glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
+                                        ), 
+                                        glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
+                                    )
+                                );
+
+                            unsigned int idistance_to_leaf = (unsigned int)(distance_to_leaf * INTEGRAL_SCALE);
+
+                            atomic_min(compute_data->udf_texture[tex3d_index], idistance_to_leaf);
+                        }
+
+                        //===============================================================================================================================================================================================
+                        // come back one/more levels up in the octree
+                        //===============================================================================================================================================================================================
+                        while(octree_digit[level] == 7)
+                        {
+                            scale += scale;
+                            node_index = (node_index >> 3) - 1;
+                            level--;
+                        }
+                        octree_digit[level]++;
+                        node_index++;
+                    }   
+                    else
+                    {
+                        //===============================================================================================================================================================================================
+                        // go down
+                        //===============================================================================================================================================================================================
+                        level++;
+                        octree_digit[level] = 0;
+                        node_index = (node_index + 1) << 3;
+                        scale *= 0.5;
+                    }
+                }
+            }
+
+            //===============================================================================================================================================================================================================
+            // done ... proceed to next triangle
+            //===============================================================================================================================================================================================================
+            triangle = compute_data->triangle_index++;
+        }
+    }
 };
-
-
 
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+    debug_msg("Sizeof(std::atomic_uint) = %u", sizeof(std::atomic_uint));
+
     int res_x = 1920;
     int res_y = 1080;
 
@@ -483,7 +750,7 @@ int main(int argc, char *argv[])
     glBindImageTexture(1, vbo_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
     //===================================================================================================================================================================================================================
-    // 3. 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152 + 16777216 octree buffer;
+    // 3. 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152 octree buffer;
     //===================================================================================================================================================================================================================
     GLuint octree_size = 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152;
 
@@ -497,9 +764,9 @@ int main(int argc, char *argv[])
     glBindTexture(GL_TEXTURE_BUFFER, octree_tex_id);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, octree_buf_id);
 
-    GLuint minus1 = 0xFFFFFFFF;
+    GLuint diameter = 929887697;        // = 2^28 * 2sqrt(3)
     GLuint zero = 0;
-    glClearBufferData(GL_ARRAY_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+    glClearBufferData(GL_ARRAY_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &diameter);
     glBindImageTexture(2, octree_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32UI);
 
     //===================================================================================================================================================================================================================
@@ -533,10 +800,10 @@ int main(int argc, char *argv[])
 
     glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32UI, size, size, size);
 
-    glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &minus1);
+    glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &diameter);
     glBindImageTexture(3, texture_id, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA32F);
 
-
+/*
     udf_compute.enable();
     udf_compute["triangles"] = (unsigned int) F;
     glDispatchCompute(1, 1, 1);
@@ -563,6 +830,9 @@ int main(int argc, char *argv[])
     }
 
     free(pixels);    
+*/
+
+    sdf_compute.udf_compute<4>(7);
 
     //===================================================================================================================================================================================================================
     // main program loop
