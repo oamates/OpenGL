@@ -1153,7 +1153,7 @@ int main(int argc, char *argv[])
     int res_x = 1920;
     int res_y = 1080;
 
-    int max_level = 6;
+    int max_level = 7;
     int p2 = 1 << max_level;
     int octree_size = 0;
     int mip_size = 8;
@@ -1286,29 +1286,9 @@ int main(int argc, char *argv[])
 
     udf_compute.enable();
     udf_compute["triangles"] = (int) F;
+    udf_compute["level"] = (int) max_level;
     glDispatchCompute(1, 1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-
-
-
-    GLuint pixel_data_size = sizeof(GLuint) * p2 * p2 * p2;
-    GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
-    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, pixels);
-
-    int w = p2 / 4;
-
-    debug_msg("Printing integral texture");
-    for (int i0 = w; i0 < p2 - w; ++i0) for (int i1 = w; i1 < p2 - w; ++i1) for (int i2 = w; i2 < p2 - w; ++i2)
-    {
-        int index = i0 + p2 * i1 + p2 * p2 * i2;
-        GLuint value = ((GLuint *) pixels)[index];
-        debug_msg("texture[%u, %u, %u] = %u.", i0, i1, i2, value);
-    }
-
-    free(pixels);    
-
-
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -1326,9 +1306,9 @@ int main(int argc, char *argv[])
     udf_visualizer["mask"] = (int) ((1 << max_level) - 1);
     udf_visualizer["shift"] = (int) max_level;
 
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //glDisable(GL_DEPTH_TEST);
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //===================================================================================================================================================================================================================
     // main program loop

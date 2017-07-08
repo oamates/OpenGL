@@ -1,23 +1,19 @@
 #version 430 core
 
-layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout (local_size_x = 1024, local_size_y = 1, local_size_z = 1) in;
 
 const int MAX_LEVEL = 10;
 
-const int max_level = 6;
-const int p2 = 64; //1 << max_level;
-const int p2m1 = 1 << (max_level - 1);
-const float inv_p2 = 1.0 / p2;
-
 //==============================================================================================================================================================
-// input :: the number of triangles to process and ...
+// input :: level, the number of triangles to process and ...
 //   image unit 0 :: index buffer of GL_TRIANGLES type
 //   image unit 1 :: positions buffer, vec3 with w component ignored for now (format GL_RGB32F is not valid for GL_TEXTURE_BUFFER)
 //==============================================================================================================================================================
+uniform int level;
 uniform int triangles;
 
 layout (r32ui, binding = 0) uniform uimageBuffer index_buffer;
-layout (rgba32f, binding = 1) uniform imageBuffer vertex_buffer;
+layout (rgba32f, binding = 1) uniform imageBuffer position_buffer;
 
 //==============================================================================================================================================================
 // auxiliary buffer needed for search octree construction
@@ -27,12 +23,12 @@ layout (rgba32f, binding = 1) uniform imageBuffer vertex_buffer;
 layout (r32ui, binding = 2) uniform uimageBuffer octree;
 
 //==============================================================================================================================================================
-// atomic counter backed up by an atomic counter buffer for triangle separation among execution threads 
+// atomic counter backed up by an atomic counter buffer for triangles dispatching among this shader invocations
 //==============================================================================================================================================================
 layout (binding = 0, offset = 0) uniform atomic_uint triangle_index;
 
 //==============================================================================================================================================================
-// output 3d texture, of size 2^{n} x 2^{n} x 2^{n}, n = max_level
+// output 3d texture, of size 2^{n} x 2^{n} x 2^{n}, n = level
 //==============================================================================================================================================================
 layout (r32ui, binding = 3) uniform uimage3D udf_tex;
 
@@ -56,6 +52,10 @@ const vec3 shift[8] = vec3[]
     vec3( 1.0,  1.0,  1.0)
 );
 
+const int p2 = 1 << level;
+const int p2m1 = 1 << (level - 1);
+const float inv_p2 = 1.0 / p2;
+
 const float INTEGRAL_SCALE = 268435456.0;
 const float INV_INT_SCALE = 1.0 / INTEGRAL_SCALE;
 const float sqrt3 = 1.73205080757;
@@ -66,22 +66,22 @@ void main()
     //==========================================================================================================================================================
     // get the index of the triangle this invocation will work on 
     //==========================================================================================================================================================
-    uint triangle = atomicCounterIncrement(triangle_index);
+    uint t = atomicCounterIncrement(triangle_index);
 
-    while (triangle < triangles)
+    while (t < triangles)
     {
         //======================================================================================================================================================
-        // get the indices and the vertices of the triangle
+        // get indices and vertices of the triangle
         //======================================================================================================================================================
-        int base_index = 3 * int(triangle);
+        int base_index = 3 * int(t);
 
         int iA = int(imageLoad(index_buffer, base_index + 0).x);        
         int iB = int(imageLoad(index_buffer, base_index + 1).x);
         int iC = int(imageLoad(index_buffer, base_index + 2).x);
 
-        vec3 vA = imageLoad(vertex_buffer, iA).xyz;
-        vec3 vB = imageLoad(vertex_buffer, iB).xyz;
-        vec3 vC = imageLoad(vertex_buffer, iC).xyz;
+        vec3 vA = imageLoad(position_buffer, iA).xyz;
+        vec3 vB = imageLoad(position_buffer, iB).xyz;
+        vec3 vC = imageLoad(position_buffer, iC).xyz;
 
         //======================================================================================================================================================
         // calculate triangle diameter
@@ -107,22 +107,22 @@ void main()
         octree_digit[1] = 0;        
 
         //======================================================================================================================================================
-        // the algorithm starts with jumping from level 0 to level 1 and recursively going down/up
+        // the algorithm starts with jumping from level 0 to level 1 and recursively going down / up
         // when we come back to the level 0, distance octree will be traversed and updated
         //======================================================================================================================================================
-        int level = 1;
+        int l = 1;
         float scale = 0.5;
 
         vec3 node_position[MAX_LEVEL];
         node_position[0] = vec3(0.0);
 
-        while(level != 0)
+        while(l != 0)
         {
             //==================================================================================================================================================
             // update the current position of the node and calculate the distance from the triangle to it
             //==================================================================================================================================================
-            node_position[level] = node_position[level - 1] + scale * shift[octree_digit[level]];
-            vec3 p = node_position[level];
+            node_position[l] = node_position[l - 1] + scale * shift[octree_digit[l]];
+            vec3 p = node_position[l];
 
             vec3 pA = p - vA;
             vec3 pB = p - vB;
@@ -157,23 +157,23 @@ void main()
                 // current_distance is small enough, the node can be skipped completely
                 // either stay on the same level and take next digit or go up if the last digit (7) on the current level has been processed
                 //==============================================================================================================================================
-                while(octree_digit[level] == 7)
+                while(octree_digit[l] == 7)
                 {
                     scale += scale;
                     node_index = (node_index >> 3) - 1;
-                    level--;
+                    l--;
                 }
-                octree_digit[level]++;
+                octree_digit[l]++;
                 node_index++;
             }
             else
             {
-                if (level == max_level - 1)
+                if (l == level - 1)
                 {
                     //==========================================================================================================================================
-                    // we came to 8 octree leafs, compute the 8 distances and do atomicMin
+                    // we came to the last level, update 8 leaves, computing 8 distances and doing imageAtomicMin
                     //==========================================================================================================================================
-                    vec3 leaf_node = node_position[max_level - 1];
+                    vec3 leaf_node = node_position[level - 1];
                     for(int v = 0; v < 8; ++v)
                     {
                         vec3 leaf_position = leaf_node + inv_p2 * shift[v];
@@ -202,22 +202,22 @@ void main()
                     //==========================================================================================================================================
                     // stay on the same level and take next digit or go up if the last digit (=7) on the current level has been processed
                     //==========================================================================================================================================
-                    while(octree_digit[level] == 7)
+                    while(octree_digit[l] == 7)
                     {
                         scale += scale;
                         node_index = (node_index >> 3) - 1;
-                        level--;
+                        l--;
                     }
-                    octree_digit[level]++;
+                    octree_digit[l]++;
                     node_index++;
                 }
                 else
                 {
                     //==========================================================================================================================================
-                    // go down
+                    // descend one level down
                     //==========================================================================================================================================
-                    level++;
-                    octree_digit[level] = 0;
+                    l++;
+                    octree_digit[l] = 0;
                     node_index = (node_index + 1) << 3;
                     scale *= 0.5;
                 }
@@ -227,6 +227,6 @@ void main()
         //======================================================================================================================================================
         // done ... proceed to next triangle
         //======================================================================================================================================================
-        triangle = atomicCounterIncrement(triangle_index);
+        t = atomicCounterIncrement(triangle_index);
     }
 }

@@ -14,8 +14,10 @@ void main()
 	uint d = texture(udf_tex, uvw).x;
 
     float q = INV_INT_SCALE * float(d);
+    if (q > 0.05) discard;
 
 	float w = exp(-8.0 * abs(q));
+
 
     FragmentColor = vec4(w, w, w, 1.0);
 }
