@@ -518,7 +518,7 @@ struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int));
+        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int), "Atomic uint has larger size than uint. Not good.");
 
         tri_udf_compute_data_t compute_data;
 
@@ -607,7 +607,7 @@ struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int));
+        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int), "Atomic uint has larger size than uint. Not good.");
 
         pnt_udf_compute_data_t compute_data;
 
@@ -697,10 +697,10 @@ struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int));
+        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int), "Atomic uint has larger size than uint. Not good.");
 
         const unsigned int diameter = 929887697;        // = 2^28 * 2sqrt(3)
-        const double delta = 0.0078125;
+        const double delta = 0.0078125 * 2;
 
         pnt_udf_compute_data_t compute_data;
 
@@ -958,7 +958,7 @@ struct sdf_compute_t
                         //===============================================================================================================================================================================================
                         // we came to 8 octree leafs, compute the 8 distances and do atomic_min
                         //===============================================================================================================================================================================================
-                        glm::dvec3 leaf_node = node_position[compute_data->max_level - 1];
+                        glm::dvec3 leaf_node = node_position[max_level - 1];
                         for(unsigned int v = 0; v < 8; ++v)
                         {
                             glm::dvec3 leaf_position = leaf_node + inv_p2 * shift[v];
@@ -977,7 +977,7 @@ struct sdf_compute_t
                                             glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
                                             glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
                                         ), 
-                                        glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
+                                            glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
                                     )
                                 );
 
@@ -985,7 +985,7 @@ struct sdf_compute_t
                             atomic_min(compute_data->udf_texture[tex3d_index], idistance_to_leaf);
                         }
                         //===============================================================================================================================================================================================
-                        // come back one/more levels up in the octree
+                        // stay on the same level or go up if the last digit (=7) on the current level has been processed
                         //===============================================================================================================================================================================================
                         while(octree_digit[level] == 7)
                         {
@@ -1047,6 +1047,7 @@ struct sdf_compute_t
             //===========================================================================================================================================================================================================
             unsigned int octree_digit[MAX_LEVEL];
             unsigned int node_index = 0;
+            octree_digit[0] = 0;
             octree_digit[1] = 0;
 
             //===========================================================================================================================================================================================================
@@ -1149,10 +1150,22 @@ struct sdf_compute_t
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-    debug_msg("Sizeof(std::atomic_uint) = %u", sizeof(std::atomic_uint));
-
     int res_x = 1920;
     int res_y = 1080;
+
+    int max_level = 6;
+    int p2 = 1 << max_level;
+    int octree_size = 0;
+    int mip_size = 8;
+
+    GLuint diameter = 929887697;        // = 2^28 * 2sqrt(3)
+    GLuint zero = 0;
+
+    for(int i = 0; i < max_level - 1; ++i)
+    {
+        octree_size += mip_size;
+        mip_size <<= 3;
+    }    
 
     //===================================================================================================================================================================================================================
     // step 0 :: initialize GLFW library
@@ -1166,33 +1179,29 @@ int main(int argc, char *argv[])
 
     glsl_program_t udf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/udf_compute.cs"));
 
-    //=========================================================================================================     ==========================================================================================================
-    // step 2 :: load demon model
+    //===================================================================================================================================================================================================================
+    // step 1 :: load demon model
     //===================================================================================================================================================================================================================
     sdf_compute_t sdf_compute;
     sdf_compute.load_model("../../../resources/models/vao/trefoil.vao", 0.984375);
     sdf_compute.calculate_statistics();
     debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for original model after normalization. !!!!!!!!!!!!\n\n");
 
-
-
     sdf_compute.compute_area_weighted_normals();
     sdf_compute.test_original_degeneracy();
     debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for area-weighted normals. !!!!!!!!!!!!\n\n");
-
-
 
     sdf_compute.compute_angle_weighted_normals();
     sdf_compute.test_original_degeneracy();
     debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for angle-weighted normals. !!!!!!!!!!!!\n\n");
 
+    int F = sdf_compute.F;
+    int V = sdf_compute.V;
 
-/*
     //===================================================================================================================================================================================================================
     // 1. index buffer
     //===================================================================================================================================================================================================================
     GLuint ibo_id;
-    int F = sdf_compute.F;
 
     glGenBuffers(1, &ibo_id);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
@@ -1208,7 +1217,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // 2. vertex positions buffer
     //===================================================================================================================================================================================================================
-    int V = sdf_compute.V;
     glm::vec4* positions = (glm::vec4*) malloc(sizeof(glm::vec4) * V);
 
     for(int v = 0; v < V; ++v)
@@ -1217,7 +1225,9 @@ int main(int argc, char *argv[])
     GLuint vbo_id;
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(glm::vec4) * V, positions, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec4) * V, positions, GL_STATIC_DRAW);
+
+    free(positions);
 
     GLuint vbo_tex_id;
     glGenTextures(1, &vbo_tex_id);
@@ -1227,43 +1237,35 @@ int main(int argc, char *argv[])
     glBindImageTexture(1, vbo_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
 
     //===================================================================================================================================================================================================================
-    // 3. 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152 octree buffer;
+    // 3. create octree buffer with texture buffer access
     //===================================================================================================================================================================================================================
-    GLuint octree_size = 8 + 64 + 512 + 4096 + 32768 + 262144 + 2097152;
-
     GLuint octree_buf_id;
     glGenBuffers(1, &octree_buf_id);
-    glBindBuffer(GL_ARRAY_BUFFER, octree_buf_id);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLuint) * octree_size, 0, GL_STATIC_DRAW);
+    glBindBuffer(GL_TEXTURE_BUFFER, octree_buf_id);
+    glBufferData(GL_TEXTURE_BUFFER, sizeof(GLuint) * octree_size, 0, GL_DYNAMIC_COPY);
 
     GLuint octree_tex_id;
     glGenTextures(1, &octree_tex_id);
     glBindTexture(GL_TEXTURE_BUFFER, octree_tex_id);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, octree_buf_id);
 
-    GLuint diameter = 929887697;        // = 2^28 * 2sqrt(3)
-    GLuint zero = 0;
-    glClearBufferData(GL_ARRAY_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &diameter);
-    glBindImageTexture(2, octree_tex_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_R32UI);
+    glClearBufferData(GL_TEXTURE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &diameter);
+    glBindImageTexture(2, octree_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
 
     //===================================================================================================================================================================================================================
-    // 4. create the atomic counter buffer with 1 element
+    // 4. create atomic counter buffer with 1 element
     //===================================================================================================================================================================================================================
     GLuint acbo_id;
     glGenBuffers(1, &acbo_id);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, acbo_id);
     glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
     glClearBufferData(GL_ATOMIC_COUNTER_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
-
-
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, acbo_id);
 
     //===================================================================================================================================================================================================================
-    // 5. 256x256x256 GL_TEXTURE_3D
+    // 5. GL_TEXTURE_3D
     //===================================================================================================================================================================================================================
-
     GLuint texture_id;
-    GLuint size = 256;
-
     glActiveTexture(GL_TEXTURE0);
     glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_3D, texture_id);
@@ -1275,48 +1277,46 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32UI, size, size, size);
+    glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32UI, p2, p2, p2);
 
     glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &diameter);
-    glBindImageTexture(3, texture_id, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA32F);
+
+
+    glBindImageTexture(3, texture_id, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R32UI);
 
     udf_compute.enable();
-    udf_compute["triangles"] = (unsigned int) F;
+    udf_compute["triangles"] = (int) F;
     glDispatchCompute(1, 1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);    
 
-    debug_msg("Computation done ...");
 
 
-    GLuint pixel_data_size = sizeof(GLuint) * 256 * 256 * 256;
+
+    GLuint pixel_data_size = sizeof(GLuint) * p2 * p2 * p2;
     GLvoid* pixels = (GLvoid*) malloc(pixel_data_size);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_3D, texture_id);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, pixels);
 
-    int w = 112;
+    int w = p2 / 4;
 
     debug_msg("Printing integral texture");
-    for (int i0 = w; i0 < 256 - w; ++i0) for (int i1 = w; i1 < 256 - w; ++i1) for (int i2 = w; i2 < 256 - w; ++i2)
+    for (int i0 = w; i0 < p2 - w; ++i0) for (int i1 = w; i1 < p2 - w; ++i1) for (int i2 = w; i2 < p2 - w; ++i2)
     {
-        int index = i0 + 256 * i1 + 65536 * i2;
+        int index = i0 + p2 * i1 + p2 * p2 * i2;
         GLuint value = ((GLuint *) pixels)[index];
         debug_msg("texture[%u, %u, %u] = %u.", i0, i1, i2, value);
     }
 
     free(pixels);    
-*/
 
-    int max_level = 7;
-    int p2 = 1 << max_level;
+
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
     // sdf_compute.pnt_udf_compute<8>(max_level, GL_TEXTURE0);
-    sdf_compute.pnt_udf_compute<8>(max_level, GL_TEXTURE0);
+    // sdf_compute.pnt_sdf_compute<4>(max_level, GL_TEXTURE0);
+
 
     glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/udf_visualize.fs"));

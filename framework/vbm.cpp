@@ -61,11 +61,11 @@ bool VBObject::LoadFromVBM(const char * filename, int vertexIndex, int normalInd
         unsigned int element_size;
         element_size = (header->index_type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLuint);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, header->num_indices * element_size, data + total_data_size, GL_STATIC_DRAW);
-    };
+    }
 
     delete [] data;
     return true;
-};
+}
 
 void VBObject::Render(unsigned int frame_index, unsigned int instances)
 {
@@ -85,8 +85,8 @@ void VBObject::Render(unsigned int frame_index, unsigned int instances)
             glDrawElements(GL_TRIANGLES, m_frame[frame_index].count, GL_UNSIGNED_INT, (GLvoid *)(m_frame[frame_index].first * sizeof(GLuint)));
         else
             glDrawArrays(GL_TRIANGLES, m_frame[frame_index].first, m_frame[frame_index].count);
-    };
-};
+    }
+}
 
 VBObject::~VBObject(void)
 {
@@ -95,4 +95,4 @@ VBObject::~VBObject(void)
     glDeleteVertexArrays(1, &vao_id);
     delete [] m_attrib;
     delete [] m_frame;
-};
+}

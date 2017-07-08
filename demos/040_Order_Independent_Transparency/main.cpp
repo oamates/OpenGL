@@ -140,6 +140,7 @@ int main(int argc, char *argv[])
     glGenBuffers(1, &acbo_id);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, acbo_id);
     glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, acbo_id);    
 
     //===================================================================================================================================================================================================================
     // clear list root pointers texture and bind it to texture unit 0
