@@ -1287,7 +1287,7 @@ int main(int argc, char *argv[])
     udf_compute.enable();
     udf_compute["triangles"] = (int) F;
     glDispatchCompute(1, 1, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);    
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 
 
