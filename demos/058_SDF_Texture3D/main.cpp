@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <thread>
+#include <map>
  
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -111,6 +112,15 @@ const glm::dvec3 shift[8] =
     glm::dvec3( 1.0,  1.0,  1.0)
 };
 
+struct tex3d_header_t
+{
+    GLenum target;
+    GLenum internal_format;
+    GLenum format;
+    GLenum type;
+    glm::ivec3 size;
+    GLuint data_size;    
+};
 
 struct texture3d_t
 {
@@ -190,30 +200,13 @@ struct sdf_compute_t
         V = header.vbo_size;
         F = header.ibo_size / 3;
         debug_msg("VAO Loaded :: V = %d. F = %d. indices = %d. ", V, F, header.ibo_size);
+        if(header.mode == GL_TRIANGLES)
+            debug_msg("Primitive mode :: GL_TRIANGLES");
+        else
+            debug_msg("Primitive mode :: GL_TRIANGLE_STRIP");
 
-        debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for original model. !!!!!!!!!!!!\n\n");
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::vec3 A  = vertices[indices[3 * f + 0]].position;
-            glm::vec3 nA = vertices[indices[3 * f + 0]].normal;
-            glm::vec3 B  = vertices[indices[3 * f + 1]].position;
-            glm::vec3 nB = vertices[indices[3 * f + 1]].normal;
-            glm::vec3 C  = vertices[indices[3 * f + 2]].position;
-            glm::vec3 nC = vertices[indices[3 * f + 2]].normal;
-
-            glm::vec3 n = glm::normalize(glm::cross(B - A, C - A));
-
-            float dpA = glm::dot(n, nA);
-            float dpB = glm::dot(n, nB);
-            float dpC = glm::dot(n, nC);
-
-            if ((dpA < 0.0) || (dpB < 0.0) || (dpC < 0.0))
-            {
-                debug_msg("Normal degeneracy at triangle %u ::", f);
-                //debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
-            }
-        }
-
+        test_manifoldness();
+        
         sdf_compute_t::bbox_max = bbox_max;
         debug_msg("Normalizing the model :: bbox_max = %f.", bbox_max);
 
@@ -248,7 +241,7 @@ struct sdf_compute_t
         double scale = bbox_max / max_bbox;
 
         debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
-        debug_msg("maximum = %f. scale = %f. Scaling ...", max_bbox, scale);
+        debug_msg("bbox_max = %f. maximum = %f. scale = %f. Scaling ...", bbox_max, max_bbox, scale);
 
         bbox = glm::dvec3(0.0);
         for (GLuint v = 0; v < V; ++v)
@@ -268,68 +261,73 @@ struct sdf_compute_t
         debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
         debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
 
-/*
-        debug_msg("\n\n\nTesting distance-to-triangle function\n\n\n");
-
-        for(int i = 0; i < 65536; ++i)
-        {
-            int base_index = 3 * (i % F);
-            glm::dvec3 vA = positions[indices[base_index + 0]];
-            glm::dvec3 vB = positions[indices[base_index + 1]];
-            glm::dvec3 vC = positions[indices[base_index + 2]];
-
-            glm::dvec3 vP = glm::dvec3(glm::linearRand(-1.0, 1.0), glm::linearRand(-1.0, 1.0), glm::linearRand(-1.0, 1.0));
-
-            double distanceABC = triangle_udf(vP, vA, vB, vC);
-            double distanceBCA = triangle_udf(vP, vB, vC, vA);
-            double distanceCAB = triangle_udf(vP, vC, vA, vB);
-
-            double distanceAP = glm::length(vP - vA);
-            double distanceBP = glm::length(vP - vB);
-            double distanceCP = glm::length(vP - vC);
-
-            if ((distanceABC < 0.0) || (distanceBCA < 0.0) || (distanceCAB < 0.0))
-            {
-                debug_msg("Error !!!!! Negative distance returned !!!!");
-                debug_msg("\tdistanceABC = %f, distanceBCA = %f, distanceCAB = %f", distanceABC, distanceBCA, distanceCAB);
-            }
-
-            if (distanceAP < distanceABC)
-                debug_msg("distanceAP > distanceABC :: %f < %f", distanceAP, distanceABC);
-            if (distanceAP < distanceBCA)
-                debug_msg("distanceAP > distanceBCA :: %f < %f", distanceAP, distanceBCA);
-            if (distanceAP < distanceCAB)
-                debug_msg("distanceAP > distanceCAB :: %f < %f", distanceAP, distanceCAB);
-
-            if (distanceBP < distanceABC)
-                debug_msg("distanceBP > distanceABC :: %f < %f", distanceBP, distanceABC);
-            if (distanceBP < distanceBCA)
-                debug_msg("distanceBP > distanceBCA :: %f < %f", distanceBP, distanceBCA);
-            if (distanceBP < distanceCAB)
-                debug_msg("distanceBP > distanceCAB :: %f < %f", distanceBP, distanceCAB);
-
-            if (distanceCP < distanceABC)
-                debug_msg("distanceCP > distanceABC :: %f < %f", distanceCP, distanceABC);
-            if (distanceCP < distanceBCA)
-                debug_msg("distanceCP > distanceBCA :: %f < %f", distanceCP, distanceBCA);
-            if (distanceCP < distanceCAB)
-                debug_msg("distanceCP > distanceCAB :: %f < %f", distanceCP, distanceCAB);
-
-            const double eps = 0.00001;
-
-            if ((glm::abs(distanceABC - distanceBCA) > eps) || 
-                (glm::abs(distanceBCA - distanceCAB) > eps) || 
-                (glm::abs(distanceCAB - distanceABC) > eps))
-                debug_msg("Distances not equal ABC = %f, BCA = %f, CAB = %f", distanceABC, distanceBCA, distanceCAB);
-        }
-*/
-
         free(vertices);
+    }
+
+    struct uvec2_lex : public glm::uvec2
+    {
+        uvec2_lex(GLuint a, GLuint b) : glm::uvec2(a, b) {};
+
+        friend bool operator < (const uvec2_lex a, const uvec2_lex b)
+        {
+            if (a.y < b.y) return true;
+            if (a.y > b.y) return false;
+            if (a.x < b.x) return true;
+            return false;
+        };
+    };
+
+    void test_manifoldness()
+    {
+        debug_msg("test_manifoldness :: begin");
+        std::map<uvec2_lex, GLuint> edge_count;
+
+        for(GLuint f = 0; f < F; ++f)
+        {
+            GLuint iA = indices[3 * f + 0];
+            GLuint iB = indices[3 * f + 1];
+            GLuint iC = indices[3 * f + 2];
+
+            uvec2_lex AB = uvec2_lex(iA, iB);
+            uvec2_lex BC = uvec2_lex(iB, iC);
+            uvec2_lex CA = uvec2_lex(iC, iA);
+
+            std::map<uvec2_lex, GLuint>::iterator it = edge_count.find(AB);
+            if (it != edge_count.end()) edge_count[AB] = 1;
+            else
+                edge_count[AB]++;
+
+            it = edge_count.find(BC);
+            if (it != edge_count.end()) edge_count[BC] = 1;
+            else
+                edge_count[BC]++;
+
+            it = edge_count.find(CA);
+            if (it != edge_count.end()) edge_count[CA] = 1;
+            else
+                edge_count[CA]++;
+        }
+
+        for(std::map<uvec2_lex, GLuint>::const_iterator it0 = edge_count.begin(); it0 != edge_count.end(); ++it0)
+        {
+            uvec2_lex key = it0->first;
+            GLuint value0 = it0->second;
+            GLuint value1 = 0;
+            uvec2_lex BA = uvec2_lex(key.y, key.x);
+            std::map<uvec2_lex, GLuint>::iterator it1 = edge_count.find(BA);
+            if (it1 != edge_count.end())
+                value1 = it1->second;
+            if ((value1 != value0) || (value1 != 1) || (value0 != 1))
+            {
+                debug_msg("Error !! value0 = %u, value1 = %u, key = (%u, %u)", value0, value1, key.x, key.y);
+            }
+        }        
+        debug_msg("test_manifoldness :: end");
     }
 
     void compute_area_weighted_normals()
     {
-        debug_msg("Averaging face normals with area weight");
+        debug_msg("Averaging face normals with area weight ...");
         memset(normals, 0, sizeof(glm::dvec3) * V);
 
         for(GLuint f = 0; f < F; ++f)
@@ -338,7 +336,7 @@ struct sdf_compute_t
             glm::dvec3 B = positions[indices[3 * f + 1]];
             glm::dvec3 C = positions[indices[3 * f + 2]];
 
-            glm::dvec3 n = glm::normalize(glm::cross(B - A, C - A));
+            glm::dvec3 n = glm::cross(B - A, C - A);
 
             normals[indices[3 * f + 0]] += n;
             normals[indices[3 * f + 1]] += n;
@@ -351,7 +349,7 @@ struct sdf_compute_t
 
     void compute_angle_weighted_normals()
     {
-        debug_msg("Averaging face normals with area weight");
+        debug_msg("Averaging face normals with angular weight ...");
         memset(normals, 0, sizeof(glm::dvec3) * V);
 
         for(GLuint f = 0; f < F; ++f)
@@ -378,7 +376,6 @@ struct sdf_compute_t
         for(GLuint v = 0; v < V; ++v)
             normals[v] = glm::normalize(normals[v]);
     }
-
 
     void calculate_statistics()
     {
@@ -411,39 +408,64 @@ struct sdf_compute_t
         debug_msg("Average edge length = %f", edge / (3 * F));
         debug_msg("Max area = %f", max_area);
         debug_msg("Average area = %f", area / F);
-
     }
 
-    void test_original_degeneracy()
+    void test_normals()
     {
+        debug_msg("\n\n\n\t\t\tTesting normals ... \n\n");
+        int errors = 0;
+        double max_min_edge = 0.0;
 
         for(GLuint f = 0; f < F; ++f)
         {
-            glm::vec3 A  = positions[indices[3 * f + 0]];
-            glm::vec3 nA = normals[indices[3 * f + 0]];
-            glm::vec3 B  = positions[indices[3 * f + 1]];
-            glm::vec3 nB = normals[indices[3 * f + 1]];
-            glm::vec3 C  = positions[indices[3 * f + 2]];
-            glm::vec3 nC = normals[indices[3 * f + 2]];
+            glm::dvec3 A  = positions[indices[3 * f + 0]];
+            glm::dvec3 nA = normals[indices[3 * f + 0]];
+            glm::dvec3 B  = positions[indices[3 * f + 1]];
+            glm::dvec3 nB = normals[indices[3 * f + 1]];
+            glm::dvec3 C  = positions[indices[3 * f + 2]];
+            glm::dvec3 nC = normals[indices[3 * f + 2]];
 
-            glm::vec3 n = glm::normalize(glm::cross(B - A, C - A));
+            glm::dvec3 n = glm::cross(B - A, C - A);
+            double area = length(n);
+            n /= area;
 
-            float dpA = glm::dot(n, nA);
-            float dpB = glm::dot(n, nB);
-            float dpC = glm::dot(n, nC);
+            double lAB = glm::length(B - A);
+            double lBC = glm::length(C - B);
+            double lCA = glm::length(A - C);
+
+            double min_edge = glm::min(glm::min(lAB, lBC), lCA);
+
+            double dpA = glm::dot(n, nA);
+            double dpB = glm::dot(n, nB);
+            double dpC = glm::dot(n, nC);
 
             if ((dpA < 0.0) || (dpB < 0.0) || (dpC < 0.0))
             {
-                debug_msg("Normal degeneracy at triangle %u ::", f);
-                //debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
+                debug_msg("Degeneracy at triangle %u :: ", f);
+                debug_msg("A = %s", glm::to_string(A).c_str());
+                debug_msg("B = %s", glm::to_string(B).c_str());
+                debug_msg("C = %s", glm::to_string(C).c_str());
+                debug_msg("AB = %f", lAB);
+                debug_msg("BC = %f", lBC);
+                debug_msg("CA = %f", lCA);
+                debug_msg("area = %.17f", area);
+                debug_msg("min_edge = %.17f", min_edge);
+                debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
+                max_min_edge = glm::max(max_min_edge, min_edge);
+                errors++;
             }
-        }         
-    }
+        }
+        debug_msg("Total number of errors :: %u", errors);
+        debug_msg("Maximal minimal edge :: %f", max_min_edge);
 
+
+    }
 
     void test_degeneracy(double shift_value)
     {
-        debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for shift = %f !!!!!!!!!!!!\n\n", shift_value);
+        debug_msg("\n\n\n\t\t\tTesting degeneracies for shift = %f.\n\n", shift_value);
+        int errors = 0;
+
         for(GLuint f = 0; f < F; ++f)
         {
             glm::dvec3 A  = positions[indices[3 * f + 0]];
@@ -455,9 +477,9 @@ struct sdf_compute_t
 
             glm::dvec3 n = glm::normalize(glm::cross(B - A, C - A));
 
-            glm::dvec3 As = A + shift_value * n;
-            glm::dvec3 Bs = B + shift_value * n;
-            glm::dvec3 Cs = C + shift_value * n;
+            glm::dvec3 As = A + shift_value * nA;
+            glm::dvec3 Bs = B + shift_value * nB;
+            glm::dvec3 Cs = C + shift_value * nC;
 
             glm::dvec3 ns = glm::normalize(glm::cross(Bs - As, Cs - As));
 
@@ -465,14 +487,17 @@ struct sdf_compute_t
             double dpB = glm::dot(ns, nB);
             double dpC = glm::dot(ns, nC);
 
-            if ((dpA < 0.0) || (dpA < 0.0) || (dpA < 0.0))
+            if ((dpA < 0.0) || (dpB < 0.0) || (dpC < 0.0))
             {
-                debug_msg("Degeneracy at triangle %u ::", f);
+                debug_msg("Degeneracy at triangle %u :: shift_value = %f", f, shift_value);
                 debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
                 debug_msg("\t\tOriginal products :: ");
                 debug_msg("\t\t\tdpA = %f, dpB = %f, dpC = %f", glm::dot(n, nA), glm::dot(n, nB), glm::dot(n, nC));
+                errors++;
             }
-        }        
+        }
+
+        debug_msg("Total number of errors :: %u", errors);
     }
 
     //===================================================================================================================================================================================================================
@@ -600,6 +625,162 @@ struct sdf_compute_t
     }
 
     //===================================================================================================================================================================================================================
+    // computes approximate signed distance function from a triangle mesh to a discrete lattice in 3D-space
+    // the function runs multiple threads executing the main unsigned distance function computation algorithm
+    // on both external and internal layers of the model 
+    // no modification is necessary to increase the amount of threads -- so let it be equal to the number of processor (logical) cores
+    // the implementation will work for distance textures up to 1024 x 1024 x 1024 dimension
+    //===================================================================================================================================================================================================================
+    template<int threads> GLuint tri_sdf_compute(int max_level, GLenum texture_unit, double delta)
+    {
+        //===============================================================================================================================================================================================================
+        // this must hold unless someone decided to put an extra auxiliary data to atomic structures
+        //===============================================================================================================================================================================================================
+        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int), "Atomic uint has larger size than uint. Not good.");
+
+        const unsigned int diameter = 929887697;        // = 2^28 * 2sqrt(3)
+
+        tri_udf_compute_data_t compute_data;
+
+        //===============================================================================================================================================================================================================
+        // step 1 :: create common compute structure with atomic counter to be used by all threads
+        //===============================================================================================================================================================================================================
+        compute_data.max_level = max_level;
+
+        glm::dvec3* layer = (glm::dvec3*) malloc(sizeof(glm::dvec3) * V);
+        for(unsigned int v = 0; v < V; ++v)
+            layer[v] = positions[v] + delta * normals[v];
+
+        compute_data.positions = layer;
+        compute_data.indices = indices;
+        compute_data.triangles = F;
+        compute_data.triangle_index = 0;
+
+        unsigned int p2 = 1 << max_level;
+        unsigned int texture_size = 1 << (3 * max_level);
+
+        unsigned int octree_size = 0;
+        unsigned int mip_size = 8;
+        for(unsigned int i = 0; i < max_level - 1; ++i)
+        {
+            octree_size += mip_size;
+            mip_size <<= 3;
+        }
+
+        compute_data.octree      = (std::atomic_uint*) malloc( octree_size * sizeof(unsigned int));
+        compute_data.udf_texture = (std::atomic_uint*) malloc(texture_size * sizeof(unsigned int));
+
+        for(unsigned int i = 0; i < octree_size; ++i)  compute_data.octree[i] = diameter;
+        for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
+
+        //===============================================================================================================================================================================================================
+        // step 2 :: launch threads to compute udf for the external shell of the model
+        //===============================================================================================================================================================================================================
+        std::thread computation_thread[threads];
+
+        for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+            computation_thread[thread_id] = std::thread(sdf_compute_t::tri_udf_compute_thread, &compute_data);
+
+        tri_udf_compute_thread(&compute_data);
+
+        for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+            computation_thread[thread_id].join();
+
+        //===============================================================================================================================================================================================================
+        // step 3 :: compute udf for the internal shell of the model
+        //===============================================================================================================================================================================================================
+        for(unsigned int v = 0; v < V; ++v)
+            layer[v] = positions[v] - delta * normals[v];
+
+        compute_data.triangle_index = 0;
+
+        int* external_udf = (int*) compute_data.udf_texture;
+        compute_data.udf_texture = (std::atomic_uint*) malloc(texture_size * sizeof(unsigned int));
+
+        for(unsigned int i = 0; i < octree_size; ++i) compute_data.octree[i] = diameter;
+        for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
+
+        for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+            computation_thread[thread_id] = std::thread(sdf_compute_t::tri_udf_compute_thread, &compute_data);
+
+        tri_udf_compute_thread(&compute_data);
+
+        for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+            computation_thread[thread_id].join();
+
+        int* internal_udf = (int*) compute_data.udf_texture;
+
+        //===============================================================================================================================================================================================================
+        // create 3d texture of the type GL_R32F
+        //===============================================================================================================================================================================================================
+        GLuint texture_id;
+        glActiveTexture(texture_unit);
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_3D, texture_id);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        //===============================================================================================================================================================================================================
+        // uncomment this line to allocate immutable texture storage, i.e. if you are not planning to change it dimensions and internal type in future
+        //===============================================================================================================================================================================================================
+        // glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, p2, p2, p2);
+
+        GLfloat* texture_data = (GLfloat*) malloc(texture_size * sizeof(GLfloat));
+
+        for(unsigned int p = 0; p < texture_size; ++p)
+        {
+            double sdf;
+            if (internal_udf[p] < external_udf[p])
+            {
+                //=======================================================================================================================================================================================================
+                // the point is inside the mesh
+                //=======================================================================================================================================================================================================
+                sdf = -glm::max(double(external_udf[p]) * INV_INT_SCALE - delta, 0.0);
+            }
+            else
+            {
+                //=======================================================================================================================================================================================================
+                // the point is outside inside the mesh -- use external field to determine signed distance
+                //=======================================================================================================================================================================================================
+                sdf = glm::max(double(internal_udf[p]) * INV_INT_SCALE - delta, 0.0);
+
+            }
+
+            texture_data[p] = (float) sdf;
+        }
+        // afoksha
+        tex3d_header_t header 
+        {
+            .target = GL_TEXTURE_3D,
+            .internal_format = GL_R32F,
+            .format = GL_RED,
+            .type = GL_FLOAT,
+            .size = glm::ivec3(p2, p2, p2),
+            .data_size = texture_size * sizeof(GLfloat)
+        };  
+
+        FILE* f = fopen("trefoil.t3d", "wb");
+        fwrite(&header, sizeof(tex3d_header_t), 1, f);
+        fwrite(texture_data, header.data_size, 1, f);
+        fclose(f);
+
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
+
+        free(layer);
+        free(compute_data.octree);
+        free(external_udf);
+        free(internal_udf);
+        free(texture_data);
+
+        return texture_id;
+    }
+
+    //===================================================================================================================================================================================================================
     // computes exact unsigned distance function from a point cloud to a discrete lattice in 3D-space
     //===================================================================================================================================================================================================================
     template<int threads> GLuint pnt_udf_compute(int max_level, GLenum texture_unit)
@@ -660,8 +841,8 @@ struct sdf_compute_t
         glGenTextures(1, &texture_id);
         glBindTexture(GL_TEXTURE_3D, texture_id);
 
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -821,6 +1002,24 @@ struct sdf_compute_t
 
             texture_data[p] = (float) sdf;
         }
+
+        //=======================================================================================================================================================================================================
+        // store texture to file
+        //=======================================================================================================================================================================================================
+        tex3d_header_t header 
+        {
+            .target = GL_TEXTURE_3D,
+            .internal_format = GL_R32F,
+            .format = GL_RED,
+            .type = GL_FLOAT,
+            .size = glm::ivec3(p2, p2, p2),
+            .data_size = texture_size * sizeof(GLfloat)
+        };  
+
+        FILE* f = fopen("trefoil.t3d", "wb");
+        fwrite(&header, sizeof(tex3d_header_t), 1, f);
+        fwrite(texture_data, header.data_size, 1, f);
+        fclose(f);
 
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
 
@@ -1143,6 +1342,7 @@ struct sdf_compute_t
             point = compute_data->point_index++;
         }
     }
+
 };
 
 //=======================================================================================================================================================================================================================
@@ -1153,8 +1353,11 @@ int main(int argc, char *argv[])
     int res_x = 1920;
     int res_y = 1080;
 
-    int max_level = 7;
+    int max_level = 8;
     int p2 = 1 << max_level;
+    int p2m1 = 1 << (max_level - 1);
+    double inv_p2m1 = 1.0 / p2m1;
+    double texel_size = inv_p2m1;
     int octree_size = 0;
     int mip_size = 8;
 
@@ -1177,23 +1380,21 @@ int main(int argc, char *argv[])
 
     demo_window_t window("SDF Texture 3D generator", 4, 4, 3, res_x, res_y, true);
 
-    glsl_program_t udf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/udf_compute.cs"));
+    glsl_program_t pnt_udf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/pnt_udf_compute.cs"));
+    glsl_program_t tri_udf_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/tri_udf_compute.cs"));
 
     //===================================================================================================================================================================================================================
     // step 1 :: load demon model
     //===================================================================================================================================================================================================================
     sdf_compute_t sdf_compute;
-    sdf_compute.load_model("../../../resources/models/vao/trefoil.vao", 0.984375);
+    sdf_compute.load_model("../../../resources/models/vao/trefoil.vao", 1.0 - 3 * texel_size);
     sdf_compute.calculate_statistics();
-    debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for original model after normalization. !!!!!!!!!!!!\n\n");
-
-    sdf_compute.compute_area_weighted_normals();
-    sdf_compute.test_original_degeneracy();
-    debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for area-weighted normals. !!!!!!!!!!!!\n\n");
-
+    //sdf_compute.compute_area_weighted_normals();
     sdf_compute.compute_angle_weighted_normals();
-    sdf_compute.test_original_degeneracy();
-    debug_msg("\n\n\n!!!!!!!!!!!! Testing degeneracies for angle-weighted normals. !!!!!!!!!!!!\n\n");
+    sdf_compute.test_normals();
+
+    //sdf_compute.test_degeneracy(0.0 /* 0.0625 * texel_size */);
+    //sdf_compute.test_degeneracy(-0.0625 * texel_size);
 
     int F = sdf_compute.F;
     int V = sdf_compute.V;
@@ -1201,6 +1402,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // 1. index buffer
     //===================================================================================================================================================================================================================
+/*
     GLuint ibo_id;
 
     glGenBuffers(1, &ibo_id);
@@ -1278,24 +1480,25 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32UI, p2, p2, p2);
-
     glClearTexImage(texture_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &diameter);
 
 
     glBindImageTexture(3, texture_id, 0, GL_TRUE, 0, GL_READ_WRITE, GL_R32UI);
 
-    udf_compute.enable();
-    udf_compute["triangles"] = (int) F;
-    udf_compute["level"] = (int) max_level;
+    tri_udf_compute.enable();
+    tri_udf_compute["triangles"] = (int) F;
+    tri_udf_compute["level"] = (int) max_level;
+
     glDispatchCompute(1, 1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
+*/
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    // sdf_compute.pnt_udf_compute<8>(max_level, GL_TEXTURE0);
-    // sdf_compute.pnt_sdf_compute<4>(max_level, GL_TEXTURE0);
+
+
+    sdf_compute.tri_sdf_compute<8>(max_level, GL_TEXTURE0, texel_size);
 
 
     glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
@@ -1305,6 +1508,7 @@ int main(int argc, char *argv[])
     uniform_t uni_uv_pv_matrix = udf_visualizer["projection_view_matrix"];
     udf_visualizer["mask"] = (int) ((1 << max_level) - 1);
     udf_visualizer["shift"] = (int) max_level;
+    udf_visualizer["udf_tex"] = 0;
 
     //glDisable(GL_DEPTH_TEST);
     //glEnable(GL_BLEND);
