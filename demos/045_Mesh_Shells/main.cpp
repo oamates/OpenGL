@@ -65,6 +65,18 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
+
+    void on_scroll(double xoffset, double yoffset) override
+    {
+        const float max_speed = 8.0;
+        const float min_speed = 0.125;
+
+        float factor = exp(0.125 * yoffset);
+        float speed = factor * camera.linear_speed;
+
+        if ((speed <= max_speed) && (speed >= min_speed))
+            camera.linear_speed = speed;
+    }
 };
 
 const double INTEGRAL_SCALE = 268435456.0;
@@ -317,6 +329,67 @@ struct sdf_compute_t
         debug_msg("Average area = %f", area / F);
     }
 
+    struct uvec2_lex : public glm::uvec2
+    {
+        uvec2_lex(GLuint a, GLuint b) : glm::uvec2(a, b) {};
+
+        friend bool operator < (const uvec2_lex a, const uvec2_lex b)
+        {
+            if (a.y < b.y) return true;
+            if (a.y > b.y) return false;
+            if (a.x < b.x) return true;
+            return false;
+        }
+    };
+
+    void test_manifoldness()
+    {
+        debug_msg("test_manifoldness :: begin");
+        std::map<uvec2_lex, GLuint> edge_count;
+
+        for(GLuint f = 0; f < F; ++f)
+        {
+            GLuint iA = indices[3 * f + 0];
+            GLuint iB = indices[3 * f + 1];
+            GLuint iC = indices[3 * f + 2];
+
+            uvec2_lex AB = uvec2_lex(iA, iB);
+            uvec2_lex BC = uvec2_lex(iB, iC);
+            uvec2_lex CA = uvec2_lex(iC, iA);
+
+            std::map<uvec2_lex, GLuint>::iterator it = edge_count.find(AB);
+            if (it != edge_count.end()) edge_count[AB] = 1;
+            else
+                edge_count[AB]++;
+
+            it = edge_count.find(BC);
+            if (it != edge_count.end()) edge_count[BC] = 1;
+            else
+                edge_count[BC]++;
+
+            it = edge_count.find(CA);
+            if (it != edge_count.end()) edge_count[CA] = 1;
+            else
+                edge_count[CA]++;
+        }
+
+        for(std::map<uvec2_lex, GLuint>::const_iterator it0 = edge_count.begin(); it0 != edge_count.end(); ++it0)
+        {
+            uvec2_lex key = it0->first;
+            GLuint value0 = it0->second;
+            GLuint value1 = 0;
+            uvec2_lex BA = uvec2_lex(key.y, key.x);
+            std::map<uvec2_lex, GLuint>::iterator it1 = edge_count.find(BA);
+            if (it1 != edge_count.end())
+                value1 = it1->second;
+            if ((value1 != value0) || (value1 != 1) || (value0 != 1))
+            {
+                debug_msg("Error !! value0 = %u, value1 = %u, key = (%u, %u)", value0, value1, key.x, key.y);
+            }
+        }        
+        debug_msg("test_manifoldness :: end");
+    }    
+
     vao_t create_vao()
     {
         vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * sizeof(vertex_pn_t));
@@ -357,12 +430,11 @@ int main(int argc, char *argv[])
     // load demon model
     //===================================================================================================================================================================================================================
     glsl_program_t shell_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/model_shell.vs"),
+                                    glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/model_shell.gs"),
                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/model_shell.fs"));
 
     shell_visualizer.enable();
     uniform_t uni_pv_matrix = shell_visualizer["projection_view_matrix"];
-    uniform_t uni_delta     = shell_visualizer["delta"];
-    uniform_t uni_color     = shell_visualizer["color"];
     uniform_t uni_camera_ws = shell_visualizer["camera_ws"];
     uniform_t uni_light_ws  = shell_visualizer["light_ws"];
 
@@ -375,6 +447,7 @@ int main(int argc, char *argv[])
     sdf_compute.compute_angle_weighted_normals();
 
     vao_t demon_vao = sdf_compute.create_vao();
+    //sdf_compute.test_manifoldness();
 
     glEnable(GL_DEPTH_TEST);
 
@@ -396,13 +469,6 @@ int main(int argc, char *argv[])
         uni_pv_matrix = projection_view_matrix;
         uni_camera_ws = camera_ws;  
         uni_light_ws = light_ws;
-
-        uni_delta = (float) 0.0f;
-        uni_color = glm::vec3(1.0f, 0.0f, 0.0f);
-        demon_vao.render();
-
-        uni_delta = (float) 0.00125f;
-        uni_color = glm::vec3(0.717f, 0.717f, 0.0f);
         demon_vao.render();
 
         window.end_frame();

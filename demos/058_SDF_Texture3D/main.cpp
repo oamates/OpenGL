@@ -274,7 +274,7 @@ struct sdf_compute_t
             if (a.y > b.y) return false;
             if (a.x < b.x) return true;
             return false;
-        };
+        }
     };
 
     void test_manifoldness()
