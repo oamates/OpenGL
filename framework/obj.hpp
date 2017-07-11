@@ -16,7 +16,12 @@ struct model
     std::vector<material_t> materials;                                      // array of materials used to render the model
     std::map<std::string, GLuint> textures;    
 
-    model(const std::string& filename, const std::string& dir);    
+    //===============================================================================================================================================================================================================
+    // Constructor that parses the object file and creates OpenGL vertex array object from it 
+    // together with some auxiliary information needed to render the model
+    //===============================================================================================================================================================================================================
+    model(const std::string& filename, const std::string& dir);
+
     bool load_mtl(std::map<std::string, int>& material_map, const std::string& mtl_file_name);
     void load_textures(const std::string& mtl_base_path);
 

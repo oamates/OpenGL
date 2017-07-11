@@ -5,14 +5,12 @@ layout (triangle_strip, max_vertices = 3) out;
 
 in vec3 position[];
 in vec3 normal[];
-in vec3 color_mark[];
 
 uniform mat4 projection_view_matrix;
 
 out vec3 position_ws;
 out vec3 normal_ws;
 out float defect;
-out vec3 manifold_mark;
 
 void main()
 {
@@ -22,8 +20,7 @@ void main()
     {
         position_ws = position[i];
         normal_ws = normal[i];
-        defect = 0.5 + 0.5 * dot(normal[i], n);
-        manifold_mark = color_mark[i];
+        defect = dot(normal[i], n) < 0.0 ? 1.0 : 0.0;
         gl_Position = projection_view_matrix * vec4(position[i], 1.0f);        
         EmitVertex();
     }

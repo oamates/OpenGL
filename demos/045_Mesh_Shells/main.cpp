@@ -7,6 +7,8 @@
 #include <atomic>
 #include <thread>
 #include <map>
+#include <sstream>
+#include <fstream>
  
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -39,7 +41,7 @@ struct demo_window_t : public glfw_window_t
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.01f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.001f);
     }
 
     //===================================================================================================================================================================================================================
@@ -79,171 +81,85 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-const double INTEGRAL_SCALE = 268435456.0;
-const double INV_INT_SCALE = 1.0 / INTEGRAL_SCALE;
 
 
-//=======================================================================================================================================================================================================================
-// unsigned distance-to-triangle function
-// has been tested a lot, works for non-degenerate triangles
-//=======================================================================================================================================================================================================================
-template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& p, const glm::tvec3<real_t>& a, const glm::tvec3<real_t>& b, const glm::tvec3<real_t>& c)
+
+struct hqs_model_t
 {
-    glm::tvec3<real_t> ba = b - a; glm::tvec3<real_t> pa = p - a;
-    glm::tvec3<real_t> cb = c - b; glm::tvec3<real_t> pb = p - b;
-    glm::tvec3<real_t> ac = a - c; glm::tvec3<real_t> pc = p - c;
-    glm::tvec3<real_t> n = glm::cross(ba, ac);
-
-    real_t q = glm::sign(glm::dot(glm::cross(ba, n), pa)) + 
-               glm::sign(glm::dot(glm::cross(cb, n), pb)) + 
-               glm::sign(glm::dot(glm::cross(ac, n), pc));
-
-    if (q >= (real_t) 2.0) 
-        return glm::sqrt(glm::dot(n, pa) * glm::dot(n, pa) / glm::length2(n));
-
-    return glm::sqrt(
-        glm::min(
-            glm::min(
-                glm::length2(ba * glm::clamp(glm::dot(ba, pa) / glm::length2(ba), (real_t) 0.0, (real_t) 1.0) - pa),
-                glm::length2(cb * glm::clamp(glm::dot(cb, pb) / glm::length2(cb), (real_t) 0.0, (real_t) 1.0) - pb)
-            ), 
-            glm::length2(ac * glm::clamp(glm::dot(ac, pc) / glm::length2(ac), (real_t) 0.0, (real_t) 1.0) - pc)
-        )
-    );
-}
-
-unsigned int atomic_min(std::atomic_uint& atomic_var, unsigned int value)
-{
-    unsigned int previous_value = atomic_var;
-    while(previous_value > value && !atomic_var.compare_exchange_weak(previous_value, value));
-    return previous_value;
-}
-
-const glm::dvec3 shift[8] =
-{
-    glm::dvec3(-1.0, -1.0, -1.0),
-    glm::dvec3( 1.0, -1.0, -1.0),
-    glm::dvec3(-1.0,  1.0, -1.0),
-    glm::dvec3( 1.0,  1.0, -1.0),
-    glm::dvec3(-1.0, -1.0,  1.0),
-    glm::dvec3( 1.0, -1.0,  1.0),
-    glm::dvec3(-1.0,  1.0,  1.0),
-    glm::dvec3( 1.0,  1.0,  1.0)
-};
-
-
-struct texture3d_t
-{
-    glm::ivec3 size;
-	GLuint texture_id;
-    GLenum texture_unit;
-    GLenum internal_format;
-
-    texture3d_t() {}
-
-    texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
-        : size(size), texture_unit(texture_unit), internal_format(internal_format)
-    {
-    	glActiveTexture(texture_unit);
-	    glGenTextures(1, &texture_id);
-	    glBindTexture(GL_TEXTURE_3D, texture_id);
-
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-        glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, size.x, size.y, size.z);
-    }
-
-    void bind_as_image(GLuint image_unit, GLenum access = GL_READ_WRITE)
-        { glBindImageTexture(image_unit, texture_id, 0, GL_TRUE, 0, access, internal_format); }
-
-    GLuint data_size()
-        { return size.x * size.y * size.z * sizeof(GLuint); }
-
-    ~texture3d_t()
-        { glDeleteTextures(1, &texture_id); }
-};
-
-
-struct sdf_compute_t
-{
-    vao_t::header_t header;
-
     GLuint V;
     GLuint F;
-    GLuint* indices;
+
+    std::vector<glm::dvec3> positions;
+    std::vector<glm::uvec3> indices;
+    std::vector<glm::dvec3> normals;
 
     double bbox_max;
 
-    glm::dvec3* positions; 
-    glm::dvec3* normals; 
-
-    GLuint ibo_id;
-
-    sdf_compute_t() {}
-
-    void load_model(const char* file_name, double bbox_max)
+    hqs_model_t(const char* filename)
     {
-        debug_msg("Loading model :: %s ... \n", file_name);
+        std::ifstream input_stream(filename);
+        for (std::string buffer; getline(input_stream, buffer);)
+        {        
+            if (buffer.empty()) continue;
+            std::stringstream line(buffer);
+            std::string token;
+            line >> token;
+                                                                            
+            if (token == "v")
+            {
+                glm::dvec3 position;
+                line >> position.x >> position.y >> position.z;
+                positions.push_back(position);
+                continue;
+            }
 
-        FILE* f = fopen(file_name, "rb");
-        fread (&header, sizeof(vao_t::header_t), 1, f);
+            if (token == "f")
+            {
+                glm::uvec3 index;
+                line >> index.x >> index.y >> index.z;
+                indices.push_back(index - glm::uvec3(1));
+                continue;
+            }
+        }
+        V = positions.size();
+        F = indices.size();
+        debug_msg("Done :: #vertices = %u. triangles = %u.", V, F);
+    }
 
-        assert(header.layout == vertex_pn_t::layout && "File does not contain a valid PN - model");
-        assert(header.mode == GL_TRIANGLES && "Primitive type must be GL_TRIANGLES");
-        assert(header.type == GL_UNSIGNED_INT && "Index type is not GL_UNSIGNED_INT");
-        V = header.vbo_size;
-        F = header.ibo_size / 3;
-
-        GLsizei stride = vertex_pn_t::total_dimension * sizeof(GLfloat);
-        vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * stride);
-        fread(vertices, stride, header.vbo_size, f);
-    
-        indices = (GLuint *) malloc(sizeof(GLuint) * header.ibo_size);
-        fread(indices, sizeof(GLuint), header.ibo_size, f);
-        fclose(f);
-
-        debug_msg("VAO Loaded :: V = %d. F = %d. indices = %d. ", V, F, header.ibo_size);
-        
-        sdf_compute_t::bbox_max = bbox_max;
+    void normalize(double bbox_max)
+    {
+        hqs_model_t::bbox_max = bbox_max;
         debug_msg("Normalizing the model :: bbox_max = %f.", bbox_max);
-
-        positions = (glm::dvec3*) malloc(sizeof(glm::dvec3) * V); 
-        normals = (glm::dvec3*) malloc(sizeof(glm::dvec3) * V);
 
         glm::dvec3 mass_center;
         glm::dmat3 covariance_matrix;
 
-        momenta::calculate(vertices, V, mass_center, covariance_matrix);
-        debug_msg("model mass center = %s", glm::to_string(mass_center).c_str());
-        debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
+        momenta::calculate(positions, mass_center, covariance_matrix);
+        debug_msg("\tMass center = %s", glm::to_string(mass_center).c_str());
+        debug_msg("\tCovariance matrix = %s", glm::to_string(covariance_matrix).c_str());
 
         glm::dquat q = diagonalizer(covariance_matrix);
         glm::dmat3 Q = mat3_cast(q);
         glm::dmat3 Qt = glm::transpose(Q);
 
-        debug_msg("diagonalizer = %s", glm::to_string(Q).c_str());
+        debug_msg("\tDiagonalizer = %s", glm::to_string(Q).c_str());
 
         glm::dvec3 bbox = glm::dvec3(0.0);
 
         for (GLuint v = 0; v < V; ++v)
         {
-            vertex_pn_t& vertex = vertices[v];
-            glm::dvec3 position = Q * (glm::dvec3(vertex.position) - mass_center);       
-            positions[v] = position;
-            bbox = glm::max(bbox, glm::abs(position));
-            normals[v] = Q * vertex.normal;
+            positions[v] = Q * (positions[v] - mass_center);
+            bbox = glm::max(bbox, glm::abs(positions[v]));
         }
 
         double max_bbox = glm::max(bbox.x, glm::max(bbox.y, bbox.z));
         double scale = bbox_max / max_bbox;
 
-        debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
-        debug_msg("bbox_max = %f. maximum = %f. scale = %f. Scaling ...", bbox_max, max_bbox, scale);
+        debug_msg("\tModel BBox = %s", glm::to_string(bbox).c_str());
+        debug_msg("\tBBox_max = %f. Maximum = %f. Scale = %f. Scaling ...", bbox_max, max_bbox, scale);
+
+        covariance_matrix = (scale * scale) * (Q * covariance_matrix * Qt);
+        debug_msg("\tCovariance matrix after normalization = %s", glm::to_string(covariance_matrix).c_str());
 
         bbox = glm::dvec3(0.0);
         for (GLuint v = 0; v < V; ++v)
@@ -251,45 +167,57 @@ struct sdf_compute_t
             positions[v] = scale * positions[v];
             bbox = glm::max(bbox, glm::abs(positions[v]));
         }
-
-        covariance_matrix = (scale * scale) * (Q * covariance_matrix * Qt);
-
-        debug_msg("model covariance matrix after normalization = %s", glm::to_string(covariance_matrix).c_str());
-        debug_msg("Verification :: ");
-
-        momenta::calculate(positions, V, mass_center, covariance_matrix);
-
-        debug_msg("model mass center = %s", glm::to_string(mass_center).c_str());
-        debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
-        debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
-
-        free(vertices);
     }
 
-    void compute_angle_weighted_normals()
+    void calculate_area_weighted_normals()
     {
         debug_msg("Averaging face normals with angular weight ...");
-        memset(normals, 0, sizeof(glm::dvec3) * V);
+        normals.resize(V);
+        memset(normals.data(), 0, sizeof(glm::dvec3) * V);
 
         for(GLuint f = 0; f < F; ++f)
         {
-            glm::dvec3 A = positions[indices[3 * f + 0]];
-            glm::dvec3 B = positions[indices[3 * f + 1]];
-            glm::dvec3 C = positions[indices[3 * f + 2]];
+            glm::uvec3 triangle = indices[f];
+            glm::dvec3 A = positions[triangle.x];
+            glm::dvec3 B = positions[triangle.y];
+            glm::dvec3 C = positions[triangle.z];
+            glm::dvec3 n = glm::cross(B - A, C - A);
+
+            normals[triangle.x] += n;
+            normals[triangle.y] += n;
+            normals[triangle.z] += n;
+        }
+
+        for(GLuint v = 0; v < V; ++v)
+            normals[v] = glm::normalize(normals[v]);
+    }
+
+    void calculate_angle_weighted_normals()
+    {
+        debug_msg("Averaging face normals with angular weight ...");
+        normals.resize(V);
+        memset(normals.data(), 0, sizeof(glm::dvec3) * V);
+
+        for(GLuint f = 0; f < F; ++f)
+        {
+            glm::uvec3 triangle = indices[f];
+            glm::dvec3 A = positions[triangle.x];
+            glm::dvec3 B = positions[triangle.y];
+            glm::dvec3 C = positions[triangle.z];
 
             glm::dvec3 n = glm::normalize(glm::cross(B - A, C - A));
 
-            glm::dvec3 AB = normalize(B - A);
-            glm::dvec3 BC = normalize(C - B);
-            glm::dvec3 CA = normalize(A - C);
+            glm::dvec3 AB = glm::normalize(B - A);
+            glm::dvec3 BC = glm::normalize(C - B);
+            glm::dvec3 CA = glm::normalize(A - C);
 
             double qA = glm::sqrt(1.0 + dot(CA, AB));
             double qB = glm::sqrt(1.0 + dot(AB, BC));
             double qC = glm::sqrt(1.0 + dot(BC, CA));
 
-            normals[indices[3 * f + 0]] += qA * n;
-            normals[indices[3 * f + 1]] += qB * n;
-            normals[indices[3 * f + 2]] += qC * n;
+            normals[triangle.x] += qA * n;
+            normals[triangle.y] += qB * n;
+            normals[triangle.z] += qC * n;
         }
 
         for(GLuint v = 0; v < V; ++v)
@@ -305,9 +233,10 @@ struct sdf_compute_t
 
         for(GLuint f = 0; f < F; ++f)
         {
-            glm::dvec3 A = positions[indices[3 * f + 0]];
-            glm::dvec3 B = positions[indices[3 * f + 1]];
-            glm::dvec3 C = positions[indices[3 * f + 2]];
+            glm::uvec3 triangle = indices[f];
+            glm::dvec3 A = positions[triangle.x];
+            glm::dvec3 B = positions[triangle.y];
+            glm::dvec3 C = positions[triangle.z];
 
             double eAB = glm::length(B - A);
             double eBC = glm::length(C - B);
@@ -329,6 +258,7 @@ struct sdf_compute_t
         debug_msg("Average area = %f", area / F);
     }
 
+
     struct uvec2_lex : public glm::uvec2
     {
         uvec2_lex(GLuint a, GLuint b) : glm::uvec2(a, b) {};
@@ -349,9 +279,11 @@ struct sdf_compute_t
 
         for(GLuint f = 0; f < F; ++f)
         {
-            GLuint iA = indices[3 * f + 0];
-            GLuint iB = indices[3 * f + 1];
-            GLuint iC = indices[3 * f + 2];
+            glm::uvec3 triangle = indices[f];
+
+            GLuint iA = triangle.x;
+            GLuint iB = triangle.y;
+            GLuint iC = triangle.z;
 
             uvec2_lex AB = uvec2_lex(iA, iB);
             uvec2_lex BC = uvec2_lex(iB, iC);
@@ -384,12 +316,64 @@ struct sdf_compute_t
                 value1 = it1->second;
             if ((value1 != value0) || (value1 != 1) || (value0 != 1))
             {
-                debug_msg("Error !! value0 = %u, value1 = %u, key = (%u, %u)", value0, value1, key.x, key.y);
+                debug_msg("Error !! value0 = %u, value1 = %u, key = (%u, %u)", value0, value1, key.x + 1, key.y + 1);
             }
         }        
         debug_msg("test_manifoldness :: end");
     }    
 
+    void test_normals()
+    {
+        debug_msg("\n\n\n\t\t\tTesting normals ... \n\n");
+        int errors = 0;
+        double max_min_edge = 0.0;
+
+        for(GLuint f = 0; f < F; ++f)
+        {
+            glm::uvec3 triangle = indices[f];
+
+            glm::dvec3 A  = positions[triangle.x];
+            glm::dvec3 nA = normals[triangle.x];
+            glm::dvec3 B  = positions[triangle.y];
+            glm::dvec3 nB = normals[triangle.y];
+            glm::dvec3 C  = positions[triangle.z];
+            glm::dvec3 nC = normals[triangle.z];
+
+            glm::dvec3 n = glm::cross(B - A, C - A);
+            double area = length(n);
+            n /= area;
+
+            double lAB = glm::length(B - A);
+            double lBC = glm::length(C - B);
+            double lCA = glm::length(A - C);
+
+            double min_edge = glm::min(glm::min(lAB, lBC), lCA);
+
+            double dpA = glm::dot(n, nA);
+            double dpB = glm::dot(n, nB);
+            double dpC = glm::dot(n, nC);
+
+            if ((dpA < 0.0) || (dpB < 0.0) || (dpC < 0.0))
+            {
+                debug_msg("Degeneracy at triangle %u :: ", f);
+                debug_msg("A = %s", glm::to_string(A).c_str());
+                debug_msg("B = %s", glm::to_string(B).c_str());
+                debug_msg("C = %s", glm::to_string(C).c_str());
+                debug_msg("AB = %f", lAB);
+                debug_msg("BC = %f", lBC);
+                debug_msg("CA = %f", lCA);
+                debug_msg("area = %.17f", area);
+                debug_msg("min_edge = %.17f", min_edge);
+                debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
+                max_min_edge = glm::max(max_min_edge, min_edge);
+                errors++;
+            }
+        }
+        debug_msg("Total number of errors :: %u", errors);
+        debug_msg("Maximal minimal edge :: %f", max_min_edge);
+
+
+    }
     vao_t create_vao()
     {
         vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * sizeof(vertex_pn_t));
@@ -400,13 +384,14 @@ struct sdf_compute_t
             vertices[v].normal = glm::vec3(normals[v]);
         }
 
-        vao_t model_vao = vao_t(GL_TRIANGLES, vertices, V, indices, 3 * F);
+        vao_t model_vao = vao_t(GL_TRIANGLES, vertices, V, (GLuint*) indices.data(), 3 * F);
         free(vertices);
 
         return model_vao;
-    }
+    }    
 
 };
+
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -441,13 +426,13 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // load demon model
     //===================================================================================================================================================================================================================
-    sdf_compute_t sdf_compute;
-    sdf_compute.load_model("../../../resources/models/vao/demon.vao", 10.0);
-    sdf_compute.calculate_statistics();
-    sdf_compute.compute_angle_weighted_normals();
+    hqs_model_t demon("../../../resources/models/obj/demon.obj");
+    demon.normalize(1.0);
+    demon.calculate_angle_weighted_normals();
+    demon.test_manifoldness();
+    demon.test_normals();
 
-    vao_t demon_vao = sdf_compute.create_vao();
-    //sdf_compute.test_manifoldness();
+    vao_t demon_vao = demon.create_vao();
 
     glEnable(GL_DEPTH_TEST);
 

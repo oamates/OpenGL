@@ -3,7 +3,6 @@
 in vec3 position_ws;
 in vec3 normal_ws;
 in float defect;
-in vec3 manifold_mark;
 
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
@@ -12,14 +11,6 @@ out vec4 FragmentColor;
 
 void main()
 {
-
-    if (length(manifold_mark) > 0.0125)
-    {
-        FragmentColor = vec4(manifold_mark, 1.0f);
-        return;
-    }
-
-
     vec3 n = normalize(normal_ws);
 
     vec3 view = camera_ws - position_ws;
@@ -32,12 +23,10 @@ void main()
 
     float cos_theta = 0.5 + 0.5 * dot(n, l);
 
-    vec3 DEFECTIVE_COLOR = vec3(1.0, 0.0, 0.0);
-    vec3 NORMAL_COLOR = vec3(0.35, 0.35, 0.0);
+    vec3 DEFECTIVE_COLOR = vec3(0.0, 0.0, 1.0);
+    vec3 NORMAL_COLOR = vec3(0.5, 0.5, 0.0);
 
-    float q = pow(defect, 4.0);
-
-    vec3 color = mix(DEFECTIVE_COLOR, NORMAL_COLOR, q);
+    vec3 color = mix(DEFECTIVE_COLOR, NORMAL_COLOR, 1.0 - defect);
     vec3 ambient = 0.175 * color;
     vec3 diffuse = color;
 
