@@ -12,6 +12,28 @@ template<typename index_t> struct edge_t
     edge_t(index_t a, index_t b, uint32_t face) : a(a), b(b), face(face) {}
 };
 
+template<typename index_t> struct edge_face_struct
+{
+    GLuint F;
+    GLuint E;
+    GLuint V;
+    GLuint gE;
+
+    edge_t<index_t>* edges;
+    glm::tvec3<index_t>* faces;
+
+    edge_face_struct(const glm::tvec3<index_t>* faces, uint32_t F)
+        : faces(faces), F(F)
+    {
+        E = F + F + F;
+        edges = (edge_t<index_t>*) malloc(E * sizeof(edge_t<index_t>));
+        build_adjacency(faces, F, edges);
+    }
+
+    ~edge_face_struct()
+        { free(edges); }
+};
+
 template<typename index_t> void build_adjacency(const glm::tvec3<index_t>* faces, uint32_t F, edge_t<index_t>* edges)                          
 {
     uint32_t E = F + F + F;
