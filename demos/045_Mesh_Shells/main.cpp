@@ -4,8 +4,6 @@
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
 
-#include <atomic>
-#include <thread>
 #include <map>
 #include <sstream>
 #include <fstream>
@@ -23,14 +21,11 @@
 #include "constants.hpp"
 #include "gl_info.hpp"
 #include "glfw_window.hpp"
-#include "glsl_noise.hpp"
-#include "plato.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
-#include "polyhedron.hpp"
-#include "image.hpp"
 #include "vertex.hpp"
 #include "momenta.hpp"
+#include "edgeface.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
@@ -71,7 +66,7 @@ struct demo_window_t : public glfw_window_t
     void on_scroll(double xoffset, double yoffset) override
     {
         const float max_speed = 8.0;
-        const float min_speed = 0.125;
+        const float min_speed = 0.03125;
 
         float factor = exp(0.125 * yoffset);
         float speed = factor * camera.linear_speed;
@@ -80,6 +75,7 @@ struct demo_window_t : public glfw_window_t
             camera.linear_speed = speed;
     }
 };
+
 
 
 
@@ -116,14 +112,36 @@ struct hqs_model_t
             if (token == "f")
             {
                 glm::uvec3 index;
-                line >> index.x >> index.y >> index.z;
-                indices.push_back(index - glm::uvec3(1));
+                //line >> index.x >> index.y >> index.z;
+                index.x = read_position_index(line);
+                index.y = read_position_index(line);
+                index.z = read_position_index(line);
+                indices.push_back(index);
                 continue;
             }
         }
         V = positions.size();
         F = indices.size();
         debug_msg("Done :: #vertices = %u. triangles = %u.", V, F);
+    }
+
+    GLuint read_position_index(std::stringstream& is)                
+    {           
+        GLuint p, n, t;
+        is >> p;
+        p--;                                                                            
+        int slash = is.get();
+        if (slash != '/') return p;
+        if (is.peek() != '/')
+        {
+            is >> t;
+            slash = is.get(); 
+            if (slash != '/') return p;
+        }
+        else
+            is.get();
+        is >> n;
+        return p;
     }
 
     void normalize(double bbox_max)
@@ -171,13 +189,14 @@ struct hqs_model_t
 
     void calculate_area_weighted_normals()
     {
-        debug_msg("Averaging face normals with angular weight ...");
+        debug_msg("Averaging face normals with area weight ...");
         normals.resize(V);
         memset(normals.data(), 0, sizeof(glm::dvec3) * V);
 
         for(GLuint f = 0; f < F; ++f)
         {
             glm::uvec3 triangle = indices[f];
+            debug_msg("processing %s", glm::to_string(triangle).c_str());
             glm::dvec3 A = positions[triangle.x];
             glm::dvec3 B = positions[triangle.y];
             glm::dvec3 C = positions[triangle.z];
@@ -201,6 +220,7 @@ struct hqs_model_t
         for(GLuint f = 0; f < F; ++f)
         {
             glm::uvec3 triangle = indices[f];
+
             glm::dvec3 A = positions[triangle.x];
             glm::dvec3 B = positions[triangle.y];
             glm::dvec3 C = positions[triangle.z];
@@ -257,70 +277,6 @@ struct hqs_model_t
         debug_msg("Max area = %f", max_area);
         debug_msg("Average area = %f", area / F);
     }
-
-
-    struct uvec2_lex : public glm::uvec2
-    {
-        uvec2_lex(GLuint a, GLuint b) : glm::uvec2(a, b) {};
-
-        friend bool operator < (const uvec2_lex a, const uvec2_lex b)
-        {
-            if (a.y < b.y) return true;
-            if (a.y > b.y) return false;
-            if (a.x < b.x) return true;
-            return false;
-        }
-    };
-
-    void test_manifoldness()
-    {
-        debug_msg("test_manifoldness :: begin");
-        std::map<uvec2_lex, GLuint> edge_count;
-
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::uvec3 triangle = indices[f];
-
-            GLuint iA = triangle.x;
-            GLuint iB = triangle.y;
-            GLuint iC = triangle.z;
-
-            uvec2_lex AB = uvec2_lex(iA, iB);
-            uvec2_lex BC = uvec2_lex(iB, iC);
-            uvec2_lex CA = uvec2_lex(iC, iA);
-
-            std::map<uvec2_lex, GLuint>::iterator it = edge_count.find(AB);
-            if (it != edge_count.end()) edge_count[AB] = 1;
-            else
-                edge_count[AB]++;
-
-            it = edge_count.find(BC);
-            if (it != edge_count.end()) edge_count[BC] = 1;
-            else
-                edge_count[BC]++;
-
-            it = edge_count.find(CA);
-            if (it != edge_count.end()) edge_count[CA] = 1;
-            else
-                edge_count[CA]++;
-        }
-
-        for(std::map<uvec2_lex, GLuint>::const_iterator it0 = edge_count.begin(); it0 != edge_count.end(); ++it0)
-        {
-            uvec2_lex key = it0->first;
-            GLuint value0 = it0->second;
-            GLuint value1 = 0;
-            uvec2_lex BA = uvec2_lex(key.y, key.x);
-            std::map<uvec2_lex, GLuint>::iterator it1 = edge_count.find(BA);
-            if (it1 != edge_count.end())
-                value1 = it1->second;
-            if ((value1 != value0) || (value1 != 1) || (value0 != 1))
-            {
-                debug_msg("Error !! value0 = %u, value1 = %u, key = (%u, %u)", value0, value1, key.x + 1, key.y + 1);
-            }
-        }        
-        debug_msg("test_manifoldness :: end");
-    }    
 
     void test_normals()
     {
@@ -424,15 +380,43 @@ int main(int argc, char *argv[])
     uniform_t uni_light_ws  = shell_visualizer["light_ws"];
 
     //===================================================================================================================================================================================================================
-    // load demon model
+    // load model and build it edge-face structure
     //===================================================================================================================================================================================================================
-    hqs_model_t demon("../../../resources/models/obj/demon.obj");
-    demon.normalize(1.0);
-    demon.calculate_angle_weighted_normals();
-    demon.test_manifoldness();
-    demon.test_normals();
+    hqs_model_t model("../../../resources/models/obj/demon.obj");
+    model.normalize(1.0);
+    model.calculate_angle_weighted_normals();
+    model.test_normals();
 
-    vao_t demon_vao = demon.create_vao();
+
+    edge_face_struct<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
+    vao_t model_vao = model.create_vao();
+
+    for(GLuint e = 0; e < manifold_struct.E; ++e)
+    {
+        debug_msg("Edge {%u, %u} :: face = %u, adjacent_face = %u", manifold_struct.edges[e].a, manifold_struct.edges[e].b, 
+            manifold_struct.edges[e].face, manifold_struct.edges[e].adjacent_face);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     glEnable(GL_DEPTH_TEST);
 
@@ -454,7 +438,7 @@ int main(int argc, char *argv[])
         uni_pv_matrix = projection_view_matrix;
         uni_camera_ws = camera_ws;  
         uni_light_ws = light_ws;
-        demon_vao.render();
+        model_vao.render();
 
         window.end_frame();
     }

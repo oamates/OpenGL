@@ -21,7 +21,6 @@
 #include "vao.hpp"
 #include "vertex.hpp"
 #include "plato.hpp"
-#include "adjacency.hpp"
 #include "attribute.hpp"
 
 struct demo_window_t : public glfw_window_t

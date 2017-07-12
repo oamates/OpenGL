@@ -4,7 +4,7 @@
 #include <glm/gtx/string_cast.hpp>
 
 #include "vao.hpp"
-#include "adjacency.hpp"
+#include "edgeface.hpp"
 #include "constants.hpp"
 
 template<typename vertex_t, typename index_t = GLuint, GLenum mode = GL_TRIANGLES> struct attribute_data_t

@@ -8,46 +8,7 @@
 #include "gl_info.hpp"
 #include "glfw_window.hpp"
 #include "shader.hpp"
-
-//========================================================================================================================================================================================================================
-// bitonic sort algorithm implementation
-//========================================================================================================================================================================================================================
-template<typename T> void bitonic_sort(T* a, const int length)
-{
-    int half_length = length >> 1;
-    int l = half_length;
-    int stage = 0;
-
-    while(l)
-    {
-        int pair_distance = 1 << stage;
-
-        for(int pass = 0; pass <= stage; ++pass)
-        {
-            for(int id = 0; id < half_length; ++id)
-            {
-                int l = id + (id & (-pair_distance));
-                int r = l + pair_distance;
-
-                T l_elem = a[l];
-                T r_elem = a[r];
-
-                bool correct_order = ((id >> stage) & 1) == 0;          // true  -- increasing
-                bool actual_order = l_elem < r_elem;                    // false -- decreasing
-
-                if (actual_order ^ correct_order)
-                {
-                    a[l] = r_elem;
-                    a[r] = l_elem;
-                }
-            }
-            pair_distance >>= 1;
-        }
-
-        stage++;
-        l >>= 1;
-    }
-}
+#include "sort.hpp"
 
 //=======================================================================================================================================================================================================================
 // program entry point
