@@ -18,14 +18,14 @@
 #include "glsl_noise.hpp"
 #include "image.hpp"
 
-struct demo_window_t : public imgui_window_t
+struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
 
     bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
     }
 
     //===================================================================================================================================================================================================================
-    // main program loop : just clear the buffer in a loop
+    // main program loop
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
@@ -181,11 +181,6 @@ int main(int argc, char *argv[])
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
         float t = 0.25f * time;
-
-        //===============================================================================================================================================================================================================
-        // Show FPS
-        //===============================================================================================================================================================================================================
-        ImGui::Text("Application average %.3f ms/frame (%.2f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
         //===============================================================================================================================================================================================================
         // render raymarch scene
