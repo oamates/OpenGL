@@ -20,7 +20,7 @@ void main()
     {
         position_ws = position[i];
         normal_ws = normal[i];
-        defect = dot(normal[i], n) < 0.0 ? 1.0 : 0.0;
+        defect = dot(normal[i], n) < 0.25 ? 1.0 : 0.0;
         gl_Position = projection_view_matrix * vec4(position[i], 1.0f);        
         EmitVertex();
     }

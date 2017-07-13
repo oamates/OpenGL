@@ -231,9 +231,10 @@ struct hqs_model_t
             glm::dvec3 BC = glm::normalize(C - B);
             glm::dvec3 CA = glm::normalize(A - C);
 
-            double qA = glm::sqrt(1.0 + dot(CA, AB));
-            double qB = glm::sqrt(1.0 + dot(AB, BC));
-            double qC = glm::sqrt(1.0 + dot(BC, CA));
+            double qA = glm::acos(glm::sqrt(0.5 + 0.5 * dot(CA, AB)));
+            double qB = glm::acos(glm::sqrt(0.5 + 0.5 * dot(AB, BC)));
+            double qC = glm::acos(glm::sqrt(0.5 + 0.5 * dot(BC, CA)));
+
 
             normals[triangle.x] += qA * n;
             normals[triangle.y] += qB * n;
@@ -309,7 +310,7 @@ struct hqs_model_t
             double dpB = glm::dot(n, nB);
             double dpC = glm::dot(n, nC);
 
-            if ((dpA < 0.0) || (dpB < 0.0) || (dpC < 0.0))
+            if ((dpA < 0.25) || (dpB < 0.25) || (dpC < 0.25))
             {
                 debug_msg("Degeneracy at triangle %u :: ", f);
                 debug_msg("A = %s", glm::to_string(A).c_str());
@@ -382,43 +383,17 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // load model and build it edge-face structure
     //===================================================================================================================================================================================================================
-    hqs_model_t model("../../../resources/models/obj/demon.obj");
+    hqs_model_t model("../../../resources/manifolds/azog.obj");
     model.normalize(1.0);
     model.calculate_angle_weighted_normals();
     model.test_normals();
 
-
     edge_face_struct<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
     vao_t model_vao = model.create_vao();
 
-    for(GLuint e = 0; e < manifold_struct.E; ++e)
-    {
-        debug_msg("Edge {%u, %u} :: face = %u, adjacent_face = %u", manifold_struct.edges[e].a, manifold_struct.edges[e].b, 
-            manifold_struct.edges[e].face, manifold_struct.edges[e].adjacent_face);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
     //===================================================================================================================================================================================================================
     // main program loop

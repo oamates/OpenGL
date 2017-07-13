@@ -33,8 +33,8 @@ void main()
     float diffuse_factor = cos_theta;
     vec3 h = normalize(l + v);
     float cos_alpha = max(dot(h, n), 0.0f);
-    float specular_factor = 0.125 * pow(cos_alpha, 40.0);
-    vec3 c = ambient + distance_factor * (diffuse_factor * diffuse + vec3(specular_factor));
+    float specular_factor = 0.0125 * pow(cos_alpha, 40.0);
+    vec3 c = ambient + pow(distance_factor, 8.0) * (diffuse_factor * diffuse + vec3(specular_factor));
 
-    FragmentColor = vec4(c, 1.0f);
+    FragmentColor = vec4(1.35 * c, 1.0f);
 }
