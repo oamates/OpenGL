@@ -331,6 +331,7 @@ struct hqs_model_t
 
 
     }
+
     vao_t create_vao()
     {
         vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * sizeof(vertex_pn_t));
@@ -348,6 +349,32 @@ struct hqs_model_t
     }    
 
 };
+
+template<typename index_t> struct edge_t
+{
+    index_t a, b;                                                                                       // structure represents directed edge [ab]
+    uint32_t face;                                                                                      // index of the face edge [ab] belongs to
+    uint32_t adjacent_face;
+
+    edge_t(index_t a, index_t b, uint32_t face, uint32_t adjacent_face)
+        : a(a), b(b), face(face), adjacent_face(adjacent_face)
+    {}
+};
+
+
+template<typename index_t> struct edge_face_struct
+{
+    glm::tvec3<index_t>* faces;
+    glm::dvec3* positions;
+
+    GLuint F;
+    GLuint V;
+
+    GLuint E;
+    GLuint gE;
+    edge_t<index_t>* edges;
+
+    glm::dvec3* edge_directions;
 
 
 //=======================================================================================================================================================================================================================
@@ -383,18 +410,43 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // load model and build it edge-face structure
     //===================================================================================================================================================================================================================
-    hqs_model_t model("../../../resources/manifolds/azog.obj");
+    hqs_model_t model("../../../resources/manifolds/demon.obj");
     model.normalize(1.0);
     model.calculate_angle_weighted_normals();
     model.test_normals();
 
     edge_face_struct<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
+
+    void flip_edges(double threshold)
+    {
+        for(GLuint e = 0; e < manifold_struct.E; ++e)
+        {
+            edge_t& edge = manifold_struct.edges[e];
+            index_t iA = edge.a;    
+            index_t iB = edge.b;
+            glm::tvec3<index_t>& face = manifold_struct.faces[edge.face];
+            glm::tvec3<index_t>& adjacent_face = manifold_struct.faces[edge.adjacent_face];
+
+            index_t iC = face.x + face.y + face.z - iA - iB;    
+            index_t iD = adjacent_face.x + adjacent_face.y + adjacent_face.z - iA - iB;
+
+            glm::dvec3& A = manifold_struct.positions[iA];
+            glm::dvec3& B = manifold_struct.positions[iB];
+            glm::dvec3& C = manifold_struct.positions[iC];
+            glm::dvec3& D = manifold_struct.positions[iD];
+
+            glm::dvec3 AB = glm::normalize(B - A);    
+
+
+
+        }    
+    }
+
+
     vao_t model_vao = model.create_vao();
 
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
+                                                         
     //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
@@ -414,7 +466,7 @@ int main(int argc, char *argv[])
         uni_camera_ws = camera_ws;  
         uni_light_ws = light_ws;
         model_vao.render();
-
+           
         window.end_frame();
     }
 
