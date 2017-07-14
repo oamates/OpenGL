@@ -19,347 +19,17 @@
 
 #include "log.hpp"
 #include "constants.hpp"
-#include "gl_info.hpp"
-#include "glfw_window.hpp"
-#include "shader.hpp"
-#include "camera.hpp"
-#include "vertex.hpp"
-#include "momenta.hpp"
-#include "edgeface.hpp"
-
-struct demo_window_t : public glfw_window_t
-{
-    camera_t camera;
-    GLenum mode = GL_FILL;
-
-    demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
-    {
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.001f);
-    }
-
-    //===================================================================================================================================================================================================================
-    // mouse handlers
-    //===================================================================================================================================================================================================================
-    void on_key(int key, int scancode, int action, int mods) override
-    {
-        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
-        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
-        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
-        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
-
-        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
-        {
-            mode = (mode == GL_FILL) ? GL_LINE : GL_FILL;
-            glPolygonMode(GL_FRONT_AND_BACK, mode);
-        }
-    }
-
-    void on_mouse_move() override
-    {
-        double norm = glm::length(mouse_delta);
-        if (norm > 0.01)
-            camera.rotateXY(mouse_delta / norm, norm * frame_dt);
-    }
-
-    void on_scroll(double xoffset, double yoffset) override
-    {
-        const float max_speed = 8.0;
-        const float min_speed = 0.03125;
-
-        float factor = exp(0.125 * yoffset);
-        float speed = factor * camera.linear_speed;
-
-        if ((speed <= max_speed) && (speed >= min_speed))
-            camera.linear_speed = speed;
-    }
-};
-
-
-
-
-
-struct hqs_model_t
-{
-    GLuint V;
-    GLuint F;
-
-    std::vector<glm::dvec3> positions;
-    std::vector<glm::uvec3> indices;
-    std::vector<glm::dvec3> normals;
-
-    double bbox_max;
-
-    hqs_model_t(const char* filename)
-    {
-        std::ifstream input_stream(filename);
-        for (std::string buffer; getline(input_stream, buffer);)
-        {        
-            if (buffer.empty()) continue;
-            std::stringstream line(buffer);
-            std::string token;
-            line >> token;
-                                                                            
-            if (token == "v")
-            {
-                glm::dvec3 position;
-                line >> position.x >> position.y >> position.z;
-                positions.push_back(position);
-                continue;
-            }
-
-            if (token == "f")
-            {
-                glm::uvec3 index;
-                //line >> index.x >> index.y >> index.z;
-                index.x = read_position_index(line);
-                index.y = read_position_index(line);
-                index.z = read_position_index(line);
-                indices.push_back(index);
-                continue;
-            }
-        }
-        V = positions.size();
-        F = indices.size();
-        debug_msg("Done :: #vertices = %u. triangles = %u.", V, F);
-    }
-
-    GLuint read_position_index(std::stringstream& is)                
-    {           
-        GLuint p, n, t;
-        is >> p;
-        p--;                                                                            
-        int slash = is.get();
-        if (slash != '/') return p;
-        if (is.peek() != '/')
-        {
-            is >> t;
-            slash = is.get(); 
-            if (slash != '/') return p;
-        }
-        else
-            is.get();
-        is >> n;
-        return p;
-    }
-
-    void normalize(double bbox_max)
-    {
-        hqs_model_t::bbox_max = bbox_max;
-        debug_msg("Normalizing the model :: bbox_max = %f.", bbox_max);
-
-        glm::dvec3 mass_center;
-        glm::dmat3 covariance_matrix;
-
-        momenta::calculate(positions, mass_center, covariance_matrix);
-        debug_msg("\tMass center = %s", glm::to_string(mass_center).c_str());
-        debug_msg("\tCovariance matrix = %s", glm::to_string(covariance_matrix).c_str());
-
-        glm::dquat q = diagonalizer(covariance_matrix);
-        glm::dmat3 Q = mat3_cast(q);
-        glm::dmat3 Qt = glm::transpose(Q);
-
-        debug_msg("\tDiagonalizer = %s", glm::to_string(Q).c_str());
-
-        glm::dvec3 bbox = glm::dvec3(0.0);
-
-        for (GLuint v = 0; v < V; ++v)
-        {
-            positions[v] = Q * (positions[v] - mass_center);
-            bbox = glm::max(bbox, glm::abs(positions[v]));
-        }
-
-        double max_bbox = glm::max(bbox.x, glm::max(bbox.y, bbox.z));
-        double scale = bbox_max / max_bbox;
-
-        debug_msg("\tModel BBox = %s", glm::to_string(bbox).c_str());
-        debug_msg("\tBBox_max = %f. Maximum = %f. Scale = %f. Scaling ...", bbox_max, max_bbox, scale);
-
-        covariance_matrix = (scale * scale) * (Q * covariance_matrix * Qt);
-        debug_msg("\tCovariance matrix after normalization = %s", glm::to_string(covariance_matrix).c_str());
-
-        bbox = glm::dvec3(0.0);
-        for (GLuint v = 0; v < V; ++v)
-        {
-            positions[v] = scale * positions[v];
-            bbox = glm::max(bbox, glm::abs(positions[v]));
-        }
-    }
-
-    void calculate_area_weighted_normals()
-    {
-        debug_msg("Averaging face normals with area weight ...");
-        normals.resize(V);
-        memset(normals.data(), 0, sizeof(glm::dvec3) * V);
-
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::uvec3 triangle = indices[f];
-            debug_msg("processing %s", glm::to_string(triangle).c_str());
-            glm::dvec3 A = positions[triangle.x];
-            glm::dvec3 B = positions[triangle.y];
-            glm::dvec3 C = positions[triangle.z];
-            glm::dvec3 n = glm::cross(B - A, C - A);
-
-            normals[triangle.x] += n;
-            normals[triangle.y] += n;
-            normals[triangle.z] += n;
-        }
-
-        for(GLuint v = 0; v < V; ++v)
-            normals[v] = glm::normalize(normals[v]);
-    }
-
-    void calculate_angle_weighted_normals()
-    {
-        debug_msg("Averaging face normals with angular weight ...");
-        normals.resize(V);
-        memset(normals.data(), 0, sizeof(glm::dvec3) * V);
-
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::uvec3 triangle = indices[f];
-
-            glm::dvec3 A = positions[triangle.x];
-            glm::dvec3 B = positions[triangle.y];
-            glm::dvec3 C = positions[triangle.z];
-
-            glm::dvec3 n = glm::normalize(glm::cross(B - A, C - A));
-
-            glm::dvec3 AB = glm::normalize(B - A);
-            glm::dvec3 BC = glm::normalize(C - B);
-            glm::dvec3 CA = glm::normalize(A - C);
-
-            double qA = glm::acos(glm::sqrt(0.5 + 0.5 * dot(CA, AB)));
-            double qB = glm::acos(glm::sqrt(0.5 + 0.5 * dot(AB, BC)));
-            double qC = glm::acos(glm::sqrt(0.5 + 0.5 * dot(BC, CA)));
-
-
-            normals[triangle.x] += qA * n;
-            normals[triangle.y] += qB * n;
-            normals[triangle.z] += qC * n;
-        }
-
-        for(GLuint v = 0; v < V; ++v)
-            normals[v] = glm::normalize(normals[v]);
-    }
-
-    void calculate_statistics()
-    {
-        double area = 0.0;
-        double max_area = 0.0;
-        double edge = 0.0;
-        double max_edge = 0.0;
-
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::uvec3 triangle = indices[f];
-            glm::dvec3 A = positions[triangle.x];
-            glm::dvec3 B = positions[triangle.y];
-            glm::dvec3 C = positions[triangle.z];
-
-            double eAB = glm::length(B - A);
-            double eBC = glm::length(C - B);
-            double eCA = glm::length(A - C);
-
-            edge += (eAB + eBC + eCA);
-            max_edge = glm::max(max_edge, eAB);
-            eBC = glm::max(eBC, eCA);
-            max_edge = glm::max(max_edge, eBC);
-
-            double a = glm::length(glm::cross(B - A, C - A));
-            area += a;
-            max_area = glm::max(max_area, a);
-        }
-
-        debug_msg("Max edge length = %f", max_edge);
-        debug_msg("Average edge length = %f", edge / (3 * F));
-        debug_msg("Max area = %f", max_area);
-        debug_msg("Average area = %f", area / F);
-    }
-
-    void test_normals()
-    {
-        debug_msg("\n\n\n\t\t\tTesting normals ... \n\n");
-        int errors = 0;
-        double max_min_edge = 0.0;
-
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::uvec3 triangle = indices[f];
-
-            glm::dvec3 A  = positions[triangle.x];
-            glm::dvec3 nA = normals[triangle.x];
-            glm::dvec3 B  = positions[triangle.y];
-            glm::dvec3 nB = normals[triangle.y];
-            glm::dvec3 C  = positions[triangle.z];
-            glm::dvec3 nC = normals[triangle.z];
-
-            glm::dvec3 n = glm::cross(B - A, C - A);
-            double area = length(n);
-            n /= area;
-
-            double lAB = glm::length(B - A);
-            double lBC = glm::length(C - B);
-            double lCA = glm::length(A - C);
-
-            double min_edge = glm::min(glm::min(lAB, lBC), lCA);
-
-            double dpA = glm::dot(n, nA);
-            double dpB = glm::dot(n, nB);
-            double dpC = glm::dot(n, nC);
-
-            if ((dpA < 0.25) || (dpB < 0.25) || (dpC < 0.25))
-            {
-                debug_msg("Degeneracy at triangle %u :: ", f);
-                debug_msg("A = %s", glm::to_string(A).c_str());
-                debug_msg("B = %s", glm::to_string(B).c_str());
-                debug_msg("C = %s", glm::to_string(C).c_str());
-                debug_msg("AB = %f", lAB);
-                debug_msg("BC = %f", lBC);
-                debug_msg("CA = %f", lCA);
-                debug_msg("area = %.17f", area);
-                debug_msg("min_edge = %.17f", min_edge);
-                debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
-                max_min_edge = glm::max(max_min_edge, min_edge);
-                errors++;
-            }
-        }
-        debug_msg("Total number of errors :: %u", errors);
-        debug_msg("Maximal minimal edge :: %f", max_min_edge);
-
-
-    }
-
-    vao_t create_vao()
-    {
-        vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * sizeof(vertex_pn_t));
-
-        for (GLuint v = 0; v < V; ++v)
-        {
-            vertices[v].position = glm::vec3(positions[v]);
-            vertices[v].normal = glm::vec3(normals[v]);
-        }
-
-        vao_t model_vao = vao_t(GL_TRIANGLES, vertices, V, (GLuint*) indices.data(), 3 * F);
-        free(vertices);
-
-        return model_vao;
-    }    
-
-};
 
 template<typename index_t> struct halfedge_t
 {
     index_t a, b;
     uint32_t face;
+
+    uint32_t next;
     uint32_t opposite;
-    uint32_t bc;
-    uint32_t ca;
 
     halfedge_t(index_t a, index_t b, uint32_t face)
-        : a(a), b(b), face(face), opposite(-1), bc(-1), ca(-1)
+        : a(a), b(b), face(face), next(-1), opposite(-1)
     {}
 };
 
@@ -393,34 +63,44 @@ template<typename index_t> struct he_manifold_t
         //================================================================================================================================================================================================================
         // create half-edge structure array from the input data                                                                                                                                                                    
         //================================================================================================================================================================================================================
-        for (uint32_t index = 0, f = 0; f < F; ++f)
+        for (uint32_t e = 0, f = 0; f < F; ++f)
         {
+            debug_msg("Creating halfedge #%u", e);
+
+
             index_t a = faces[f].x,
                     b = faces[f].y,
                     c = faces[f].z;
 
-            uint32_t i_ab = index++;
-            uint32_t i_bc = index++;
-            uint32_t i_ca = index++;
+            uint32_t i_ab = e++;
+            uint32_t i_bc = e++;
+            uint32_t i_ca = e++;
 
             edges[i_ab].a = a;
             edges[i_ab].b = b;
             edges[i_ab].face = f;
-            edges[i_ab].bc = i_bc;
-            edges[i_ab].ca = i_ca;
+            edges[i_ab].next = i_bc;
 
             edges[i_bc].a = b;
             edges[i_bc].b = c;
             edges[i_bc].face = f;
-            edges[i_bc].bc = i_ca;
-            edges[i_bc].ca = i_ab;
+            edges[i_bc].next = i_ca;
 
             edges[i_ca].a = c;
             edges[i_ca].b = a;
             edges[i_ca].face = f;
-            edges[i_ca].bc = i_ab;
-            edges[i_ca].ca = i_bc;
+            edges[i_ca].next = i_ab;
+
+
         }
+
+        debug_msg("Array filled\n\n");
+
+        for(uint32_t e = 0; e < E; ++e)
+        {
+            debug_msg("edges[%u] = halfedge(a = %u, b = %u, face = %u, next = %u)", e, edges[e].a, edges[e].b, edges[e].face, edges[e].next);
+        }
+
 
         //================================================================================================================================================================================================================
         // quick sort edges lexicographically
@@ -429,8 +109,8 @@ template<typename index_t> struct he_manifold_t
 
         struct
         {
-            uint32_t l;                                                                             // left index of the sub-array that needs to be sorted
-            uint32_t r;                                                                             // right index of the sub-array to sort
+            int32_t l;                                                                             // left index of the sub-array that needs to be sorted
+            int32_t r;                                                                             // right index of the sub-array to sort
         } _stack[STACK_SIZE];
 
         int sp = 0;                                                                                 // stack pointer, stack grows up not down
@@ -439,20 +119,20 @@ template<typename index_t> struct he_manifold_t
                                                                                                                                                                                                                           
         do                                                                                                                                                                                                                    
         {                                                                                                                                                                                                                     
-            uint32_t l = _stack[sp].l;                                                                                                                                                                                
-            uint32_t r = _stack[sp].r;                                                                                                                                                                                
+            int32_t l = _stack[sp].l;                                                                                                                                                                                
+            int32_t r = _stack[sp].r;                                                                                                                                                                                
             --sp;                                                                                                                                                                                                             
             do                                                                                                                                                                                                                
             {                                                                                                                                                                                                                 
-                uint32_t i = l;                                                                                                                                                                                       
-                uint32_t j = r;                                                                                                                                                                                       
-                uint32_t m = i + (j - i) / 2;                                                                                                                                                                         
+                int32_t i = l;                                                                                                                                                                                       
+                int32_t j = r;                                                                                                                                                                                       
+                int32_t m = (i + j) / 2;                                                                                                                                                                         
                 index_t a = edges[m].a;                                                                                                                                                                                             
                 index_t b = edges[m].b;                                                                                                                                                                                             
                 do                                                                                                                                                                                                            
                 {                                                                                                                                                                                                             
                     while ((edges[i].b < b) || ((edges[i].b == b) && (edges[i].a < a))) i++;        // lexicographic compare and proceed forward if less                                                                      
-                    while ((edges[j].b > b) || ((edges[j].b == b) && (edges[j].a > a))) j--;        // lexicographic compare and proceed backward if less                                                                     
+                    while ((edges[j].b > b) || ((edges[j].b == b) && (edges[j].a > a))) j--;        // lexicographic compare and proceed backward if greater                                                                     
                                                                                                                                                                                                                           
                     if (i <= j)                                                                                                                                                                                               
                     {
@@ -460,10 +140,10 @@ template<typename index_t> struct he_manifold_t
                         std::swap(edges[i].b, edges[j].b);
                         std::swap(edges[i].face, edges[j].face);
 
-                        edges[edges[i].bc].ca = j;
-                        edges[edges[i].ca].bc = j;
-                        edges[edges[j].bc].ca = i;
-                        edges[edges[j].ca].bc = i;
+                        uint32_t i_bc = edges[i].next; 
+                        uint32_t j_bc = edges[j].next; 
+                        edges[i_bc].next = j;
+                        edges[j_bc].next = i;
 
                         i++;
                         j--;
@@ -496,9 +176,17 @@ template<typename index_t> struct he_manifold_t
         }                                                                                                                                                                                                                     
         while (sp >= 0);
 
+        debug_msg("Edges sorted\n\n");
+
+        for(uint32_t e = 0; e < E; ++e)
+        {
+            debug_msg("edges[%u] = halfedge(a = %u, b = %u, face = %u, next = %u)", e, edges[e].a, edges[e].b, edges[e].face, edges[e].next);
+        }
+
         //============================================================================================================================================================================================================
         // fill opposite edge indices, -1 will indicate boundary edges                                                                                                                                                        
         //============================================================================================================================================================================================================
+
         for (uint32_t e = 0; e < E; ++e)
         {
             index_t a = edges[e].a;
@@ -506,38 +194,35 @@ template<typename index_t> struct he_manifold_t
 
             if (a < b)
             {
-                uint32_t opposite = find_edge(b, a);
-                edges[e].opposite = opposite;
+                int32_t l = 0;
+                int32_t r = E - 1;
+                while (l <= r)
+                {
+                    int32_t o = (r + l) / 2;
 
-                if (opposite != -1)
-                    edges[opposite].opposite = e;
+                    if (edges[o].b < a) { l = o + 1; continue; }
+                    if (edges[o].b > a) { r = o - 1; continue; }
+                    if (edges[o].a < b) { l = o + 1; continue; }
+                    if (edges[o].a > b) { r = o - 1; continue; }
+
+                    //================================================================================================================================================================================================
+                    // opposite edge found, o is its index
+                    //================================================================================================================================================================================================
+                    edges[e].opposite = o;
+                    edges[o].opposite = e;
+                    break;
+                }
             }
         }
-    }
 
-    //================================================================================================================================================================================================================
-    // finds edge [a,b] and returns its index
-    // if edge does not exist returns -1
-    //================================================================================================================================================================================================================
-    uint32_t find_edge(index_t a, index_t b)
-    {
-        int32_t l = 0;
-        int32_t r = E - 1;
-        while (l <= r)
+        debug_msg("Edges opposite filled :: \n\n");
+
+        for(uint32_t e = 0; e < E; ++e)
         {
-            int32_t m = (r + l) / 2;
-
-            if (edges[m].b < b) { l = m + 1; continue; }
-            if (edges[m].b > b) { r = m - 1; continue; }
-            if (edges[m].a < a) { l = m + 1; continue; }
-            if (edges[m].a > a) { r = m - 1; continue; }
-
-            //========================================================================================================================================================================================================
-            // edge found, m is its index
-            //========================================================================================================================================================================================================
-            return m;
+            debug_msg("edges[%u] = halfedge(a = %u, b = %u, face = %u, next = %u, opposite = %u)", e, edges[e].a, edges[e].b, edges[e].face, edges[e].next, edges[e].opposite);
         }
-        return -1;
+
+
     }
 
     //================================================================================================================================================================================================================
@@ -546,33 +231,24 @@ template<typename index_t> struct he_manifold_t
     uint32_t flip_edge(uint32_t e)
     {
         uint32_t o = edges[e].opposite;
-
         index_t a = edges[e].a;
         index_t b = edges[e].b;
 
-        index_t c = edges[edges[e].bc].b;
-        index_t d = edges[edges[o].bc].b;
+        index_t c = edges[edges[e].next].b;
+        index_t d = edges[edges[o].next].b;
+
+        edges[e].a = d;
+        edges[e].b = c;
+        edges[o].a = c;
+        edges[o].b = d;
+
+        faces[edges[o].next] = e;
+        faces[edges[e].next] = o;
+        edges[e].next = edges[edges[e].next].next;
+        edges[o].next = edges[edges[o].next].next;
 
         faces[edges[e].face] = glm::tvec3<index_t>(a, d, c);
         faces[edges[o].face] = glm::tvec3<index_t>(b, c, d);
-
-        int32_t l = 0;
-        int32_t r = E - 1;
-        while (l <= r)
-        {
-            int32_t m = (r + l) / 2;
-
-            if (edges[m].b < b) { l = m + 1; continue; }
-            if (edges[m].b > b) { r = m - 1; continue; }
-            if (edges[m].a < a) { l = m + 1; continue; }
-            if (edges[m].a > a) { r = m - 1; continue; }
-
-            //========================================================================================================================================================================================================
-            // edge found, m is its index
-            //========================================================================================================================================================================================================
-            return m;
-        }
-        return -1;
     }
 
     double angle_defect(double cos_A, double cos_B, double cos_C)
@@ -584,10 +260,12 @@ template<typename index_t> struct he_manifold_t
     {
         for(GLuint e = 0; e < E; ++e)
         {
+            uint32_t o = edges[e].opposite;
+
             index_t a = edges[e].a;
             index_t b = edges[e].b;
-            index_t c = edges[edges[e].bc].b;
-            index_t d = edges[edges[o].bc].b;
+            index_t c = edges[edges[e].next].b;
+            index_t d = edges[edges[o].next].b;
 
             glm::dvec3 A = positions[a];
             glm::dvec3 B = positions[b];
@@ -634,9 +312,12 @@ template<typename index_t> struct he_manifold_t
             double cos_BCD = -glm::dot(BC, DC);
             double cos_DBC =  glm::dot(DB, BC);
             double cos_CDB = -glm::dot(DC, DB);
-            double degeneracy_ADC = angle_defect(cos_DCA, cos_ADC, cos_CAD);
+            double degeneracy_DBC = angle_defect(cos_BCD, cos_DBC, cos_CDB);
 
 
+            if(degeneracy_ABC + degeneracy_ADB > degeneracy_ADC + degeneracy_DBC)
+            {
+            }
 
         }    
     }    
@@ -650,40 +331,56 @@ template<typename index_t> struct he_manifold_t
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-    int res_x = 1920;
-    int res_y = 1080;
-
-    //===================================================================================================================================================================================================================
-    // initialize GLFW library
-    // create GLFW window and initialize GLEW library
-    // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080
-    //===================================================================================================================================================================================================================
-    if (!glfw::init())
-        exit_msg("Failed to initialize GLFW library. Exiting ...");
-
-    demo_window_t window("Model shell visualizer", 4, 3, 3, res_x, res_y, true);
-
     //===================================================================================================================================================================================================================
     // load model and build it edge-face structure
     //===================================================================================================================================================================================================================
-    hqs_model_t model("../../../resources/manifolds/demon.obj");
+    const int F = 20;
+    const int V = 12;
 
-    he_manifold_t<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
-
-                                                         
-    //===================================================================================================================================================================================================================
-    // main program loop
-    //===================================================================================================================================================================================================================
-    while(!window.should_close())
+    glm::uvec3 triangles[F] = 
     {
-        window.new_frame();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        window.end_frame();
-    }
+        glm::uvec3(2,  0,  8),
+        glm::uvec3(0,  2,  9),
+        glm::uvec3(4,  0,  6),
+        glm::uvec3(0,  4,  8),
+        glm::uvec3(6,  0,  9),
+        glm::uvec3(1,  3, 10),
+        glm::uvec3(3,  1, 11),
+        glm::uvec3(1,  4,  6),
+        glm::uvec3(4,  1, 10),
+        glm::uvec3(1,  6, 11),
+        glm::uvec3(2,  5,  7),
+        glm::uvec3(5,  2,  8),
+        glm::uvec3(2,  7,  9),
+        glm::uvec3(5,  3,  7),
+        glm::uvec3(3,  5, 10),
+        glm::uvec3(7,  3, 11),
+        glm::uvec3(8,  4, 10),
+        glm::uvec3(5,  8, 10),
+        glm::uvec3(6,  9, 11),
+        glm::uvec3(9,  7, 11) 
+    };
 
-    //===================================================================================================================================================================================================================
-    // terminate the program and exit
-    //===================================================================================================================================================================================================================
-    glfw::terminate();
+    const double phi = constants::phi_d;
+
+    glm::dvec3 positions[V] = 
+    {
+        glm::dvec3(  0.0, -1.0, -phi),
+        glm::dvec3(  0.0, -1.0,  phi),
+        glm::dvec3(  0.0,  1.0, -phi),
+        glm::dvec3(  0.0,  1.0,  phi),
+        glm::dvec3( -1.0, -phi,  0.0),
+        glm::dvec3( -1.0,  phi,  0.0),
+        glm::dvec3(  1.0, -phi,  0.0),
+        glm::dvec3(  1.0,  phi,  0.0),
+        glm::dvec3( -phi,  0.0, -1.0),
+        glm::dvec3(  phi,  0.0, -1.0),
+        glm::dvec3( -phi,  0.0,  1.0),
+        glm::dvec3(  phi,  0.0,  1.0)
+    };
+
+    he_manifold_t<GLuint> manifold_struct(triangles, F, positions, V);
+
+
     return 0;
 }
