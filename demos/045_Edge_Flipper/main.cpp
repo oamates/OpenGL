@@ -550,18 +550,11 @@ template<typename index_t> struct he_manifold_t
         index_t a = edges[e].a;
         index_t b = edges[e].b;
 
-        uint32_t f_abc = edges[e].face;
-        uint32_t f_adb = edges[o].face;
+        index_t c = edges[edges[e].bc].b;
+        index_t d = edges[edges[o].bc].b;
 
-        index_t c = faces[f_abc].x + faces[f_abc].y + faces[f_abc].z - a - b;
-        index_t d = faces[f_adb].x + faces[f_adb].y + faces[f_adb].z - a - b;
-
-        faces[f_abc] = glm::tvec3<index_t>(a, d, c);
-        faces[f_adb] = glm::tvec3<index_t>(b, c, d);
-
-        uint32_t 
-
-        faces[]
+        faces[edges[e].face] = glm::tvec3<index_t>(a, d, c);
+        faces[edges[o].face] = glm::tvec3<index_t>(b, c, d);
 
         int32_t l = 0;
         int32_t r = E - 1;
@@ -582,25 +575,69 @@ template<typename index_t> struct he_manifold_t
         return -1;
     }
 
+    double angle_defect(double cos_A, double cos_B, double cos_C)
+    {
+        return glm::abs(cos_A - 0.5) + glm::abs(cos_B - 0.5) + glm::abs(cos_C - 0.5);
+    }
+
     void flip_edges(double threshold)
     {
         for(GLuint e = 0; e < E; ++e)
         {
-            halfedge_t<index_t>& edge = edges[e];
-            index_t iA = edge.a;    
-            index_t iB = edge.b;
-            glm::tvec3<index_t>& face = faces[edge.face];
-//            glm::tvec3<index_t>& adjacent_face = faces[edge.adjacent_face];
+            index_t a = edges[e].a;
+            index_t b = edges[e].b;
+            index_t c = edges[edges[e].bc].b;
+            index_t d = edges[edges[o].bc].b;
 
-            index_t iC = face.x + face.y + face.z - iA - iB;    
-            //index_t iD = adjacent_face.x + adjacent_face.y + adjacent_face.z - iA - iB;
+            glm::dvec3 A = positions[a];
+            glm::dvec3 B = positions[b];
+            glm::dvec3 C = positions[c];
+            glm::dvec3 D = positions[d];
 
-            glm::dvec3& A = positions[iA];
-            glm::dvec3& B = positions[iB];
-            glm::dvec3& C = positions[iC];
-            //glm::dvec3& D = positions[iD];
 
             glm::dvec3 AB = glm::normalize(B - A);
+            glm::dvec3 BC = glm::normalize(C - B);
+            glm::dvec3 CA = glm::normalize(A - C);
+
+            glm::dvec3 AD = glm::normalize(D - A);
+            glm::dvec3 DB = glm::normalize(B - D);
+
+            glm::dvec3 DC = glm::normalize(C - D);
+
+            //========================================================================================================================================================================================================
+            // triangle ABC
+            //========================================================================================================================================================================================================
+            double cos_CAB = glm::dot(CA, AB);
+            double cos_ABC = glm::dot(AB, BC);
+            double cos_BCA = glm::dot(BC, CA);
+            double degeneracy_ABC = angle_defect(cos_CAB, cos_ABC, cos_BCA);
+
+            //========================================================================================================================================================================================================
+            // triangle ADB
+            //========================================================================================================================================================================================================
+            double cos_DBA = -glm::dot(DB, AB);
+            double cos_ADB =  glm::dot(AD, DB);
+            double cos_BAD = -glm::dot(AB, AD);
+            double degeneracy_ADB = angle_defect(cos_DBA, cos_ADB, cos_BAD);
+
+            //========================================================================================================================================================================================================
+            // triangle ADC
+            //========================================================================================================================================================================================================
+            double cos_DCA = glm::dot(DC, CA);
+            double cos_ADC = glm::dot(AD, DC);
+            double cos_CAD = glm::dot(CA, AD);
+            double degeneracy_ADC = angle_defect(cos_DCA, cos_ADC, cos_CAD);
+
+            //========================================================================================================================================================================================================
+            // triangle DBC
+            //========================================================================================================================================================================================================
+            double cos_BCD = -glm::dot(BC, DC);
+            double cos_DBC =  glm::dot(DB, BC);
+            double cos_CDB = -glm::dot(DC, DB);
+            double degeneracy_ADC = angle_defect(cos_DCA, cos_ADC, cos_CAD);
+
+
+
         }    
     }    
 
@@ -627,30 +664,12 @@ int main(int argc, char *argv[])
     demo_window_t window("Model shell visualizer", 4, 3, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
-    // load demon model
-    //===================================================================================================================================================================================================================
-    glsl_program_t shell_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/model_shell.vs"),
-                                    glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/model_shell.gs"),
-                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/model_shell.fs"));
-
-    shell_visualizer.enable();
-    uniform_t uni_pv_matrix = shell_visualizer["projection_view_matrix"];
-    uniform_t uni_camera_ws = shell_visualizer["camera_ws"];
-    uniform_t uni_light_ws  = shell_visualizer["light_ws"];
-
-    //===================================================================================================================================================================================================================
     // load model and build it edge-face structure
     //===================================================================================================================================================================================================================
     hqs_model_t model("../../../resources/manifolds/demon.obj");
-    model.normalize(1.0);
-    model.calculate_angle_weighted_normals();
-    model.test_normals();
 
-    edge_face_struct<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
+    he_manifold_t<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
 
-    vao_t model_vao = model.create_vao();
-
-    glEnable(GL_DEPTH_TEST);
                                                          
     //===================================================================================================================================================================================================================
     // main program loop
@@ -659,26 +678,12 @@ int main(int argc, char *argv[])
     {
         window.new_frame();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
-
-        float time = window.frame_ts;
-        const float light_radius = 1.707f;
-        glm::vec3 light_ws = glm::vec3(light_radius * cos(0.5f * time), 2.0f, light_radius * sin(0.5f * time));
-        glm::vec3 camera_ws = window.camera.position();
-
-        uni_pv_matrix = projection_view_matrix;
-        uni_camera_ws = camera_ws;  
-        uni_light_ws = light_ws;
-        model_vao.render();
-           
         window.end_frame();
     }
 
     //===================================================================================================================================================================================================================
     // terminate the program and exit
     //===================================================================================================================================================================================================================
-
     glfw::terminate();
     return 0;
 }

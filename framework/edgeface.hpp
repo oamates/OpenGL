@@ -192,7 +192,8 @@ template<typename index_t> struct edge_face_struct
         }
     }
 
-    topological_info()
+/*
+    void topological_info()
     {
         const unsigned int MAX_EDGE_MULTIPLICITY = 16;
         unsigned int edge_multiplicities[MAX_EDGE_MULTIPLICITY];
@@ -212,7 +213,6 @@ template<typename index_t> struct edge_face_struct
         }
 
         debug_msg("Boundary edges :: %u", boundary_edges);
-
     }
 
     void build_edge_directions()
@@ -237,6 +237,7 @@ template<typename index_t> struct edge_face_struct
 
         return glm::length2(ext_cos - cs2pi_3);
     }
+*/
 
     ~edge_face_struct()
         { free(edges); }
