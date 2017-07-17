@@ -980,7 +980,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
 //    hqs_model_t model("../../../resources/models/obj/demon.obj");
-    hqs_model_t model("../../../resources/manifolds/demon.obj");
+    hqs_model_t model("../../../resources/manifolds/demon3.obj");
     model.normalize(1.0);
 
     he_manifold_t<GLuint> manifold(model.faces.data(), model.F, model.positions.data(), model.V);
@@ -1006,7 +1006,7 @@ int main(int argc, char *argv[])
     manifold.validate();
 
     debug_msg("\n\n\n");
-    threshold = glm::cos(constants::pi_d * (1.0 - 1.0 / 48.0));
+    double threshold = glm::cos(constants::pi_d * (1.0 - 1.0 / 32.0));
 
     for(int i = 0; i < 32; ++i)
     {
@@ -1017,8 +1017,8 @@ int main(int argc, char *argv[])
 
     manifold.find_degenerate_faces(threshold);
     manifold.validate();
-*/
 
+*/
     vao_t model_flp_vao = model.create_vao();
     manifold.export_obj("demon.obj", false);
 
