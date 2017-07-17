@@ -1,9 +1,6 @@
 //========================================================================================================================================================================================================================
-// DEMO 045 : Mesh Edge Flipper
+// DEMO 045 : Edge Flipper
 //========================================================================================================================================================================================================================
-#define GLM_FORCE_RADIANS 
-#define GLM_FORCE_NO_CTOR_INIT
-
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
  
@@ -30,6 +27,7 @@ struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
     GLenum mode = GL_FILL;
+    bool render_original = true;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -53,6 +51,12 @@ struct demo_window_t : public glfw_window_t
             mode = (mode == GL_FILL) ? GL_LINE : GL_FILL;
             glPolygonMode(GL_FRONT_AND_BACK, mode);
         }
+
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+        {
+            render_original = !render_original;
+            debug_msg("Rendering mode = %s", render_original ? "original" : "flipped");
+        }
     }
 
     void on_mouse_move() override
@@ -74,10 +78,6 @@ struct demo_window_t : public glfw_window_t
             camera.linear_speed = speed;
     }
 };
-
-
-
-
 
 template<typename index_t> struct halfedge_t
 {
@@ -106,7 +106,6 @@ template<typename index_t> struct he_manifold_t
     //===================================================================================================================================================================================================================
     GLuint V;
     glm::dvec3* positions;
-    glm::dvec3* normals;
 
     //===================================================================================================================================================================================================================
     // main data structure for fast mesh traversing
@@ -114,37 +113,11 @@ template<typename index_t> struct he_manifold_t
     GLuint E;
     halfedge_t<index_t>* edges;
 
-
-    double bbox_max;
-
+    glm::dvec3* normals;
+    glm::dvec3* edge_directions;
 
     he_manifold_t(glm::tvec3<index_t>* faces, uint32_t F, glm::dvec3* positions, uint32_t V)
-        : faces(faces), F(F), positions(positions), normals(0), V(V) 
-    {
-        init();
-    }
-
-
-    GLuint read_position_index(std::stringstream& is)                
-    {           
-        GLuint p, n, t;
-        is >> p;
-        p--;                                                                            
-        int slash = is.get();
-        if (slash != '/') return p;
-        if (is.peek() != '/')
-        {
-            is >> t;
-            slash = is.get(); 
-            if (slash != '/') return p;
-        }
-        else
-            is.get();
-        is >> n;
-        return p;
-    }
-
-    void init()
+        : faces(faces), F(F), positions(positions), V(V), normals(0), edge_directions(0)
     {
         E = F + F + F;
         edges = (halfedge_t<index_t>*) malloc(E * sizeof(halfedge_t<index_t>));
@@ -154,9 +127,6 @@ template<typename index_t> struct he_manifold_t
         //================================================================================================================================================================================================================
         for (uint32_t e = 0, f = 0; f < F; ++f)
         {
-            debug_msg("Creating halfedge #%u", e);
-
-
             index_t a = faces[f].x,
                     b = faces[f].y,
                     c = faces[f].z;
@@ -179,17 +149,7 @@ template<typename index_t> struct he_manifold_t
             edges[i_ca].b = a;
             edges[i_ca].face = f;
             edges[i_ca].next = i_ab;
-
-
         }
-
-        debug_msg("Array filled\n\n");
-
-        for(uint32_t e = 0; e < E; ++e)
-        {
-            debug_msg("edges[%u] = halfedge(a = %u, b = %u, face = %u, next = %u)", e, edges[e].a, edges[e].b, edges[e].face, edges[e].next);
-        }
-
 
         //================================================================================================================================================================================================================
         // quick sort edges lexicographically
@@ -268,17 +228,9 @@ template<typename index_t> struct he_manifold_t
         }
         while (sp >= 0);
 
-        debug_msg("Edges sorted\n\n");
-
-        for(uint32_t e = 0; e < E; ++e)
-        {
-            debug_msg("edges[%u] = halfedge(a = %u, b = %u, face = %u, next = %u)", e, edges[e].a, edges[e].b, edges[e].face, edges[e].next);
-        }
-
         //============================================================================================================================================================================================================
         // fill opposite edge indices, -1 will indicate boundary edges                                                                                                                                                        
         //============================================================================================================================================================================================================
-
         for (uint32_t e = 0; e < E; ++e)
         {
             index_t a = edges[e].a;
@@ -305,13 +257,6 @@ template<typename index_t> struct he_manifold_t
                     break;
                 }
             }
-        }
-
-        debug_msg("Edges opposite filled :: \n\n");
-
-        for(uint32_t e = 0; e < E; ++e)
-        {
-            debug_msg("edges[%u] = halfedge(a = %u, b = %u, face = %u, next = %u, opposite = %u)", e, edges[e].a, edges[e].b, edges[e].face, edges[e].next, edges[e].opposite);
         }
     }
 
@@ -438,70 +383,250 @@ template<typename index_t> struct he_manifold_t
         return glm::abs(cos_A - 0.5) + glm::abs(cos_B - 0.5) + glm::abs(cos_C - 0.5);
     }
 
-    void flip_edges(double threshold)
+    double angle_deg(double cosine)
     {
+        return constants::one_rad_d * glm::acos(glm::clamp(cosine, -1.0, 1.0));
+    }
+
+    void calculate_edge_directions()
+    {
+        if (!edge_directions)
+            edge_directions = (glm::dvec3*) malloc(sizeof(glm::dvec3) * E);
+
+        for(GLuint e = 0; e < E; ++e)
+        {
+            uint32_t a = edges[e].a;
+            uint32_t b = edges[e].b;
+
+            if (a < b)
+            {
+                uint32_t o = edges[e].opposite;
+                glm::dvec3 AB = glm::normalize(positions[b] - positions[a]);
+                edge_directions[e] =  AB;
+                edge_directions[o] = -AB;
+            }
+        }
+    }
+
+    
+    void find_folded_edges(double threshold)
+    {
+        debug_msg("Searching folded edges :: ");
+        uint32_t flippable_folded = 0;
+        uint32_t non_flippable_folded = 0;
+
         for(GLuint e = 0; e < E; ++e)
         {
             uint32_t o = edges[e].opposite;
-
-            index_t a = edges[e].a;
-            index_t b = edges[e].b;
-            index_t c = edges[edges[e].next].b;
-            index_t d = edges[edges[o].next].b;
+            uint32_t a = edges[e].a;
+            uint32_t b = edges[e].b;
+            uint32_t c = edges[edges[e].next].b;
+            uint32_t d = edges[edges[o].next].b;
 
             glm::dvec3 A = positions[a];
             glm::dvec3 B = positions[b];
             glm::dvec3 C = positions[c];
             glm::dvec3 D = positions[d];
 
+            glm::dvec3 AB = B - A;
+            glm::dvec3 AC = C - A;
+            glm::dvec3 AD = D - A;
 
-            glm::dvec3 AB = glm::normalize(B - A);
-            glm::dvec3 BC = glm::normalize(C - B);
-            glm::dvec3 CA = glm::normalize(A - C);
+            glm::dvec3 n_ABC = glm::normalize(glm::cross(AB, AC));
+            glm::dvec3 n_ADB = glm::normalize(glm::cross(AD, AB));
 
-            glm::dvec3 AD = glm::normalize(D - A);
-            glm::dvec3 DB = glm::normalize(B - D);
-
-            glm::dvec3 DC = glm::normalize(C - D);
-
-            //========================================================================================================================================================================================================
-            // triangle ABC
-            //========================================================================================================================================================================================================
-            double cos_CAB = glm::dot(CA, AB);
-            double cos_ABC = glm::dot(AB, BC);
-            double cos_BCA = glm::dot(BC, CA);
-            double degeneracy_ABC = angle_defect(cos_CAB, cos_ABC, cos_BCA);
-
-            //========================================================================================================================================================================================================
-            // triangle ADB
-            //========================================================================================================================================================================================================
-            double cos_DBA = -glm::dot(DB, AB);
-            double cos_ADB =  glm::dot(AD, DB);
-            double cos_BAD = -glm::dot(AB, AD);
-            double degeneracy_ADB = angle_defect(cos_DBA, cos_ADB, cos_BAD);
-
-            //========================================================================================================================================================================================================
-            // triangle ADC
-            //========================================================================================================================================================================================================
-            double cos_DCA = glm::dot(DC, CA);
-            double cos_ADC = glm::dot(AD, DC);
-            double cos_CAD = glm::dot(CA, AD);
-            double degeneracy_ADC = angle_defect(cos_DCA, cos_ADC, cos_CAD);
-
-            //========================================================================================================================================================================================================
-            // triangle DBC
-            //========================================================================================================================================================================================================
-            double cos_BCD = -glm::dot(BC, DC);
-            double cos_DBC =  glm::dot(DB, BC);
-            double cos_CDB = -glm::dot(DC, DB);
-            double degeneracy_DBC = angle_defect(cos_BCD, cos_DBC, cos_CDB);
-
-
-            if(degeneracy_ABC + degeneracy_ADB > degeneracy_ADC + degeneracy_DBC)
+            double cos_dihedral = glm::dot(n_ABC, n_ADB);
+            if (cos_dihedral < threshold)
             {
-            }
+                if (c != d)
+                {
+                    // check if projection of D lies inside ABC
+                    glm::dvec3 P = positions[d] - glm::dot(positions[d], n_ABC) * n_ABC;
+                    glm::dvec3 AP = P - A;
 
-        }    
+                    double dot00, dot01, dot02, dot11, dot12;
+                    double inv_det, u, v;
+
+                    dot00 = glm::dot(AC, AC);
+                    dot01 = glm::dot(AC, AB);
+                    dot02 = glm::dot(AC, AP);
+                    dot11 = glm::dot(AB, AB);
+                    dot12 = glm::dot(AB, AP);
+
+                    inv_det = 1.0 / (dot00 * dot11 - dot01 * dot01);
+                    u = (dot11 * dot02 - dot01 * dot12) * inv_det;
+                    v = (dot00 * dot12 - dot01 * dot02) * inv_det;
+
+                    if ((u >= 0.0) && (v >= 0.0) && (u + v <= 1.0))
+                    {
+                        flippable_folded++;
+                        debug_msg("\tedge #%u :: [%u, %u], dihedral_angle = %f, flippable: true", e, a, b, angle_deg(cos_dihedral));
+                        continue;
+                    }
+
+                    // unfortunately, no
+                    // then check if projection of C lies inside ADB
+
+                    P = positions[c] - glm::dot(positions[c], n_ADB) * n_ADB;
+                    AP = P - A;
+
+                    dot00 = glm::dot(AB, AB);
+                    dot01 = glm::dot(AB, AD);
+                    dot02 = glm::dot(AB, AP);
+                    dot11 = glm::dot(AD, AD);
+                    dot12 = glm::dot(AD, AP);
+
+                    inv_det = 1.0 / (dot00 * dot11 - dot01 * dot01);
+                    u = (dot11 * dot02 - dot01 * dot12) * inv_det;
+                    v = (dot00 * dot12 - dot01 * dot02) * inv_det;
+
+                    if ((u >= 0.0) && (v >= 0.0) && (u + v <= 1.0))
+                    {
+                        flippable_folded++;
+                        debug_msg("\tedge #%u :: [%u, %u], dihedral_angle = %f, flippable: true", e, a, b, angle_deg(cos_dihedral));
+                        continue;
+                    }
+
+                    non_flippable_folded++;
+                    debug_msg("\tedge #%u :: [%u, %u], dihedral_angle = %f, flippable: false: bad projection", e, a, b, angle_deg(cos_dihedral));
+
+
+                }
+                else
+                {
+                    non_flippable_folded++;
+                    debug_msg("\tedge #%u :: [%u, %u], dihedral_angle = %f, flippable: false: c == d", e, a, b, angle_deg(cos_dihedral));
+                }
+            }
+        }
+        debug_msg("Done. #folded_flippable_edges = %u, #non_flippable_folded_edges = %u, total = %u", 
+            flippable_folded, non_flippable_folded, flippable_folded + non_flippable_folded);        
+    }
+
+    void flip_folded_edges(double threshold)
+    {
+        for(GLuint e = 0; e < E; ++e)
+        {
+            uint32_t o = edges[e].opposite;
+            uint32_t a = edges[e].a;
+            uint32_t b = edges[e].b;
+            uint32_t c = edges[edges[e].next].b;
+            uint32_t d = edges[edges[o].next].b;
+
+            glm::dvec3 A = positions[a];
+            glm::dvec3 B = positions[b];
+            glm::dvec3 C = positions[c];
+            glm::dvec3 D = positions[d];
+
+            glm::dvec3 AB = B - A;
+            glm::dvec3 AC = C - A;
+            glm::dvec3 AD = D - A;
+
+            glm::dvec3 n_ABC = glm::normalize(glm::cross(AB, AC));
+            glm::dvec3 n_ADB = glm::normalize(glm::cross(AD, AB));
+
+            double cos_dihedral = glm::dot(n_ABC, n_ADB);
+
+            if ((cos_dihedral < threshold) && (c != d))
+            {
+                // check if projection of D lies inside ABC
+                glm::dvec3 P = positions[d] - glm::dot(positions[d], n_ABC) * n_ABC;
+                glm::dvec3 AP = P - A;
+
+                double dot00, dot01, dot02, dot11, dot12;
+                double inv_det, u, v;
+
+                dot00 = glm::dot(AC, AC);
+                dot01 = glm::dot(AC, AB);
+                dot02 = glm::dot(AC, AP);
+                dot11 = glm::dot(AB, AB);
+                dot12 = glm::dot(AB, AP);
+
+                inv_det = 1.0 / (dot00 * dot11 - dot01 * dot01);
+                u = (dot11 * dot02 - dot01 * dot12) * inv_det;
+                v = (dot00 * dot12 - dot01 * dot02) * inv_det;
+
+                if ((u >= 0.0) && (v >= 0.0) && (u + v <= 1.0))
+                {
+                    flip_edge(e);
+                    continue;
+                }
+
+                // unfortunately, no
+                // then check if projection of C lies inside ADB
+
+                P = positions[c] - glm::dot(positions[c], n_ADB) * n_ADB;
+                AP = P - A;
+
+                dot00 = glm::dot(AB, AB);
+                dot01 = glm::dot(AB, AD);
+                dot02 = glm::dot(AB, AP);
+                dot11 = glm::dot(AD, AD);
+                dot12 = glm::dot(AD, AP);
+
+                inv_det = 1.0 / (dot00 * dot11 - dot01 * dot01);
+                u = (dot11 * dot02 - dot01 * dot12) * inv_det;
+                v = (dot00 * dot12 - dot01 * dot02) * inv_det;
+
+                if ((u >= 0.0) && (v >= 0.0) && (u + v <= 1.0))
+                    flip_edge(e);
+            }
+        }
+    }
+
+
+    void find_degenerate_faces(double threshold)
+    {
+        debug_msg("Searching degenerate triangles :: ");
+
+        uint32_t flippable_degenerate = 0;
+        uint32_t non_flippable_degenerate = 0;
+
+        for(GLuint e = 0; e < E; ++e)
+        {
+            uint32_t o = edges[e].opposite;            
+            uint32_t a = edges[e].a;
+            uint32_t b = edges[e].b;
+            uint32_t c = edges[edges[e].next].b;
+            uint32_t d = edges[edges[o].next].b;
+
+            glm::dvec3 CB = glm::normalize(positions[b] - positions[c]);
+            glm::dvec3 CA = glm::normalize(positions[a] - positions[c]);
+            double cos_C = glm::dot(CB, CA);
+            if (cos_C < threshold)
+            {
+                if (c != d)
+                {
+                    debug_msg("Found degenerate flippable edge #%u [%u, %u] :: angle = %f", e, a, b, angle_deg(cos_C));
+                    flippable_degenerate++;
+                }
+                else
+                {
+                    debug_msg("Found degenerate but non-flippable edge #%u [%u, %u] :: angle = %f", e, a, b, angle_deg(cos_C));
+                    non_flippable_degenerate++;
+                }
+            }
+        }
+        debug_msg("Done. #degenerate flippable edges = %u, #degenerate non-flippable edges = %u, total = %u", 
+            flippable_degenerate, non_flippable_degenerate, flippable_degenerate + non_flippable_degenerate);
+    }
+
+    void flip_degenerate_faces(double threshold)
+    {
+        for(GLuint e = 0; e < E; ++e)
+        {
+            uint32_t o = edges[e].opposite;
+            uint32_t a = edges[e].a;
+            uint32_t b = edges[e].b;
+            uint32_t c = edges[edges[e].next].b;
+            uint32_t d = edges[edges[o].next].b;
+
+            glm::dvec3 CB = glm::normalize(positions[b] - positions[c]);
+            glm::dvec3 CA = glm::normalize(positions[a] - positions[c]);
+
+            double cos_C = glm::dot(CB, CA);
+            if ((cos_C < threshold) && (c != d)) flip_edge(e);
+        }
     }
 
     void calculate_area_weighted_normals()
@@ -617,21 +742,92 @@ template<typename index_t> struct he_manifold_t
         fclose(f);
     }
 
-    vao_t create_vao()
+    void calculate_statistics()
     {
-        vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * sizeof(vertex_pn_t));
+        double area = 0.0;
+        double max_area = 0.0;
+        double edge = 0.0;
+        double max_edge = 0.0;
 
-        for (GLuint v = 0; v < V; ++v)
+        for(GLuint f = 0; f < F; ++f)
         {
-            vertices[v].position = glm::vec3(positions[v]);
-            vertices[v].normal = glm::vec3(normals[v]);
+            glm::uvec3 triangle = faces[f];
+            glm::dvec3 A = positions[triangle.x];
+            glm::dvec3 B = positions[triangle.y];
+            glm::dvec3 C = positions[triangle.z];
+
+            double eAB = glm::length(B - A);
+            double eBC = glm::length(C - B);
+            double eCA = glm::length(A - C);
+
+            edge += (eAB + eBC + eCA);
+            max_edge = glm::max(max_edge, eAB);
+            eBC = glm::max(eBC, eCA);
+            max_edge = glm::max(max_edge, eBC);
+
+            double a = glm::length(glm::cross(B - A, C - A));
+            area += a;
+            max_area = glm::max(max_area, a);
         }
 
-        vao_t model_vao = vao_t(GL_TRIANGLES, vertices, V, (GLuint*) indices.data(), 3 * F);
-        free(vertices);
+        debug_msg("Max edge length = %f", max_edge);
+        debug_msg("Average edge length = %f", edge / (3 * F));
+        debug_msg("Max area = %f", max_area);
+        debug_msg("Average area = %f", area / F);
+    }
 
-        return model_vao;
-    }    
+    void test_normals()
+    {
+        debug_msg("\n\n\n\t\t\tTesting normals ... \n\n");
+        int errors = 0;
+        double max_min_edge = 0.0;
+
+        for(GLuint f = 0; f < F; ++f)
+        {
+            glm::uvec3 triangle = faces[f];
+
+            glm::dvec3 A  = positions[triangle.x];
+            glm::dvec3 nA = normals[triangle.x];
+            glm::dvec3 B  = positions[triangle.y];
+            glm::dvec3 nB = normals[triangle.y];
+            glm::dvec3 C  = positions[triangle.z];
+            glm::dvec3 nC = normals[triangle.z];
+
+            glm::dvec3 n = glm::cross(B - A, C - A);
+            double area = length(n);
+            n /= area;
+
+            double lAB = glm::length(B - A);
+            double lBC = glm::length(C - B);
+            double lCA = glm::length(A - C);
+
+            double min_edge = glm::min(glm::min(lAB, lBC), lCA);
+
+            double dpA = glm::dot(n, nA);
+            double dpB = glm::dot(n, nB);
+            double dpC = glm::dot(n, nC);
+
+            if ((dpA < 0.25) || (dpB < 0.25) || (dpC < 0.25))
+            {
+                debug_msg("Degeneracy at triangle %u :: ", f);
+                debug_msg("A = %s", glm::to_string(A).c_str());
+                debug_msg("B = %s", glm::to_string(B).c_str());
+                debug_msg("C = %s", glm::to_string(C).c_str());
+                debug_msg("AB = %f", lAB);
+                debug_msg("BC = %f", lBC);
+                debug_msg("CA = %f", lCA);
+                debug_msg("area = %.17f", area);
+                debug_msg("min_edge = %.17f", min_edge);
+                debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
+                max_min_edge = glm::max(max_min_edge, min_edge);
+                errors++;
+            }
+        }
+        debug_msg("Total number of errors :: %u", errors);
+        debug_msg("Maximal minimal edge :: %f", max_min_edge);
+
+
+    }
 
     ~he_manifold_t()
         { free(edges); }
@@ -653,9 +849,6 @@ struct hqs_model_t
     {
         debug_msg("Loading %s model", file_name);
 
-        std::vector<glm::dvec3> positions;
-        std::vector<glm::uvec3> indices;
-
         FILE* file = fopen(file_name, "rb");
         char buf[4096];
 
@@ -674,7 +867,7 @@ struct hqs_model_t
             {
                 glm::dvec3 vertex;
                 if (3 != sscanf(&buf[2], "%lf %lf %lf", &vertex[0], &vertex[1], &vertex[2])) continue;
-                vertices.push_back(vertex);
+                positions.push_back(vertex);
                 continue;
             }
 
@@ -735,178 +928,22 @@ struct hqs_model_t
         }
     }
 
-    void calculate_statistics()
+    vao_t create_vao()
     {
-        double area = 0.0;
-        double max_area = 0.0;
-        double edge = 0.0;
-        double max_edge = 0.0;
+        vertex_pn_t* vertices = (vertex_pn_t*) malloc(V * sizeof(vertex_pn_t));
 
-        for(GLuint f = 0; f < F; ++f)
+        for (GLuint v = 0; v < V; ++v)
         {
-            glm::uvec3 triangle = indices[f];
-            glm::dvec3 A = positions[triangle.x];
-            glm::dvec3 B = positions[triangle.y];
-            glm::dvec3 C = positions[triangle.z];
-
-            double eAB = glm::length(B - A);
-            double eBC = glm::length(C - B);
-            double eCA = glm::length(A - C);
-
-            edge += (eAB + eBC + eCA);
-            max_edge = glm::max(max_edge, eAB);
-            eBC = glm::max(eBC, eCA);
-            max_edge = glm::max(max_edge, eBC);
-
-            double a = glm::length(glm::cross(B - A, C - A));
-            area += a;
-            max_area = glm::max(max_area, a);
+            vertices[v].position = glm::vec3(positions[v]);
+            vertices[v].normal = glm::vec3(normals[v]);
         }
 
-        debug_msg("Max edge length = %f", max_edge);
-        debug_msg("Average edge length = %f", edge / (3 * F));
-        debug_msg("Max area = %f", max_area);
-        debug_msg("Average area = %f", area / F);
-    }
+        vao_t model_vao = vao_t(GL_TRIANGLES, vertices, V, glm::value_ptr(faces[0]), 3 * F);
+        free(vertices);
 
-    void test_normals()
-    {
-        debug_msg("\n\n\n\t\t\tTesting normals ... \n\n");
-        int errors = 0;
-        double max_min_edge = 0.0;
-
-        for(GLuint f = 0; f < F; ++f)
-        {
-            glm::uvec3 triangle = indices[f];
-
-            glm::dvec3 A  = positions[triangle.x];
-            glm::dvec3 nA = normals[triangle.x];
-            glm::dvec3 B  = positions[triangle.y];
-            glm::dvec3 nB = normals[triangle.y];
-            glm::dvec3 C  = positions[triangle.z];
-            glm::dvec3 nC = normals[triangle.z];
-
-            glm::dvec3 n = glm::cross(B - A, C - A);
-            double area = length(n);
-            n /= area;
-
-            double lAB = glm::length(B - A);
-            double lBC = glm::length(C - B);
-            double lCA = glm::length(A - C);
-
-            double min_edge = glm::min(glm::min(lAB, lBC), lCA);
-
-            double dpA = glm::dot(n, nA);
-            double dpB = glm::dot(n, nB);
-            double dpC = glm::dot(n, nC);
-
-            if ((dpA < 0.25) || (dpB < 0.25) || (dpC < 0.25))
-            {
-                debug_msg("Degeneracy at triangle %u :: ", f);
-                debug_msg("A = %s", glm::to_string(A).c_str());
-                debug_msg("B = %s", glm::to_string(B).c_str());
-                debug_msg("C = %s", glm::to_string(C).c_str());
-                debug_msg("AB = %f", lAB);
-                debug_msg("BC = %f", lBC);
-                debug_msg("CA = %f", lCA);
-                debug_msg("area = %.17f", area);
-                debug_msg("min_edge = %.17f", min_edge);
-                debug_msg("\tdpA = %f, dpB = %f, dpC = %f", dpA, dpB, dpC);
-                max_min_edge = glm::max(max_min_edge, min_edge);
-                errors++;
-            }
-        }
-        debug_msg("Total number of errors :: %u", errors);
-        debug_msg("Maximal minimal edge :: %f", max_min_edge);
-
-
-    }
-
-};    
-
-
-//=======================================================================================================================================================================================================================
-// program entry point
-//=======================================================================================================================================================================================================================
-int main(int argc, char *argv[])
-{
-    //===================================================================================================================================================================================================================
-    // load model and build it edge-face structure
-    //===================================================================================================================================================================================================================
-    const int F = 20;
-    const int V = 12;
-
-    glm::uvec3 triangles[F] = 
-    {
-        glm::uvec3(2,  0,  8),
-        glm::uvec3(0,  2,  9),
-        glm::uvec3(4,  0,  6),
-        glm::uvec3(0,  4,  8),
-        glm::uvec3(6,  0,  9),
-        glm::uvec3(1,  3, 10),
-        glm::uvec3(3,  1, 11),
-        glm::uvec3(1,  4,  6),
-        glm::uvec3(4,  1, 10),
-        glm::uvec3(1,  6, 11),
-        glm::uvec3(2,  5,  7),
-        glm::uvec3(5,  2,  8),
-        glm::uvec3(2,  7,  9),
-        glm::uvec3(5,  3,  7),
-        glm::uvec3(3,  5, 10),
-        glm::uvec3(7,  3, 11),
-        glm::uvec3(8,  4, 10),
-        glm::uvec3(5,  8, 10),
-        glm::uvec3(6,  9, 11),
-        glm::uvec3(9,  7, 11) 
-    };
-
-    const double phi = constants::phi_d;
-
-    glm::dvec3 positions[V] = 
-    {
-        glm::dvec3(  0.0, -1.0, -phi),
-        glm::dvec3(  0.0, -1.0,  phi),
-        glm::dvec3(  0.0,  1.0, -phi),
-        glm::dvec3(  0.0,  1.0,  phi),
-        glm::dvec3( -1.0, -phi,  0.0),
-        glm::dvec3( -1.0,  phi,  0.0),
-        glm::dvec3(  1.0, -phi,  0.0),
-        glm::dvec3(  1.0,  phi,  0.0),
-        glm::dvec3( -phi,  0.0, -1.0),
-        glm::dvec3(  phi,  0.0, -1.0),
-        glm::dvec3( -phi,  0.0,  1.0),
-        glm::dvec3(  phi,  0.0,  1.0)
-    };
-
-    he_manifold_t<GLuint> manifold_struct(triangles, F, positions, V);
-
-    manifold_struct.validate();
-
-    manifold_struct.export_vao("icosahedron.vao", true);
-    manifold_struct.export_obj("icosahedron.obj", false);
-    manifold_struct.export_obj("icosahedron_n.obj", true);
-
-    uint32_t seed = 12365407;
-    for(uint32_t q = 0; q < 5000; ++q)
-    {
-        seed = 3259123461 * seed + 123526539;
-        uint32_t e = seed % manifold_struct.E;
-
-        debug_msg("Flip test #%u :: edge #%u = [%u, %u].\n", q, e, manifold_struct.edges[e].a, manifold_struct.edges[e].b);
-
-        if (manifold_struct.flippable(e))
-        {
-            manifold_struct.flip_edge(e);
-            if (!manifold_struct.validate())
-                break;
-
-        }
-
-    }
-
-    return 0;
-}
-/*
+        return model_vao;
+    }        
+};
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -924,7 +961,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Model shell visualizer", 4, 3, 3, res_x, res_y, true);
+    demo_window_t window("Edge Flipper", 4, 3, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
     // load demon model
@@ -941,14 +978,52 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // load model and build it edge-face structure
     //===================================================================================================================================================================================================================
+
+//    hqs_model_t model("../../../resources/models/obj/demon.obj");
     hqs_model_t model("../../../resources/manifolds/demon.obj");
     model.normalize(1.0);
-    model.calculate_angle_weighted_normals();
-    model.test_normals();
 
-    edge_face_struct<GLuint> manifold_struct(model.indices.data(), model.F, model.positions.data(), model.V);
+    he_manifold_t<GLuint> manifold(model.faces.data(), model.F, model.positions.data(), model.V);
+    model.normals.resize(model.V);
+    manifold.normals = model.normals.data();
+    manifold.calculate_angle_weighted_normals();
 
-    vao_t model_vao = model.create_vao();
+    vao_t model_ori_vao = model.create_vao();
+/*
+    double threshold = glm::cos(constants::pi_d * (1.0 - 1.0 / 16.0)); // angles greater than pi * (1 - 1/64) ~ 177.1875 degrees
+
+    for(int i = 0; i < 32; ++i)
+    {
+        //manifold.flip_degenerate_faces(threshold);
+        manifold.find_folded_edges(threshold);
+        manifold.flip_folded_edges(threshold);
+        debug_msg("\n\n\n");
+    }
+
+    //manifold.find_degenerate_faces(threshold);
+    manifold.find_folded_edges(threshold);
+    debug_msg("\n\n\n");
+    manifold.validate();
+
+    debug_msg("\n\n\n");
+    threshold = glm::cos(constants::pi_d * (1.0 - 1.0 / 48.0));
+
+    for(int i = 0; i < 32; ++i)
+    {
+        manifold.find_degenerate_faces(threshold);
+        manifold.flip_degenerate_faces(threshold);
+        debug_msg("\n\n\n");
+    }
+
+    manifold.find_degenerate_faces(threshold);
+    manifold.validate();
+*/
+
+    vao_t model_flp_vao = model.create_vao();
+    manifold.export_obj("demon.obj", false);
+
+    manifold.calculate_angle_weighted_normals();
+    manifold.test_normals();
 
     glEnable(GL_DEPTH_TEST);
                                                          
@@ -970,8 +1045,12 @@ int main(int argc, char *argv[])
         uni_pv_matrix = projection_view_matrix;
         uni_camera_ws = camera_ws;  
         uni_light_ws = light_ws;
-        model_vao.render();
-           
+
+        if (window.render_original)
+            model_ori_vao.render();
+        else
+            model_flp_vao.render();
+
         window.end_frame();
     }
 
@@ -982,4 +1061,3 @@ int main(int argc, char *argv[])
     glfw::terminate();
     return 0;
 }
-*/

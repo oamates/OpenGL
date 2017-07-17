@@ -26,7 +26,7 @@ void main()
     vec3 DEFECTIVE_COLOR = vec3(0.0, 0.0, 1.0);
     vec3 NORMAL_COLOR = vec3(0.5, 0.5, 0.0);
 
-    vec3 color = mix(DEFECTIVE_COLOR, NORMAL_COLOR, 1.0 - defect);
+    vec3 color = mix(NORMAL_COLOR, DEFECTIVE_COLOR, defect);
     vec3 ambient = 0.175 * color;
     vec3 diffuse = color;
 
