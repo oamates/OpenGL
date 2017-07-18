@@ -18,9 +18,11 @@ void main()
 {
 	vec3 n = normalize(cross(position[1] - position[0], position[2] - position[0]));
 
-    float d =((dot(n, normal[0]) < 0.25) ||
-              (dot(n, normal[1]) < 0.25) ||
-              (dot(n, normal[2]) < 0.25)) ? 1.0 : 0.0;
+    const float threshold = 0.5;
+
+    float d = ((dot(n, normal[0]) < threshold) ||
+               (dot(n, normal[1]) < threshold) ||
+               (dot(n, normal[2]) < threshold)) ? 1.0 : 0.0;
 
 /*
     vec3 ab = normalize(position[1] - position[0]);
@@ -34,12 +36,21 @@ void main()
     cosines[2] = inv_pi * acos(-dot(bc, ca));    	
 */
 
+    const float scale = 0.5 * 0.03125;
+
+    const vec3 tri[3] = vec3[]
+    (
+        scale * vec3( 0.5,  0.5, -1.0),
+        scale * vec3( 0.5, -1.0,  0.5),
+        scale * vec3(-1.0,  0.5,  0.5)
+    );
+
     for(int i = 0; i < 3; ++i)
     {
-        position_ws = position[i];
+        position_ws = position[i] + 0.5 * d * tri[i];
         normal_ws = normal[i];
         defect = d;
-        gl_Position = projection_view_matrix * vec4(position[i], 1.0f);        
+        gl_Position = projection_view_matrix * vec4(position_ws, 1.0f);
         EmitVertex();
     }
 }

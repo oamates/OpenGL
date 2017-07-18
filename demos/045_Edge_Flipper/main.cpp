@@ -807,7 +807,9 @@ template<typename index_t> struct he_manifold_t
             double dpB = glm::dot(n, nB);
             double dpC = glm::dot(n, nC);
 
-            if ((dpA < 0.25) || (dpB < 0.25) || (dpC < 0.25))
+            const double threshold = 0.5;
+
+            if ((dpA < threshold) || (dpB < threshold) || (dpC < threshold))
             {
                 debug_msg("Degeneracy at triangle %u :: ", f);
                 debug_msg("A = %s", glm::to_string(A).c_str());
@@ -980,7 +982,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
 //    hqs_model_t model("../../../resources/models/obj/demon.obj");
-    hqs_model_t model("../../../resources/manifolds/demon3.obj");
+    hqs_model_t model("../../../resources/manifolds/demon2.obj");
     model.normalize(1.0);
 
     he_manifold_t<GLuint> manifold(model.faces.data(), model.F, model.positions.data(), model.V);

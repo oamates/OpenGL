@@ -24,10 +24,10 @@ void main()
     float cos_theta = 0.5 + 0.5 * dot(n, l);
 
     vec3 DEFECTIVE_COLOR = vec3(1.5, 0.25, 0.25);
-    vec3 NORMAL_COLOR = vec3(0.1, 0.1, 0.1);
+    vec3 NORMAL_COLOR = vec3(0.25, 0.25, 0.25);
 
     vec3 color = mix(NORMAL_COLOR, DEFECTIVE_COLOR, defect);
-    vec3 ambient = 0.175 * color;
+    vec3 ambient = 0.225 * color;
     vec3 diffuse = color;
 
     float diffuse_factor = cos_theta;
