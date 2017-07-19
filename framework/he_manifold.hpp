@@ -716,7 +716,7 @@ template<typename index_t> struct he_manifold_t
         debug_msg("Average area = %f", area / F);
     }
 
-    void test_normals()
+    void test_normals(double threshold)
     {
         debug_msg("\n\n\n\t\t\tTesting normals ... \n\n");
         int errors = 0;
@@ -746,8 +746,6 @@ template<typename index_t> struct he_manifold_t
             double dpA = glm::dot(n, nA);
             double dpB = glm::dot(n, nB);
             double dpC = glm::dot(n, nC);
-
-            const double threshold = 0.5;
 
             if ((dpA < threshold) || (dpB < threshold) || (dpC < threshold))
             {

@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     vao_t model_ori_vao = model.create_vao();
 
     sdf_compute_t<GLuint> sdf_compute(manifold.faces, manifold.F, manifold.positions, manifold.V);
-
+    sdf_compute.normals = manifold.normals;
 
     //===================================================================================================================================================================================================================
     // 1. index buffer
@@ -215,10 +215,7 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-
-
     sdf_compute.tri_sdf_compute<4>(max_level, GL_TEXTURE0, texel_size);
-
 
     glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/udf_visualize.fs"));

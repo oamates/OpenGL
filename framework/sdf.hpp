@@ -107,12 +107,8 @@ template<typename index_t> struct sdf_compute_t
     GLuint F;
     glm::tvec3<index_t>* faces;
 
-    double bbox_max;
-
     glm::dvec3* positions;
-    glm::dvec3* normals; 
-
-    GLuint ibo_id;
+    glm::dvec3* normals;
 
     sdf_compute_t(glm::tvec3<index_t>* faces, uint32_t F, glm::dvec3* positions, uint32_t V)
         : faces(faces), F(F), positions(positions), V(V), normals(0)
@@ -217,7 +213,7 @@ template<typename index_t> struct sdf_compute_t
 
         glm::dvec3* positions;
         glm::tvec3<index_t>* faces;
-        uint32_t triangles;
+        uint32_t F;
 
         std::atomic_uint triangle_index;
         std::atomic_uint* octree;
@@ -258,7 +254,7 @@ template<typename index_t> struct sdf_compute_t
         compute_data.max_level = max_level;
         compute_data.positions = positions;
         compute_data.faces = faces;
-        compute_data.triangles = F;
+        compute_data.F = F;
         compute_data.triangle_index = 0;
 
         unsigned int p2 = 1 << max_level;
@@ -341,6 +337,7 @@ template<typename index_t> struct sdf_compute_t
     //===================================================================================================================================================================================================================
     template<int threads> GLuint tri_sdf_compute(int max_level, GLenum texture_unit, double delta)
     {
+debug_msg("QQQQQQQQQQQQQQ1111111111111142532476987867543 :: V = %u", V); fflush(stdout);        
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
@@ -359,9 +356,11 @@ template<typename index_t> struct sdf_compute_t
         for(unsigned int v = 0; v < V; ++v)
             layer[v] = positions[v] + delta * normals[v];
 
+debug_msg("QQQQQQQQQQQQQQ111111111111114253247698 :: "); fflush(stdout);
+
         compute_data.positions = layer;
         compute_data.faces = faces;
-        compute_data.triangles = F;
+        compute_data.F = F;
         compute_data.triangle_index = 0;
 
         unsigned int p2 = 1 << max_level;
@@ -369,6 +368,7 @@ template<typename index_t> struct sdf_compute_t
 
         unsigned int octree_size = 0;
         unsigned int mip_size = 8;
+debug_msg("QQQQQQQQQQQQQQ1111111111111"); fflush(stdout);
         for(unsigned int i = 0; i < max_level - 1; ++i)
         {
             octree_size += mip_size;
@@ -380,7 +380,7 @@ template<typename index_t> struct sdf_compute_t
 
         for(unsigned int i = 0; i < octree_size; ++i)  compute_data.octree[i] = diameter;
         for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
-
+debug_msg("QQQQQQQQQQQQQQ"); fflush(stdout);
         //===============================================================================================================================================================================================================
         // step 2 :: launch threads to compute udf for the external shell of the model
         //===============================================================================================================================================================================================================
@@ -759,17 +759,17 @@ template<typename index_t> struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // get the index of the triangle this invocation will work on 
         //===============================================================================================================================================================================================================
-        unsigned int triangle = compute_data->triangle_index++;
+        unsigned int f = compute_data->triangle_index++;
 
-        while (triangle < compute_data->triangles)
+        while (f < compute_data->F)
         {
-            debug_msg("Processing triangle #%u", triangle);
+            debug_msg("Processing triangle #%u", f);
             //===========================================================================================================================================================================================================
             // get the indices and the vertices of the triangle
             //===========================================================================================================================================================================================================
-            unsigned int iA = compute_data->faces[triangle].x;
-            unsigned int iB = compute_data->faces[triangle].y;
-            unsigned int iC = compute_data->faces[triangle].z;
+            unsigned int iA = compute_data->faces[f].x;
+            unsigned int iB = compute_data->faces[f].y;
+            unsigned int iC = compute_data->faces[f].z;
 
             glm::dvec3 vA = compute_data->positions[iA];
             glm::dvec3 vB = compute_data->positions[iB];
@@ -919,7 +919,7 @@ template<typename index_t> struct sdf_compute_t
             //===============================================================================================================================================================================================================
             // done ... proceed to next triangle
             //===============================================================================================================================================================================================================
-            triangle = compute_data->triangle_index++;
+            f = compute_data->triangle_index++;
         }
     }
 

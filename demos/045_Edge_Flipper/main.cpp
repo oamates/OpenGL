@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
     manifold.export_vao("demon.vao", true);
 
     manifold.calculate_angle_weighted_normals();
-    manifold.test_normals();
+    manifold.test_normals(0.571);
 
     glEnable(GL_DEPTH_TEST);
                                                          

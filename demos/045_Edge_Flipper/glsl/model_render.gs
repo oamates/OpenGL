@@ -18,7 +18,7 @@ void main()
 {
 	vec3 n = normalize(cross(position[1] - position[0], position[2] - position[0]));
 
-    const float threshold = 0.5;
+    const float threshold = 0.571;
 
     float d = ((dot(n, normal[0]) < threshold) ||
                (dot(n, normal[1]) < threshold) ||
