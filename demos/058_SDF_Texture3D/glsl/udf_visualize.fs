@@ -12,9 +12,8 @@ void main()
 
     if (q > 0.05) discard;
 
-	float w = exp(-8.0 * abs(q));
+	float w = exp(-4.0 * abs(q));
 
 
     FragmentColor = vec4(w, w, w, 1.0);
-    FragmentColor = vec4(1.0);
 }

@@ -335,9 +335,8 @@ template<typename index_t> struct sdf_compute_t
     // no modification is necessary to increase the amount of threads -- so let it be equal to the number of processor (logical) cores
     // the implementation will work for distance textures up to 1024 x 1024 x 1024 dimension
     //===================================================================================================================================================================================================================
-    template<int threads> GLuint tri_sdf_compute(int max_level, GLenum texture_unit, double delta)
+    template<int threads> GLuint tri_sdf_compute(int max_level, GLenum texture_unit, double delta, const char* file_name = 0)
     {
-debug_msg("QQQQQQQQQQQQQQ1111111111111142532476987867543 :: V = %u", V); fflush(stdout);        
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
@@ -356,8 +355,6 @@ debug_msg("QQQQQQQQQQQQQQ1111111111111142532476987867543 :: V = %u", V); fflush(
         for(unsigned int v = 0; v < V; ++v)
             layer[v] = positions[v] + delta * normals[v];
 
-debug_msg("QQQQQQQQQQQQQQ111111111111114253247698 :: "); fflush(stdout);
-
         compute_data.positions = layer;
         compute_data.faces = faces;
         compute_data.F = F;
@@ -368,7 +365,7 @@ debug_msg("QQQQQQQQQQQQQQ111111111111114253247698 :: "); fflush(stdout);
 
         unsigned int octree_size = 0;
         unsigned int mip_size = 8;
-debug_msg("QQQQQQQQQQQQQQ1111111111111"); fflush(stdout);
+
         for(unsigned int i = 0; i < max_level - 1; ++i)
         {
             octree_size += mip_size;
@@ -380,7 +377,6 @@ debug_msg("QQQQQQQQQQQQQQ1111111111111"); fflush(stdout);
 
         for(unsigned int i = 0; i < octree_size; ++i)  compute_data.octree[i] = diameter;
         for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
-debug_msg("QQQQQQQQQQQQQQ"); fflush(stdout);
         //===============================================================================================================================================================================================================
         // step 2 :: launch threads to compute udf for the external shell of the model
         //===============================================================================================================================================================================================================
@@ -465,20 +461,25 @@ debug_msg("QQQQQQQQQQQQQQ"); fflush(stdout);
         //===============================================================================================================================================================================================================
         // afoksha
         //===============================================================================================================================================================================================================
-        tex3d_header_t header 
-        {
-            .target = GL_TEXTURE_3D,
-            .internal_format = GL_R32F,
-            .format = GL_RED,
-            .type = GL_FLOAT,
-            .size = glm::ivec3(p2, p2, p2),
-            .data_size = (uint32_t) texture_size * sizeof(GLfloat)
-        };  
 
-        FILE* f = fopen("trefoil.t3d", "wb");
-        fwrite(&header, sizeof(tex3d_header_t), 1, f);
-        fwrite(texture_data, header.data_size, 1, f);
-        fclose(f);
+        if (file_name)
+        {
+            tex3d_header_t header 
+            {
+                .target = GL_TEXTURE_3D,
+                .internal_format = GL_R32F,
+                .format = GL_RED,
+                .type = GL_FLOAT,
+                .size = glm::ivec3(p2, p2, p2),
+                .data_size = (uint32_t) texture_size * sizeof(GLfloat)
+            };  
+
+
+            FILE* f = fopen(file_name, "wb");
+            fwrite(&header, sizeof(tex3d_header_t), 1, f);
+            fwrite(texture_data, header.data_size, 1, f);
+            fclose(f);
+        }
 
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
 
