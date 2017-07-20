@@ -196,7 +196,6 @@ template<typename index_t> struct he_manifold_t
         }
     }
 
-
     bool validate()
     {
         debug_msg("Validating half edge-face structure :: \n\n");

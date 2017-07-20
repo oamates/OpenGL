@@ -3,10 +3,6 @@
 //========================================================================================================================================================================================================================
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
-
-#include <atomic>
-#include <thread>
-#include <map>
  
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -118,6 +114,9 @@ int main(int argc, char *argv[])
     sdf_compute_t<GLuint> sdf_compute(manifold.faces, manifold.F, manifold.positions, manifold.V);
     sdf_compute.normals = manifold.normals;
 
+    manifold.export_vao("demon.vao", true);
+
+
     //===================================================================================================================================================================================================================
     // 1. index buffer
     //===================================================================================================================================================================================================================
@@ -215,7 +214,7 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    sdf_compute.tri_sdf_compute<4>(max_level, GL_TEXTURE0, texel_size, "demon.sdf");
+    //sdf_compute.tri_sdf_compute<4>(max_level, GL_TEXTURE0, texel_size, "demon.sdf");
 
     glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/udf_visualize.fs"));
@@ -225,6 +224,9 @@ int main(int argc, char *argv[])
     udf_visualizer["mask"] = (int) ((1 << max_level) - 1);
     udf_visualizer["shift"] = (int) max_level;
     udf_visualizer["udf_tex"] = 0;
+
+
+    texture3d_t demon_sdf(GL_TEXTURE0, "../../../resources/sdf/demon.sdf");
 
     //glDisable(GL_DEPTH_TEST);
     //glEnable(GL_BLEND);

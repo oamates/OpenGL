@@ -1,6 +1,9 @@
 #ifndef _sdf_included_015145034650764357365074365343417534721056415465105143173
 #define _sdf_included_015145034650764357365074365343417534721056415465105143173
 
+#include <atomic>
+#include <thread>
+
 #include "log.hpp"
 
 const double INTEGRAL_SCALE = 268435456.0;
@@ -71,7 +74,45 @@ struct texture3d_t
     GLenum texture_unit;
     GLenum internal_format;
 
-    texture3d_t() {}
+    texture3d_t(GLenum texture_unit, const char* file_name)
+        : texture_unit(texture_unit)
+    {
+        tex3d_header_t header;
+
+        FILE* f = fopen(file_name, "rb");
+        assert(f);
+        
+        fread(&header, sizeof(tex3d_header_t), 1, f);
+
+        size = header.size;
+        internal_format = header.internal_format;
+        void* texture_data = malloc(header.data_size);
+
+        fread(texture_data, header.data_size, 1, f);
+        fclose(f);
+
+        glActiveTexture(texture_unit);
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_3D, texture_id);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        glTexImage3D(GL_TEXTURE_3D, 0, internal_format, size.x, size.y, size.z, 0, header.format, header.type, texture_data);
+
+        /*
+        debug_msg("internal_format = %u. GL_R32F = %u", internal_format, GL_R32F);
+        debug_msg("size = (%u, %u, %u).", size.x, size.y, size.z);
+        debug_msg("format = %x. GL_FLOAT = %x", header.format, GL_RED);
+        debug_msg("type = %x. GL_FLOAT = %x", header.type, GL_FLOAT);
+        */
+
+        free(texture_data);
+    }
 
     texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
         : size(size), texture_unit(texture_unit), internal_format(internal_format)
@@ -88,6 +129,10 @@ struct texture3d_t
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
         glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, size.x, size.y, size.z);
+    }
+
+    void load(const char* file_name)
+    {
     }
 
     void bind_as_image(GLuint image_unit, GLenum access = GL_READ_WRITE)
@@ -585,7 +630,7 @@ template<typename index_t> struct sdf_compute_t
     // the function generates two point clouds (external and internal), computes two unsigned distance fields and by simple analysis 
     // decides whether the given lattice point lies inside or outside of the distance mesh and computes the distance
     //===================================================================================================================================================================================================================
-    template<int threads> GLuint pnt_sdf_compute(int max_level, GLenum texture_unit)
+    template<int threads> GLuint pnt_sdf_compute(int max_level, GLenum texture_unit, const char* file_name = 0)
     {
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
@@ -718,20 +763,25 @@ template<typename index_t> struct sdf_compute_t
         //=======================================================================================================================================================================================================
         // store texture to file
         //=======================================================================================================================================================================================================
-        tex3d_header_t header 
+        if (file_name)
         {
-            .target = GL_TEXTURE_3D,
-            .internal_format = GL_R32F,
-            .format = GL_RED,
-            .type = GL_FLOAT,
-            .size = glm::ivec3(p2, p2, p2),
-            .data_size = texture_size * sizeof(GLfloat)
-        };  
+            tex3d_header_t header 
+            {
+                .target = GL_TEXTURE_3D,
+                .internal_format = GL_R32F,
+                .format = GL_RED,
+                .type = GL_FLOAT,
+                .size = glm::ivec3(p2, p2, p2),
+                .data_size = (uint32_t) texture_size * sizeof(GLfloat)
+            };  
 
-        FILE* f = fopen("trefoil.t3d", "wb");
-        fwrite(&header, sizeof(tex3d_header_t), 1, f);
-        fwrite(texture_data, header.data_size, 1, f);
-        fclose(f);
+
+            FILE* f = fopen(file_name, "wb");
+            fwrite(&header, sizeof(tex3d_header_t), 1, f);
+            fwrite(texture_data, header.data_size, 1, f);
+            fclose(f);
+        }
+
 
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
 
