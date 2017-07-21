@@ -45,8 +45,8 @@ float distance_field(vec3 p)
 
 float raymarch(vec3 position, vec3 direction)
 {
-    const float epsilon = 0.001;
-    const int maxSteps = 200;
+    const float epsilon = 0.0005;
+    const int maxSteps = 128;
     float t = 0.0f;
 
     for(int i = 0; i < maxSteps; ++i) 
@@ -54,7 +54,7 @@ float raymarch(vec3 position, vec3 direction)
         float d = distance_field(position + direction * t);
         if(d < epsilon)
             return t;
-        t += 0.85 * d;
+        t += d;
     }
 
     return -1.0;
