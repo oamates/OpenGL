@@ -27,6 +27,7 @@
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
+    bool position_changed = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -40,10 +41,10 @@ struct demo_window_t : public glfw_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
-        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
-        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
-        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) { camera.move_forward(frame_dt);   position_changed = true; }
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) { camera.move_backward(frame_dt);  position_changed = true; }
+        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) { camera.straight_right(frame_dt); position_changed = true; }
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) { camera.straight_left(frame_dt);  position_changed = true; }
     }
 
     void on_mouse_move() override
@@ -129,6 +130,15 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // skybox and environment map shader initialization
     //===================================================================================================================================================================================================================
+    glsl_program_t sorter(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter.cs"));
+    sorter.enable();
+    uniform_t uni_sorter_shift = sorter["shift"];
+    uniform_t uni_sorter_triangles = sorter["triangles"];
+    uniform_t uni_sorter_camera_ws = sorter["camera_ws"];
+
+    //===================================================================================================================================================================================================================
+    // skybox and environment map shader initialization
+    //===================================================================================================================================================================================================================
     glsl_program_t skybox_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/skybox.vs"),
                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/skybox.fs"));
 
@@ -139,8 +149,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // volume raymarch shader
     //===================================================================================================================================================================================================================
-    glsl_program_t crystal_raymarch(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/raymarch_crystal.vs"),
-                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/raymarch_crystal.fs"));
+    glsl_program_t crystal_raymarch(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/sdf_march.vs"),
+                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sdf_march.fs"));
 
     crystal_raymarch.enable();
 
@@ -183,6 +193,24 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
+
+    //===================================================================================================================================================================================================================
+    // create texture buffer access to vertices and to indices
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE4);
+    GLuint indices_tbo_id;
+    glGenTextures(1, &indices_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, indices_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, model.ibo.id);
+    glBindImageTexture(0, indices_tbo_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);    
+
+    glActiveTexture(GL_TEXTURE5);
+    GLuint vertices_tbo_id;
+    glGenTextures(1, &vertices_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, vertices_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, model.vbo.id);
+    glBindImageTexture(1, vertices_tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F);
+
     //===================================================================================================================================================================================================================
     // light variables
     //===================================================================================================================================================================================================================
@@ -203,22 +231,23 @@ int main(int argc, char *argv[])
         window.new_frame();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        float time = window.frame_ts;
+        float time = 0.25 * window.frame_ts;
         glm::vec3 light_ws = glm::vec3(10.0f, 2.0f * glm::cos(time), 3.0f * glm::sin(time));
 
         /* automatic camera */
-/*
-        float radius = 9.0f + 2.55f * glm::cos(0.25f * time);
-        float z = 1.45f * glm::sin(0.25f * time);
 
-        glm::vec3 camera_ws = glm::vec3(radius * glm::cos(0.3f * time), z, radius * glm::sin(0.3f * time));
-        glm::vec3 up = glm::normalize(glm::vec3(glm::cos(0.41 * time), -6.0f, glm::sin(0.41 * time)));
-        glm::mat4 view_matrix = glm::lookAt(camera_ws, glm::vec3(0.0f), up);
-        glm::mat4 projection_view_matrix = window.camera.projection_matrix * view_matrix;
-*/
+        //float radius = 9.0f + 2.55f * glm::cos(0.25f * time);
+        //float z = 1.45f * glm::sin(0.25f * time);
+        //glm::vec3 camera_ws = glm::vec3(radius * glm::cos(0.3f * time), z, radius * glm::sin(0.3f * time));
+        //glm::vec3 up = glm::normalize(glm::vec3(glm::cos(0.41 * time), -6.0f, glm::sin(0.41 * time)));
+        //glm::mat4 view_matrix = glm::lookAt(camera_ws, glm::vec3(0.0f), up);
+        //glm::mat4 projection_view_matrix = window.camera.projection_matrix * view_matrix;
+        window.position_changed = true;
+
         /* hand-driven camera */
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
+        
 
         //===============================================================================================================================================================================================================
         // render skybox
@@ -235,12 +264,35 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
         crystal_raymarch.enable();
         uni_cm_pv_matrix = projection_view_matrix;
         uni_cm_camera_ws = camera_ws;
         uni_cm_light_ws = light_ws;
         model.render();
+
+        //===============================================================================================================================================================================================================
+        // sort triangles by distance to camera
+        //===============================================================================================================================================================================================================
+        if (window.position_changed)
+        {
+            sorter.enable();
+            const int workgroup_size = 128;
+            int triangles = model.ibo.size / 3;
+            int workgroups = (triangles + workgroup_size - 1) / workgroup_size;
+
+            uni_sorter_triangles = triangles;
+            uni_sorter_shift = 0;
+            uni_sorter_camera_ws = camera_ws;
+            glDispatchCompute(workgroups, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            uni_sorter_shift = 1;
+            glDispatchCompute(workgroups, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            window.position_changed = false;
+        }
 
         window.end_frame();
     }
@@ -251,6 +303,3 @@ int main(int argc, char *argv[])
     glfw::terminate();
     return 0;
 }
-
-
-

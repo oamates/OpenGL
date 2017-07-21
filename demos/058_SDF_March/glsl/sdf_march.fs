@@ -73,7 +73,7 @@ float map(in vec3 p)
 float distance_field(vec3 p)
 {
     vec3 q = 0.5f * inv_scale * p + 0.5f;
-    return texture(sdf_tex, q);
+    return texture(sdf_tex, q).x;
 }
 
 vec4 crystal_march(vec3 position, vec3 ray)
@@ -94,7 +94,7 @@ vec4 crystal_march(vec3 position, vec3 ray)
         color = 0.975f * color + vec3(0.1f, 0.08f, 0.06f) * pow(vec3(c), vec3(0.75, 1.21, 2.11));
         alpha = max(alpha, q);
     }    
-    return vec4(log(1.0 + 1.25 * color), sqrt(alpha));
+    return vec4(log(1.0 + 1.25 * color), t * sqrt(alpha));
 }
 
 void main()
