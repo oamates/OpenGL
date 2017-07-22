@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
-    texture3d_t demon_sdf(GL_TEXTURE2, "../../../resources/sdf/demon.sdf");
+    texture3d_t demon_sdf(GL_TEXTURE2, "../../../resources/sdf/demon.udf");
 
     //===================================================================================================================================================================================================================
     // light variables
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
         glm::mat3 camera_matrix;
         glm::vec3 camera_ws;
 
-if (0 == 0) {
+if (0 != 0) {
 
 
         float radius = 2.65f + 1.15f * glm::cos(0.25f * time);

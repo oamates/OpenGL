@@ -29,6 +29,7 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 // volume marcher/blender function
 //==============================================================================================================================================================
+/*
 float distance_field(vec3 p)
 {
     p.y = -p.y;
@@ -42,19 +43,56 @@ float distance_field(vec3 p)
     else
         return max(tex3d_sd, cube_sd);
 }
+*/
 
-float raymarch(vec3 position, vec3 direction)
+/*
+float distance_field(vec3 p)
 {
-    const float epsilon = 0.0005;
-    const int maxSteps = 128;
-    float t = 0.0f;
+    const float sigma = 1.0 / 128.0;
+    p.y = -p.y;
+    vec3 q = 0.5f * p + 0.5f;
+    vec3 r = abs(p);
+    float cube_sd = max(r.x, max(r.y, r.z)) - 1.0;
+
+    vec2 ei = texture(sdf_tex, q).xy;
+
+//    float tex3d_sd = (ei.x < ei.y) ? max(ei.y - sigma, 0.0) : -max(ei.x - sigma, 0.0);
+
+    float tex3d_sd = sign(ei.y - ei.x) * max(max(ei.x, ei.y) - sigma, 0.0);
+
+    if (cube_sd < 0.0)
+        return tex3d_sd;
+    else
+        return max(tex3d_sd, cube_sd);
+}
+*/
+float distance_field(vec3 p)
+{
+    const float sigma = 1.0 / 2048.0;
+    p.y = -p.y;
+    vec3 q = 0.5f * p + 0.5f;
+//    vec2 ei = texture(sdf_tex, q).xy;
+    float e = texture(sdf_tex, q).x;
+    return e - 0.00375;
+//    return sign(ei.y - ei.x) * (max(ei.x, ei.y) - sigma);
+}
+
+float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
+{
+    const float epsilon = 0.0000125;
+    const int maxSteps = 160;
+    float t = min_t;
 
     for(int i = 0; i < maxSteps; ++i) 
     {
         float d = distance_field(position + direction * t);
-        if(d < epsilon)
+        if(d < 0.0000725)
             return t;
-        t += d;
+        t += 0.45 * d;
+
+        if(t >= max_t)
+            break;
+
     }
 
     return -1.0;
@@ -62,19 +100,35 @@ float raymarch(vec3 position, vec3 direction)
 
 vec3 grad(vec3 p)
 {
-    vec3 dp = vec3(0.075f, 0.0f, -0.075f);
-    vec3 q = vec3(distance_field(p + dp.xyy) - distance_field(p + dp.zyy), 
-                  distance_field(p + dp.yxy) - distance_field(p + dp.yzy), 
-                  distance_field(p + dp.yyx) - distance_field(p + dp.yyz));
-    return normalize(q);
+    // Note the slightly increased sampling distance, to alleviate artifacts due to hit point inaccuracies.
+    vec2 e = vec2(0.025, -0.025); 
+    return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
 void main()
 {
     vec3 direction = normalize(view);
 
-    float t = raymarch(camera_ws, direction);
 
+    // check if the ray intersects unit cube and find two intersections if it does
+
+    vec3 s = 1.0 / abs(direction);
+    vec3 r = camera_ws / direction;
+
+    vec4 a = vec4(-s - r, 0.0);
+    a.xy = max(a.xy, a.zw);
+    float t0 = max(a.x, a.y);
+
+    vec3 b = s - r;
+    float t1 = min(b.x, min(b.y, b.z));
+
+    if (t0 >= t1)
+    {
+        FragmentColor = texture(environment_tex, view);
+        return;        
+    }
+
+    float t = raymarch(camera_ws, direction, t0, t1);
     if (t < 0.0)
     {
         FragmentColor = texture(environment_tex, view);

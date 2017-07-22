@@ -45,6 +45,13 @@ unsigned int atomic_min(std::atomic_uint& atomic_var, unsigned int value)
     return previous_value;
 }
 
+double atomic_min(std::atomic<double>& atomic_var, double value)
+{
+    double previous_value = atomic_var;
+    while(previous_value > value && !atomic_var.compare_exchange_weak(previous_value, value));
+    return previous_value;
+}
+
 const glm::dvec3 shift[8] =
 {
     glm::dvec3(-1.0, -1.0, -1.0),
@@ -261,8 +268,8 @@ template<typename index_t> struct sdf_compute_t
         uint32_t F;
 
         std::atomic_uint triangle_index;
-        std::atomic_uint* octree;
-        std::atomic_uint* udf_texture;
+        std::atomic<double>* octree;
+        std::atomic<double>* udf_texture;
     };
 
     //===================================================================================================================================================================================================================
@@ -287,12 +294,12 @@ template<typename index_t> struct sdf_compute_t
     // the implementation will work for unsigned distance textures up to 1024 x 1024 x 1024 dimension
     // this should be enough and will take forever to compute
     //===================================================================================================================================================================================================================
-    template<int threads> GLuint tri_udf_compute(int max_level, GLenum texture_unit)
+    template<int threads> GLuint tri_udf_compute(int max_level, GLenum texture_unit, const char* file_name = 0)
     {
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int), "Atomic uint has larger size than uint. Not good.");
+        static_assert(sizeof(std::atomic<double>) == sizeof(double), "Atomic double has larger size than double. Not good.");
 
         tri_udf_compute_data_t compute_data;
 
@@ -313,14 +320,15 @@ template<typename index_t> struct sdf_compute_t
             mip_size <<= 3;
         }
 
-        const unsigned int diameter = 929887697;        // = 2^28 * 2sqrt(3)
+        const double diameter = 3.464101615137754587054892683011744734;         // = 2sqrt(3)
+
         //===============================================================================================================================================================================================================
         // to avoid dealing with std::atomic<double>, to gain some speed and to save some space 
         // the distance field values (bounded by the length of the [-1, 1] 3d-cube diagonal) are scaled and result is stored in an integer atomic array
         //===============================================================================================================================================================================================================
 
-        compute_data.octree      = (std::atomic_uint*) malloc( octree_size * sizeof(unsigned int));
-        compute_data.udf_texture = (std::atomic_uint*) malloc(texture_size * sizeof(unsigned int));
+        compute_data.octree      = (std::atomic<double>*) malloc( octree_size * sizeof(double));
+        compute_data.udf_texture = (std::atomic<double>*) malloc(texture_size * sizeof(double));
 
         for(unsigned int i = 0; i < octree_size; ++i) compute_data.octree[i] = diameter;
         for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
@@ -360,9 +368,29 @@ template<typename index_t> struct sdf_compute_t
 
         GLfloat* texture_data = (GLfloat*) malloc(texture_size * sizeof(GLfloat));
 
-        int* udf_data = (int*) compute_data.udf_texture;
+        double* udf_data = (double*) compute_data.udf_texture;
         for(unsigned int p = 0; p < texture_size; ++p)
-            texture_data[p] = (float) (double(udf_data[p]) * INV_INT_SCALE);
+            texture_data[p] = (float) udf_data[p];
+
+        if (file_name)
+        {
+            tex3d_header_t header 
+            {
+                .target = GL_TEXTURE_3D,
+                .internal_format = GL_R32F,
+                .format = GL_RED,
+                .type = GL_FLOAT,
+                .size = glm::ivec3(p2, p2, p2),
+                .data_size = (uint32_t) texture_size * sizeof(GLfloat)
+            };  
+
+
+            FILE* f = fopen(file_name, "wb");
+            fwrite(&header, sizeof(tex3d_header_t), 1, f);
+            fwrite(texture_data, header.data_size, 1, f);
+            fclose(f);
+        }        
+
 
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
 
@@ -385,9 +413,9 @@ template<typename index_t> struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-        static_assert(sizeof(std::atomic_uint) == sizeof(unsigned int), "Atomic uint has larger size than uint. Not good.");
+        static_assert(sizeof(std::atomic<double>) == sizeof(double), "Atomic double has larger size than double. Not good.");
 
-        const unsigned int diameter = 929887697;        // = 2^28 * 2sqrt(3)
+        const double diameter = 3.464101615137754587054892683011744734;         // = 2sqrt(3)
 
         tri_udf_compute_data_t compute_data;
 
@@ -417,8 +445,8 @@ template<typename index_t> struct sdf_compute_t
             mip_size <<= 3;
         }
 
-        compute_data.octree      = (std::atomic_uint*) malloc( octree_size * sizeof(unsigned int));
-        compute_data.udf_texture = (std::atomic_uint*) malloc(texture_size * sizeof(unsigned int));
+        compute_data.octree      = (std::atomic<double>*) malloc( octree_size * sizeof(double));
+        compute_data.udf_texture = (std::atomic<double>*) malloc(texture_size * sizeof(double));
 
         for(unsigned int i = 0; i < octree_size; ++i)  compute_data.octree[i] = diameter;
         for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
@@ -443,8 +471,8 @@ template<typename index_t> struct sdf_compute_t
 
         compute_data.triangle_index = 0;
 
-        int* external_udf = (int*) compute_data.udf_texture;
-        compute_data.udf_texture = (std::atomic_uint*) malloc(texture_size * sizeof(unsigned int));
+        double* external_udf = (double*) compute_data.udf_texture;
+        compute_data.udf_texture = (std::atomic<double>*) malloc(texture_size * sizeof(double));
 
         for(unsigned int i = 0; i < octree_size; ++i) compute_data.octree[i] = diameter;
         for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
@@ -457,7 +485,7 @@ template<typename index_t> struct sdf_compute_t
         for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
             computation_thread[thread_id].join();
 
-        int* internal_udf = (int*) compute_data.udf_texture;
+        double* internal_udf = (double*) compute_data.udf_texture;
 
         //===============================================================================================================================================================================================================
         // create 3d texture of the type GL_R32F
@@ -479,29 +507,10 @@ template<typename index_t> struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, p2, p2, p2);
 
-        GLfloat* texture_data = (GLfloat*) malloc(texture_size * sizeof(GLfloat));
+        glm::vec2* texture_data = (glm::vec2*) malloc(texture_size * sizeof(glm::vec2));
 
         for(unsigned int p = 0; p < texture_size; ++p)
-        {
-            double sdf;
-            if (internal_udf[p] < external_udf[p])
-            {
-                //=======================================================================================================================================================================================================
-                // the point is inside the mesh
-                //=======================================================================================================================================================================================================
-                sdf = -glm::max(double(external_udf[p]) * INV_INT_SCALE - delta, 0.0);
-            }
-            else
-            {
-                //=======================================================================================================================================================================================================
-                // the point is outside inside the mesh -- use external field to determine signed distance
-                //=======================================================================================================================================================================================================
-                sdf = glm::max(double(internal_udf[p]) * INV_INT_SCALE - delta, 0.0);
-
-            }
-
-            texture_data[p] = (float) sdf;
-        }
+            texture_data[p] = glm::vec2(external_udf[p], internal_udf[p]);
 
         //===============================================================================================================================================================================================================
         // afoksha
@@ -512,11 +521,11 @@ template<typename index_t> struct sdf_compute_t
             tex3d_header_t header 
             {
                 .target = GL_TEXTURE_3D,
-                .internal_format = GL_R32F,
-                .format = GL_RED,
+                .internal_format = GL_RG32F,
+                .format = GL_RG,
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
-                .data_size = (uint32_t) texture_size * sizeof(GLfloat)
+                .data_size = (uint32_t) texture_size * sizeof(glm::vec2)
             };  
 
 
@@ -526,7 +535,7 @@ template<typename index_t> struct sdf_compute_t
             fclose(f);
         }
 
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RG32F, p2, p2, p2, 0, GL_RG, GL_FLOAT, texture_data);
 
         free(layer);
         free(compute_data.octree);
@@ -883,9 +892,7 @@ template<typename index_t> struct sdf_compute_t
                         )
                     );
 
-                unsigned int idistance_to_node = (unsigned int)(distance_to_node * INTEGRAL_SCALE);
-                unsigned int icurrent_distance = atomic_min(compute_data->octree[node_index], idistance_to_node);
-                float current_distance = float(icurrent_distance) * INV_INT_SCALE;
+                double current_distance = atomic_min(compute_data->octree[node_index], distance_to_node);
                 double node_diameter = (scale - inv_p2) * cube_diameter;
 
                 //=======================================================================================================================================================================================================
@@ -940,8 +947,7 @@ template<typename index_t> struct sdf_compute_t
                                     )
                                 );
 
-                            unsigned int idistance_to_leaf = (unsigned int)(distance_to_leaf * INTEGRAL_SCALE);
-                            atomic_min(compute_data->udf_texture[tex3d_index], idistance_to_leaf);
+                            atomic_min(compute_data->udf_texture[tex3d_index], distance_to_leaf);
                         }
                         //===============================================================================================================================================================================================
                         // stay on the same level or go up if the last digit (=7) on the current level has been processed
