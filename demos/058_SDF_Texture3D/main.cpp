@@ -75,7 +75,6 @@ int main(int argc, char *argv[])
     int octree_size = 0;
     int mip_size = 8;
 
-    GLuint diameter = 929887697;        // = 2^28 * 2sqrt(3)
     GLuint zero = 0;
 
     for(int i = 0; i < max_level - 1; ++i)
@@ -102,7 +101,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     hqs_model_t model("../../../resources/manifolds/demon.obj");
-    model.normalize(1.0 - 3 * texel_size);
+    model.normalize(1.0 - 4.0 * texel_size);
+    model.sort_faces_by_area();
 
     he_manifold_t<GLuint> manifold(model.faces.data(), model.F, model.positions.data(), model.V);
     model.normals.resize(model.V);
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    sdf_compute.tri_udf_compute<4>(max_level, GL_TEXTURE0, "demon.udf");
+    sdf_compute.tri_sdf_compute<8>(max_level, GL_TEXTURE0, 0.125 * texel_size, "demon_rg.sdf");
 
     glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/udf_visualize.fs"));

@@ -68,13 +68,10 @@ float distance_field(vec3 p)
 */
 float distance_field(vec3 p)
 {
-    const float sigma = 1.0 / 2048.0;
     p.y = -p.y;
     vec3 q = 0.5f * p + 0.5f;
-//    vec2 ei = texture(sdf_tex, q).xy;
-    float e = texture(sdf_tex, q).x;
-    return e - 0.00375;
-//    return sign(ei.y - ei.x) * (max(ei.x, ei.y) - sigma);
+    vec2 r = texture(sdf_tex, q).xy;
+    return r.x;     
 }
 
 float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
@@ -86,15 +83,13 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
     for(int i = 0; i < maxSteps; ++i) 
     {
         float d = distance_field(position + direction * t);
-        if(d < 0.0000725)
+        if(d < 0.00125)
             return t;
-        t += 0.45 * d;
+        t += d;
 
         if(t >= max_t)
             break;
-
     }
-
     return -1.0;
 }
 
