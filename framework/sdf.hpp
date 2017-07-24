@@ -8,6 +8,7 @@
 
 const double INTEGRAL_SCALE = 268435456.0;
 const double INV_INT_SCALE = 1.0 / INTEGRAL_SCALE;
+const double diameter = 3.464101615137754587054892683011744734;         // = 2sqrt(3)
 
 //=======================================================================================================================================================================================================================
 // unsigned distance-to-triangle function
@@ -1135,42 +1136,53 @@ template<typename index_t> struct sdf_compute_t
                     }
                 }
             }
-            //===============================================================================================================================================================================================================
+            //===========================================================================================================================================================================================================
             // done ... proceed to next triangle
-            //===============================================================================================================================================================================================================
+            //===========================================================================================================================================================================================================
             point = compute_data->point_index++;
         }
     }
 
 
+/*
 
 
+    //===================================================================================================================================================================================================================
+    // triangle extended unsigned distance field function computation data structure
+    //===================================================================================================================================================================================================================
+    struct tri_eudf_compute_data_t
+    {
+        uint32_t max_level;
 
+        glm::dvec3* positions;
+        glm::tvec3<index_t>* faces;
+        uint32_t F;
 
-
-
+        std::atomic_uint triangle_index;
+        std::atomic<double>* octree;
+        double* udf_texture;
+        uint32_t* closest_tri;
+    };
 
     //===================================================================================================================================================================================================================
     // triangle sdf -- atomic free implementation
     //===================================================================================================================================================================================================================
-
-    template<int threads> GLuint tri_sdf_compute_no_atomic(int max_level, GLenum texture_unit, double delta, const char* file_name = 0)
+    template<int threads> GLuint tri_esdf_compute(int max_level, GLenum texture_unit, double delta, const char* file_name = 0)
     {
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-        const double diameter = 3.464101615137754587054892683011744734;         // = 2sqrt(3)
 
-        tri_udf_compute_data_t compute_data;
+        tri_eudf_compute_data_t ext_compute_data;
 
         //===============================================================================================================================================================================================================
         // step 1 :: create common compute structure with atomic counter to be used by all threads
         //===============================================================================================================================================================================================================
-        compute_data.max_level = max_level;
-        compute_data.positions = positions;
-        compute_data.faces = faces;
-        compute_data.F = F;
-        compute_data.triangle_index = 0;
+        ext_compute_data.max_level = max_level;
+        ext_compute_data.positions = positions;
+        ext_compute_data.faces = faces;
+        ext_compute_data.F = F;
+        ext_compute_data.triangle_index = 0;
 
         unsigned int p2 = 1 << max_level;
         unsigned int texture_size = 1 << (3 * max_level);
@@ -1184,23 +1196,46 @@ template<typename index_t> struct sdf_compute_t
             mip_size <<= 3;
         }
 
-        compute_data.octree      = (double*) malloc( octree_size * sizeof(double));
-        compute_data.udf_texture = (double*) malloc(texture_size * threads * sizeof(double));
+        ext_compute_data.octree      = (double*) malloc( octree_size * sizeof(double));
+        ext_compute_data.udf_texture = (double*) malloc(texture_size * threads * sizeof(double));
+        ext_compute_data.closest_tri = (uint32_t*) malloc(texture_size * threads * sizeof(uint32_t));
 
-        for(unsigned int i = 0; i < octree_size; ++i)  compute_data.octree[i] = diameter;
-        for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
+        for(unsigned int i = 0; i < octree_size; ++i) ext_compute_data.octree[i] = diameter;
+
         //===============================================================================================================================================================================================================
-        // step 2 :: launch threads to compute udf for the mesh itself
+        // step 2 :: launch threads to compute extended udf for the mesh itself
         //===============================================================================================================================================================================================================
-        std::thread computation_thread[threads];
+        std::thread computation_thread[threads - 1];
 
         for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
-            computation_thread[thread_id] = std::thread(sdf_compute_t::tri_udf_compute_thread, &compute_data);
+            computation_thread[thread_id] = std::thread(sdf_compute_t::tri_eudf_compute_thread, &ext_compute_data, thread_id);
 
-        tri_udf_compute_thread(&compute_data);
+        tri_eudf_compute_thread(&ext_compute_data, threads - 1);
 
         for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
             computation_thread[thread_id].join();
+
+        //===============================================================================================================================================================================================================
+        // step 3 :: process and assemble computed distance fields into one
+        //===============================================================================================================================================================================================================
+
+        double* field = ext_compute_data.udf_texture;
+        uint32_t* closest_tri = ext_compute_data.closest_tri;
+
+        for(unsigned int thread_id = 1; thread_id < threads; ++thread_id)
+        {
+            double* field_chunk = ext_compute_data.udf_texture + texture_size * thread_id;
+            uint32_t* closest_tri_chunk = ext_compute_data.closest_tri + texture_size * thread_id;
+
+            for(uint32_t p = 0; p < texture_size; ++p)
+            {
+                if (field_chunk[p] < field[p])
+                {
+                    field[p] = field_chunk[p];
+                    closest_tri[p] = closest_tri_chunk[p];
+                }
+            }
+        }
 
         //===============================================================================================================================================================================================================
         // step 3 :: compute udf for the external shell of the mesh
@@ -1209,11 +1244,15 @@ template<typename index_t> struct sdf_compute_t
         for(unsigned int v = 0; v < V; ++v)
             external_layer[v] = positions[v] + delta * normals[v];
 
-        compute_data.positions = external_layer;
-        compute_data.triangle_index = 0;
+        tri_eudf_compute_data_t compute_data;
 
-        double* udf = (double*) compute_data.udf_texture;
-        compute_data.udf_texture = (std::atomic<double>*) malloc(texture_size * sizeof(double));
+        compute_data.max_level = max_level;
+        compute_data.positions = external_layer;
+        compute_data.faces = faces;
+        compute_data.F = F;
+        compute_data.triangle_index = 0;
+        compute_data.udf_texture = field + texture_size;
+        compute_data.octree = ext_compute_data.octree;
 
         for(unsigned int i = 0; i < octree_size; ++i) compute_data.octree[i] = diameter;
         for(unsigned int i = 0; i < texture_size; ++i) compute_data.udf_texture[i] = diameter;
@@ -1248,43 +1287,62 @@ template<typename index_t> struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, p2, p2, p2);
 
-    #ifdef SINGLE_CHANNEL_SDF
-        float* texture_data = (float*) malloc(texture_size * sizeof(float));
+        glm::vec4* texture_data = (glm::vec4*) malloc(texture_size * sizeof(glm::vec4));
 
-        for(unsigned int p = 0; p < texture_size; ++p)
-            texture_data[p] = (external_udf[p] < udf[p]) ? udf[p] : -udf[p];
+        int index = 0;
+        double scale = 1.0 / p2;
 
-        //===============================================================================================================================================================================================================
-        // afoksha
-        //===============================================================================================================================================================================================================
 
-        if (file_name)
+        for(int w = -p2 + 1; w <= p2 - 1; w += 2)
         {
-            tex3d_header_t header 
+            for(int v = -p2 + 1; v <= p2 - 1; v += 2)
             {
-                .target = GL_TEXTURE_3D,
-                .internal_format = GL_R32F,
-                .format = GL_RED,
-                .type = GL_FLOAT,
-                .size = glm::ivec3(p2, p2, p2),
-                .data_size = (uint32_t) texture_size * sizeof(float)
-            };  
+                for(int u = -p2 + 1; u <= p2 - 1; u += 2)
+                {
+
+                    glm::dvec3 position = scale * glm::dvec3(u, v, w);
 
 
-            FILE* f = fopen(file_name, "wb");
-            fwrite(&header, sizeof(tex3d_header_t), 1, f);
-            fwrite(texture_data, header.data_size, 1, f);
-            fclose(f);
+
+                    glm::dvec3 gradient = glm::normalize(find_closest_point(...) - glm::dvec3(...,...,...));
+
+
+                    texture_data[index++] = glm::vec4(...);
+
+                }
+            }
         }
 
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
-
-    #else
-        glm::vec2* texture_data = (glm::vec2*) malloc(texture_size * sizeof(glm::vec2));
-
         for(unsigned int p = 0; p < texture_size; ++p)
+        {
             texture_data[p] = glm::vec2(udf[p], external_udf[p]);
 
+            double sdf;
+
+            glm::dvec3 p = 
+            glm::dvec3 gradient = glm::normalize(find_closest_point(...) - glm::dvec3(...,...,...));
+
+
+            if (udf[p] < external_udf[p])
+            {
+                //=======================================================================================================================================================================================================
+                // the point is inside the mesh
+                //=======================================================================================================================================================================================================
+                sdf = -glm::max(double(external_udf[p]) * INV_INT_SCALE - delta, 0.0);
+            }
+            else
+            {
+                //=======================================================================================================================================================================================================
+                // the point is outside inside the mesh -- use external field to determine signed distance
+                //=======================================================================================================================================================================================================
+                sdf = glm::max(double(internal_udf[p]) * INV_INT_SCALE - delta, 0.0);
+
+            }
+
+            texture_data[p] = (float) sdf;
+
+        }
+
         //===============================================================================================================================================================================================================
         // afoksha
         //===============================================================================================================================================================================================================
@@ -1294,11 +1352,11 @@ template<typename index_t> struct sdf_compute_t
             tex3d_header_t header 
             {
                 .target = GL_TEXTURE_3D,
-                .internal_format = GL_RG32F,
-                .format = GL_RG,
+                .internal_format = GL_RGBA32F,
+                .format = GL_RGBA,
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
-                .data_size = (uint32_t) texture_size * sizeof(glm::vec2)
+                .data_size = (uint32_t) texture_size * sizeof(glm::vec4)
             };  
 
 
@@ -1308,8 +1366,7 @@ template<typename index_t> struct sdf_compute_t
             fclose(f);
         }
 
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_RG32F, p2, p2, p2, 0, GL_RG, GL_FLOAT, texture_data);
-    #endif
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, p2, p2, p2, 0, GL_RGBA, GL_FLOAT, texture_data);
 
         free(external_layer);
         free(compute_data.octree);
@@ -1325,6 +1382,7 @@ template<typename index_t> struct sdf_compute_t
     // the function takes a triangle and traverses (simultaneously modifying it) distance octree avoiding octree branches
     // that distances to this particular triangle will certainly not modify and updating releveant ones using atomic minimum operation 
     //===================================================================================================================================================================================================================
+
     static void tri_udf_compute_thread(tri_udf_compute_data_t* compute_data, int thread_id)
     {
         const unsigned int MAX_LEVEL = 10;
@@ -1498,7 +1556,7 @@ template<typename index_t> struct sdf_compute_t
         }
     }
 
-
+*/
 };
 
 #endif // _sdf_included_015145034650764357365074365343417534721056415465105143173

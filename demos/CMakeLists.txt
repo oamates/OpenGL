@@ -93,6 +93,7 @@ add_subdirectory (091_SGI_Stripifier)
 add_subdirectory (092_Tri_Stripper)
 add_subdirectory (094_Stripifier2)
 add_subdirectory (095_NvTriStrip)
+add_subdirectory (101_SDF_Test)
 
 IF (FFMPEG_FOUND)
     add_subdirectory (098_x264_Encoder)
