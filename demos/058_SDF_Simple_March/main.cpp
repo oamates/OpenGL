@@ -57,8 +57,6 @@ struct demo_window_t : public glfw_window_t
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-    debug_msg("std::atomic<glm::vec2> is %s a lock-free atomic structure", std::atomic<glm::vec2>{}.is_lock_free() ? "" : "not");
-
     int res_x = 1920;
     int res_y = 1080;
 
@@ -107,7 +105,7 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
-    texture3d_t demon_sdf(GL_TEXTURE2, "../../../resources/sdf/demon.sdf");
+    texture3d_t demon_sdf(GL_TEXTURE2, "../../../resources/sdf/demon_rgba.sdf");
 
     //===================================================================================================================================================================================================================
     // light variables

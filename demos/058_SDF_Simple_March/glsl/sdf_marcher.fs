@@ -71,28 +71,62 @@ float distance_field(vec3 p)
 {
     p.y = -p.y;
     vec3 q = 0.5f * p + 0.5f;
-    vec2 r = texture(sdf_tex, q).xy;
-    return r.x;     
+    vec4 r = texture(sdf_tex, q);
+    return dot(r, vec4(p, 1.0));     
 }
 */
+
 float distance_field(vec3 p)
 {
     p.y = -p.y;
     vec3 q = 0.5f * p + 0.5f;
     vec4 r = texture(sdf_tex, q);
-    return r.x;     
+    return r.w + dot(p, r.xyz);
 }
 
+/*
+
+vec3 delta[8] = vec3[8]
+(
+    vec3(0.0, 0.0, 0.0),
+    vec3(1.0, 0.0, 0.0),
+    vec3(0.0, 1.0, 0.0),
+    vec3(1.0, 1.0, 0.0),
+    vec3(0.0, 0.0, 1.0),
+    vec3(1.0, 0.0, 1.0),
+    vec3(0.0, 1.0, 1.0),
+    vec3(1.0, 1.0, 1.0)
+);
+
+float distance_field(vec3 p)
+{
+    vec3 q = 0.5f * p + 0.5f;
+    vec3 base = floor(q * 256.0);
+
+    const float inv_scale = 1.0 / 256.0;
+
+    float m = -4.0;
+
+    for(int i = 0; i < 8; ++i)
+    {
+        vec3 w = inv_scale * (base + delta[i] + 0.5);
+        vec4 r = texture(sdf_tex, w);
+        float l = dot(r, vec4(p, 1.0));
+        m = max(m, l);
+    }
+
+    return m;
+}
+*/
 float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
 {
-    const float epsilon = 0.0000125;
     const int maxSteps = 160;
     float t = min_t;
 
     for(int i = 0; i < maxSteps; ++i) 
     {
         float d = distance_field(position + direction * t);
-        if(d < 0.00125)
+        if(d < 0.000125)
             return t;
         t += d;
 

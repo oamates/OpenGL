@@ -1214,13 +1214,10 @@ template<typename index_t> struct sdf_compute_t
     template<int threads> GLuint tri_esdf_compute(int max_level, GLenum texture_unit, double delta, const char* file_name = 0)
     {
         //===============================================================================================================================================================================================================
-        // this must hold unless someone decided to put an extra auxiliary data to atomic structures
+        // step 1 :: create common compute structure with atomic counter to be used by all threads
         //===============================================================================================================================================================================================================
         tri_eudf_compute_data_t ext_compute_data;
 
-        //===============================================================================================================================================================================================================
-        // step 1 :: create common compute structure with atomic counter to be used by all threads
-        //===============================================================================================================================================================================================================
         ext_compute_data.max_level = max_level;
         ext_compute_data.positions = positions;
         ext_compute_data.faces = faces;
@@ -1239,7 +1236,7 @@ template<typename index_t> struct sdf_compute_t
             mip_size <<= 3;
         }
 
-        ext_compute_data.octree      = (std::atomic<double>*) malloc( octree_size * sizeof(double));
+        ext_compute_data.octree      = (std::atomic<double>*) malloc(octree_size * sizeof(double));
         ext_compute_data.udf_texture = (double*) malloc(texture_size * threads * sizeof(double));
         ext_compute_data.closest_tri = (uint32_t*) malloc(texture_size * threads * sizeof(uint32_t));
 
@@ -1310,6 +1307,8 @@ template<typename index_t> struct sdf_compute_t
         for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
             computation_thread[thread_id].join();
 
+
+
         //===============================================================================================================================================================================================================
         // create 3d texture of the type GL_R32F
         //===============================================================================================================================================================================================================
@@ -1332,30 +1331,35 @@ template<typename index_t> struct sdf_compute_t
 
         int index = 0;
         double scale = 1.0 / p2;
+        int bound = p2 - 1;
 
-        for(int w = -p2 + 1; w <= p2 - 1; w += 2)
+        for(int w = -bound; w <= bound; w += 2)
         {
-            for(int v = -p2 + 1; v <= p2 - 1; v += 2)
+            for(int v = -bound; v <= bound; v += 2)
             {
-                for(int u = -p2 + 1; u <= p2 - 1; u += 2)
+                for(int u = -bound; u <= bound; u += 2)
                 {
                     glm::dvec3 position = scale * glm::dvec3(u, v, w);
-
                     glm::uvec3 triangle = faces[closest_tri[index]];
                     glm::dvec3 A = positions[triangle.x];
                     glm::dvec3 B = positions[triangle.y];
                     glm::dvec3 C = positions[triangle.z];
 
-                    glm::dvec4 grad = tri_closest_point(position, A, B, C);
+                    glm::dvec4 g = tri_closest_point(position, A, B, C);
 
-                    double inv_length = 1.0 / grad.w; 
-                    glm::dvec3 unit_grad = inv_length * glm::dvec3(grad);
+                    if (glm::abs(g.w - udf[index]) > 0.00001)
+                    {
+                        debug_msg("Crap happened gentleman!");
+                    }
 
-                    if (external_udf[index] > udf[index])
-                        grad = -grad;
 
-                    glm::dvec4 q = glm::dvec4(unit_grad, grad.w - glm::dot(unit_grad, position)); 
-                    texture_data[index++] = glm::vec4(grad.w);
+                    double inv_length = 1.0 / g.w; 
+                    glm::dvec3 n = inv_length * glm::dvec3(g);
+                    glm::dvec4 q = glm::dvec4(n, g.w - glm::dot(n, position)); 
+
+                    if (external_udf[index] > udf[index]) q = -q;
+
+                    texture_data[index++] = glm::vec4(q);
                 }
             }
         }
@@ -1385,6 +1389,7 @@ template<typename index_t> struct sdf_compute_t
         free(compute_data.octree);
         free(udf);
         free(texture_data);
+        free(closest_tri);
 
         return texture_id;
     }
