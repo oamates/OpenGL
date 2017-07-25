@@ -1307,8 +1307,6 @@ template<typename index_t> struct sdf_compute_t
         for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
             computation_thread[thread_id].join();
 
-
-
         //===============================================================================================================================================================================================================
         // create 3d texture of the type GL_R32F
         //===============================================================================================================================================================================================================
@@ -1346,12 +1344,6 @@ template<typename index_t> struct sdf_compute_t
                     glm::dvec3 C = positions[triangle.z];
 
                     glm::dvec4 g = tri_closest_point(position, A, B, C);
-
-                    if (glm::abs(g.w - udf[index]) > 0.00001)
-                    {
-                        debug_msg("Crap happened gentleman!");
-                    }
-
 
                     double inv_length = 1.0 / g.w; 
                     glm::dvec3 n = inv_length * glm::dvec3(g);

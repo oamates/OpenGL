@@ -29,95 +29,14 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 // volume marcher/blender function
 //==============================================================================================================================================================
-/*
 float distance_field(vec3 p)
 {
-    p.y = -p.y;
-    vec3 q = 0.5f * p + 0.5f;
-    vec3 r = abs(p);
-    float cube_sd = max(r.x, max(r.y, r.z)) - 1.0;
-    float tex3d_sd = texture(sdf_tex, q).x;
-
-    if (cube_sd < 0.0)
-        return tex3d_sd;
-    else
-        return max(tex3d_sd, cube_sd);
-}
-*/
-
-/*
-float distance_field(vec3 p)
-{
-    const float sigma = 1.0 / 128.0;
-    p.y = -p.y;
-    vec3 q = 0.5f * p + 0.5f;
-    vec3 r = abs(p);
-    float cube_sd = max(r.x, max(r.y, r.z)) - 1.0;
-
-    vec2 ei = texture(sdf_tex, q).xy;
-
-//    float tex3d_sd = (ei.x < ei.y) ? max(ei.y - sigma, 0.0) : -max(ei.x - sigma, 0.0);
-
-    float tex3d_sd = sign(ei.y - ei.x) * max(max(ei.x, ei.y) - sigma, 0.0);
-
-    if (cube_sd < 0.0)
-        return tex3d_sd;
-    else
-        return max(tex3d_sd, cube_sd);
-}
-*/
-/*
-float distance_field(vec3 p)
-{
-    p.y = -p.y;
     vec3 q = 0.5f * p + 0.5f;
     vec4 r = texture(sdf_tex, q);
+    //return r.x;
     return dot(r, vec4(p, 1.0));     
 }
-*/
 
-float distance_field(vec3 p)
-{
-    p.y = -p.y;
-    vec3 q = 0.5f * p + 0.5f;
-    vec4 r = texture(sdf_tex, q);
-    return r.w + dot(p, r.xyz);
-}
-
-/*
-
-vec3 delta[8] = vec3[8]
-(
-    vec3(0.0, 0.0, 0.0),
-    vec3(1.0, 0.0, 0.0),
-    vec3(0.0, 1.0, 0.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(0.0, 0.0, 1.0),
-    vec3(1.0, 0.0, 1.0),
-    vec3(0.0, 1.0, 1.0),
-    vec3(1.0, 1.0, 1.0)
-);
-
-float distance_field(vec3 p)
-{
-    vec3 q = 0.5f * p + 0.5f;
-    vec3 base = floor(q * 256.0);
-
-    const float inv_scale = 1.0 / 256.0;
-
-    float m = -4.0;
-
-    for(int i = 0; i < 8; ++i)
-    {
-        vec3 w = inv_scale * (base + delta[i] + 0.5);
-        vec4 r = texture(sdf_tex, w);
-        float l = dot(r, vec4(p, 1.0));
-        m = max(m, l);
-    }
-
-    return m;
-}
-*/
 float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
 {
     const int maxSteps = 160;
@@ -139,7 +58,7 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
 vec3 grad(vec3 p)
 {
     // Note the slightly increased sampling distance, to alleviate artifacts due to hit point inaccuracies.
-    vec2 e = vec2(0.025, -0.025); 
+    vec2 e = vec2(0.0025, -0.0025); 
     return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
