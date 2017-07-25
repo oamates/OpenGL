@@ -50,7 +50,7 @@ template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& P, const
 
 //=======================================================================================================================================================================================================================
 // extended unsigned distance-to-triangle function
-// returns both the closest point (in xyz components) and the distance (in w component)
+// returns both the vector from closest point in ABC to P (in xyz components) and the distance (in w component)
 //=======================================================================================================================================================================================================================
 template<typename real_t> glm::tvec4<real_t> tri_closest_point(const glm::tvec3<real_t>& P, const glm::tvec3<real_t>& A, const glm::tvec3<real_t>& B, const glm::tvec3<real_t>& C)
 {
@@ -67,12 +67,12 @@ template<typename real_t> glm::tvec4<real_t> tri_closest_point(const glm::tvec3<
     {
         n = normalize(n);
         real_t dp = glm::dot(n, AP);
-        return glm::tvec4<real_t> (P - dp * n, glm::abs(dp));
+        return glm::tvec4<real_t> (dp * n, glm::abs(dp));
     }
 
-    glm::tvec3<real_t> proj_AB = AB * glm::clamp(glm::dot(AB, AP) / glm::length2(AB), zero, one) - AP;
-    glm::tvec3<real_t> proj_BC = BC * glm::clamp(glm::dot(BC, BP) / glm::length2(BC), zero, one) - BP;
-    glm::tvec3<real_t> proj_CA = CA * glm::clamp(glm::dot(CA, CP) / glm::length2(CA), zero, one) - CP;
+    glm::tvec3<real_t> proj_AB = AP - AB * glm::clamp(glm::dot(AB, AP) / glm::length2(AB), zero, one);
+    glm::tvec3<real_t> proj_BC = BP - BC * glm::clamp(glm::dot(BC, BP) / glm::length2(BC), zero, one);
+    glm::tvec3<real_t> proj_CA = CP - CA * glm::clamp(glm::dot(CA, CP) / glm::length2(CA), zero, one);
 
     real_t dAB = glm::length(proj_AB);
     real_t dBC = glm::length(proj_BC);
@@ -80,13 +80,13 @@ template<typename real_t> glm::tvec4<real_t> tri_closest_point(const glm::tvec3<
 
     if (dAB > dBC)
     {
-        if (dCA > dBC) return glm::tvec4<real_t>(P - proj_BC, dBC);
+        if (dCA > dBC) return glm::tvec4<real_t>(proj_BC, dBC);
     }
     else
     {
-        if (dCA > dAB) return glm::tvec4<real_t>(P - proj_AB, dAB);
+        if (dCA > dAB) return glm::tvec4<real_t>(proj_AB, dAB);
     }
-    return glm::tvec4<real_t>(P - proj_CA, dCA);
+    return glm::tvec4<real_t>(proj_CA, dCA);
 }
 
 std::mt19937 generator(452387519);
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
         // Test 3 : length should be less than distances to vertices
         //===============================================================================================================================================================================================================
 
-        for(int i = 0; i < 128; ++i)
+        for(int i = 0; i < 8; ++i)
         {
             glm::dvec3 uvw = glm::abs(gaussrand3d());
             double q = 1.0 / (uvw.x + uvw.y + uvw.z);
@@ -180,28 +180,34 @@ int main(int argc, char *argv[])
         }
 
         //===============================================================================================================================================================================================================
-        // Test 2 : length should be less than distances to vertices
+        // Test 4 : length should be less than distances to vertices
         //===============================================================================================================================================================================================================
 
         glm::dvec4 cp = tri_closest_point(P, A, B, C);
         double d2 = cp.w;
-        glm::dvec3 dst = glm::dvec3(cp);
-        double d3 = glm::length(dst - P);
+        glm::dvec3 grad = glm::dvec3(cp);
+        double d3 = glm::length(grad);
 
         if ((glm::abs(d_abc - d2) > eps) || (glm::abs(d_bca - d2) > eps) || (glm::abs(d_cab - d2) > eps))
         {
-            debug_msg("Test 3 failed :: d_abc = %f, d_cab = %f, d_bca = %f, d2 = %f", d_abc, d_cab, d_bca, d2);
+            debug_msg("Test 4 failed :: d_abc = %f, d_cab = %f, d_bca = %f, d2 = %f", d_abc, d_cab, d_bca, d2);
         }
 
         if (glm::abs(d3 - d2) > eps)
         {
-            debug_msg("Test 3 failed :: d3 = %f, d2 = %f", d3, d2);
+            debug_msg("Test 4 failed :: d3 = %f, d2 = %f", d3, d2);
         }
 
+        //===============================================================================================================================================================================================================
+        // Test 5 : length should grow if P shifted along distance gradient
+        //===============================================================================================================================================================================================================
 
-
+        glm::dvec3 P1 = P + 0.125 * glm::normalize(grad);
+        double d5 = triangle_udf(P1, A, B, C); 
+        
+        if ((d5 <= d_abc) || (d5 >= d_abc + 0.125 + eps))
+        {
+            debug_msg("Test 5 failed :: d5 = %f, d = %f", d5, d_abc);
+        }      
     }
-
-
-
 }

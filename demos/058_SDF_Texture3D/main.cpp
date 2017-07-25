@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    sdf_compute.tri_sdf_compute<8>(max_level, GL_TEXTURE0, 0.125 * texel_size, "demon_rg.sdf");
+    sdf_compute.tri_esdf_compute<8>(max_level, GL_TEXTURE0, 0.125 * texel_size, "demon_rgba.sdf");
 
     glsl_program_t udf_visualizer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/udf_visualize.vs"),
                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/udf_visualize.fs"));

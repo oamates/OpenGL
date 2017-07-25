@@ -10,35 +10,81 @@ const double INTEGRAL_SCALE = 268435456.0;
 const double INV_INT_SCALE = 1.0 / INTEGRAL_SCALE;
 const double diameter = 3.464101615137754587054892683011744734;         // = 2sqrt(3)
 
+template<typename real_t> real_t volume(const glm::tvec3<real_t>& A, const glm::tvec3<real_t>& B, const glm::tvec3<real_t>& C)
+    { return glm::determinant(glm::tmat3x3<real_t>(A, B, C)); }
+
 //=======================================================================================================================================================================================================================
 // unsigned distance-to-triangle function
-// has been tested a lot, works for non-degenerate triangles
 //=======================================================================================================================================================================================================================
-template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& p, const glm::tvec3<real_t>& a, const glm::tvec3<real_t>& b, const glm::tvec3<real_t>& c)
+template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& P, const glm::tvec3<real_t>& A, const glm::tvec3<real_t>& B, const glm::tvec3<real_t>& C)
 {
-    glm::tvec3<real_t> ba = b - a; glm::tvec3<real_t> pa = p - a;
-    glm::tvec3<real_t> cb = c - b; glm::tvec3<real_t> pb = p - b;
-    glm::tvec3<real_t> ac = a - c; glm::tvec3<real_t> pc = p - c;
-    glm::tvec3<real_t> n = glm::cross(ba, ac);
+    const real_t zero = 0.0;
+    const real_t  one = 1.0;
 
-    real_t q = glm::sign(glm::dot(glm::cross(ba, n), pa)) + 
-               glm::sign(glm::dot(glm::cross(cb, n), pb)) + 
-               glm::sign(glm::dot(glm::cross(ac, n), pc));
+    glm::tvec3<real_t> AB = B - A; glm::tvec3<real_t> AP = P - A;
+    glm::tvec3<real_t> BC = C - B; glm::tvec3<real_t> BP = P - B;
+    glm::tvec3<real_t> CA = A - C; glm::tvec3<real_t> CP = P - C;
 
-    if (q >= (real_t) 2.0) 
-        return glm::sqrt(glm::dot(n, pa) * glm::dot(n, pa) / glm::length2(n));
+    glm::tvec3<real_t> n = glm::cross(CA, AB);
+
+    if ((volume(n, AB, AP) >= zero) && (volume(n, BC, BP) >= zero) && (volume(n, CA, CP) >= zero))
+        return glm::sqrt(glm::dot(n, AP) * glm::dot(n, AP) / glm::length2(n));
 
     return glm::sqrt(
         glm::min(
             glm::min(
-                glm::length2(ba * glm::clamp(glm::dot(ba, pa) / glm::length2(ba), (real_t) 0.0, (real_t) 1.0) - pa),
-                glm::length2(cb * glm::clamp(glm::dot(cb, pb) / glm::length2(cb), (real_t) 0.0, (real_t) 1.0) - pb)
+                glm::length2(AB * glm::clamp(glm::dot(AB, AP) / glm::length2(AB), zero, one) - AP),
+                glm::length2(BC * glm::clamp(glm::dot(BC, BP) / glm::length2(BC), zero, one) - BP)
             ), 
-            glm::length2(ac * glm::clamp(glm::dot(ac, pc) / glm::length2(ac), (real_t) 0.0, (real_t) 1.0) - pc)
+            glm::length2(CA * glm::clamp(glm::dot(CA, CP) / glm::length2(CA), zero, one) - CP)
         )
     );
 }
 
+//=======================================================================================================================================================================================================================
+// extended unsigned distance-to-triangle function
+// returns both the vector from closest point in ABC to P (in xyz components) and the distance (in w component)
+//=======================================================================================================================================================================================================================
+template<typename real_t> glm::tvec4<real_t> tri_closest_point(const glm::tvec3<real_t>& P, const glm::tvec3<real_t>& A, const glm::tvec3<real_t>& B, const glm::tvec3<real_t>& C)
+{
+    const real_t zero = 0.0;
+    const real_t  one = 1.0;
+
+    glm::tvec3<real_t> AB = B - A; glm::tvec3<real_t> AP = P - A;
+    glm::tvec3<real_t> BC = C - B; glm::tvec3<real_t> BP = P - B;
+    glm::tvec3<real_t> CA = A - C; glm::tvec3<real_t> CP = P - C;
+
+    glm::tvec3<real_t> n = glm::cross(CA, AB);
+
+    if ((volume(n, AB, AP) >= zero) && (volume(n, BC, BP) >= zero) && (volume(n, CA, CP) >= zero))
+    {
+        n = normalize(n);
+        real_t dp = glm::dot(n, AP);
+        return glm::tvec4<real_t> (dp * n, glm::abs(dp));
+    }
+
+    glm::tvec3<real_t> proj_AB = AP - AB * glm::clamp(glm::dot(AB, AP) / glm::length2(AB), zero, one);
+    glm::tvec3<real_t> proj_BC = BP - BC * glm::clamp(glm::dot(BC, BP) / glm::length2(BC), zero, one);
+    glm::tvec3<real_t> proj_CA = CP - CA * glm::clamp(glm::dot(CA, CP) / glm::length2(CA), zero, one);
+
+    real_t dAB = glm::length(proj_AB);
+    real_t dBC = glm::length(proj_BC);
+    real_t dCA = glm::length(proj_CA);
+
+    if (dAB > dBC)
+    {
+        if (dCA > dBC) return glm::tvec4<real_t>(proj_BC, dBC);
+    }
+    else
+    {
+        if (dCA > dAB) return glm::tvec4<real_t>(proj_AB, dAB);
+    }
+    return glm::tvec4<real_t>(proj_CA, dCA);
+}
+
+//=======================================================================================================================================================================================================================
+// atomic minimum operations via CAS loops
+//=======================================================================================================================================================================================================================
 unsigned int atomic_min(std::atomic_uint& atomic_var, unsigned int value)
 {
     unsigned int previous_value = atomic_var;
@@ -1144,8 +1190,6 @@ template<typename index_t> struct sdf_compute_t
     }
 
 
-/*
-
 
     //===================================================================================================================================================================================================================
     // triangle extended unsigned distance field function computation data structure
@@ -1172,7 +1216,6 @@ template<typename index_t> struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // this must hold unless someone decided to put an extra auxiliary data to atomic structures
         //===============================================================================================================================================================================================================
-
         tri_eudf_compute_data_t ext_compute_data;
 
         //===============================================================================================================================================================================================================
@@ -1196,7 +1239,7 @@ template<typename index_t> struct sdf_compute_t
             mip_size <<= 3;
         }
 
-        ext_compute_data.octree      = (double*) malloc( octree_size * sizeof(double));
+        ext_compute_data.octree      = (std::atomic<double>*) malloc( octree_size * sizeof(double));
         ext_compute_data.udf_texture = (double*) malloc(texture_size * threads * sizeof(double));
         ext_compute_data.closest_tri = (uint32_t*) malloc(texture_size * threads * sizeof(uint32_t));
 
@@ -1219,19 +1262,19 @@ template<typename index_t> struct sdf_compute_t
         // step 3 :: process and assemble computed distance fields into one
         //===============================================================================================================================================================================================================
 
-        double* field = ext_compute_data.udf_texture;
+        double* udf = ext_compute_data.udf_texture;
         uint32_t* closest_tri = ext_compute_data.closest_tri;
 
         for(unsigned int thread_id = 1; thread_id < threads; ++thread_id)
         {
-            double* field_chunk = ext_compute_data.udf_texture + texture_size * thread_id;
+            double* udf_chunk = ext_compute_data.udf_texture + texture_size * thread_id;
             uint32_t* closest_tri_chunk = ext_compute_data.closest_tri + texture_size * thread_id;
 
             for(uint32_t p = 0; p < texture_size; ++p)
             {
-                if (field_chunk[p] < field[p])
+                if (udf_chunk[p] < udf[p])
                 {
-                    field[p] = field_chunk[p];
+                    udf[p] = udf_chunk[p];
                     closest_tri[p] = closest_tri_chunk[p];
                 }
             }
@@ -1244,14 +1287,16 @@ template<typename index_t> struct sdf_compute_t
         for(unsigned int v = 0; v < V; ++v)
             external_layer[v] = positions[v] + delta * normals[v];
 
-        tri_eudf_compute_data_t compute_data;
+        tri_udf_compute_data_t compute_data;
+
+        double* external_udf = udf + texture_size;
 
         compute_data.max_level = max_level;
         compute_data.positions = external_layer;
         compute_data.faces = faces;
         compute_data.F = F;
         compute_data.triangle_index = 0;
-        compute_data.udf_texture = field + texture_size;
+        compute_data.udf_texture = (std::atomic<double>*) external_udf;
         compute_data.octree = ext_compute_data.octree;
 
         for(unsigned int i = 0; i < octree_size; ++i) compute_data.octree[i] = diameter;
@@ -1264,8 +1309,6 @@ template<typename index_t> struct sdf_compute_t
 
         for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
             computation_thread[thread_id].join();
-
-        double* external_udf = (double*) compute_data.udf_texture;
 
         //===============================================================================================================================================================================================================
         // create 3d texture of the type GL_R32F
@@ -1285,13 +1328,10 @@ template<typename index_t> struct sdf_compute_t
         //===============================================================================================================================================================================================================
         // uncomment this line to allocate immutable texture storage, i.e. if you are not planning to change it dimensions and internal type in future
         //===============================================================================================================================================================================================================
-        // glTexStorage3D(GL_TEXTURE_3D, 1, GL_R32F, p2, p2, p2);
-
         glm::vec4* texture_data = (glm::vec4*) malloc(texture_size * sizeof(glm::vec4));
 
         int index = 0;
         double scale = 1.0 / p2;
-
 
         for(int w = -p2 + 1; w <= p2 - 1; w += 2)
         {
@@ -1299,53 +1339,26 @@ template<typename index_t> struct sdf_compute_t
             {
                 for(int u = -p2 + 1; u <= p2 - 1; u += 2)
                 {
-
                     glm::dvec3 position = scale * glm::dvec3(u, v, w);
 
+                    glm::uvec3 triangle = faces[closest_tri[index]];
+                    glm::dvec3 A = positions[triangle.x];
+                    glm::dvec3 B = positions[triangle.y];
+                    glm::dvec3 C = positions[triangle.z];
 
+                    glm::dvec4 grad = tri_closest_point(position, A, B, C);
 
-                    glm::dvec3 gradient = glm::normalize(find_closest_point(...) - glm::dvec3(...,...,...));
+                    double inv_length = 1.0 / grad.w; 
+                    glm::dvec3 unit_grad = inv_length * glm::dvec3(grad);
 
+                    if (external_udf[index] > udf[index])
+                        grad = -grad;
 
-                    texture_data[index++] = glm::vec4(...);
-
+                    glm::dvec4 q = glm::dvec4(unit_grad, grad.w - glm::dot(unit_grad, position)); 
+                    texture_data[index++] = glm::vec4(grad.w);
                 }
             }
         }
-
-        for(unsigned int p = 0; p < texture_size; ++p)
-        {
-            texture_data[p] = glm::vec2(udf[p], external_udf[p]);
-
-            double sdf;
-
-            glm::dvec3 p = 
-            glm::dvec3 gradient = glm::normalize(find_closest_point(...) - glm::dvec3(...,...,...));
-
-
-            if (udf[p] < external_udf[p])
-            {
-                //=======================================================================================================================================================================================================
-                // the point is inside the mesh
-                //=======================================================================================================================================================================================================
-                sdf = -glm::max(double(external_udf[p]) * INV_INT_SCALE - delta, 0.0);
-            }
-            else
-            {
-                //=======================================================================================================================================================================================================
-                // the point is outside inside the mesh -- use external field to determine signed distance
-                //=======================================================================================================================================================================================================
-                sdf = glm::max(double(internal_udf[p]) * INV_INT_SCALE - delta, 0.0);
-
-            }
-
-            texture_data[p] = (float) sdf;
-
-        }
-
-        //===============================================================================================================================================================================================================
-        // afoksha
-        //===============================================================================================================================================================================================================
 
         if (file_name)
         {
@@ -1371,45 +1384,55 @@ template<typename index_t> struct sdf_compute_t
         free(external_layer);
         free(compute_data.octree);
         free(udf);
-        free(external_udf);
         free(texture_data);
 
         return texture_id;
     }
 
     //===================================================================================================================================================================================================================
-    // implementation of the main algorithm for unsigned distance function computation ::
+    // implementation of the extended version of the main algorithm for unsigned distance function computation ::
     // the function takes a triangle and traverses (simultaneously modifying it) distance octree avoiding octree branches
-    // that distances to this particular triangle will certainly not modify and updating releveant ones using atomic minimum operation 
+    // that distances to this particular triangle will certainly not modify and updating relevant ones using atomic minimum operation
+    // for the leaves (texture elements) the algorithm also saves the index of the closest triangle
+    // to be later used for finding not just the value of the distance function but also its gradient
+    // and storing linearized part of the distance function in a texel  
     //===================================================================================================================================================================================================================
 
-    static void tri_udf_compute_thread(tri_udf_compute_data_t* compute_data, int thread_id)
+    static void tri_eudf_compute_thread(tri_eudf_compute_data_t* ext_compute_data, int thread_id)
     {
         const unsigned int MAX_LEVEL = 10;
-        unsigned int max_level = compute_data->max_level;
+        unsigned int max_level = ext_compute_data->max_level;
         unsigned int p2 = 1 << max_level;
+        unsigned int texture_size = 1 << (3 * max_level);
+
         double p2m1 = double(1 << (max_level - 1));
         double inv_p2 = 1.0 / p2;
         double cube_diameter = 2.0 * constants::sqrt3_d;
 
+        double* field = ext_compute_data->udf_texture + texture_size * thread_id;
+        uint32_t* closest_tri = ext_compute_data->closest_tri + texture_size * thread_id;
+
+        for(uint32_t i = 0; i < texture_size; ++i)
+            field[i] = diameter;
+
         //===============================================================================================================================================================================================================
         // get the index of the triangle this invocation will work on 
         //===============================================================================================================================================================================================================
-        unsigned int f = compute_data->triangle_index++;
+        unsigned int f = ext_compute_data->triangle_index++;
 
-        while (f < compute_data->F)
+        while (f < ext_compute_data->F)
         {
             debug_msg("Processing triangle #%u", f);
             //===========================================================================================================================================================================================================
             // get the indices and the vertices of the triangle
             //===========================================================================================================================================================================================================
-            unsigned int iA = compute_data->faces[f].x;
-            unsigned int iB = compute_data->faces[f].y;
-            unsigned int iC = compute_data->faces[f].z;
+            unsigned int iA = ext_compute_data->faces[f].x;
+            unsigned int iB = ext_compute_data->faces[f].y;
+            unsigned int iC = ext_compute_data->faces[f].z;
 
-            glm::dvec3 vA = compute_data->positions[iA];
-            glm::dvec3 vB = compute_data->positions[iB];
-            glm::dvec3 vC = compute_data->positions[iC];
+            glm::dvec3 vA = ext_compute_data->positions[iA];
+            glm::dvec3 vB = ext_compute_data->positions[iB];
+            glm::dvec3 vC = ext_compute_data->positions[iC];
 
             glm::dvec3 BA = vB - vA; double dBA = glm::length2(BA);
             glm::dvec3 CB = vC - vB; double dCB = glm::length2(CB);
@@ -1468,7 +1491,7 @@ template<typename index_t> struct sdf_compute_t
                         )
                     );
 
-                double current_distance = atomic_min(compute_data->octree[node_index], distance_to_node);
+                double current_distance = atomic_min(ext_compute_data->octree[node_index], distance_to_node);
                 double node_diameter = (scale - inv_p2) * cube_diameter;
 
                 //=======================================================================================================================================================================================================
@@ -1523,7 +1546,15 @@ template<typename index_t> struct sdf_compute_t
                                     )
                                 );
 
-                            atomic_min(compute_data->udf_texture[tex3d_index], distance_to_leaf);
+                            //===========================================================================================================================================================================================
+                            // note : every thread has its own array for field values and closest face indices
+                            // so we do not use atomics here
+                            //===========================================================================================================================================================================================
+                            if (field[tex3d_index] > distance_to_leaf)
+                            {
+                                field[tex3d_index] = distance_to_leaf;
+                                closest_tri[tex3d_index] = f;
+                            }
                         }
                         //===============================================================================================================================================================================================
                         // stay on the same level or go up if the last digit (=7) on the current level has been processed
@@ -1552,11 +1583,10 @@ template<typename index_t> struct sdf_compute_t
             //===============================================================================================================================================================================================================
             // done ... proceed to next triangle
             //===============================================================================================================================================================================================================
-            f = compute_data->triangle_index++;
+            f = ext_compute_data->triangle_index++;
         }
     }
 
-*/
 };
 
 #endif // _sdf_included_015145034650764357365074365343417534721056415465105143173

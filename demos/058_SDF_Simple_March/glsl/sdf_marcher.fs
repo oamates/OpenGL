@@ -66,11 +66,20 @@ float distance_field(vec3 p)
         return max(tex3d_sd, cube_sd);
 }
 */
+/*
 float distance_field(vec3 p)
 {
     p.y = -p.y;
     vec3 q = 0.5f * p + 0.5f;
     vec2 r = texture(sdf_tex, q).xy;
+    return r.x;     
+}
+*/
+float distance_field(vec3 p)
+{
+    p.y = -p.y;
+    vec3 q = 0.5f * p + 0.5f;
+    vec4 r = texture(sdf_tex, q);
     return r.x;     
 }
 
