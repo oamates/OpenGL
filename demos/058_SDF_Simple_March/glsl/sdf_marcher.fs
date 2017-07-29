@@ -34,6 +34,7 @@ float distance_field(vec3 p)
     vec3 q = 0.5f * p + 0.5f;
     vec4 r = texture(sdf_tex, q);
     //return r.x;
+    //r.xyz = normalize(r.xyz);
     return dot(r, vec4(p, 1.0));     
 }
 
@@ -58,8 +59,10 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
 vec3 grad(vec3 p)
 {
     // Note the slightly increased sampling distance, to alleviate artifacts due to hit point inaccuracies.
-    vec2 e = vec2(0.0025, -0.0025); 
-    return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
+    vec3 q = 0.5f * p + 0.5f;    
+    return normalize(texture(sdf_tex, q).rgb);
+    //vec2 e = vec2(0.0025, -0.0025); 
+    //return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
 void main()

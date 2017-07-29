@@ -180,8 +180,8 @@ double sdf(const glm::dvec3& p)
 
 glm::dvec3 grad(const glm::dvec3& p)
 {
-    const double delta = 0.00048828125;
-    const double inv_delta2 = 1024.0;
+    const double delta = 0.125 * 0.00048828125;
+    const double inv_delta2 = 8.0 * 1024.0;
     glm::dvec3 dF = glm::dvec3(
                         sdf(glm::dvec3(p.x + delta, p.y, p.z)) - sdf(glm::dvec3(p.x - delta, p.y, p.z)),
                         sdf(glm::dvec3(p.x, p.y + delta, p.z)) - sdf(glm::dvec3(p.x, p.y - delta, p.z)),
@@ -400,7 +400,7 @@ int main(int argc, char *argv[])
         glm::mat3 camera_matrix;
         glm::vec3 camera_ws;
 
-if (0 == 0) {
+if (0 != 0) {
 
 
         float radius = 2.65f + 1.15f * glm::cos(0.25f * time);

@@ -1,10 +1,12 @@
-#include "makelevelset3.h"
+
+#include <glm/gtx/string_cast.hpp>
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <limits>
 
+#include "makelevelset3.hpp"
 #include "log.hpp"
 
 int main(int argc, char* argv[])
@@ -12,33 +14,29 @@ int main(int argc, char* argv[])
   
     if(argc != 4)
     {
-        std::cout << "SDFGen - A utility for converting closed oriented triangle meshes into grid-based signed distance fields.\n";
-        std::cout << "\nThe output file format is:";
-        std::cout << "<ni> <nj> <nk>\n";
-        std::cout << "<origin_x> <origin_y> <origin_z>\n";
-        std::cout << "<dx>\n";
-        std::cout << "<value_1> <value_2> <value_3> [...]\n\n";
-        
-        std::cout << "(ni,nj,nk) are the integer dimensions of the resulting distance field.\n";
-        std::cout << "(origin_x,origin_y,origin_z) is the 3D position of the grid origin.\n";
-        std::cout << "<dx> is the grid spacing.\n\n";
-        std::cout << "<value_n> are the signed distance data values, in ascending order of i, then j, then k.\n";
-        
-        std::cout << "The output filename will match that of the input, with the OBJ suffix replaced with SDF.\n\n";
-        
-        std::cout << "Usage: SDFGen <filename> <dx> <padding>\n\n";
-        std::cout << "Where:\n";
-        std::cout << "\t<filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n";
-        std::cout << "\t<dx> specifies the length of grid cell in the resulting distance field.\n";
-        std::cout << "\t<padding> specifies the number of cells worth of padding between the object bound box and the boundary of the distance field grid. Minimum is 1.\n\n";
-        
+        printf("SDFGen - A utility for converting closed oriented triangle meshes into grid-based signed distance fields.\n");
+        printf("\nThe output file format is:");
+        printf("<ni> <nj> <nk>\n");
+        printf("<origin_x> <origin_y> <origin_z>\n");
+        printf("<dx>\n");
+        printf("<value_1> <value_2> <value_3> [...]\n\n");
+        printf("(ni, nj, nk) are the integer dimensions of the resulting distance field.\n");
+        printf("(origin_x,origin_y,origin_z) is the 3D position of the grid origin.\n");
+        printf("<dx> is the grid spacing.\n\n");
+        printf("<value_n> are the signed distance data values, in ascending order of i, then j, then k.\n");
+        printf("The output filename will match that of the input, with the OBJ suffix replaced with SDF.\n\n");
+        printf("Usage: SDFGen <filename> <dx> <padding>\n\n");
+        printf("Where:\n");
+        printf("\t<filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n");
+        printf("\t<dx> specifies the length of grid cell in the resulting distance field.\n");
+        printf("\t<padding> specifies the number of cells worth of padding between the object bound box and the boundary of the distance field grid. Minimum is 1.\n\n");
         exit(-1);
     }
 
     std::string filename(argv[1]);
     if(filename.size() < 5 || filename.substr(filename.size() - 4) != std::string(".obj"))
     {
-        std::cerr << "Error: Expected OBJ file with filename of the form <name>.obj.\n";
+        printf("Error: Expected OBJ file with filename of the form <name>.obj.\n");
         exit(-1);
     }
 
@@ -54,22 +52,22 @@ int main(int argc, char* argv[])
         padding = 1;
     
     // start with a massive inside out bound box.
-    Vec3f min_box(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max()), 
-          max_box(-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max());
+    glm::vec3 min_box( std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()), 
+              max_box(-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max());
   
     std::cout << "Reading data.\n";
 
     std::ifstream infile(argv[1]);
     if(!infile)
     {
-        std::cerr << "Failed to open. Terminating.\n";
+        printf("Failed to open file. Terminating.\n");
         exit(-1);
     }
 
     int ignored_lines = 0;
     std::string line;
-    std::vector<Vec3f> vertList;
-    std::vector<Vec3ui> faceList;
+    std::vector<glm::vec3> vertList;
+    std::vector<glm::uvec3> faceList;
     while(!infile.eof())
     {
         std::getline(infile, line);
@@ -79,10 +77,11 @@ int main(int argc, char* argv[])
         {
             std::stringstream data(line);
             char c;
-            Vec3f point;
+            glm::vec3 point;
             data >> c >> point[0] >> point[1] >> point[2];
             vertList.push_back(point);
-            update_minmax(point, min_box, max_box);
+            min_box = glm::min(min_box, point);
+            max_box = glm::max(max_box, point);
         }
         else if(line.substr(0, 1) == std::string("f"))
         {
@@ -90,7 +89,7 @@ int main(int argc, char* argv[])
             char c;
             int v0, v1, v2;
             data >> c >> v0 >> v1 >> v2;
-            faceList.push_back(Vec3ui(v0-1,v1-1,v2-1));
+            faceList.push_back(glm::uvec3(v0 - 1, v1 - 1, v2 - 1));
         }
         else
             ++ignored_lines; 
@@ -100,24 +99,22 @@ int main(int argc, char* argv[])
     if(ignored_lines > 0)
         debug_msg("Warning: %u lines were ignored since they did not contain faces or vertices.", ignored_lines);
 
-    std::cout << "Read in " << vertList.size() << " vertices and " << faceList.size() << " faces." << std::endl;
+    debug_msg("Read in %u vertices and %u faces.", (unsigned int) vertList.size(), (unsigned int) faceList.size());
 
     // Add padding around the box.
-    Vec3f unit(1, 1, 1);
+    glm::vec3 unit = glm::vec3(1.0f);
     min_box -= padding * dx * unit;
     max_box += padding * dx * unit;
-    Vec3ui sizes = Vec3ui((max_box - min_box) / dx);
+    glm::uvec3 sizes = glm::uvec3((max_box - min_box) / dx);
   
-    std::cout << "Bound box size: (" << min_box << ") to (" << max_box << ") with dimensions " << sizes << "." << std::endl;
+    debug_msg("Bound box: (%s) to (%s) :: dimensions :: %s", glm::to_string(min_box).c_str(), glm::to_string(max_box).c_str(), glm::to_string(sizes).c_str());
 
     debug_msg("Computing signed distance field.");
     Array3f phi_grid;
 
     make_level_set3(faceList, vertList, min_box, dx, sizes[0], sizes[1], sizes[2], phi_grid);
 
-    std::string outname;
-
-    outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
+    std::string outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
     debug_msg("Writing results to: %s", outname.c_str());
     
     std::ofstream outfile(outname.c_str());

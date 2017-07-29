@@ -19,13 +19,13 @@ using std::min;
 using std::max;
 using std::swap;
 
-template<class T>
+template<typename T>
 inline T sqr(const T& x)
-{ return x*x; }
+   { return x * x; }
 
 template<class T>
 inline T cube(const T& x)
-{ return x*x*x; }
+   { return x * x * x; }
 
 template<class T>
 inline T min(T a1, T a2, T a3)
@@ -166,12 +166,11 @@ inline void sort(T &a, T &b, T &c)
    }
 }
 
-template<class T>
-inline T clamp(T a, T lower, T upper)
+template<class T> inline T clamp(T a, T lower, T upper)
 {
-   if(a<lower) return lower;
-   else if(a>upper) return upper;
-   else return a;
+    if(a < lower) return lower;
+    if(a > upper) return upper;
+    return a;
 }
 
 
