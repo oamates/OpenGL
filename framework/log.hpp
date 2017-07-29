@@ -39,7 +39,3 @@ static constexpr const char * const short_path(const char * const str)
 #endif
 
 #endif // _logger_included_124900971247253743634896758972312399234333009756612344
-
-#define GLEW_STATIC
-#include <GL/glew.h> 
-

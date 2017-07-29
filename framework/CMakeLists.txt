@@ -8,10 +8,10 @@ add_library (framework STATIC
 if(WIN32)
     set(ADDITIONAL_LIBRARIES opengl32)
 else()
-    set(ADDITIONAL_LIBRARIES "")
+    set(ADDITIONAL_LIBRARIES pthread)
 endif()
 
-target_link_libraries(framework ${GLFW_STATIC_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${PNG_STATIC_LIBRARIES} ${ZLIB_STATIC_LIBRARIES} ${PTHREAD} ${ADDITIONAL_LIBRARIES} image)
+target_link_libraries(framework ${GLFW_STATIC_LIBRARIES} ${GLEW_STATIC_LIBRARIES} ${PNG_STATIC_LIBRARIES} ${ZLIB_STATIC_LIBRARIES} ${ADDITIONAL_LIBRARIES} image ${PTHREAD})
 target_include_directories (framework PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

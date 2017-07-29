@@ -1,17 +1,71 @@
-
-#include <glm/gtx/string_cast.hpp>
+//========================================================================================================================================================================================================================
+// DEMO 058 : SDF Texture 3D raymarcher
+//========================================================================================================================================================================================================================
+#define GLM_FORCE_RADIANS 
+#define GLM_FORCE_NO_CTOR_INIT
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <limits>
 
-#include "makelevelset3.hpp"
-#include "log.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/random.hpp>
+#include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/norm.hpp>
+#include <glm/gtc/random.hpp>
+#include <glm/gtx/transform.hpp>
 
-int main(int argc, char* argv[])
+#include "log.hpp"
+#include "constants.hpp"
+#include "gl_info.hpp"
+#include "glfw_window.hpp"
+#include "shader.hpp"
+#include "camera.hpp"
+#include "image.hpp"
+#include "sdf.hpp"
+#include "makelevelset3.hpp"
+
+struct demo_window_t : public glfw_window_t
 {
-  
+    camera_t camera;
+
+    demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
+    {
+        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.01f);
+    }
+
+    //===================================================================================================================================================================================================================
+    // mouse handlers
+    //===================================================================================================================================================================================================================
+    void on_key(int key, int scancode, int action, int mods) override
+    {
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);  
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt); 
+        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt); 
+    }
+
+    void on_mouse_move() override
+    {
+        double norm = glm::length(mouse_delta);
+        if (norm > 0.01)
+            camera.rotateXY(mouse_delta / norm, norm * frame_dt);
+    }
+};
+
+//=======================================================================================================================================================================================================================
+// program entry point
+//=======================================================================================================================================================================================================================
+int main(int argc, char *argv[])
+{
+    int res_x = 1920;
+    int res_y = 1080;
+
     if(argc != 4)
     {
         printf("SDFGen - A utility for converting closed oriented triangle meshes into grid-based signed distance fields.\n");
@@ -30,15 +84,17 @@ int main(int argc, char* argv[])
         printf("\t<filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n");
         printf("\t<dx> specifies the length of grid cell in the resulting distance field.\n");
         printf("\t<padding> specifies the number of cells worth of padding between the object bound box and the boundary of the distance field grid. Minimum is 1.\n\n");
-        exit(-1);
+        std::exit(-1);
     }
 
     std::string filename(argv[1]);
+
     if(filename.size() < 5 || filename.substr(filename.size() - 4) != std::string(".obj"))
     {
         printf("Error: Expected OBJ file with filename of the form <name>.obj.\n");
-        exit(-1);
+        std::exit(-1);
     }
+
 
     std::stringstream arg2(argv[2]);
     float dx;
@@ -101,22 +157,28 @@ int main(int argc, char* argv[])
 
     debug_msg("Read in %u vertices and %u faces.", (unsigned int) vertList.size(), (unsigned int) faceList.size());
 
+    //===================================================================================================================================================================================================================
     // Add padding around the box.
+    //===================================================================================================================================================================================================================
     glm::vec3 unit = glm::vec3(1.0f);
     min_box -= padding * dx * unit;
     max_box += padding * dx * unit;
-    glm::uvec3 sizes = glm::uvec3((max_box - min_box) / dx);
+    glm::ivec3 sizes = glm::ivec3(glm::ceil((max_box - min_box) / dx));
   
-    debug_msg("Bound box: (%s) to (%s) :: dimensions :: %s", glm::to_string(min_box).c_str(), glm::to_string(max_box).c_str(), glm::to_string(sizes).c_str());
+    debug_msg("Bounding box: (%s) to (%s) :: dimensions :: %s", glm::to_string(min_box).c_str(), glm::to_string(max_box).c_str(), glm::to_string(sizes).c_str());
+    debug_msg("Computing signed distance field ... ");
 
-    debug_msg("Computing signed distance field.");
-    Array3f phi_grid;
+    array3d<float> phi_grid;
 
-    make_level_set3(faceList, vertList, min_box, dx, sizes[0], sizes[1], sizes[2], phi_grid);
+    make_level_set3(faceList, vertList, min_box, dx, sizes, phi_grid);
 
     std::string outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
     debug_msg("Writing results to: %s", outname.c_str());
     
+    //FILE* f = fopen(outname.c_str(), "wb");
+
+
+
     std::ofstream outfile(outname.c_str());
     outfile << phi_grid.ni << " " << phi_grid.nj << " " << phi_grid.nk << std::endl;
     outfile << min_box[0] << " " << min_box[1] << " " << min_box[2] << std::endl;
@@ -129,5 +191,16 @@ int main(int argc, char* argv[])
     outfile.close();
 
     debug_msg("Processing complete.");
+
+    //===================================================================================================================================================================================================================
+    // initialize GLFW library
+    // create GLFW window and initialize GLEW library
+    // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080
+    //===================================================================================================================================================================================================================
+    if (!glfw::init())
+        exit_msg("Failed to initialize GLFW library. Exiting ...");
+
+    demo_window_t window("SDF Simple Volume RayMarch", 4, 3, 3, res_x, res_y, true);
+
     return 0;
 }

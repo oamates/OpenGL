@@ -1,14 +1,13 @@
-#ifndef ARRAY3_H
-#define ARRAY3_H
+#ifndef _array3dd_included_52160135608347568714560183476501873465081734568173465
+#define _array3dd_included_52160135608347568714560183476501873465081734568173465
 
-#include "array1d.hpp"
 #include <algorithm>
 #include <cassert>
 #include <vector>
 
-template<class T, class ArrayT = std::vector<T>> struct Array3
+template <typename T, typename ArrayT = std::vector<T>> struct array3d
 {
-   // STL-friendly typedefs
+    // STL-friendly typedefs
 
     typedef typename ArrayT::iterator iterator;
     typedef typename ArrayT::const_iterator const_iterator;
@@ -29,86 +28,98 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
 
     // the interface
 
-    Array3(void) : ni(0), nj(0), nk(0) {}
+    array3d(void) : ni(0), nj(0), nk(0) {}
 
-    Array3(int ni_, int nj_, int nk_)
-      : ni(ni_), nj(nj_), nk(nk_), a(ni_*nj_*nk_)
-    { assert(ni_>=0 && nj_>=0 && nk_>=0); }
+    array3d(int ni_, int nj_, int nk_) : ni(ni_), nj(nj_), nk(nk_), a(ni_ * nj_ * nk_)
+        { assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0); }
 
-    Array3(int ni_, int nj_, int nk_, ArrayT& a_)
-      : ni(ni_), nj(nj_), nk(nk_), a(a_)
-    { assert(ni_>=0 && nj_>=0 && nk_>=0); }
+    array3d(int ni_, int nj_, int nk_, ArrayT& a_) : ni(ni_), nj(nj_), nk(nk_), a(a_)
+        { assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0); }
 
-    Array3(int ni_, int nj_, int nk_, const T& value)
-      : ni(ni_), nj(nj_), nk(nk_), a(ni_*nj_*nk_, value)
-    { assert(ni_>=0 && nj_>=0 && nk_>=0); }
+    array3d(int ni_, int nj_, int nk_, const T& value) : ni(ni_), nj(nj_), nk(nk_), a(ni_ * nj_ * nk_, value)
+        { assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0); }
 
-    Array3(int ni_, int nj_, int nk_, const T& value, size_type max_n_)
-      : ni(ni_), nj(nj_), nk(nk_), a(ni_*nj_*nk_, value, max_n_)
-    { assert(ni_>=0 && nj_>=0 && nk_>=0); }
+    array3d(int ni_, int nj_, int nk_, const T& value, size_type max_n_): ni(ni_), nj(nj_), nk(nk_), a(ni_ * nj_ * nk_, value, max_n_)
+        { assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0); }
 
-    Array3(int ni_, int nj_, int nk_, T* data_)
-      : ni(ni_), nj(nj_), nk(nk_), a(ni_*nj_*nk_, data_)
-    { assert(ni_>=0 && nj_>=0 && nk_>=0); }
+    array3d(int ni_, int nj_, int nk_, T* data_) : ni(ni_), nj(nj_), nk(nk_), a(ni_ * nj_ * nk_, data_)
+        { assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0); }
 
-    Array3(int ni_, int nj_, int nk_, T* data_, size_type max_n_)
-      : ni(ni_), nj(nj_), nk(nk_), a(ni_*nj_*nk_, data_, max_n_)
-    { assert(ni_>=0 && nj_>=0 && nk_>=0); }
+    array3d(int ni_, int nj_, int nk_, T* data_, size_type max_n_) : ni(ni_), nj(nj_), nk(nk_), a(ni_ * nj_ * nk_, data_, max_n_)
+        { assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0); }
 
-    ~Array3(void) { }
+    ~array3d(void) { }
 
-    const T& operator()(int i, int j, int k) const
+    const T& operator() (int i, int j, int k) const
     {
         assert(i >= 0 && i < ni && j >= 0 && j < nj && k >= 0 && k < nk);
         return a[i + ni * (j + nj * k)];
     }
 
-    T& operator()(int i, int j, int k)
+    T& operator() (int i, int j, int k)
     {
         assert(i >= 0 && i < ni && j >= 0 && j < nj && k >= 0 && k < nk);
         return a[i + ni * (j + nj * k)];
     }
 
-    bool operator == (const Array3<T>& x) const
+    bool operator == (const array3d<T>& x) const
         { return ni == x.ni && nj == x.nj && nk == x.nk && a == x.a; }
 
-    bool operator!=(const Array3<T>& x) const
+    bool operator != (const array3d<T>& x) const
         { return ni != x.ni || nj != x.nj || nk != x.nk || a != x.a; }
 
-    bool operator<(const Array3<T>& x) const
+    bool operator < (const array3d<T>& x) const
     {
-        if(ni < x.ni) return true; else if(ni > x.ni) return false;
-        if(nj < x.nj) return true; else if(nj > x.nj) return false;
-        if(nk < x.nk) return true; else if(nk > x.nk) return false;
+        if(ni < x.ni) return true;
+        if(ni > x.ni) return false;
+        if(nj < x.nj) return true;
+        if(nj > x.nj) return false;
+        if(nk < x.nk) return true;
+        if(nk > x.nk) return false;
         return a < x.a;
     }
 
-    bool operator>(const Array3<T>& x) const
+    bool operator > (const array3d<T>& x) const
     {
-        if(ni > x.ni) return true; else if(ni < x.ni) return false;
-        if(nj > x.nj) return true; else if(nj < x.nj) return false;
-        if(nk > x.nk) return true; else if(nk < x.nk) return false;
+        if(ni > x.ni) return true;
+        if(ni < x.ni) return false;
+        if(nj > x.nj) return true;
+        if(nj < x.nj) return false;
+        if(nk > x.nk) return true;
+        if(nk < x.nk) return false;
         return a > x.a;
     }
 
-    bool operator <= (const Array3<T>& x) const
+    bool operator <= (const array3d<T>& x) const
     {
-        if(ni < x.ni) return true; else if(ni > x.ni) return false;
-        if(nj < x.nj) return true; else if(nj > x.nj) return false;
-        if(nk < x.nk) return true; else if(nk > x.nk) return false;
+        if(ni < x.ni) return true;
+        if(ni > x.ni) return false;
+        if(nj < x.nj) return true;
+        if(nj > x.nj) return false;
+        if(nk < x.nk) return true;
+        if(nk > x.nk) return false;
         return a <= x.a;
     }
 
-    bool operator >= (const Array3<T>& x) const
+    bool operator >= (const array3d<T>& x) const
     {
-        if(ni > x.ni) return true; else if(ni < x.ni) return false;
-        if(nj > x.nj) return true; else if(nj < x.nj) return false;
-        if(nk > x.nk) return true; else if(nk < x.nk) return false;
+        if(ni > x.ni) return true;
+        if(ni < x.ni) return false;
+        if(nj > x.nj) return true;
+        if(nj < x.nj) return false;
+        if(nk > x.nk) return true;
+        if(nk < x.nk) return false;
         return a >= x.a;
     }
 
     void assign(const T& value)
-        { a.assign(value); }
+        { 
+
+
+            std::fill(a.begin(), a.end(), value);
+
+
+}
 
     void assign(int ni_, int nj_, int nk_, const T& value)
     {
@@ -120,7 +131,7 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
     
     void assign(int ni_, int nj_, int nk_, const T* copydata)
     {
-        a.assign(ni_*nj_*nk_, copydata);
+        a.assign(ni_ * nj_ * nk_, copydata);
         ni = ni_;
         nj = nj_;
         nk = nk_;
@@ -176,7 +187,7 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
 
     void fill(int ni_, int nj_, int nk_, const T& value)
     {
-        a.fill(ni_*nj_*nk_, value);
+        a.fill(ni_ * nj_ * nk_, value);
         ni = ni_;
         nj = nj_;
         nk = nk_;
@@ -215,7 +226,7 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
     void resize(int ni_, int nj_, int nk_)
     {
         assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0);
-        a.resize(ni_*nj_*nk_);
+        a.resize(ni_ * nj_ * nk_);
         ni = ni_;
         nj = nj_;
         nk = nk_;
@@ -224,7 +235,7 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
     void resize(int ni_, int nj_, int nk_, const T& value)
     {
         assert(ni_ >= 0 && nj_ >= 0 && nk_ >= 0);
-        a.resize(ni_*nj_*nk_, value);
+        a.resize(ni_ * nj_ * nk_, value);
         ni = ni_;
         nj = nj_;
         nk = nk_;
@@ -236,7 +247,7 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
     size_type size(void) const
         { return a.size(); }
 
-    void swap(Array3<T>& x)
+    void swap(array3d<T>& x)
     {
         std::swap(ni, x.ni);
         std::swap(nj, x.nj);
@@ -249,16 +260,17 @@ template<class T, class ArrayT = std::vector<T>> struct Array3
 };
 
 // some common arrays
+/*
 
-typedef Array3<double, Array1<double> > Array3d;
-typedef Array3<float, Array1<float> > Array3f;
-typedef Array3<long long, Array1<long long> > Array3ll;
-typedef Array3<unsigned long long, Array1<unsigned long long> > Array3ull;
-typedef Array3<int, Array1<int> > Array3i;
-typedef Array3<unsigned int, Array1<unsigned int> > Array3ui;
-typedef Array3<short, Array1<short> > Array3s;
-typedef Array3<unsigned short, Array1<unsigned short> > Array3us;
-typedef Array3<char, Array1<char> > Array3c;
-typedef Array3<unsigned char, Array1<unsigned char> > Array3uc;
-
+typedef array3d<double, Array1<double> > array3d;
+typedef array3d<float, Array1<float> > array3df;
+typedef array3d<long long, Array1<long long> > array3dll;
+typedef array3d<unsigned long long, Array1<unsigned long long> > array3dull;
+typedef array3d<int, Array1<int> > array3di;
+typedef array3d<unsigned int, Array1<unsigned int> > array3dui;
+typedef array3d<short, Array1<short> > array3ds;
+typedef array3d<unsigned short, Array1<unsigned short> > array3dus;
+typedef array3d<char, Array1<char> > array3dc;
+typedef array3d<unsigned char, Array1<unsigned char> > array3duc;
+*/
 #endif
