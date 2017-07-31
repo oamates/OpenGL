@@ -31,6 +31,7 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 float distance_field(vec3 p)
 {
+    p.y = -p.y;
     vec3 q = 0.5f * p + 0.5f;
     float r = texture(sdf_tex, q).x;
     return r;
@@ -44,7 +45,8 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
     for(int i = 0; i < maxSteps; ++i) 
     {
         float d = distance_field(position + direction * t);
-        if(d < 0.00125)
+
+        if(d < 0.0007125)
             return t;
         t += d;
 
@@ -56,7 +58,7 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
 
 vec3 grad(vec3 p)
 {
-    vec2 e = vec2(0.00125, -0.00125); 
+    vec2 e = vec2(0.0014125, -0.0014125); 
     return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 

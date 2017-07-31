@@ -1,5 +1,14 @@
+<<<<<<< HEAD
 #ifndef _tex3d_included_3246158736480756134807560831475634108756341097560834156
 #define _tex3d_included_3246158736480756134807560831475634108756341097560834156
+=======
+#ifndef _tex3d_included_3287495632427534875632875639487521895623930815623493248
+#define _tex3d_included_3287495632427534875632875639487521895623930815623493248
+
+#define GLEW_STATIC
+#include <GL/glew.h>
+#include <glm/glm.hpp>
+>>>>>>> Fixed Gen2
 
 struct tex3d_header_t
 {
@@ -46,7 +55,11 @@ struct texture3d_t
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
+<<<<<<< HEAD
         glTexImage3D(GL_TEXTURE_3D, 0, internal_format, size.x, size.y, size.z, 0, header.format, header.type, texture_data);
+=======
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F/* internal_format */, size.x, size.y, size.z, 0, header.format, header.type, texture_data);
+>>>>>>> Fixed Gen2
 
         /*
         debug_msg("internal_format = %u. GL_R32F = %u", internal_format, GL_R32F);
@@ -58,6 +71,7 @@ struct texture3d_t
         free(texture_data);
     }
 
+<<<<<<< HEAD
     texture3d_t(GLenum texture_unit, tex3d_header_t& header, const GLvoid* data)
         : texture_unit(texture_unit)
     {
@@ -76,6 +90,8 @@ struct texture3d_t
     }
 
 
+=======
+>>>>>>> Fixed Gen2
     texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
         : size(size), texture_unit(texture_unit), internal_format(internal_format)
     {
@@ -107,4 +123,8 @@ struct texture3d_t
         { glDeleteTextures(1, &texture_id); }
 };
 
+<<<<<<< HEAD
 #endif // _tex3d_included_3246158736480756134807560831475634108756341097560834156
+=======
+#endif // _tex3d_included_3287495632427534875632875639487521895623930815623493248
+>>>>>>> Fixed Gen2

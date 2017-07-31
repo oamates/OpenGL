@@ -29,6 +29,8 @@
 #include "tex3d.hpp"
 #include "makelevelset3.hpp"
 
+#include "tex3d.hpp"
+
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
@@ -66,10 +68,14 @@ int main(int argc, char *argv[])
 {
     int res_x = 1920;
     int res_y = 1080;
-
+/*
     if(argc != 4)
     {
+<<<<<<< HEAD
         printf("Usage :: %s <filename> <delta> <padding> ", argv[0]);
+=======
+        printf("Usage %s <filename> <dx> <padding>", argv[0]);
+>>>>>>> Fixed Gen2
         std::exit(-1);
     }
 
@@ -121,9 +127,15 @@ int main(int argc, char *argv[])
             char c;
             glm::dvec3 point;
             data >> c >> point[0] >> point[1] >> point[2];
+<<<<<<< HEAD
             positions.push_back(point);
             min_box = glm::min(min_box, point);
             max_box = glm::max(max_box, point);
+=======
+            vertList.push_back(point);
+            min_box = glm::min(min_box, glm::dvec3(point));
+            max_box = glm::max(max_box, glm::dvec3(point));
+>>>>>>> Fixed Gen2
         }
         else if(line.substr(0, 1) == std::string("f"))
         {
@@ -149,18 +161,49 @@ int main(int argc, char *argv[])
     glm::dvec3 unit = glm::dvec3(1.0);
     min_box -= padding * delta * unit;
     max_box += padding * delta * unit;
+<<<<<<< HEAD
     double inv_delta = 1.0 / delta;
     glm::ivec3 sizes = glm::ivec3(glm::ceil(inv_delta * (max_box - min_box)));
+=======
+    glm::ivec3 sizes = glm::ivec3(glm::ceil((max_box - min_box) / delta));
+>>>>>>> Fixed Gen2
   
     debug_msg("Bounding box: (%s) to (%s) :: dimensions :: %s", glm::to_string(min_box).c_str(), glm::to_string(max_box).c_str(), glm::to_string(sizes).c_str());
     debug_msg("Computing signed distance field ... ");
 
     array3d<double> distance_field;
 
+<<<<<<< HEAD
     make_level_set3(faces, positions, min_box, delta, sizes, distance_field);
 
     std::string outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
     debug_msg("Writing results to: %s", outname.c_str());
+=======
+    make_level_set3(faceList, vertList, min_box, delta, sizes, phi_grid);
+
+    std::string outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
+    debug_msg("Writing results to: %s", outname.c_str());
+
+    tex3d_header_t header = 
+    {
+        .target = GL_TEXTURE_3D,
+        .internal_format = GL_R32F,
+        .format = GL_RED,
+        .type = GL_FLOAT,
+        .size = sizes,
+        .data_size = sizes.x * sizes.y * sizes.z * sizeof(GLfloat)
+    };
+
+    FILE* f = fopen(outname.c_str(), "wb");
+    fwrite(&header, sizeof(tex3d_header_t), 1, f);
+    fwrite(phi_grid.a.data(), header.data_size, 1, f);
+    fclose(f);    
+
+    debug_msg("Processing complete.");
+
+*/
+
+>>>>>>> Fixed Gen2
 
 
     //===================================================================================================================================================================================================================
@@ -173,6 +216,7 @@ int main(int argc, char *argv[])
 
     demo_window_t window("SDF Simple Volume RayMarch", 4, 3, 3, res_x, res_y, true);
 
+<<<<<<< HEAD
 
 
     uint32_t data_size = (uint32_t) sizes.x * sizes.y * sizes.z * sizeof(GLfloat);
@@ -201,6 +245,8 @@ int main(int argc, char *argv[])
     texture3d_t distance_tex(GL_TEXTURE2, header, tex_data);
     free(tex_data);
 
+=======
+>>>>>>> Fixed Gen2
     //===================================================================================================================================================================================================================
     // volume raymarch shader
     //===================================================================================================================================================================================================================
@@ -236,6 +282,12 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
+<<<<<<< HEAD
+=======
+    //texture3d_t demon_sdf(GL_TEXTURE2, outname.c_str());
+    texture3d_t demon_sdf(GL_TEXTURE2, "demon.sdf");
+
+>>>>>>> Fixed Gen2
     //===================================================================================================================================================================================================================
     // light variables
     //===================================================================================================================================================================================================================
@@ -298,3 +350,4 @@ else
     glfw::terminate();
     return 0;
 }
+

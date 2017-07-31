@@ -259,18 +259,4 @@ template <typename T, typename ArrayT = std::vector<T>> struct array3d
         { a.trim(); }
 };
 
-// some common arrays
-/*
-
-typedef array3d<double, Array1<double> > array3d;
-typedef array3d<float, Array1<float> > array3df;
-typedef array3d<long long, Array1<long long> > array3dll;
-typedef array3d<unsigned long long, Array1<unsigned long long> > array3dull;
-typedef array3d<int, Array1<int> > array3di;
-typedef array3d<unsigned int, Array1<unsigned int> > array3dui;
-typedef array3d<short, Array1<short> > array3ds;
-typedef array3d<unsigned short, Array1<unsigned short> > array3dus;
-typedef array3d<char, Array1<char> > array3dc;
-typedef array3d<unsigned char, Array1<unsigned char> > array3duc;
-*/
 #endif

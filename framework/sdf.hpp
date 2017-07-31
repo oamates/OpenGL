@@ -251,8 +251,7 @@ template<typename index_t> struct sdf_compute_t
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
                 .data_size = (uint32_t) texture_size * sizeof(GLfloat)
-            };  
-
+            };
 
             FILE* f = fopen(file_name, "wb");
             fwrite(&header, sizeof(tex3d_header_t), 1, f);
