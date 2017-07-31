@@ -4,6 +4,7 @@
 #include <atomic>
 #include <thread>
 
+#include "tex3d.hpp"
 #include "log.hpp"
 
 const double INTEGRAL_SCALE = 268435456.0;
@@ -111,95 +112,6 @@ const glm::dvec3 shift[8] =
     glm::dvec3( 1.0,  1.0,  1.0)
 };
 
-struct tex3d_header_t
-{
-    GLenum target;
-    GLenum internal_format;
-    GLenum format;
-    GLenum type;
-    glm::ivec3 size;
-    GLuint data_size;    
-};
-
-struct texture3d_t
-{
-    glm::ivec3 size;
-    GLuint texture_id;
-    GLenum texture_unit;
-    GLenum internal_format;
-
-    texture3d_t(GLenum texture_unit, const char* file_name)
-        : texture_unit(texture_unit)
-    {
-        tex3d_header_t header;
-
-        FILE* f = fopen(file_name, "rb");
-        assert(f);
-        
-        fread(&header, sizeof(tex3d_header_t), 1, f);
-
-        size = header.size;
-        internal_format = header.internal_format;
-        void* texture_data = malloc(header.data_size);
-
-        fread(texture_data, header.data_size, 1, f);
-        fclose(f);
-
-        glActiveTexture(texture_unit);
-        glGenTextures(1, &texture_id);
-        glBindTexture(GL_TEXTURE_3D, texture_id);
-
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-        glTexImage3D(GL_TEXTURE_3D, 0, internal_format, size.x, size.y, size.z, 0, header.format, header.type, texture_data);
-
-        /*
-        debug_msg("internal_format = %u. GL_R32F = %u", internal_format, GL_R32F);
-        debug_msg("size = (%u, %u, %u).", size.x, size.y, size.z);
-        debug_msg("format = %x. GL_FLOAT = %x", header.format, GL_RED);
-        debug_msg("type = %x. GL_FLOAT = %x", header.type, GL_FLOAT);
-        */
-
-        free(texture_data);
-    }
-
-    texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
-        : size(size), texture_unit(texture_unit), internal_format(internal_format)
-    {
-        glActiveTexture(texture_unit);
-        glGenTextures(1, &texture_id);
-        glBindTexture(GL_TEXTURE_3D, texture_id);
-
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-        glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, size.x, size.y, size.z);
-    }
-
-    void load(const char* file_name)
-    {
-    }
-
-    void bind_as_image(GLuint image_unit, GLenum access = GL_READ_WRITE)
-        { glBindImageTexture(image_unit, texture_id, 0, GL_TRUE, 0, access, internal_format); }
-
-    GLuint data_size()
-        { return size.x * size.y * size.z * sizeof(GLuint); }
-
-    ~texture3d_t()
-        { glDeleteTextures(1, &texture_id); }
-};
-
-
 template<typename index_t> struct sdf_compute_t
 {
     GLuint V;
@@ -213,96 +125,6 @@ template<typename index_t> struct sdf_compute_t
         : faces(faces), F(F), positions(positions), V(V), normals(0)
     { }
 
-
-/*
-    void load_model(const char* file_name, double bbox_max)
-    {
-        vao_t::header_t header;
-        debug_msg("Loading model :: %s ... \n", file_name);
-
-        FILE* f = fopen(file_name, "rb");
-        fread (&header, sizeof(vao_t::header_t), 1, f);
-
-        assert(header.layout == vertex_pn_t::layout && "File does not contain a valid PN - model");
-        assert(header.mode == GL_TRIANGLES && "Primitive type must be GL_TRIANGLES");
-        assert(header.type == GL_UNSIGNED_INT && "Index type is not GL_UNSIGNED_INT");
-
-        GLsizei stride = vertex_pn_t::total_dimension * sizeof(GLfloat);
-        vertex_pn_t* vertices = (vertex_pn_t*) malloc(header.vbo_size * stride);
-        fread(vertices, stride, header.vbo_size, f);
-    
-        indices = (GLuint *) malloc(sizeof(GLuint) * header.ibo_size);
-        fread(indices, sizeof(GLuint), header.ibo_size, f);
-        fclose(f);
-
-        V = header.vbo_size;
-        F = header.ibo_size / 3;
-        debug_msg("VAO Loaded :: V = %d. F = %d. indices = %d. ", V, F, header.ibo_size);
-        if(header.mode == GL_TRIANGLES)
-            debug_msg("Primitive mode :: GL_TRIANGLES");
-        else
-            debug_msg("Primitive mode :: GL_TRIANGLE_STRIP");
-
-        test_manifoldness();
-        
-        sdf_compute_t::bbox_max = bbox_max;
-        debug_msg("Normalizing the model :: bbox_max = %f.", bbox_max);
-
-        positions = (glm::dvec3*) malloc(sizeof(glm::dvec3) * V); 
-        normals = (glm::dvec3*) malloc(sizeof(glm::dvec3) * V);
-
-        glm::dvec3 mass_center;
-        glm::dmat3 covariance_matrix;
-
-        momenta::calculate(vertices, V, mass_center, covariance_matrix);
-        debug_msg("model mass center = %s", glm::to_string(mass_center).c_str());
-        debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
-
-        glm::dquat q = diagonalizer(covariance_matrix);
-        glm::dmat3 Q = mat3_cast(q);
-        glm::dmat3 Qt = glm::transpose(Q);
-
-        debug_msg("diagonalizer = %s", glm::to_string(Q).c_str());
-
-        glm::dvec3 bbox = glm::dvec3(0.0);
-
-        for (GLuint v = 0; v < V; ++v)
-        {
-            vertex_pn_t& vertex = vertices[v];
-            glm::dvec3 position = Q * (glm::dvec3(vertex.position) - mass_center);       
-            positions[v] = position;
-            bbox = glm::max(bbox, glm::abs(position));
-            normals[v] = Q * vertex.normal;
-        }
-
-        double max_bbox = glm::max(bbox.x, glm::max(bbox.y, bbox.z));
-        double scale = bbox_max / max_bbox;
-
-        debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
-        debug_msg("bbox_max = %f. maximum = %f. scale = %f. Scaling ...", bbox_max, max_bbox, scale);
-
-        bbox = glm::dvec3(0.0);
-        for (GLuint v = 0; v < V; ++v)
-        {
-            positions[v] = scale * positions[v];
-            bbox = glm::max(bbox, glm::abs(positions[v]));
-        }
-
-        covariance_matrix = (scale * scale) * (Q * covariance_matrix * Qt);
-
-        debug_msg("model covariance matrix after normalization = %s", glm::to_string(covariance_matrix).c_str());
-        debug_msg("Verification :: ");
-
-        momenta::calculate(positions, V, mass_center, covariance_matrix);
-
-        debug_msg("model mass center = %s", glm::to_string(mass_center).c_str());
-        debug_msg("model covariance matrix = %s", glm::to_string(covariance_matrix).c_str());
-        debug_msg("model bbox = %s", glm::to_string(bbox).c_str());
-
-        free(vertices);
-    }
-
-*/
     //===================================================================================================================================================================================================================
     // auxiliary structure to be passed to all mesh udf computation threads
     //===================================================================================================================================================================================================================

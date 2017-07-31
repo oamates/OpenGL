@@ -26,6 +26,7 @@
 #include "camera.hpp"
 #include "image.hpp"
 #include "sdf.hpp"
+#include "tex3d.hpp"
 #include "makelevelset3.hpp"
 
 struct demo_window_t : public glfw_window_t
@@ -68,22 +69,7 @@ int main(int argc, char *argv[])
 
     if(argc != 4)
     {
-        printf("SDFGen - A utility for converting closed oriented triangle meshes into grid-based signed distance fields.\n");
-        printf("\nThe output file format is:");
-        printf("<ni> <nj> <nk>\n");
-        printf("<origin_x> <origin_y> <origin_z>\n");
-        printf("<dx>\n");
-        printf("<value_1> <value_2> <value_3> [...]\n\n");
-        printf("(ni, nj, nk) are the integer dimensions of the resulting distance field.\n");
-        printf("(origin_x,origin_y,origin_z) is the 3D position of the grid origin.\n");
-        printf("<dx> is the grid spacing.\n\n");
-        printf("<value_n> are the signed distance data values, in ascending order of i, then j, then k.\n");
-        printf("The output filename will match that of the input, with the OBJ suffix replaced with SDF.\n\n");
-        printf("Usage: SDFGen <filename> <dx> <padding>\n\n");
-        printf("Where:\n");
-        printf("\t<filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n");
-        printf("\t<dx> specifies the length of grid cell in the resulting distance field.\n");
-        printf("\t<padding> specifies the number of cells worth of padding between the object bound box and the boundary of the distance field grid. Minimum is 1.\n\n");
+        printf("Usage :: %s <filename> <delta> <padding> ", argv[0]);
         std::exit(-1);
     }
 
@@ -97,8 +83,8 @@ int main(int argc, char *argv[])
 
 
     std::stringstream arg2(argv[2]);
-    float dx;
-    arg2 >> dx;
+    double delta;
+    arg2 >> delta;
   
     std::stringstream arg3(argv[3]);
     int padding;
@@ -108,8 +94,8 @@ int main(int argc, char *argv[])
         padding = 1;
     
     // start with a massive inside out bound box.
-    glm::vec3 min_box( std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()), 
-              max_box(-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max());
+    glm::dvec3 min_box( std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max()), 
+               max_box(-std::numeric_limits<double>::max(),-std::numeric_limits<double>::max(),-std::numeric_limits<double>::max());
   
     std::cout << "Reading data.\n";
 
@@ -122,8 +108,8 @@ int main(int argc, char *argv[])
 
     int ignored_lines = 0;
     std::string line;
-    std::vector<glm::vec3> vertList;
-    std::vector<glm::uvec3> faceList;
+    std::vector<glm::dvec3> positions;
+    std::vector<glm::uvec3> faces;
     while(!infile.eof())
     {
         std::getline(infile, line);
@@ -133,9 +119,9 @@ int main(int argc, char *argv[])
         {
             std::stringstream data(line);
             char c;
-            glm::vec3 point;
+            glm::dvec3 point;
             data >> c >> point[0] >> point[1] >> point[2];
-            vertList.push_back(point);
+            positions.push_back(point);
             min_box = glm::min(min_box, point);
             max_box = glm::max(max_box, point);
         }
@@ -143,9 +129,9 @@ int main(int argc, char *argv[])
         {
             std::stringstream data(line);
             char c;
-            int v0, v1, v2;
-            data >> c >> v0 >> v1 >> v2;
-            faceList.push_back(glm::uvec3(v0 - 1, v1 - 1, v2 - 1));
+            glm::uvec3 face;
+            data >> c >> face.x >> face.y >> face.z;
+            faces.push_back(face - glm::uvec3(1));
         }
         else
             ++ignored_lines; 
@@ -155,42 +141,27 @@ int main(int argc, char *argv[])
     if(ignored_lines > 0)
         debug_msg("Warning: %u lines were ignored since they did not contain faces or vertices.", ignored_lines);
 
-    debug_msg("Read in %u vertices and %u faces.", (unsigned int) vertList.size(), (unsigned int) faceList.size());
+    debug_msg("Read in %u vertices and %u faces.", (unsigned int) positions.size(), (unsigned int) faces.size());
 
     //===================================================================================================================================================================================================================
     // Add padding around the box.
     //===================================================================================================================================================================================================================
-    glm::vec3 unit = glm::vec3(1.0f);
-    min_box -= padding * dx * unit;
-    max_box += padding * dx * unit;
-    glm::ivec3 sizes = glm::ivec3(glm::ceil((max_box - min_box) / dx));
+    glm::dvec3 unit = glm::dvec3(1.0);
+    min_box -= padding * delta * unit;
+    max_box += padding * delta * unit;
+    double inv_delta = 1.0 / delta;
+    glm::ivec3 sizes = glm::ivec3(glm::ceil(inv_delta * (max_box - min_box)));
   
     debug_msg("Bounding box: (%s) to (%s) :: dimensions :: %s", glm::to_string(min_box).c_str(), glm::to_string(max_box).c_str(), glm::to_string(sizes).c_str());
     debug_msg("Computing signed distance field ... ");
 
-    array3d<float> phi_grid;
+    array3d<double> distance_field;
 
-    make_level_set3(faceList, vertList, min_box, dx, sizes, phi_grid);
+    make_level_set3(faces, positions, min_box, delta, sizes, distance_field);
 
     std::string outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
     debug_msg("Writing results to: %s", outname.c_str());
-    
-    //FILE* f = fopen(outname.c_str(), "wb");
 
-
-
-    std::ofstream outfile(outname.c_str());
-    outfile << phi_grid.ni << " " << phi_grid.nj << " " << phi_grid.nk << std::endl;
-    outfile << min_box[0] << " " << min_box[1] << " " << min_box[2] << std::endl;
-    outfile << dx << std::endl;
-
-    for(unsigned int i = 0; i < phi_grid.a.size(); ++i)
-    {
-        outfile << phi_grid.a[i] << std::endl;
-    }
-    outfile.close();
-
-    debug_msg("Processing complete.");
 
     //===================================================================================================================================================================================================================
     // initialize GLFW library
@@ -202,5 +173,128 @@ int main(int argc, char *argv[])
 
     demo_window_t window("SDF Simple Volume RayMarch", 4, 3, 3, res_x, res_y, true);
 
+
+
+    uint32_t data_size = (uint32_t) sizes.x * sizes.y * sizes.z * sizeof(GLfloat);
+    float* tex_data = (float*) malloc(data_size);
+
+    for(int idx = 0; idx < sizes.x * sizes.y * sizes.z; ++idx)
+    {
+        tex_data[idx] = distance_field.a[idx];
+    }
+
+    tex3d_header_t header 
+    {
+        .target = GL_TEXTURE_3D,
+        .internal_format = GL_R32F,
+        .format = GL_RED,
+        .type = GL_FLOAT,
+        .size = sizes,
+        .data_size = data_size
+    };  
+
+    FILE* f = fopen(outname.c_str(), "wb");
+    fwrite(&header, sizeof(tex3d_header_t), 1, f);
+    fwrite(tex_data, data_size, 1, f);
+    fclose(f);
+
+    texture3d_t distance_tex(GL_TEXTURE2, header, tex_data);
+    free(tex_data);
+
+    //===================================================================================================================================================================================================================
+    // volume raymarch shader
+    //===================================================================================================================================================================================================================
+    glsl_program_t sdf_raymarch(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ray_marcher.vs"),
+                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sdf_marcher.fs"));
+
+    sdf_raymarch.enable();
+
+    uniform_t uni_cm_camera_matrix = sdf_raymarch["camera_matrix"];       
+    uniform_t uni_cm_camera_ws     = sdf_raymarch["camera_ws"];       
+    uniform_t uni_cm_light_ws      = sdf_raymarch["light_ws"];
+
+    glm::vec2 focal_scale = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
+
+    sdf_raymarch["focal_scale"] = focal_scale;
+    sdf_raymarch["tb_tex"] = 0;
+    sdf_raymarch["environment_tex"] = 1;
+    sdf_raymarch["sdf_tex"] = 2;
+
+    //===================================================================================================================================================================================================================
+    // load textures
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    
+    glActiveTexture(GL_TEXTURE1);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    const char* sunset_files[6] = {"../../../resources/cubemap/sunset/positive_x.png",
+                                   "../../../resources/cubemap/sunset/negative_x.png",
+                                   "../../../resources/cubemap/sunset/positive_y.png",
+                                   "../../../resources/cubemap/sunset/negative_y.png",
+                                   "../../../resources/cubemap/sunset/positive_z.png",
+                                   "../../../resources/cubemap/sunset/negative_z.png"};
+    GLuint env_tex_id = image::png::cubemap(sunset_files);
+
+    //===================================================================================================================================================================================================================
+    // light variables
+    //===================================================================================================================================================================================================================
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glDisable(GL_DEPTH_TEST);
+
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+
+    //===================================================================================================================================================================================================================
+    // main program loop
+    //===================================================================================================================================================================================================================
+    while(!window.should_close())
+    {
+        window.new_frame();
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        float time = 0.55 * window.frame_ts;
+        glm::vec3 light_ws = glm::vec3(10.0f, 2.0f * glm::cos(time), 3.0f * glm::sin(time));
+
+        glm::mat4 cmatrix4x4;
+        glm::mat3 camera_matrix;
+        glm::vec3 camera_ws;
+
+if (0 != 0) {
+
+
+        float radius = 2.65f + 1.15f * glm::cos(0.25f * time);
+        float z = 0.35f * glm::sin(0.25f * time);
+        camera_ws = glm::vec3(radius * glm::cos(0.3f * time), z, radius * glm::sin(0.3f * time));
+        glm::vec3 up = glm::normalize(glm::vec3(glm::cos(0.41 * time), -6.0f, glm::sin(0.41 * time)));
+        glm::mat4 view_matrix = glm::lookAt(camera_ws, glm::vec3(0.0f), up);
+        cmatrix4x4 = glm::inverse(view_matrix);
+        camera_matrix = glm::mat3(cmatrix4x4);
+}
+else
+{
+        cmatrix4x4 = glm::inverse(window.camera.view_matrix);
+        camera_matrix = glm::mat3(cmatrix4x4);
+        camera_ws = glm::vec3(cmatrix4x4[3]);
+}
+
+
+        //===============================================================================================================================================================================================================
+        // raymarch through signed distance field
+        //===============================================================================================================================================================================================================
+        uni_cm_camera_matrix = camera_matrix;
+        uni_cm_camera_ws = camera_ws;
+        uni_cm_light_ws = light_ws;
+
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+        window.end_frame();
+    }
+
+    //===================================================================================================================================================================================================================
+    // terminate the program and exit
+    //===================================================================================================================================================================================================================
+    glfw::terminate();
     return 0;
 }
