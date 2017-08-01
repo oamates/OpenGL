@@ -10,6 +10,10 @@ uniform sampler2D tb_tex;
 uniform sampler3D sdf_tex;
 uniform samplerCube environment_tex;
 
+uniform vec3 bbox_half_size;
+uniform vec3 bbox_inv_size;
+uniform vec3 bbox_center;
+
 out vec4 FragmentColor;
 
 //==============================================================================================================================================================
@@ -31,8 +35,7 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 float distance_field(vec3 p)
 {
-    p.y = -p.y;
-    vec3 q = 0.5f * p + 0.5f;
+    vec3 q = 0.5f + inv_size * (p - bbox_center);
     float r = texture(sdf_tex, q).x;
     return r;
 }
@@ -62,6 +65,7 @@ vec3 grad(vec3 p)
     return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
+
 void main()
 {
     vec3 direction = normalize(view);
@@ -69,15 +73,15 @@ void main()
 
     // check if the ray intersects unit cube and find two intersections if it does
 
-    vec3 s = 1.0 / abs(direction);
-    vec3 r = camera_ws / direction;
+    vec3 s = bbox_half_size / abs(direction);
+    vec3 r = (bbox_center - camera_ws) / direction;
 
-    vec4 a = vec4(-s - r, 0.0);
+    vec4 a = vec4(r - s, 0.0);
     a.xy = max(a.xy, a.zw);
     float t0 = max(a.x, a.y);
 
-    vec3 b = s - r;
-    float t1 = min(b.x, min(b.y, b.z));
+    vec3 b = r + s;
+    float t1 = min(min(b.x, b.y), b.z);
 
     if (t0 >= t1)
     {

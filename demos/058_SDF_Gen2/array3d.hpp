@@ -50,16 +50,48 @@ template <typename T, typename ArrayT = std::vector<T>> struct array3d
 
     ~array3d(void) { }
 
-    const T& operator() (int i, int j, int k) const
+    const T& operator[] (const glm::ivec3& index) const
+    {
+        assert(index.x >= 0 && index.x < ni && index.y >= 0 && index.y < nj && index.z >= 0 && index.z < nk);
+        return a[index.x + ni * (index.y + nj * index.z)];
+    }
+
+    T& operator[] (const glm::ivec3& index)
+    {
+        assert(index.x >= 0 && index.x < ni && index.y >= 0 && index.y < nj && index.z >= 0 && index.z < nk);
+        return a[index.x + ni * (index.y + nj * index.z)];
+    }
+/*
+    const T& operator[] (int i, int j, int k) const
     {
         assert(i >= 0 && i < ni && j >= 0 && j < nj && k >= 0 && k < nk);
         return a[i + ni * (j + nj * k)];
     }
 
-    T& operator() (int i, int j, int k)
+    T& operator[] (int i, int j, int k)
     {
         assert(i >= 0 && i < ni && j >= 0 && j < nj && k >= 0 && k < nk);
         return a[i + ni * (j + nj * k)];
+    }
+*/
+    array3d(const array3d& other) = delete;
+    array3d& operator = (const array3d&) = delete;
+
+    array3d (array3d&& rhs)
+    {
+        ni = rhs.ni;
+        nj = rhs.nj;
+        nk = rhs.nk;
+        a = std::move(rhs.a);
+    } 
+
+    array3d& operator = (array3d&& rhs)
+    {
+        ni = rhs.ni;
+        nj = rhs.nj;
+        nk = rhs.nk;
+        a = std::move(rhs.a);
+        return *this;
     }
 
     bool operator == (const array3d<T>& x) const
@@ -113,17 +145,11 @@ template <typename T, typename ArrayT = std::vector<T>> struct array3d
     }
 
     void assign(const T& value)
-        { 
-
-
-            std::fill(a.begin(), a.end(), value);
-
-
-}
+        { std::fill(a.begin(), a.end(), value); }
 
     void assign(int ni_, int nj_, int nk_, const T& value)
     {
-        a.assign(ni_*nj_*nk_, value);
+        a.assign(ni_ * nj_ * nk_, value);
         ni = ni_;
         nj = nj_;
         nk = nk_;

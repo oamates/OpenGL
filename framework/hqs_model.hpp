@@ -1,6 +1,10 @@
 #ifndef _hqs_model_included_103639641560235613475634786357156849375610563087634
 #define _hqs_model_included_103639641560235613475634786357156849375610563087634
 
+#include "vao.hpp"
+#include "momenta.hpp"
+#include "vertex.hpp"
+
 struct hqs_model_t
 {
     uint32_t V;
@@ -10,7 +14,8 @@ struct hqs_model_t
     std::vector<glm::uvec3> faces;
     std::vector<glm::dvec3> normals;
 
-    double bbox_max;
+    glm::dvec3 bbox_min;
+    glm::dvec3 bbox_max;
 
     hqs_model_t(const char* file_name)
     {
@@ -52,10 +57,9 @@ struct hqs_model_t
         debug_msg("File %s parsed : vertices = %u, faces = %u", file_name, V, F);
     }
 
-    void normalize(double bbox_max)
+    void normalize(double m)
     {
-        hqs_model_t::bbox_max = bbox_max;
-        debug_msg("Normalizing the model :: bbox_max = %f.", bbox_max);
+        debug_msg("Normalizing the model :: max = %f.", m);
 
         glm::dvec3 mass_center;
         glm::dmat3 covariance_matrix;
@@ -70,29 +74,37 @@ struct hqs_model_t
 
         debug_msg("\tDiagonalizer = %s", glm::to_string(Q).c_str());
 
-        glm::dvec3 bbox = glm::dvec3(0.0);
+        bbox_min = glm::dvec3(0.0);
+        bbox_max = glm::dvec3(0.0);
 
         for (GLuint v = 0; v < V; ++v)
         {
             positions[v] = Q * (positions[v] - mass_center);
-            bbox = glm::max(bbox, glm::abs(positions[v]));
+            bbox_min = glm::min(bbox_min, positions[v]);
+            bbox_max = glm::max(bbox_max, positions[v]);
         }
 
-        double max_bbox = glm::max(bbox.x, glm::max(bbox.y, bbox.z));
-        double scale = bbox_max / max_bbox;
+        glm::dvec3 bbox = glm::max(-bbox_min, bbox_max);
+        double mcube = glm::max(bbox.x, glm::max(bbox.y, bbox.z));
+        double scale = m / mcube;
 
-        debug_msg("\tModel BBox = %s", glm::to_string(bbox).c_str());
-        debug_msg("\tBBox_max = %f. Maximum = %f. Scale = %f. Scaling ...", bbox_max, max_bbox, scale);
+        debug_msg("\tModel bbox :: min = %s, max = %s", glm::to_string(bbox_min).c_str(), glm::to_string(bbox_max).c_str());
+        debug_msg("\tScaling ... factor = %f", scale);
 
         covariance_matrix = (scale * scale) * (Q * covariance_matrix * Qt);
         debug_msg("\tCovariance matrix after normalization = %s", glm::to_string(covariance_matrix).c_str());
 
-        bbox = glm::dvec3(0.0);
+        bbox_min = glm::dvec3(0.0);
+        bbox_max = glm::dvec3(0.0);
         for (GLuint v = 0; v < V; ++v)
         {
             positions[v] = scale * positions[v];
-            bbox = glm::max(bbox, glm::abs(positions[v]));
+            bbox_min = glm::min(bbox_min, positions[v]);
+            bbox_max = glm::max(bbox_max, positions[v]);
         }
+
+        debug_msg("\tAfter scale bbox :: min = %s, max = %s", glm::to_string(bbox_min).c_str(), glm::to_string(bbox_max).c_str());
+        debug_msg("Normalizing the model :: done");
     }
 
     vao_t create_vao()
