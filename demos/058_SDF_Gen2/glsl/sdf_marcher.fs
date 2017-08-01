@@ -35,7 +35,7 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 float distance_field(vec3 p)
 {
-    vec3 q = 0.5f + inv_size * (p - bbox_center);
+    vec3 q = 0.5f + bbox_inv_size * (p - bbox_center);
     float r = texture(sdf_tex, q).x;
     return r;
 }
