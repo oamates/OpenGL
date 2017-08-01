@@ -10,6 +10,11 @@ uniform sampler2D tb_tex;
 uniform sampler3D sdf_tex;
 uniform samplerCube environment_tex;
 
+uniform vec3 bbox_half_size;
+uniform vec3 bbox_inv_size;
+uniform vec3 bbox_center;
+uniform vec3 bbox_min;
+
 out vec4 FragmentColor;
 
 //==============================================================================================================================================================
@@ -31,11 +36,9 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 float distance_field(vec3 p)
 {
-    vec3 q = 0.5f * p + 0.5f;
-    vec4 r = texture(sdf_tex, q);
-    //return r.x;
-    //r.xyz = normalize(r.xyz);
-    return dot(r, vec4(p, 1.0));     
+    vec3 q = bbox_inv_size * (p - bbox_min);
+    float r = texture(sdf_tex, q).x;
+    return r;
 }
 
 float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
@@ -46,7 +49,8 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
     for(int i = 0; i < maxSteps; ++i) 
     {
         float d = distance_field(position + direction * t);
-        if(d < 0.000125)
+
+        if(d < 0.0007125)
             return t;
         t += d;
 
@@ -58,29 +62,22 @@ float raymarch(vec3 position, vec3 direction, float min_t, float max_t)
 
 vec3 grad(vec3 p)
 {
-    // Note the slightly increased sampling distance, to alleviate artifacts due to hit point inaccuracies.
-    vec3 q = 0.5f * p + 0.5f;    
-    return normalize(texture(sdf_tex, q).rgb);
-    //vec2 e = vec2(0.0025, -0.0025); 
-    //return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
+    vec2 e = vec2(0.0014125, -0.0014125); 
+    return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
 void main()
 {
     vec3 direction = normalize(view);
 
-
-    // check if the ray intersects unit cube and find two intersections if it does
-
-    vec3 s = 1.0 / abs(direction);
-    vec3 r = camera_ws / direction;
-
-    vec4 a = vec4(-s - r, 0.0);
+    vec3 s = bbox_half_size / abs(direction);
+    vec3 r = (bbox_center - camera_ws) / direction;
+    vec4 a = vec4(r - s, 0.0);
     a.xy = max(a.xy, a.zw);
     float t0 = max(a.x, a.y);
 
-    vec3 b = s - r;
-    float t1 = min(b.x, min(b.y, b.z));
+    vec3 b = r + s;
+    float t1 = min(min(b.x, b.y), b.z);
 
     if (t0 >= t1)
     {

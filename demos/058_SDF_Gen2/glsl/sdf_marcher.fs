@@ -13,6 +13,7 @@ uniform samplerCube environment_tex;
 uniform vec3 bbox_half_size;
 uniform vec3 bbox_inv_size;
 uniform vec3 bbox_center;
+uniform vec3 bbox_min;
 
 out vec4 FragmentColor;
 
@@ -35,7 +36,7 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 float distance_field(vec3 p)
 {
-    vec3 q = 0.5f + bbox_inv_size * (p - bbox_center);
+    vec3 q = bbox_inv_size * (p - bbox_min);
     float r = texture(sdf_tex, q).x;
     return r;
 }
@@ -65,17 +66,12 @@ vec3 grad(vec3 p)
     return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
-
 void main()
 {
     vec3 direction = normalize(view);
 
-
-    // check if the ray intersects unit cube and find two intersections if it does
-
     vec3 s = bbox_half_size / abs(direction);
     vec3 r = (bbox_center - camera_ws) / direction;
-
     vec4 a = vec4(r - s, 0.0);
     a.xy = max(a.xy, a.zw);
     float t0 = max(a.x, a.y);

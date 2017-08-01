@@ -372,8 +372,23 @@ int main(int argc, char *argv[])
 
 //    texture3d_t demon_sdf(GL_TEXTURE2, "../../../resources/sdf/demon_rgba.sdf");
 
-    GLuint q = generate_dodecahedron_sdf(GL_TEXTURE2, 0.71319747, "sphere_rgba.sdf");
-    
+//    GLuint q = generate_dodecahedron_sdf(GL_TEXTURE2, 0.71319747, "sphere_rgba.sdf");
+
+    bbox_t bbox;
+    texture3d_t demon_sdf = texture3d_t::load_sdf(GL_TEXTURE2, "demon.sdf", bbox);
+
+    glm::dvec3 bbox_size = bbox.size;
+    glm::dvec3 bbox_center = bbox.center;
+    glm::dvec3 bbox_min = bbox_center - 0.5 * bbox_size;
+    glm::dvec3 bbox_max = bbox_center + 0.5 * bbox_size;    
+
+    debug_msg("SDF loaded :: bbox size = %s", glm::to_string(bbox_size).c_str());
+    debug_msg("              bbox center = %s", glm::to_string(bbox_center).c_str());
+
+    sdf_raymarch["bbox_min"] = glm::vec3(bbox_min);
+    sdf_raymarch["bbox_center"] = glm::vec3(bbox_center);
+    sdf_raymarch["bbox_half_size"] = glm::vec3(0.5 * bbox_size);
+    sdf_raymarch["bbox_inv_size"] = glm::vec3(1.0 / bbox_size);
 
     //===================================================================================================================================================================================================================
     // light variables

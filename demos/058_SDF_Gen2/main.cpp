@@ -67,6 +67,7 @@ struct demo_window_t : public glfw_window_t
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+
     if(argc != 4)
     {
         printf("Usage :: %s <filename> <delta> <padding> ", argv[0]);
@@ -92,7 +93,7 @@ int main(int argc, char *argv[])
         printf("Error parsing delta argument, using default value :: delta = %f\n", delta);
     }
 
-    int padding = 3;
+    int padding = 2;
     if(sscanf(argv[3], "%u", &padding) != 1)
     {
         printf("Error parsing padding argument, using default value :: padding = %f\n", delta);
@@ -103,7 +104,7 @@ int main(int argc, char *argv[])
     model.sort_faces_by_area();
     
     double inv_delta = 1.0 / delta;
-    glm::ivec3 sizes = glm::ivec3(glm::ceil(inv_delta * (model.bbox_max - model.bbox_min)));
+    glm::ivec3 sizes = glm::ivec3(glm::ceil(inv_delta * (model.bbox_max - model.bbox_min))) + 2 * glm::ivec3(padding);
 
     glm::dvec3 bbox_size = glm::dvec3(sizes) * delta;
     glm::dvec3 bbox_center = 0.5 * (model.bbox_max + model.bbox_min);
@@ -115,7 +116,8 @@ int main(int argc, char *argv[])
     debug_msg("Centralized bbox max :: %s", glm::to_string(bbox_max).c_str());
     debug_msg("Computing signed distance field ... ");
 
-    array3d<double> distance_field = make_level_set3(model.faces, model.positions, model.bbox_min, delta, sizes, padding);
+    array3d<double> distance_field = make_level_set3(model.faces, model.positions, bbox_min, delta, sizes, padding);
+
 
     //===================================================================================================================================================================================================================
     // initialize GLFW library
@@ -146,13 +148,25 @@ int main(int argc, char *argv[])
         .type = GL_FLOAT,
         .size = sizes,
         .data_size = data_size
-    };  
+    };
+
+    bbox_t bbox = 
+    {
+        .center = bbox_center,
+        .size = bbox_size        
+    };
+
+    sdf_header_t sdf_header
+    {
+        .tex3d_header = header,
+        .bbox = bbox
+    };
 
     std::string outname = filename.substr(0, filename.size() - 4) + std::string(".sdf");
     debug_msg("Writing results to: %s", outname.c_str());
 
     FILE* f = fopen(outname.c_str(), "wb");
-    fwrite(&header, sizeof(tex3d_header_t), 1, f);
+    fwrite(&sdf_header, sizeof(sdf_header_t), 1, f);
     fwrite(tex_data, data_size, 1, f);
     fclose(f);
 
@@ -160,6 +174,7 @@ int main(int argc, char *argv[])
     free(tex_data);
 
     debug_msg("Processing complete.");
+
 
 
     //===================================================================================================================================================================================================================
@@ -181,6 +196,7 @@ int main(int argc, char *argv[])
     sdf_raymarch["environment_tex"] = 1;
     sdf_raymarch["sdf_tex"] = 2;
 
+    sdf_raymarch["bbox_min"] = glm::vec3(bbox_min);
     sdf_raymarch["bbox_center"] = glm::vec3(bbox_center);
     sdf_raymarch["bbox_half_size"] = glm::vec3(0.5 * bbox_size);
     sdf_raymarch["bbox_inv_size"] = glm::vec3(1.0 / bbox_size);
@@ -201,7 +217,7 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
-//    texture3d_t demon_sdf(GL_TEXTURE2, "demon.sdf");
+    texture3d_t demon_sdf(GL_TEXTURE2, "demon.sdf");
 
     //===================================================================================================================================================================================================================
     // light variables
