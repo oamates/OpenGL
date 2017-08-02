@@ -22,7 +22,6 @@ out vec4 FragmentColor;
 //==============================================================================================================================================================
 vec3 tex3d(vec3 p)
 {
-    return vec3(0.75, 0.75, 0.41);
     vec3 q = max(abs(normalize(p)) - 0.35, 0.0);
     q /= dot(q, vec3(1.0));
     vec3 tx = texture(tb_tex, p.zy).rgb;
@@ -34,6 +33,24 @@ vec3 tex3d(vec3 p)
 //==============================================================================================================================================================
 // volume marcher/blender function
 //==============================================================================================================================================================
+vec2 csqr(vec2 a)
+    { return vec2(a.x * a.x - a.y * a.y, 2.0f * a.x * a.y); }
+
+float map(in vec3 p)
+{
+    float res = 0.0f;
+    vec3 c = p;
+    for (int i = 0; i < 6; ++i) 
+    {
+        p = 0.7f * (abs(p) / dot(p, p)) - 0.7f;
+        p.yz = csqr(p.yz);
+        p = p.zxy;
+        res += exp(-19.0f * abs(dot(p, c)));
+        
+    }
+    return 0.5f * res;
+}
+
 float distance_field(vec3 p)
 {
     vec3 q = bbox_inv_size * (p - bbox_min);
@@ -66,6 +83,28 @@ vec3 grad(vec3 p)
     return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
+vec4 crystal_march(vec3 position, vec3 ray)
+{
+    float alpha = 0.0;
+    float t = 0.0f;
+    float dt = 0.125f;
+    vec3 color = vec3(0.0f);
+    float c = 0.0f;
+    for(int i = 0; i < 40; i++)
+    {
+        t += dt * exp(-2.0f * c);
+        vec3 p = position + t * ray;
+        if (distance_field(p) > 0.0)
+            break;        
+        float q = pow(0.4 * length(p), 1.4);
+        c = q * map(0.25 * p);
+        color = 0.97f * color + vec3(0.1f, 0.08f, 0.06f) * pow(vec3(c), vec3(0.75, 1.21, 2.11));
+        alpha = max(alpha, q);
+    }    
+    return vec4(log(1.0 + 1.25 * color), alpha);
+}
+
+
 void main()
 {
     vec3 direction = normalize(view);
@@ -78,30 +117,24 @@ void main()
 
     vec3 b = r + s;
     float t1 = min(min(b.x, b.y), b.z);
+    FragmentColor = texture(environment_tex, view);
 
-    if (t0 >= t1)
-    {
-        FragmentColor = texture(environment_tex, view);
-        return;        
-    }
-
+    if (t0 >= t1) return;
     float t = raymarch(camera_ws, direction, t0, t1);
-    if (t < 0.0)
-    {
-        FragmentColor = texture(environment_tex, view);
-        return;
-    }
+    if (t < 0.0) return;
+
 
     vec3 position_ws = camera_ws + t * direction;
     vec3 normal_ws = grad(position_ws);
+
+    vec4 color = crystal_march(position_ws, view);
 
     vec3 n = normalize(normal_ws);
     vec3 light = light_ws - position_ws;
     vec3 l = normalize(light);
     vec3 v = -direction;
 
-    vec3 color = tex3d(position_ws);
-    vec3 diffuse = (0.6f + 0.4f * dot(n, l)) * color.rgb;
+    vec3 diffuse = (0.5f + 0.5f * dot(n, l)) * color.rgb;
 
     vec3 h = normalize(l + v);
     const float Ks = 0.85f;
@@ -109,5 +142,5 @@ void main()
     float specular = Ks * pow(max(dot(n, h), 0.0), Ns);
 
     vec3 c = diffuse + vec3(specular);
-    FragmentColor = vec4(c, 1.0);
+    FragmentColor = mix(FragmentColor, c, color.a);
 }

@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
-    texture3d_t demon_sdf(GL_TEXTURE2, "demon.sdf");
+    //texture3d_t demon_sdf(GL_TEXTURE2, "demon.sdf");
 
     //===================================================================================================================================================================================================================
     // light variables

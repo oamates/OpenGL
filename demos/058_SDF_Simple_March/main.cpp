@@ -415,7 +415,7 @@ int main(int argc, char *argv[])
         glm::mat3 camera_matrix;
         glm::vec3 camera_ws;
 
-if (0 != 0) {
+if (0 == 0) {
 
 
         float radius = 2.65f + 1.15f * glm::cos(0.25f * time);
