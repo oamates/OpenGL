@@ -27,33 +27,24 @@ vec3 tex3d(vec3 p)
     vec3 tx = texture(tb_tex, p.zy).rgb;
     vec3 ty = texture(tb_tex, p.xz).rgb;
     vec3 tz = texture(tb_tex, p.xy).rgb;
-    return sqrt(tx * tx * q.x + ty * ty * q.y + tz * tz * q.z);
+    return tx * tx * q.x + ty * ty * q.y + tz * tz * q.z;
 }
 
 //==============================================================================================================================================================
 // volume marcher/blender function
 //==============================================================================================================================================================
-vec2 csqr(vec2 a)
-    { return vec2(a.x * a.x - a.y * a.y, 2.0f * a.x * a.y); }
-
-float map(in vec3 p)
+float alpha_func(vec3 p)
 {
-    float res = 0.0f;
-    vec3 c = p;
-    for (int i = 0; i < 6; ++i) 
-    {
-        p = 0.7f * (abs(p) / dot(p, p)) - 0.7f;
-        p.yz = csqr(p.yz);
-        p = p.zxy;
-        res += exp(-16.0f * abs(dot(p, c)));
-        
-    }
-    return 0.5f * res;
+    vec3 q1 = cos(5.11 * p);
+    vec3 q2 = cos(12.17 * p + 13.45);
+    float q = 0.147 * dot(q1, q1) + 0.073 * dot(q2, q2);
+    return 1.55 * q * q;
 }
 
 float distance_field(vec3 p)
 {
     vec3 q = bbox_inv_size * (p - bbox_min);
+    q.y = 1.0 - q.y;
     float r = texture(sdf_tex, q).x;
     return r;
 }
@@ -64,40 +55,40 @@ vec3 grad(vec3 p)
     return normalize(e.xyy * distance_field(p + e.xyy) + e.yyx * distance_field(p + e.yyx) + e.yxy * distance_field(p + e.yxy) + e.xxx * distance_field(p + e.xxx));
 }
 
-vec4 multilayer_crystal_march(in vec3 position, in vec3 direction, in float min_t, in float max_t, out float t)
+vec4 multilayer_march(in vec3 position, in vec3 direction, in float min_t, in float max_t, out float t)
 {
-    float alpha = 0.0;
-    const int maxSteps = 256;
-    t = min_t;
-    float dt = 0.0625f;
+    const float min_step = 0.0009765625;
+    const float min_alpha = 0.001953125;
 
-    int i = 0;
-    float c = 0.0f;
+    float alpha_c = 1.0;
+    float ct = min_t;
+    float dt = 0.025f;
+    t = -1.0;
+
     vec3 color = vec3(0.0f);
 
-    while((i < maxSteps) && (t < max_t))
+    while((ct < max_t) && (alpha_c > min_alpha))
     {
-        vec3 p = position + t * direction;
+        vec3 p = position + ct * direction;
         float d = distance_field(p);
 
         if (d > 0)
         {
             // outside the surface
-            c = 0.0f;
+            ct += max(d, min_step);
+            continue;
         }
-        else
-        {
-            // inside the surface
-            c = map(1.25 * p);
-            c *= c;
-            color = 0.97f * color + vec3(c, c * c, c * c * c);
+        if (t < 0) t = ct;
+        
+        // inside the surface
+        float a = alpha_func(p);
+        vec3 rgb = tex3d(p);
 
-        }
-        t += max(d * exp(-2.0f * c), 0.003125);
-        alpha = max(alpha, c);
+        alpha_c *= (1.0 - a);
+        color += alpha_c * rgb;
+        ct += max(dt * exp2(-2.0f * a), min_step);
     }
-
-    return vec4(color, alpha);
+    return vec4(color, alpha_c);
 }
 
 void main()
@@ -117,12 +108,11 @@ void main()
     if (t0 >= t1) return;
 
     float t;
-    vec4 color = multilayer_crystal_march(camera_ws, direction, t0, t1, t);
+    vec4 color = multilayer_march(camera_ws, direction, t0, t1, t);
 
     vec3 position_ws = camera_ws + t * direction;
-    vec3 normal_ws = grad(position_ws);
+    vec3 n = grad(position_ws);
 
-    vec3 n = normalize(normal_ws);
     vec3 light = light_ws - position_ws;
     vec3 l = normalize(light);
     vec3 v = -direction;
@@ -130,10 +120,10 @@ void main()
     vec3 diffuse = (0.5f + 0.5f * dot(n, l)) * color.rgb;
 
     vec3 h = normalize(l + v);
-    const float Ks = 0.85f;
+    const float Ks = 0.15f;
     const float Ns = 70.0f;
     float specular = Ks * pow(max(dot(n, h), 0.0), Ns);
 
-    vec4 c = vec4(diffuse + vec3(specular), 1.0f);
-    FragmentColor = mix(FragmentColor, c, color.a);
+    vec3 c = diffuse + vec3(specular);
+    FragmentColor.rgb = diffuse + color.a * FragmentColor.rgb;
 }

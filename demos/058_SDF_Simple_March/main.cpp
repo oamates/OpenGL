@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
     // load textures
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/metal.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     
     glActiveTexture(GL_TEXTURE1);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -369,10 +369,6 @@ int main(int argc, char *argv[])
                                    "../../../resources/cubemap/sunset/positive_z.png",
                                    "../../../resources/cubemap/sunset/negative_z.png"};
     GLuint env_tex_id = image::png::cubemap(sunset_files);
-
-//    texture3d_t demon_sdf(GL_TEXTURE2, "../../../resources/sdf/demon_rgba.sdf");
-
-//    GLuint q = generate_dodecahedron_sdf(GL_TEXTURE2, 0.71319747, "sphere_rgba.sdf");
 
     bbox_t bbox;
     texture3d_t demon_sdf = texture3d_t::load_sdf(GL_TEXTURE2, "demon.sdf", bbox);
@@ -409,7 +405,7 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT);
 
         float time = 0.55 * window.frame_ts;
-        glm::vec3 light_ws = glm::vec3(10.0f, 2.0f * glm::cos(time), 3.0f * glm::sin(time));
+        glm::vec3 light_ws = glm::vec3(12.5f, 1.5f * glm::cos(time), 1.5f * glm::sin(time));
 
         glm::mat4 cmatrix4x4;
         glm::mat3 camera_matrix;
