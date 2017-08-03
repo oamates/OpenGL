@@ -22,24 +22,40 @@ out vec4 FragmentColor;
 //==============================================================================================================================================================
 vec3 tex3d(vec3 p)
 {
-    vec3 q = max(abs(normalize(p)) - 0.35, 0.0);
+    vec3 q = max(abs(normalize(cos(2.3 * p) + 0.5 * cos(4.7 * p))) - 0.17, 0.0);
     q /= dot(q, vec3(1.0));
+    p *= 2.5;
     vec3 tx = texture(tb_tex, p.zy).rgb;
     vec3 ty = texture(tb_tex, p.xz).rgb;
     vec3 tz = texture(tb_tex, p.xy).rgb;
-    return tx * tx * q.x + ty * ty * q.y + tz * tz * q.z;
+    return pow(tx * tx * q.x + ty * ty * q.y + tz * tz * q.z, 0.65 * vec3(1.05, 1.15, 1.25));
 }
 
 //==============================================================================================================================================================
 // volume marcher/blender function
 //==============================================================================================================================================================
-float alpha_func(vec3 p)
+vec3 tri(in vec3 x)
+    { return abs(fract(x) - 0.5); }
+
+float alpha_func2(vec3 p)
 {
     vec3 q1 = cos(5.11 * p);
     vec3 q2 = cos(12.17 * p + 13.45);
-    float q = 0.147 * dot(q1, q1) + 0.073 * dot(q2, q2);
-    return 1.55 * q * q;
+    float q = dot(q1, q1) + 0.51 * dot(q2, q2);
+    return 0.031 * q * q;
 }
+
+float alpha_func(vec3 p)
+{
+    p *= 14.0;    
+    vec3 w = p;
+    vec3 op = tri(p * 1.1 + tri(p.zxy * 1.1));
+    p += (op - 0.25) * 0.3;
+    p = cos(p * 0.315 * 1.41 + sin(p.zxy * 0.875 * 1.27));
+    float a = 0.45 * abs(length(p) - 1.05);
+    return a;
+}
+
 
 float distance_field(vec3 p)
 {
@@ -62,7 +78,7 @@ vec4 multilayer_march(in vec3 position, in vec3 direction, in float min_t, in fl
 
     float alpha_c = 1.0;
     float ct = min_t;
-    float dt = 0.025f;
+    float dt = 0.0105f;
     t = -1.0;
 
     vec3 color = vec3(0.0f);
@@ -82,7 +98,7 @@ vec4 multilayer_march(in vec3 position, in vec3 direction, in float min_t, in fl
         
         // inside the surface
         float a = alpha_func(p);
-        vec3 rgb = tex3d(p);
+        vec3 rgb = tex3d(p) * pow(a, 0.25);
 
         alpha_c *= (1.0 - a);
         color += alpha_c * rgb;
@@ -117,7 +133,7 @@ void main()
     vec3 l = normalize(light);
     vec3 v = -direction;
 
-    vec3 diffuse = (0.5f + 0.5f * dot(n, l)) * color.rgb;
+    vec3 diffuse = (0.75f + 0.25f * dot(n, l)) * color.rgb;
 
     vec3 h = normalize(l + v);
     const float Ks = 0.15f;

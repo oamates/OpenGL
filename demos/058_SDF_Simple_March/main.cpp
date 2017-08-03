@@ -51,13 +51,18 @@ struct demo_window_t : public glfw_window_t
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
 };
-
-
-GLuint generate_spheric_sdf(GLenum texture_unit, double radius, const char* file_name)
+/*
+//===================================================================================================================================================================================================================
+// procedural generator of sdf texture of the type GL_R32F
+// optionally saves generated data to file
+//===================================================================================================================================================================================================================
+template<typename field_generator_func_t, int threads> texture3d_t generate_sdf(GLenum texture_unit, const glm::ivec3& size, const bbox_t& bbox, const char* file_name = 0)
 {
     //===============================================================================================================================================================================================================
     // create 3d texture of the type GL_R32F
     //===============================================================================================================================================================================================================
+    texture3d_t texture;
+
     GLuint texture_id;
     glActiveTexture(texture_unit);
     glGenTextures(1, &texture_id);
@@ -69,10 +74,21 @@ GLuint generate_spheric_sdf(GLenum texture_unit, double radius, const char* file
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
+struct bbox_t
+{
+    glm::dvec3 center;
+    glm::dvec3 size;
+};
+
+
+    bbox.center + (bbox.size / (size - 1)) * (i, j, k);
+
+
+
     const int p2 = 256;
     const int texture_size = p2 * p2 * p2;
 
-    glm::vec4* texture_data = (glm::vec4*) malloc(texture_size * sizeof(glm::vec4));
+    float* texture_data = (float*) malloc(texture_size * sizeof(float));
 
     int index = 0;
     double scale = 1.0 / p2;
@@ -104,12 +120,13 @@ GLuint generate_spheric_sdf(GLenum texture_unit, double radius, const char* file
         fclose(f);
     }
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, p2, p2, p2, 0, GL_RGBA, GL_FLOAT, texture_data);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, size.x, size.y, size.z, 0, GL_RED, GL_FLOAT, texture_data);
 
     free(texture_data);
-    return texture_id;
-}
+    return texture;
 
+}
+*/
 
 GLuint generate_spheric_udf(GLenum texture_unit, double radius, const char* file_name)
 {
@@ -358,7 +375,7 @@ int main(int argc, char *argv[])
     // load textures
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/metal.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     
     glActiveTexture(GL_TEXTURE1);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -405,7 +422,7 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT);
 
         float time = 0.55 * window.frame_ts;
-        glm::vec3 light_ws = glm::vec3(12.5f, 1.5f * glm::cos(time), 1.5f * glm::sin(time));
+        glm::vec3 light_ws = glm::vec3(12.5f, 1.75f * glm::cos(time), 1.75f * glm::sin(time));
 
         glm::mat4 cmatrix4x4;
         glm::mat3 camera_matrix;
@@ -414,9 +431,9 @@ int main(int argc, char *argv[])
 if (0 == 0) {
 
 
-        float radius = 2.65f + 1.15f * glm::cos(0.25f * time);
-        float z = 0.35f * glm::sin(0.25f * time);
-        camera_ws = glm::vec3(radius * glm::cos(0.3f * time), z, radius * glm::sin(0.3f * time));
+        float radius = 2.05f + 0.75f * glm::cos(0.173f * time);
+        float z = -0.35f + 0.35f * glm::sin(0.191f * time);
+        camera_ws = glm::vec3(radius * glm::cos(0.314f * time), z, radius * glm::sin(0.314f * time));
         glm::vec3 up = glm::normalize(glm::vec3(glm::cos(0.41 * time), -6.0f, glm::sin(0.41 * time)));
         glm::mat4 view_matrix = glm::lookAt(camera_ws, glm::vec3(0.0f), up);
         cmatrix4x4 = glm::inverse(view_matrix);
