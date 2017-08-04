@@ -51,287 +51,130 @@ struct demo_window_t : public glfw_window_t
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
 };
-/*
+
 //===================================================================================================================================================================================================================
 // procedural generator of sdf texture of the type GL_R32F
 // optionally saves generated data to file
 //===================================================================================================================================================================================================================
-template<typename field_generator_func_t, int threads> texture3d_t generate_sdf(GLenum texture_unit, const glm::ivec3& size, const bbox_t& bbox, const char* file_name = 0)
+struct proc_sdf_compute_data_t
 {
-    //===============================================================================================================================================================================================================
-    // create 3d texture of the type GL_R32F
-    //===============================================================================================================================================================================================================
-    texture3d_t texture;
-
-    GLuint texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_3D, texture_id);
-
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-struct bbox_t
-{
-    glm::dvec3 center;
-    glm::dvec3 size;
+    glm::ivec3 size;
+    glm::dvec3 bbox_base;
+    glm::dvec3 bbox_cell;    
 };
 
+template<typename field_generator_func_t> void fill_sdf_chunk(proc_sdf_compute_data_t* compute_data, int z_min, int z_max, float* texture_data_chunk)
+{
+    field_generator_func_t generator_func;
+    float* texture_data_ptr = texture_data_chunk;
 
-    bbox.center + (bbox.size / (size - 1)) * (i, j, k);
-
-
-
-    const int p2 = 256;
-    const int texture_size = p2 * p2 * p2;
-
-    float* texture_data = (float*) malloc(texture_size * sizeof(float));
-
-    int index = 0;
-    double scale = 1.0 / p2;
-
-    for(int w = -p2 + 1; w <= p2 - 1; w += 2)
-        for(int v = -p2 + 1; v <= p2 - 1; v += 2)
-            for(int u = -p2 + 1; u <= p2 - 1; u += 2)
+    for(int z = z_min; z < z_max; ++z)
+        for(int y = 0; y < compute_data->size.y; ++y)
+            for(int x = 0; x < compute_data->size.x; ++x)
             {
-                glm::dvec3 p = scale * glm::dvec3(u, v, w);
-                glm::dvec4 q = glm::dvec4(glm::normalize(p), -radius);
-                texture_data[index++] = glm::vec4(q);
+                glm::dvec3 p = compute_data->bbox_base + compute_data->bbox_cell * glm::dvec3(x, y, z);
+                *texture_data_ptr = generator_func(p);
+                ++texture_data_ptr;
             }
+}
+
+template<typename field_generator_func_t, int threads> texture3d_t generate_sdf(GLenum texture_unit, const glm::ivec3& size, const bbox_t& bbox, const char* file_name = 0)
+{
+    int z_per_thread = size.z / threads; 
+    int z_extra = size.z % threads; 
+
+    glm::dvec3 bbox_cell = bbox.size / glm::dvec3(size - 1);
+
+    proc_sdf_compute_data_t compute_data = 
+    {
+        .size = size,
+        .bbox_base = bbox.center - 0.5 * bbox.size,
+        .bbox_cell = bbox_cell
+    };
+
+    const int z_layer_size = size.x * size.y;
+    const int texture_size = z_layer_size * size.z;
+    const int data_size = texture_size * sizeof(float);
+
+    float* texture_data = (float*) malloc(data_size);
+    float* texture_data_chunk = texture_data;
+
+    std::thread computation_thread[threads - 1];
+
+    GLuint z_min = 0;
+    for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+    {
+        GLuint z_max = z_min + z_per_thread + GLint(thread_id < z_extra);
+        debug_msg("Launching thread #%u. Z-interval: [%u, %u].", thread_id, z_min, z_max);
+        computation_thread[thread_id] = std::thread(fill_sdf_chunk<field_generator_func_t>, &compute_data, z_min, z_max, texture_data_chunk);
+        z_min = z_max;
+        texture_data_chunk += z_layer_size;
+    }    
+
+    debug_msg("Main thread :: Z-interval: [%u, %u].", z_min, size.z);
+    fill_sdf_chunk<field_generator_func_t>(&compute_data, z_min, size.z, texture_data_chunk);
+
+    for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+        computation_thread[thread_id].join();
+
+    tex3d_header_t tex3d_header = 
+    {
+        .target = GL_TEXTURE_3D,
+        .internal_format = GL_R32F,
+        .format = GL_RED,
+        .type = GL_FLOAT,
+        .size = size,
+        .data_size = data_size
+    };
+
+    sdf_header_t sdf_header
+    {
+        .tex3d_header = tex3d_header,
+        .bbox = bbox
+    };
 
     if (file_name)
     {
-        tex3d_header_t header 
-        {
-            .target = GL_TEXTURE_3D,
-            .internal_format = GL_RGBA32F,
-            .format = GL_RGBA,
-            .type = GL_FLOAT,
-            .size = glm::ivec3(p2, p2, p2),
-            .data_size = (uint32_t) texture_size * sizeof(glm::vec4)
-        };  
-
+        debug_msg("Writing results to: %s", file_name);
         FILE* f = fopen(file_name, "wb");
-        fwrite(&header, sizeof(tex3d_header_t), 1, f);
-        fwrite(texture_data, header.data_size, 1, f);
+        fwrite(&sdf_header, sizeof(sdf_header_t), 1, f);
+        fwrite(texture_data, data_size, 1, f);
         fclose(f);
     }
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, size.x, size.y, size.z, 0, GL_RED, GL_FLOAT, texture_data);
-
+    texture3d_t texture = texture3d_t(texture_unit, tex3d_header, texture_data);
     free(texture_data);
     return texture;
-
 }
-*/
 
-GLuint generate_spheric_udf(GLenum texture_unit, double radius, const char* file_name)
+struct signed_distance_field
 {
-    //===============================================================================================================================================================================================================
-    // create 3d texture of the type GL_R32F
-    //===============================================================================================================================================================================================================
-    GLuint texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_3D, texture_id);
-
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    const int p2 = 256;
-    const int texture_size = p2 * p2 * p2;
-
-    float* texture_data = (float*) malloc(texture_size * sizeof(float));
-
-    int index = 0;
-    double scale = 1.0 / p2;
-
-    for(int w = -p2 + 1; w <= p2 - 1; w += 2)
-        for(int v = -p2 + 1; v <= p2 - 1; v += 2)
-            for(int u = -p2 + 1; u <= p2 - 1; u += 2)
-            {
-                glm::dvec3 p = scale * glm::dvec3(u, v, w);
-                //texture_data[index++] = glm::length(p) - radius;
-                texture_data[index++] = glm::max(glm::max(glm::abs(p.x), glm::abs(p.y)), glm::abs(p.z)) - radius;
-            }
-
-    if (file_name)
+    float operator () (const glm::dvec3& p)
     {
-        tex3d_header_t header 
-        {
-            .target = GL_TEXTURE_3D,
-            .internal_format = GL_R32F,
-            .format = GL_RED,
-            .type = GL_FLOAT,
-            .size = glm::ivec3(p2, p2, p2),
-            .data_size = (uint32_t) texture_size * sizeof(glm::vec4)
-        };  
-
-        FILE* f = fopen(file_name, "wb");
-        fwrite(&header, sizeof(tex3d_header_t), 1, f);
-        fwrite(texture_data, header.data_size, 1, f);
-        fclose(f);
+        return sphere_sdf(p);
     }
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
-
-    free(texture_data);
-    return texture_id;
-}
-
-
-double sdf(const glm::dvec3& p)
-{
-    const double phi = 1.618033988749894848204586834365638117720309179805762862135; // (sqrt(5) + 1) / 2
-    const double psi = 1.511522628152341460960267404050002785276889577787122118459; // (sqrt(5) + 3) / (2 * sqrt(3))
-    glm::dvec3 q = glm::abs(p);
-    glm::dvec3 l = q + phi * glm::dvec3(q.y, q.z, q.x);
-    return 0.5 * glm::max(l.x, glm::max(l.y, l.z)) - 0.5 * psi;
-}
-
-glm::dvec3 grad(const glm::dvec3& p)
-{
-    const double delta = 0.125 * 0.00048828125;
-    const double inv_delta2 = 8.0 * 1024.0;
-    glm::dvec3 dF = glm::dvec3(
-                        sdf(glm::dvec3(p.x + delta, p.y, p.z)) - sdf(glm::dvec3(p.x - delta, p.y, p.z)),
-                        sdf(glm::dvec3(p.x, p.y + delta, p.z)) - sdf(glm::dvec3(p.x, p.y - delta, p.z)),
-                        sdf(glm::dvec3(p.x, p.y, p.z + delta)) - sdf(glm::dvec3(p.x, p.y, p.z - delta))
-                    );
-
-    return inv_delta2 * dF;
-}
-
-GLuint generate_dodecahedron_sdf(GLenum texture_unit, double radius, const char* file_name)
-{
-    const double phi = 1.618033988749894848204586834365638117720309179805762862135; // (sqrt(5) + 1) / 2
-    const double psi = 1.511522628152341460960267404050002785276889577787122118459; // (sqrt(5) + 3) / (2 * sqrt(3))
-
-    //===============================================================================================================================================================================================================
-    // create 3d texture of the type GL_R32F
-    //===============================================================================================================================================================================================================
-    GLuint texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_3D, texture_id);
-
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    const int p2 = 256;
-    const int texture_size = p2 * p2 * p2;
-
-    glm::vec4* texture_data = (glm::vec4*) malloc(texture_size * sizeof(glm::vec4));
-
-    int index = 0;
-    double scale = 1.0 / p2;
-
-    for(int w = -p2 + 1; w <= p2 - 1; w += 2)
-        for(int v = -p2 + 1; v <= p2 - 1; v += 2)
-            for(int u = -p2 + 1; u <= p2 - 1; u += 2)
-            {
-                glm::dvec3 p = scale * glm::dvec3(u, v, w);
-
-                double value = sdf(p);
-                glm::dvec3 q = grad(p);
-
-                glm::dvec4 w = glm::dvec4(q, value - glm::dot(q, p));
-                texture_data[index++] = glm::vec4(w);
-            }
-
-    if (file_name)
+    double cube_sdf (const glm::dvec3& p)
     {
-        tex3d_header_t header 
-        {
-            .target = GL_TEXTURE_3D,
-            .internal_format = GL_RGBA32F,
-            .format = GL_RGBA,
-            .type = GL_FLOAT,
-            .size = glm::ivec3(p2, p2, p2),
-            .data_size = (uint32_t) texture_size * sizeof(glm::vec4)
-        };  
-
-        FILE* f = fopen(file_name, "wb");
-        fwrite(&header, sizeof(tex3d_header_t), 1, f);
-        fwrite(texture_data, header.data_size, 1, f);
-        fclose(f);
+        const double size = 0.5;
+        return glm::max(glm::max(glm::abs(p.x), glm::abs(p.y)), glm::abs(p.z)) - size;
     }
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, p2, p2, p2, 0, GL_RGBA, GL_FLOAT, texture_data);
-
-    free(texture_data);
-    return texture_id;
-}
-
-GLuint generate_dodecahedron_udf(GLenum texture_unit, double radius, const char* file_name)
-{
-    const double phi = 1.618033988749894848204586834365638117720309179805762862135; // (sqrt(5) + 1) / 2
-    const double psi = 1.511522628152341460960267404050002785276889577787122118459; // (sqrt(5) + 3) / (2 * sqrt(3))
-
-    //===============================================================================================================================================================================================================
-    // create 3d texture of the type GL_R32F
-    //===============================================================================================================================================================================================================
-    GLuint texture_id;
-    glActiveTexture(texture_unit);
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_3D, texture_id);
-
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    const int p2 = 256;
-    const int texture_size = p2 * p2 * p2;
-
-    float* texture_data = (float*) malloc(texture_size * sizeof(float));
-
-    int index = 0;
-    double scale = 1.0 / p2;
-
-    for(int w = -p2 + 1; w <= p2 - 1; w += 2)
-        for(int v = -p2 + 1; v <= p2 - 1; v += 2)
-            for(int u = -p2 + 1; u <= p2 - 1; u += 2)
-            {
-                glm::dvec3 p = scale * glm::dvec3(u, v, w);
-                glm::dvec3 q = glm::abs(p);
-                glm::dvec3 l = q + phi * glm::dvec3(q.y, q.z, q.x);
-                texture_data[index++] = 0.5 * glm::max(l.x, glm::max(l.y, l.z)) - 0.5 * psi;
-            }
-
-    if (file_name)
+    double sphere_sdf(const glm::dvec3& p)
     {
-        tex3d_header_t header 
-        {
-            .target = GL_TEXTURE_3D,
-            .internal_format = GL_R32F,
-            .format = GL_RED,
-            .type = GL_FLOAT,
-            .size = glm::ivec3(p2, p2, p2),
-            .data_size = (uint32_t) texture_size * sizeof(float)
-        };  
-
-        FILE* f = fopen(file_name, "wb");
-        fwrite(&header, sizeof(tex3d_header_t), 1, f);
-        fwrite(texture_data, header.data_size, 1, f);
-        fclose(f);
+        const double radius = 0.5;
+        return glm::length(p) - radius;
     }
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
-
-    free(texture_data);
-    return texture_id;
-}
+    double dodecahedron_sdf(const glm::dvec3& p)
+    {
+        const double phi = 1.618033988749894848204586834365638117720309179805762862135; // (sqrt(5) + 1) / 2
+        const double psi = 1.511522628152341460960267404050002785276889577787122118459; // (sqrt(5) + 3) / (2 * sqrt(3))
+        glm::dvec3 q = glm::abs(p);
+        glm::dvec3 l = q + phi * glm::dvec3(q.y, q.z, q.x);
+        return 0.5 * glm::max(l.x, glm::max(l.y, l.z)) - 0.5 * psi;
+    }
+};
 
 
 //=======================================================================================================================================================================================================================
@@ -375,7 +218,7 @@ int main(int argc, char *argv[])
     // load textures
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/metal.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     
     glActiveTexture(GL_TEXTURE1);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -388,10 +231,19 @@ int main(int argc, char *argv[])
     GLuint env_tex_id = image::png::cubemap(sunset_files);
 
     bbox_t bbox;
-    texture3d_t demon_sdf = texture3d_t::load_sdf(GL_TEXTURE2, "demon.sdf", bbox);
 
+/*
+    texture3d_t demon_sdf = texture3d_t::load_sdf(GL_TEXTURE2, "demon.sdf", bbox);
     glm::dvec3 bbox_size = bbox.size;
     glm::dvec3 bbox_center = bbox.center;
+*/
+
+
+    glm::dvec3 bbox_size = glm::dvec3(2.0f);
+    glm::dvec3 bbox_center = glm::dvec3(0.0f);
+    texture3d_t demon_sdf = generate_sdf<signed_distance_field, 8>(GL_TEXTURE2, glm::ivec3(256), bbox, "dodecahedron.sdf");
+
+
     glm::dvec3 bbox_min = bbox_center - 0.5 * bbox_size;
     glm::dvec3 bbox_max = bbox_center + 0.5 * bbox_size;    
 

@@ -71,10 +71,11 @@ struct texture3d_t
 
     texture3d_t& operator = (texture3d_t&& rhs)
     {
-        std::swap(id, rhs.id);
+        id = rhs.id;
         size = rhs.size;
         texture_unit = rhs.texture_unit;
         internal_format = rhs.internal_format;
+        rhs.id = 0;
         return *this;
     }
 
