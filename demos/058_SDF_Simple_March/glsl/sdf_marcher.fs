@@ -52,7 +52,7 @@ float alpha_func(vec3 p)
     vec3 op = tri(p * 1.1 + tri(p.zxy * 1.1));
     p += (op - 0.25) * 0.3;
     p = cos(p * 0.315 * 1.41 + sin(p.zxy * 0.875 * 1.27));
-    float a = 0.35 * abs(length(p) - 1.05);
+    float a = 0.31 * abs(length(p) - 1.05);
     return a;
 }
 

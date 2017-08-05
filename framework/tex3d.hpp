@@ -88,6 +88,9 @@ struct texture3d_t
         rhs.id = 0;
     }
 
+    texture3d_t& operator = (const texture3d_t&) = delete;
+    texture3d_t(const texture3d_t&) = delete;
+
     texture3d_t(GLenum texture_unit, tex3d_header_t& header, const GLvoid* data)
         : size(header.size),
           texture_unit(texture_unit),
@@ -105,6 +108,8 @@ struct texture3d_t
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
         glTexImage3D(GL_TEXTURE_3D, 0, internal_format, size.x, size.y, size.z, 0, header.format, header.type, data);
+        debug_msg("Calling glTexImage3D(GL_TEXTURE_3D, 0, %u, %u, %u, %u, 0, %u, %u, %p)",
+            internal_format, size.x, size.y, size.z, header.format, header.type, data);
     }
 
     texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)

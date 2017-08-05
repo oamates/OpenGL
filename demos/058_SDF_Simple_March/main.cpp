@@ -107,8 +107,8 @@ template<typename field_generator_func_t, int threads> texture3d_t generate_sdf(
         GLuint z_max = z_min + z_per_thread + GLint(thread_id < z_extra);
         debug_msg("Launching thread #%u. Z-interval: [%u, %u].", thread_id, z_min, z_max);
         computation_thread[thread_id] = std::thread(fill_sdf_chunk<field_generator_func_t>, &compute_data, z_min, z_max, texture_data_chunk);
+        texture_data_chunk += z_layer_size * (z_max - z_min);
         z_min = z_max;
-        texture_data_chunk += z_layer_size;
     }    
 
     debug_msg("Main thread :: Z-interval: [%u, %u].", z_min, size.z);
@@ -151,12 +151,12 @@ struct signed_distance_field
 {
     float operator () (const glm::dvec3& p)
     {
-        return sphere_sdf(p);
+        return holed_box_sdf(p);
     }
 
     double cube_sdf (const glm::dvec3& p)
     {
-        const double size = 0.5;
+        const double size = 0.7500000001;
         return glm::max(glm::max(glm::abs(p.x), glm::abs(p.y)), glm::abs(p.z)) - size;
     }
 
@@ -174,6 +174,84 @@ struct signed_distance_field
         glm::dvec3 l = q + phi * glm::dvec3(q.y, q.z, q.x);
         return 0.5 * glm::max(l.x, glm::max(l.y, l.z)) - 0.5 * psi;
     }
+
+    double icosahedron_sdf(const glm::dvec3& p)
+    {
+        const double size = 0.75;
+        const double inv_sqrt3 = 0.577350269189625764509148780501957455647601751270126876018; // 1 / sqrt(3)
+        const double tau       = 0.934172358962715696451118623548045329629287826516995242440; // (sqrt(5) + 1) / (2 * sqrt(3))
+        const double psi       = 0.356822089773089931941969843046087873981686075246868366421; // (sqrt(5) - 1) / (2 * sqrt(3))
+
+        glm::dvec3 q = glm::abs(p);
+        double v = inv_sqrt3 * (q.x + q.y + q.z);
+        glm::dvec3 l = tau * q + psi * glm::dvec3(q.y, q.z, q.x);
+        return glm::max(glm::max(v, l.x), glm::max(l.y, l.z)) - size;
+    }
+
+    double torus_sdf(const glm::dvec3& p)
+    {
+        const double R = 0.71;
+        const double r = 0.26;
+        glm::dvec2 q = glm::dvec2(glm::length(glm::dvec2(p.x, p.y)) - R, p.z);
+        return length(q) - r;
+    }
+
+    double hexprism_sdf(const glm::dvec3& p)
+    {
+        const double half_root3 = 0.866025403784438646763723170752936183471402626905190314027;
+        const double half = 0.5;
+        const double height = 0.85;
+        const double radius = 0.65;
+        glm::dvec3 q = glm::abs(p);
+        return glm::max(q.z - height, glm::max((half_root3 * q.x + half * q.y), q.y) - radius);
+    }
+
+    double box_sdf(const glm::dvec3& p)
+    {
+        glm::dvec3 sizes = glm::dvec3(0.57, 0.93, 0.21);
+        glm::dvec3 d = glm::abs(p) - sizes;
+        return glm::min(glm::max(d.x, glm::max(d.y, d.z)), 0.0) + glm::length(glm::max(d, 0.0));
+    }
+
+    double twisted_box_sdf(const glm::dvec3& p)
+    {
+        const double angle = 0.57 * p.y;
+        const double cs = glm::cos(angle);
+        const double sn = glm::sin(angle);
+
+        double x =  cs * p.x + sn * p.z; 
+        double z = -sn * p.x + cs * p.z;
+        glm::dvec3 q = glm::dvec3(x, p.y, z);
+
+        glm::dvec3 sizes = glm::dvec3(0.47, 0.93, 0.17);
+        glm::dvec3 d = glm::abs(q) - sizes;
+        return glm::min(glm::max(d.x, glm::max(d.y, d.z)), 0.0) + glm::length(glm::max(d, 0.0));
+    }
+
+    double balls_sdf(const glm::dvec3& p)
+    {
+        const double r = 0.4;
+        const double R = 0.47;
+        glm::dvec3 q = glm::abs(p) - glm::dvec3(r);
+        double s = glm::length(q) - R;
+        return s;
+    }
+
+    double holed_box_sdf(const glm::dvec3& p)
+    {
+        glm::dvec3 external_size = glm::dvec3(0.57, 0.93, 0.37);
+        glm::dvec3 internal_size = external_size - glm::dvec3(0.13);
+        glm::dvec3 q = glm::abs(p);
+
+        glm::dvec3 de = q - external_size;
+        glm::dvec3 di = q - internal_size;
+
+        double qe = glm::min(glm::max(de.x, glm::max(de.y, de.z)), 0.0) + glm::length(glm::max(de, 0.0));
+        double qi = glm::min(glm::max(di.x, glm::max(di.y, di.z)), 0.0) + glm::length(glm::max(di, 0.0));
+        return glm::max(qe, -qi);
+    }
+
+
 };
 
 
@@ -232,22 +310,21 @@ int main(int argc, char *argv[])
 
     bbox_t bbox;
 
-/*
-    texture3d_t demon_sdf = texture3d_t::load_sdf(GL_TEXTURE2, "demon.sdf", bbox);
-    glm::dvec3 bbox_size = bbox.size;
-    glm::dvec3 bbox_center = bbox.center;
-*/
+//    texture3d_t demon_sdf = texture3d_t::load_sdf(GL_TEXTURE2, "demon.sdf", bbox);
 
-
-    glm::dvec3 bbox_size = glm::dvec3(2.0f);
-    glm::dvec3 bbox_center = glm::dvec3(0.0f);
+    debug_msg("GL_R32F = %u. GL_RED = %u. GL_FLOAT = %u.", GL_R32F, GL_RED, GL_FLOAT);
+    bbox.size = glm::dvec3(2.0f);
+    bbox.center = glm::dvec3(0.0f);
     texture3d_t demon_sdf = generate_sdf<signed_distance_field, 8>(GL_TEXTURE2, glm::ivec3(256), bbox, "dodecahedron.sdf");
 
 
+
+    glm::dvec3 bbox_size   = bbox.size;
+    glm::dvec3 bbox_center = bbox.center;
     glm::dvec3 bbox_min = bbox_center - 0.5 * bbox_size;
     glm::dvec3 bbox_max = bbox_center + 0.5 * bbox_size;    
 
-    debug_msg("SDF loaded :: bbox size = %s", glm::to_string(bbox_size).c_str());
+    debug_msg("SDF loaded :: bbox size   = %s", glm::to_string(bbox_size).c_str());
     debug_msg("              bbox center = %s", glm::to_string(bbox_center).c_str());
 
     sdf_raymarch["bbox_min"] = glm::vec3(bbox_min);
