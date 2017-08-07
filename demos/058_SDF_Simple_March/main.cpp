@@ -151,7 +151,7 @@ struct signed_distance_field
 {
     float operator () (const glm::dvec3& p)
     {
-        return holed_box_sdf(p);
+        return cave_sdf(p);
     }
 
     double cube_sdf (const glm::dvec3& p)
@@ -251,6 +251,21 @@ struct signed_distance_field
         return glm::max(qe, -qi);
     }
 
+    glm::dvec3 tri(const glm::dvec3& p)
+        { return glm::abs(glm::fract(p) - 0.5); }
+
+    double cave_sdf(const glm::dvec3& p)
+    {
+        glm::dvec3 q = 7.5 * p;    
+        glm::dvec3 w = q;
+        glm::dvec3 o = tri(q * 1.1 + tri(glm::dvec3(q.z, q.x, q.y) * 1.1));
+        q += (o - 0.25) * 0.3;
+        q = glm::cos(q * 0.315 * 1.41 + glm::sin(glm::dvec3(q.z, q.x, q.y) * 0.875 * 1.27));
+        double a = 0.21 * (glm::length(q) - 1.05);
+        return a;
+    }
+
+
 
 };
 
@@ -296,7 +311,7 @@ int main(int argc, char *argv[])
     // load textures
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/metal.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/frosted_glass.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     
     glActiveTexture(GL_TEXTURE1);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
