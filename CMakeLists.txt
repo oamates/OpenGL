@@ -25,7 +25,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -mavx2 -mfma -O3 -fabi-version=6")
 # cp mingw64\...\x86_64-w64-mingw32\...\liblto_plugin-0.dll mingw64\lib\bfd-plugins\liblto_plugin-0.dll
 # On Linux, do :: 
 # mkdir usr/lib/bfd-plugins
-# ln -s /usr/lib/gcc/x86_64-unknown-linux-gnu/5.1.0/liblto_plugin.so /usr/lib/bfd-plugins/
 # ln -s /usr/lib/gcc/x86_64-linux-gnu/5.4.0/liblto_plugin.so /usr/lib/bfd-plugins/
 
 
@@ -82,4 +81,18 @@ add_subdirectory (demos)
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # vulkan demos
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#add_subdirectory (vulkan)
+if (NOT "$ENV{VULKAN_SDK}" STREQUAL "")
+	set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
+    message("Found Vulkan SDK installed at $ENV{VULKAN_SDK}")
+    message("Vulkan include    :: ${VULKAN_INCLUDE_DIR}")
+    message("Vulkan libraries  :: $ENV{VULKAN_LIBRARY}")
+    message("Vulkan layer path :: $ENV{VK_LAYER_PATH}")
+
+	include_directories("${VULKAN_INCLUDE_DIR}")
+	link_directories("$ENV{VULKAN_LIBRARY}") 
+	link_directories("$ENV{VK_LAYER_PATH}")
+	add_subdirectory (vulkan)
+else()
+    message("Vulkan SDK is not installed or VULKAN_SDK environment variable not set")
+    message("Skipping Vulkan demos build step")
+endif()
