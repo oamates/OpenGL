@@ -22,7 +22,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto -mavx2 -mfma -O3 -fabi-version=6")
 
 # If MINGW cannot find LTO plugin, do :: 
 # mkdir mingw64\lib\bfd-plugins
-# cp mingw64\...\x86_64-w64-mingw32\...\liblto_plugin-0.dll mingw64\lib\bfd-plugins\liblto_plugin-0.dll
+# cp mingw64\lib\gcc\x86_64-w64-mingw32\{version number}\liblto_plugin-0.dll mingw64\lib\bfd-plugins\liblto_plugin-0.dll
 # On Linux, do :: 
 # mkdir usr/lib/bfd-plugins
 # ln -s /usr/lib/gcc/x86_64-linux-gnu/5.4.0/liblto_plugin.so /usr/lib/bfd-plugins/
@@ -82,17 +82,32 @@ add_subdirectory (demos)
 # vulkan demos
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 if (NOT "$ENV{VULKAN_SDK}" STREQUAL "")
-	set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
+    set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
+    set(VULKAN_LIBRARY_PATH "$ENV{VULKAN_SDK}/lib")
+
+    if(LINUX)
+        set(VULKAN_LAYER_PATH "$ENV{VULKAN_SDK}/etc/explicit_layer.d")
+    else()
+        set(VULKAN_LAYER_PATH "")
+    endif()
+
     message("Found Vulkan SDK installed at $ENV{VULKAN_SDK}")
-    message("Vulkan include    :: ${VULKAN_INCLUDE_DIR}")
-    message("Vulkan libraries  :: $ENV{VULKAN_LIBRARY}")
-    message("Vulkan layer path :: $ENV{VK_LAYER_PATH}")
 
 	include_directories("${VULKAN_INCLUDE_DIR}")
-	link_directories("$ENV{VULKAN_LIBRARY}") 
-	link_directories("$ENV{VK_LAYER_PATH}")
+	link_directories("${VULKAN_LIBRARY_PATH}") 
+	link_directories("${VULKAN_LAYER_PATH}")
 	add_subdirectory (vulkan)
 else()
     message("Vulkan SDK is not installed or VULKAN_SDK environment variable not set")
     message("Skipping Vulkan demos build step")
 endif()
+
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# LibOVR and Oculus Rift demos
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+message("Path = ${PROJECT_SOURCE_DIR}/OculusVR")
+set(OCULUS_LIBRARIES_PATH "${PROJECT_SOURCE_DIR}/OculusVR")
+
+add_subdirectory ("${OCULUS_LIBRARIES_PATH}")
+include_directories("${OCULUS_LIBRARIES_PATH}/LibOVR/Include")
+add_subdirectory (demos_vr)
