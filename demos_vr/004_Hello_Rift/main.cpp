@@ -26,9 +26,9 @@
 #include "constants.hpp"
 #include "glfw_window.hpp"
 #include "log.hpp"
-#include "camera3d.hpp"
+#include "camera.hpp"
 #include "shader.hpp"
-#include "texture.hpp"
+#include "image.hpp"
 #include "plato.hpp"
 #include "polyhedron.hpp"
 #include "surface.hpp"
@@ -151,7 +151,7 @@ void glfw_error_callback(int error, const char* description);
 //========================================================================================================================================================================================================================
 const float linear_velocity = 0.7f;
 const float angular_rate = 0.0001f;
-static camera3d camera;
+static camera_t camera;
 double mouse_x = 0.0, mouse_y = 0.0;
 double mouse_event_ts;
 
@@ -184,9 +184,9 @@ void onMouseMove (GLFWwindow*, double x, double y)
     {
         dx /= norm; dy /= norm;
         double angle = angular_rate * sqrt(norm) / (duration + 0.01);
-        camera.rotateXY(dx, -dy, angle);
-    };
-};
+        camera.rotateXY(glm::dvec2(dx, dy), angle);
+    }
+}
 
 
 
@@ -196,9 +196,9 @@ struct motion3d_t
 	glm::vec4 rotor;
 };
 
-vertex_pft2 torus_func(const glm::vec2& uv)
+vertex_pft2_t torus_func(const glm::vec2& uv)
 {
-    vertex_pft2 vertex;
+    vertex_pft2_t vertex;
     vertex.uv = uv;
 
     float cos_2piu = glm::cos(constants::two_pi * uv.y);
@@ -254,13 +254,14 @@ glm::mat4 reflection_matrix(const glm::vec3& n, float d)
                      glm::vec4(-2.0f * d * n, 1.0f));
 };
 
-struct room
+struct room_t
 {
-    GLuint vao_id, vbo_id;
+    GLuint vao_id;    
+    vbo_t vbo;
 
-    room(float size)
+    room_t(float size)
     {
-        vertex_pnt2 vertices[36];
+        vertex_pnt2_t vertices[36];
 
         glm::vec2 unit_square[4] = 
         {
@@ -280,33 +281,28 @@ struct room
             int C = plato::cube::faces[vindex++];
             int D = plato::cube::faces[vindex++];
             glm::vec3 normal = -plato::cube::normals[i];
-            vertices[index++] = vertex_pnt2(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2(size * plato::cube::vertices[B], normal, unit_square[1]);
-            vertices[index++] = vertex_pnt2(size * plato::cube::vertices[C], normal, unit_square[2]);
-            vertices[index++] = vertex_pnt2(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2(size * plato::cube::vertices[C], normal, unit_square[2]);
-            vertices[index++] = vertex_pnt2(size * plato::cube::vertices[D], normal, unit_square[3]);
-        };
+            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
+            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
+            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[B], normal, unit_square[1]);
+            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
+            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[D], normal, unit_square[3]);
+            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
+        }
 
         glGenVertexArrays(1, &vao_id);
         glBindVertexArray(vao_id);
-        vbo_id = generate_attribute_buffer(&vertices[0], 36);
-    };
+        vbo.init(vertices, 36);
+    }
 
     void render()
     {
         glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-    };
+    }
 
-    ~room()
-    {
-        glDeleteBuffers(1, &vbo_id);
-        glDeleteVertexArrays(1, &vbo_id);
-    };
+    ~room_t()
+        { glDeleteVertexArrays(1, &vao_id); };
 };
-
-
 
 
 //=======================================================================================================================================================================================================================
@@ -368,12 +364,12 @@ int main(int argc, char** argv)
         _eyeProjections[eye] = toGlm(ovrPerspectiveProjection);
         _viewScaleDesc.HmdToEyeOffset[eye] = erd.HmdToEyeOffset;
 
-        ovrFovPort & fov = _sceneLayer.Fov[eye] = _eyeRenderDescs[eye].Fov;
-        auto eyeSize = ovr_GetFovTextureSize(session, eye, fov, 1.0f);
+        ovrFovPort& fov = _sceneLayer.Fov[eye] = _eyeRenderDescs[eye].Fov;
+        ovrSizei eyeSize = ovr_GetFovTextureSize(session, eye, fov, 1.0f);
         _sceneLayer.Viewport[eye].Size = eyeSize;
         _sceneLayer.Viewport[eye].Pos = { _renderTargetSize.x, 0 };
 
-        _renderTargetSize.y = std::max(_renderTargetSize.y, (uint32_t)eyeSize.h);
+        _renderTargetSize.y = std::max(_renderTargetSize.y, (uint32_t) eyeSize.h);
         _renderTargetSize.x += eyeSize.w;
     }
 
@@ -479,19 +475,19 @@ int main(int argc, char** argv)
 	//===================================================================================================================================================================================================================
 	// phong lighting model shader initialization
 	//===================================================================================================================================================================================================================
-    glsl_program simple_light(glsl_shader(GL_VERTEX_SHADER,   "glsl/phong_light.vs"),
-                              glsl_shader(GL_FRAGMENT_SHADER, "glsl/phong_light.fs"));
+    glsl_program_t simple_light(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_light.vs"),
+                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_light.fs"));
 
 	simple_light.enable();
-	GLuint uniform_projection_view_matrix = simple_light.uniform_id("projection_view_matrix");									// projection matrix uniform id
-    GLuint uniform_time                   = simple_light.uniform_id("time");													// world time
-    GLuint uniform_light_ws               = simple_light.uniform_id("light_ws");                                                // position of the light source
-    GLuint uniform_camera_ws              = simple_light.uniform_id("camera_ws");                                               // position of the camera
-    GLuint uniform_base                   = simple_light.uniform_id("buffer_base");
-    GLuint uniform_solid_scale            = simple_light.uniform_id("solid_scale");
-    GLuint uniform_diffuse_texture        = simple_light.uniform_id("diffuse_texture");
-    GLuint uniform_normal_texture         = simple_light.uniform_id("normal_texture");
-    glUniform1f(uniform_solid_scale, 15.0f);
+	uniform_t uniform_projection_view_matrix = simple_light["projection_view_matrix"];									// projection matrix uniform id
+    uniform_t uniform_time                   = simple_light["time"];													// world time
+    uniform_t uniform_light_ws               = simple_light["light_ws"];                                                // position of the light source
+    uniform_t uniform_camera_ws              = simple_light["camera_ws"];                                               // position of the camera
+    uniform_t uniform_base                   = simple_light["buffer_base"];
+    uniform_t uniform_solid_scale            = simple_light["solid_scale"];
+    uniform_t uniform_diffuse_texture        = simple_light["diffuse_texture"];
+    uniform_t uniform_normal_texture         = simple_light["normal_texture"];
+    simple_light["solid_scale"] = 15.0f;
 
     //===================================================================================================================================================================================================================
     // Initialize buffers : position + tangent frame + texture coordinates 
@@ -506,8 +502,8 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // Creating toral mesh
     //===================================================================================================================================================================================================================
-    surface torus1;
-    torus1.generate_pft_vao(torus_func, 20, 50);
+    surface_t torus;
+    torus.generate_vao<vertex_pft2_t>(torus_func, 128, 32);
 
     //===================================================================================================================================================================================================================
     // Load textures : diffuse + bump for each polyhedron
@@ -517,38 +513,35 @@ int main(int argc, char** argv)
 
     const char* texture_filenames [TEXTURE_COUNT] = 
     {
-        "res/tetrahedron.png",  "res/tetrahedron_bump.png",
-        "res/cube.png",         "res/cube_bump.png",
-        "res/octahedron.png",   "res/octahedron_bump.png",
-        "res/pentagon.png",     "res/pentagon_bump.png",
-        "res/icosahedron.png",  "res/icosahedron_bump.png",
-        "res/torus.png",        "res/torus_bump.png"
+        "../../../resources/plato_tex2d/tetrahedron.png",  "../../../resources/plato_tex2d/tetrahedron_bump.png",
+        "../../../resources/plato_tex2d/cube.png",         "../../../resources/plato_tex2d/cube_bump.png",
+        "../../../resources/plato_tex2d/octahedron.png",   "../../../resources/plato_tex2d/octahedron_bump.png",
+        "../../../resources/plato_tex2d/pentagon.png",     "../../../resources/plato_tex2d/pentagon_bump.png",
+        "../../../resources/plato_tex2d/icosahedron.png",  "../../../resources/plato_tex2d/icosahedron_bump.png",
+        "../../../resources/plato_tex2d/torus.png",        "../../../resources/plato_tex2d/torus_bump.png"
     };
 
     for (int i = 0; i < TEXTURE_COUNT; ++i)
     {
         glActiveTexture(GL_TEXTURE0 + i);
-        texture_id[i] = texture::texture2d_png(texture_filenames[i]);
+        texture_id[i] = image::png::texture2d(texture_filenames[i]);
     };
 
     glActiveTexture(GL_TEXTURE0 + TEXTURE_COUNT);
-    GLuint glass_texture_id = texture::texture2d_png("res/marble.png");
+    GLuint glass_texture_id = image::png::texture2d("../../../resources/plato_tex2d/marble.png");
 
     //===================================================================================================================================================================================================================
     // Mirror shader to render the reflected image : mirror surface texture goes to texture unit #TEXTURE_COUNT
     //===================================================================================================================================================================================================================
-    glsl_program mirror_shader(glsl_shader(GL_VERTEX_SHADER,   "glsl/mirror.vs"),
-                               glsl_shader(GL_FRAGMENT_SHADER, "glsl/mirror.fs"));
+    glsl_program_t mirror_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/mirror.vs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/mirror.fs"));
 
     mirror_shader.enable();
-    GLuint mirror_projection_view_matrix = mirror_shader.uniform_id("projection_view_matrix");
-    GLuint mirror_glass_texture          = mirror_shader.uniform_id("glass_texture");
-    GLuint mirror_light_ws               = mirror_shader.uniform_id("light_ws");
-    GLuint mirror_camera_ws              = mirror_shader.uniform_id("camera_ws");    
+    uniform_t mirror_projection_view_matrix = mirror_shader["projection_view_matrix"];
+    uniform_t mirror_light_ws               = mirror_shader["light_ws"];
+    uniform_t mirror_camera_ws              = mirror_shader["camera_ws"];
 
-    glUniform1i(mirror_glass_texture, TEXTURE_COUNT);
-
-
+    mirror_shader["glass_texture"] = (int) TEXTURE_COUNT;
 
     //===================================================================================================================================================================================================================
     // Initialize objects displacement vectors and rotation axes, and write the data to GL_SHADER_STORAGE_BUFFER
@@ -595,9 +588,9 @@ int main(int argc, char** argv)
         reflections[i] = reflection_matrix(plato::cube::normals[i], cube_size);
 
     glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
+    glPrimitiveRestartIndex(torus.vao.ibo.pri);
 
-    room granite_room(cube_size);    
+    room_t granite_room(cube_size);    
 
     //===================================================================================================================================================================================================================
     // Main rendering loop
@@ -683,7 +676,7 @@ int main(int argc, char** argv)
                 glUniform1i(uniform_base, 5 * group_size);
                 glUniform1i(uniform_diffuse_texture, 10);
                 glUniform1i(uniform_normal_texture, 11);
-                torus1.instanced_render(group_size);
+                torus.instanced_render(group_size);
             };
     
             //===============================================================================================================================================================================================================
@@ -739,7 +732,7 @@ int main(int argc, char** argv)
             glUniform1i(uniform_base, 5 * group_size);
             glUniform1i(uniform_diffuse_texture, 10);
             glUniform1i(uniform_normal_texture, 11);
-            torus1.instanced_render(group_size);
+            torus.instanced_render(group_size);
 
         };
 

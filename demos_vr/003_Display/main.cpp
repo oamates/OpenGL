@@ -170,7 +170,7 @@ void ovr_hmd_info(const ovrHmdDesc& hmd_desc)
         default             : type_str = "Unknown";
     }
 
-    debug_msg("\tVR Device information : type = %s (value = %d).", type_str, hmd_desc.Type);
+    debug_msg("\tVR Device information : type = %s (%d).", type_str, hmd_desc.Type);
     debug_msg("\tProduct Name = %s.", hmd_desc.ProductName);
     debug_msg("\tManufacturer = %s.", hmd_desc.Manufacturer);
     debug_msg("\tVendorId = %d.", hmd_desc.VendorId);
