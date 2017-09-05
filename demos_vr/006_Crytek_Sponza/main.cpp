@@ -30,9 +30,9 @@
 #include "log.hpp"
 #include "constants.hpp"
 #include "glfw_window.hpp"
-#include "camera3d.hpp"
+#include "camera.hpp"
 #include "shader.hpp"
-#include "texture.hpp"
+#include "image.hpp"
 
 
 
@@ -155,7 +155,7 @@ void glfw_error_callback(int error, const char* description);
 //========================================================================================================================================================================================================================
 const float linear_velocity = 0.7f;
 const float angular_rate = 0.0001f;
-static camera3d camera;
+static camera_t camera;
 double mouse_x = 0.0, mouse_y = 0.0;
 double mouse_event_ts;
 
@@ -188,7 +188,7 @@ void onMouseMove (GLFWwindow*, double x, double y)
     {
         dx /= norm; dy /= norm;
         double angle = angular_rate * sqrt(norm) / (duration + 0.01);
-        camera.rotateXY(dx, -dy, angle);
+        camera.rotateXY(glm::dvec2(dx, -dy), angle);
     };
 };
 
@@ -739,8 +739,8 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // Load standard Blinn-Phong shader
     //===================================================================================================================================================================================================================
-    glsl_program blinn_phong(glsl_shader(GL_VERTEX_SHADER,   "glsl/blinn-phong.vs"),
-                             glsl_shader(GL_FRAGMENT_SHADER, "glsl/blinn-phong.fs"));
+    glsl_program_t blinn_phong(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/blinn-phong.vs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blinn-phong.fs"));
 
     blinn_phong.enable();
     glUniform1i(blinn_phong.uniform_id("map_Kd"), 0);
@@ -780,7 +780,7 @@ int main(int argc, char** argv)
     glBufferData(GL_UNIFORM_BUFFER, sizeof(matrices), 0, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);
 
-    blinn_phong.bind_uniform_buffer("matrices", 0);
+    blinn_phong.bind_ubo("matrices", 0);
 
     //===============================================================================================================================
     // create VBOs from a set of vectors
@@ -844,7 +844,7 @@ int main(int argc, char** argv)
       #define TEXTURE_LOAD(name) if (!name.empty()) { std::string path = mtlPath + name; \
                                                       std::map<std::string, GLuint>::iterator it = textures.find(name); \
                                                       if (it == textures.end()) \
-                                                          textures[name] = texture::texture2d_png(path.c_str()); \
+                                                          textures[name] = image::png::texture2d(path.c_str()); \
                                                     }
 
         TEXTURE_LOAD(materials[i].map_Ka);   
