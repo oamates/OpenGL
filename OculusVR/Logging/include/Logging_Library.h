@@ -24,8 +24,10 @@ limitations under the License.
 
 ************************************************************************************/
 
-#ifndef Logging_h
-#define Logging_h
+#pragma once
+
+#pragma warning(push)
+#pragma warning(disable: 4530) // C++ exception handler used, but unwind semantics are not enabled
 
 #include <string>
 #include <sstream>
@@ -34,10 +36,17 @@ limitations under the License.
 #include <memory>
 #include <set>
 #include <map>
+#include <time.h>
 
 #pragma warning(push)
 
 #include "Logging_Tools.h"
+
+#if defined(__clang__)
+    #pragma clang diagnostic ignored "-Wformat-nonliteral"
+    #pragma clang diagnostic ignored "-Wformat-security"  // Otherwise the printf usage below generates a warning.
+#endif
+
 
 namespace ovrlog {
 
@@ -148,7 +157,27 @@ struct LogStringBuffer
 //
 // This is the function that user code can override to control how special types
 // are serialized into the log messages.
+/*
+// Delete logging a shared_ptr
+template<typename T>
+LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::shared_ptr<T>& thing) {
+  (void)buffer;
+  (void)thing;
+//#if !defined(__clang__)
+  static_assert(false, "Don't log a shared_ptr, log *ptr (or ptr.get() for the raw pointer value).");
+//#endif
+}
 
+// Delete logging a unique_ptr
+template<typename T, typename Deleter>
+LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::unique_ptr<T, Deleter>& thing) {
+  (void)buffer;
+  (void)thing;
+//#if !defined(__clang__)
+  static_assert(false, "Don't log a unique_ptr, log *ptr (or ptr.get() for the raw pointer value).");
+//#endif
+}
+*/
 template<typename T>
 LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const T& first)
 {
@@ -215,23 +244,33 @@ enum class WriteOption : Write_Option_t
 
 // Iterate through the list of channels before the CRT has initialized
 #pragma pack(push,1)
-struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; ChannelNode* Next, *Prev; };
+struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; bool *UserOverrodeMinimumOutputLevel; ChannelNode* Next, *Prev; };
 #pragma pack(pop)
+
+
+#ifndef OVR_EXPORTED_FUNCTION
+    #if defined(_WIN32)
+        #define OVR_EXPORTED_FUNCTION __declspec(dllexport)
+    #else
+        #define OVR_EXPORTED_FUNCTION __attribute__((visibility("default")))
+    #endif
+#endif
+
 
 // Export the function to access OutputWorker::Write(). This is used by the Channel class
 // to allow writing with OutputWorker possibly in a separate module
 extern "C"
 {
-    __declspec(dllexport) extern void OutputWorkerOutputFunctionC(const char* subsystemName, Log_Level_t messageLogLevel, const char* stream, bool relogged, Write_Option_t option);
+    OVR_EXPORTED_FUNCTION extern void OutputWorkerOutputFunctionC(const char* subsystemName, Log_Level_t messageLogLevel, const char* stream, bool relogged, Write_Option_t option);
     typedef void(*OutputWorkerOutputFunctionType)(const char* subsystemName, Log_Level_t messageLogLevel, const char* stream, bool relogged, Write_Option_t option);
 
-    __declspec(dllexport) extern void ConfiguratorOnChannelLevelChangeC(const char* channelName, Log_Level_t minimumOutputLevel);
+    OVR_EXPORTED_FUNCTION extern void ConfiguratorOnChannelLevelChangeC(const char* channelName, Log_Level_t minimumOutputLevel);
     typedef void(*ConfiguratorOnChannelLevelChangeType)(const char* channelName, Log_Level_t minimumOutputLevel);
 
-    __declspec(dllexport) extern void ConfiguratorRegisterC(ChannelNode* channelNode);
+    OVR_EXPORTED_FUNCTION extern void ConfiguratorRegisterC(ChannelNode* channelNode);
     typedef void(*ConfiguratorRegisterType)(ChannelNode* channelNode);
 
-    __declspec(dllexport) extern void ConfiguratorUnregisterC(ChannelNode* channelNode);
+    OVR_EXPORTED_FUNCTION extern void ConfiguratorUnregisterC(ChannelNode* channelNode);
     typedef void(*ConfiguratorUnregisterType)(ChannelNode* channelNode);
 }
 
@@ -263,6 +302,7 @@ public:
     // Plugin management
     void AddPlugin(std::shared_ptr<OutputPlugin> plugin);
     void RemovePlugin(std::shared_ptr<OutputPlugin> plugin);
+    std::shared_ptr<OutputPlugin> GetPlugin(const char* const pluginName);
 
     // Disable all output
     void DisableAllPlugins();
@@ -270,6 +310,15 @@ public:
     // Get the lock used for the channels.
     Lock* GetChannelsLock();
 
+    // Our time type
+    #if defined(WIN32)
+        typedef SYSTEMTIME LogTime;
+    #else
+        typedef time_t LogTime;  // To do: Make this a C++ time with better resolution than time_t.
+    #endif
+    
+    static LogTime GetCurrentLogTime();
+    
 private:
     // Is the logger running in a debugger?
     bool IsInDebugger;
@@ -284,14 +333,14 @@ private:
     // Worker Log Buffer
     struct QueuedLogMessage
     {
-        QueuedLogMessage(const char* subsystemName, Level messageLogLevel, const char* stream, const SYSTEMTIME& time);
+        QueuedLogMessage(const char* subsystemName, Level messageLogLevel, const char* stream, const LogTime& time);
 
         Level             MessageLogLevel;
         const char*       SubsystemName;
         std::string       Buffer;
-        SYSTEMTIME        Time;
+        LogTime           Time;
         QueuedLogMessage* Next;
-        HANDLE            FlushEvent;
+        OvrLogHandle      FlushEvent;
     };
 
     // Maximum number of logs that we allow in the queue at a time.
@@ -321,8 +370,15 @@ private:
         WorkQueueTail = msg;
         ++WorkQueueSize;
     }
+
+    #if defined(_WIN32)
+        #define OVR_THREAD_FUNCTION_TYPE DWORD WINAPI
+    #else
+        #define OVR_THREAD_FUNCTION_TYPE uint32_t
+    #endif
     
-    static DWORD WINAPI WorkerThreadEntrypoint_(void* worker);
+    static OVR_THREAD_FUNCTION_TYPE WorkerThreadEntrypoint_(void* worker);
+    
     void WorkerThreadEntrypoint();
 
     Lock StartStopLock;
@@ -349,28 +405,38 @@ private:
 class ErrorSilencer
 {
 public:
-    // Returns true if errors are currently squelched and should not be loud.
-    // This can be called from anywhere, even outside of an ErrorSquelch block.
-    static bool IsSilenced();
+    // Returns a bitfield of SilenceOptions that are currently in effect
+    static int GetSilenceOptions();
 
     // Start silencing errors.
-    ErrorSilencer(bool initiallySilenced = true);
+    ErrorSilencer(int options = DemoteErrorsToWarnings);
+
+    enum SilenceOptions
+    {
+        // Error logs will be demoted to the warning log level
+        DemoteErrorsToWarnings = 1,
+
+        // All Log* methods will be silenced
+        CompletelySilenceLogs = 2,
+
+        // OVR::MakeError will not assert when errors are set
+        PreventErrorAsserts = 4,
+
+        // All logs at a level > Debug will be set to Debug level
+        DemoteToDebug = 8
+    };
 
     // Stop silencing errors.
     ~ErrorSilencer();
 
-public:
+private:
     // Start silencing errors.  This is done automatically be the constructor.
-    // This function is provided to manually control the silencing behavior.
     void Silence();
 
     // Stop silencing errors.  This is done automatically be the deconstructor.
-    // This function is provided to manually control the silencing behavior.
     void Unsilence();
 
-private:
-    // Haas this object requested silencing errors?
-    bool ThisObjectCurrentlySilenced = false;
+    int Options = 0;
 };
 
 
@@ -404,7 +470,7 @@ public:
 
     const char* GetName() const;
     Level GetMinimumOutputLevel() const;
-    
+
     LOGGING_INLINE bool Active(Level level) const
     {
         return MinimumOutputLevel <= (uint32_t)level;
@@ -415,12 +481,6 @@ public:
     {
         if (Active(level))
         {
-            // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && ErrorSilencer::IsSilenced())
-            {
-                // Demote to warning
-                level = Level::Warning;
-            }
             doLog(level, std::forward<Args>(args)...);
         }
     }
@@ -430,11 +490,7 @@ public:
     {
         if (Active(Level::Error))
         {
-            // Demote to warning if errors are silenced
-            const Level level = ErrorSilencer::IsSilenced() ?
-                Level::Warning : Level::Error;
-
-            doLog(level, std::forward<Args>(args)...);
+            doLog(Level::Error, std::forward<Args>(args)...);
         }
     }
 
@@ -480,12 +536,6 @@ public:
     {
         if (Active(level))
         {
-            // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && ErrorSilencer::IsSilenced())
-            {
-                // Demote to warning
-                level = Level::Warning;
-            }
             doLogF(level, std::forward<Args>(args)...);
         }
     }
@@ -495,11 +545,7 @@ public:
     {
         if (Active(Level::Error))
         {
-            // Demote to warning if errors are silenced
-            const Level level = ErrorSilencer::IsSilenced() ?
-                Level::Warning : Level::Error;
-
-            doLogF(level, std::forward<Args>(args)...);
+            doLogF(Level::Error, std::forward<Args>(args)...);
         }
     }
 
@@ -549,8 +595,18 @@ public:
     {
         if (Active(level))
         {
-            // If the log message is at error level and errors are silenced,
-            if (level == Level::Error && ErrorSilencer::IsSilenced())
+            int silenceOptions = ErrorSilencer::GetSilenceOptions();
+            if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
+            {
+                return;
+            }
+
+            if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
+            {
+                // Demote to debug
+                level = Level::Debug;
+            }
+            else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
             {
                 // Demote to warning
                 level = Level::Warning;
@@ -566,7 +622,7 @@ public:
         }
     }
     // DANGER DANGER DANGER
-    
+
 private:
     //-------------------------------------------------------------------------
     // Internal Implementation
@@ -578,7 +634,7 @@ private:
     // Used to iterate through a linked list of Channel objects
     // A linked list is used to avoid CRT new / delete during startup as this is called from the constructor
     ChannelNode Node;
-    
+
     // Level at which this channel will log.
     Log_Level_t MinimumOutputLevel;
 
@@ -587,6 +643,11 @@ private:
 
     // Optional prefix
     std::string Prefix;
+
+    // So changing Prefix is threadsafe
+    mutable Lock PrefixLock;
+
+    bool UserOverrodeMinimumOutputLevel;
 
     // Target of doLog function
     static OutputWorkerOutputFunctionType OutputWorkerOutputFunction;
@@ -619,6 +680,23 @@ private:
     template<typename... Args>
     LOGGING_INLINE void doLog(Level level, Args&&... args) const
     {
+        int silenceOptions = ErrorSilencer::GetSilenceOptions();
+        if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
+        {
+            return;
+        }
+
+        if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
+        {
+            // Demote to debug
+            level = Level::Debug;
+        }
+        else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+        {
+            // Demote to warning
+            level = Level::Warning;
+        }
+
         LogStringBuffer buffer(SubsystemName, level);
 
         writeLogBuffer(buffer, Prefix, args...);
@@ -662,6 +740,23 @@ private:
     template<typename... Args>
     LOGGING_INLINE void doLogF(Level level, Args&&... args) const
     {
+        int silenceOptions = ErrorSilencer::GetSilenceOptions();
+        if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
+        {
+            return;
+        }
+
+        if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
+        {
+            // Demote to debug
+            level = Level::Debug;
+        }
+        else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
+        {
+            // Demote to warning
+            level = Level::Warning;
+        }
+
         LogStringBuffer buffer(SubsystemName, level);
 
         char  logCharsLocal[1024];
@@ -674,7 +769,7 @@ private:
         int result = snprintf(logCharsLocal, sizeof(logCharsLocal), args...);
 #endif
 
-        if ((result < 0) || (result >= sizeof(logCharsLocal)))
+        if ((result < 0) || ((size_t)result >= sizeof(logCharsLocal)))
         {
             int requiredSize = GetPrintfLength(args...);
 
@@ -726,6 +821,7 @@ public:
 class Configurator
 {
     friend class Channel;
+    friend class OutputWorker;
     Configurator(); // Call GetInstance() to get the singleton instance.
 
 public:
@@ -744,9 +840,6 @@ public:
 
     void SetPlugin(std::shared_ptr<ConfiguratorPlugin> plugin);
 
-    // Free internal memory to avoid memory leak reports
-    void UnregisterAll();
-
     // Get all channels - note channels do not necessarily have unique names
     void GetChannels(std::vector< std::pair<std::string, Level> > &channels);
 
@@ -755,21 +848,24 @@ public:
 
     // Internal: Invoked through callbacks
     void OnChannelLevelChange(const char* channelName, Log_Level_t level);
-    
-    // Internal: Load log level for a channel from disk
+
+    // Internal: Load log level for a channel from disk, set all channels with this name to this level
     void RestoreChannelLogLevel(const char* channelName);
+
+    // Internal: Load log level for a channel from disk, set this channel to this level
+    void RestoreChannelLogLevel(ChannelNode* channelNode);
 
     // Internal: Iterate through all channels and store them
     void RestoreAllChannelLogLevels();
 private:
 
+    void RestoreAllChannelLogLevelsNoLock();
+
     uint32_t GlobalMinimumLogLevel;
     std::shared_ptr<ConfiguratorPlugin> Plugin;
 
-    void SetChannelNoLock(std::string channelName, Level level);
+    void SetChannelNoLock(std::string channelName, Level level, bool overrideUser);
 };
 
 
 } // namespace ovrlog
-
-#endif // Logging_h

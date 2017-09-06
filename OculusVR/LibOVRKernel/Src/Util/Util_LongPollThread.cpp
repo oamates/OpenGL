@@ -1,7 +1,8 @@
 /************************************************************************************
 
 Filename    :   Util_LongPollThread.cpp
-Content     :   Allows us to do all long polling tasks from a single thread to minimize deadlock risk
+Content     :   Allows us to do all long polling tasks from a single thread to minimize deadlock
+risk
 Created     :   June 30, 2013
 Authors     :   Chris Taylor
 
@@ -23,64 +24,53 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 *************************************************************************************/
+//#include <memory>
 
 #include "Util_LongPollThread.h"
 #include "Util_Watchdog.h"
 
 OVR_DEFINE_SINGLETON(OVR::Util::LongPollThread);
 
-namespace OVR { namespace Util {
-
+namespace OVR {
+namespace Util {
 
 void LongPollThread::AddPollFunc(CallbackListener<PollFunc>* func)
-{
-    PollSubject.AddListener(func);
-}
+  { PollSubject.AddListener(func); }
 
-LongPollThread::LongPollThread() :
-    Terminated(false)
+LongPollThread::LongPollThread()
+  : Terminated(false)
 {
-    Start();
-
-	// Must be at end of function
-    PushDestroyCallbacks();
+    LongPollThreadHandle = std::unique_ptr<std::thread>(new std::thread( [this] { this->Run(); }) );
+    PushDestroyCallbacks();                 // Must be at end of function
 }
 
 LongPollThread::~LongPollThread()
-{
-    fireTermination();
-
-    Join();
-}
+    { OVR_ASSERT(!LongPollThreadHandle->joinable()); }
 
 void LongPollThread::OnThreadDestroy()
 {
     fireTermination();
+    LongPollThreadHandle->join();
 }
 
 void LongPollThread::Wake()
-{
-    WakeEvent.SetEvent();
-}
+    { WakeEvent.SetEvent(); }
 
 void LongPollThread::fireTermination()
 {
-    Terminated = true;
+    Terminated.store(true, std::memory_order_relaxed);
     Wake();
 }
 
 void LongPollThread::OnSystemDestroy()
-{
-    Release();
-}
+    { delete this; }
 
-int LongPollThread::Run()
+void LongPollThread::Run()
 {
-    SetThreadName("LongPoll");
+    Thread::SetCurrentThreadName("LongPoll");
     WatchDog watchdog("LongPoll");
 
-    // While not terminated,
-    do
+    do                                                          // While not terminated
     {
         watchdog.Feed(10000);
 
@@ -88,10 +78,9 @@ int LongPollThread::Run()
 
         WakeEvent.Wait(WakeupInterval);
         WakeEvent.ResetEvent();
-    } while (!Terminated);
-
-    return 0;
+    }
+    while (!Terminated.load(std::memory_order_acquire));
 }
 
-
-}} // namespace OVR::Util
+} // Util
+} // namespace OVR

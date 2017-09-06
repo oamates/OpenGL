@@ -3,7 +3,7 @@ project( LibOVR )
 
 add_definitions(-DUNICODE -D_UNICODE -DMINGW_HAS_SECURE_API -DNOMINMAX)
 
-include_directories( LibOVR/Include LibOVR/Src ${CMAKE_SOURCE_DIR} )
+include_directories( LibOVR/Include LibOVR/Src Logging/include ${CMAKE_SOURCE_DIR} )
 
 file(GLOB LIBOVR_FILES
     LibOVR/Include/*.h

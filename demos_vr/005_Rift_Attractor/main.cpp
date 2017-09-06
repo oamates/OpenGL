@@ -326,7 +326,7 @@ struct ovr_hmd_t
             ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.5f, 100.0f, ovrProjection_ClipRangeOpenGL);
             _eyeProjections[eye] = toGlm(ovrPerspectiveProjection);
         
-            _viewScaleDesc.HmdToEyeOffset[eye] = erd.HmdToEyeOffset;
+            _viewScaleDesc.HmdToEyePose[eye] = erd.HmdToEyePose;
         
             ovrFovPort & fov = _sceneLayer.Fov[eye] = _eyeRenderDescs[eye].Fov;
             ovrSizei eyeSize = ovr_GetFovTextureSize(session, eye, fov, 1.25f);
@@ -621,7 +621,7 @@ int main(int argc, char** argv)
         // update eyes position
         //===============================================================================================================================================================================================================
         ovrPosef eyePoses[2];
-        ovr_GetEyePoses(ovr_hmd.session, window.frame, true, ovr_hmd._viewScaleDesc.HmdToEyeOffset, eyePoses, &ovr_hmd._sceneLayer.SensorSampleTime);
+        ovr_GetEyePoses(ovr_hmd.session, window.frame, true, ovr_hmd._viewScaleDesc.HmdToEyePose, eyePoses, &ovr_hmd._sceneLayer.SensorSampleTime);
 
         //===============================================================================================================================================================================================================
         // update particle positions

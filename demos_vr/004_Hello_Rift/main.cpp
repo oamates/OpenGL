@@ -362,7 +362,7 @@ int main(int argc, char** argv)
         ovrEyeRenderDesc& erd = _eyeRenderDescs[eye] = ovr_GetRenderDesc(session, eye, hmd_desc.DefaultEyeFov[eye]);
         ovrMatrix4f ovrPerspectiveProjection = ovrMatrix4f_Projection(erd.Fov, 0.01f, 1000.0f, ovrProjection_ClipRangeOpenGL);
         _eyeProjections[eye] = toGlm(ovrPerspectiveProjection);
-        _viewScaleDesc.HmdToEyeOffset[eye] = erd.HmdToEyeOffset;
+        _viewScaleDesc.HmdToEyePose[eye] = erd.HmdToEyePose;
 
         ovrFovPort& fov = _sceneLayer.Fov[eye] = _eyeRenderDescs[eye].Fov;
         ovrSizei eyeSize = ovr_GetFovTextureSize(session, eye, fov, 1.0f);
@@ -605,7 +605,7 @@ int main(int argc, char** argv)
         // Render the scene
         //===============================================================================================================================================================================================================
         ovrPosef eyePoses[2];
-        ovr_GetEyePoses(session, frame, true, _viewScaleDesc.HmdToEyeOffset, eyePoses, &_sceneLayer.SensorSampleTime);
+        ovr_GetEyePoses(session, frame, true, _viewScaleDesc.HmdToEyePose, eyePoses, &_sceneLayer.SensorSampleTime);
 
         int curIndex;
         ovr_GetTextureSwapChainCurrentIndex(session, _eyeTexture, &curIndex);
