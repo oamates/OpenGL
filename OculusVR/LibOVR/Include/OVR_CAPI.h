@@ -471,8 +471,7 @@ typedef struct OVR_ALIGNAS(8) _ovrTrackerPose
 {    
     unsigned int TrackerFlags;                                                      // ovrTrackerFlags.
 
-    // The sensor's pose. This pose includes sensor tilt (roll and pitch).
-    // For a leveled coordinate system use LeveledPose.
+    // The sensor's pose. This pose includes sensor tilt (roll and pitch). For a leveled coordinate system use LeveledPose.
     ovrPosef Pose;
 
     // The sensor's leveled pose, aligned with gravity. This value includes pos and yaw of the sensor, but not roll and pitch. 
@@ -1163,34 +1162,20 @@ OVR_PUBLIC_FUNCTION(unsigned int) ovr_GetTrackerCount(ovrSession session);
 OVR_PUBLIC_FUNCTION(ovrTrackerDesc) ovr_GetTrackerDesc(ovrSession session, unsigned int trackerDescIndex);
 
 //========================================================================================================================================================================================================================
-/// Creates a handle to a VR session.
-///
-/// Upon success the returned ovrSession must be eventually freed with ovr_Destroy when it is no
-/// longer needed.
-/// A second call to ovr_Create will result in an error return value if the previous session has not
-/// been destroyed.
-///
-/// \param[out] pSession Provides a pointer to an ovrSession which will be written to upon success.
-/// \param[out] pLuid Provides a system specific graphics adapter identifier that locates which
-/// graphics adapter has the HMD attached. This must match the adapter used by the application
-/// or no rendering output will be possible. This is important for stability on multi-adapter
-/// systems. An
-/// application that simply chooses the default adapter will not run reliably on multi-adapter
-/// systems.
-/// \return Returns an ovrResult indicating success or failure. Upon failure
-///         the returned ovrSession will be NULL.
-///
-/// <b>Example code</b>
-///     \code{.cpp}
-///         ovrSession session;
-///         ovrGraphicsLuid luid;
-///         ovrResult result = ovr_Create(&session, &luid);
-///         if(OVR_FAILURE(result))
-///            ...
-///     \endcode
-///
-/// \see ovr_Destroy
-///
+// Creates a handle to a VR session.
+// Upon success the returned ovrSession must be eventually freed with ovr_Destroy when it is no longer needed.
+// A second call to ovr_Create will result in an error return value if the previous session has not been destroyed.
+//  -pSession[out] Provides a pointer to an ovrSession which will be written to upon success.
+//  -pLuid[out] Provides a system specific graphics adapter identifier that locates which graphics adapter has the HMD attached. This must match the adapter used by the application or no rendering output will be 
+//              possible. This is important for stability on multi-adapter systems. An application that simply chooses the default adapter will not run reliably on multi-adapter systems.
+//  -return Returns an ovrResult indicating success or failure. Upon failure the returned ovrSession will be NULL.
+// Example code:
+//         ovrSession session;
+//         ovrGraphicsLuid luid;
+//         ovrResult result = ovr_Create(&session, &luid);
+//         if(OVR_FAILURE(result))
+//            ...
+// See ovr_Destroy
 //========================================================================================================================================================================================================================
 OVR_PUBLIC_FUNCTION(ovrResult) ovr_Create(ovrSession* pSession, ovrGraphicsLuid* pLuid);
 

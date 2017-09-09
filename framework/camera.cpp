@@ -18,25 +18,25 @@
 // generic camera position shift
 //=======================================================================================================================================================================================================================
 void camera_t::translate(const glm::vec3& shift)
-    { view_matrix[3] -= glm::vec4(shift, 0.0f); };
+    { view_matrix[3] -= glm::vec4(shift, 0.0f); }
 
 //=======================================================================================================================================================================================================================
 // special cases : forward/backward translation. The sign is + since camera z axis points backward (index of z-axis = 2)
 //=======================================================================================================================================================================================================================
 void camera_t::move_forward(double dt)
-    { view_matrix[3][2] += linear_speed * dt; };
+    { view_matrix[3][2] += linear_speed * dt; }
 
 void camera_t::move_backward(double dt)
-    { view_matrix[3][2] -= linear_speed * dt; };
+    { view_matrix[3][2] -= linear_speed * dt; }
 
 //=======================================================================================================================================================================================================================
 // special cases : right/left translation. Right direction is the axis x (index = 0)
 //=======================================================================================================================================================================================================================
 void camera_t::straight_right(double dt)
-    { view_matrix[3][0] -= linear_speed * dt; };
+    { view_matrix[3][0] -= linear_speed * dt; }
 
 void camera_t::straight_left(double dt)
-    { view_matrix[3][0] += linear_speed * dt; };
+    { view_matrix[3][0] += linear_speed * dt; }
 
 //=======================================================================================================================================================================================================================
 // camera rotation about the axis lying in XY - plane and orthogonal(!) to (dx, dy) mouse displacement
@@ -58,19 +58,19 @@ void camera_t::rotateXY(const glm::dvec2& direction, double dt)
                                                         - sndx,              - sndy,    cs, 0.0f,
                                                           0.0f,                0.0f,  0.0f, 1.0f);
     view_matrix = rotation_matrix * view_matrix;
-};
+}
 
 void camera_t::infinite_perspective(float view_angle, float aspect_ratio, float znear)
     { projection_matrix = glm::infinitePerspective (view_angle, aspect_ratio, znear); };
 
 glm::mat4 camera_t::projection_view_matrix()
-    { return projection_matrix * view_matrix; };
+    { return projection_matrix * view_matrix; }
 
 glm::mat4 camera_t::camera_matrix()
-    { return glm::inverse(view_matrix); };
+    { return glm::inverse(view_matrix); }
 
 glm::vec3 camera_t::position()
-    { return -glm::inverse(glm::mat3(view_matrix)) * glm::vec3(view_matrix[3]); };
+    { return -glm::inverse(glm::mat3(view_matrix)) * glm::vec3(view_matrix[3]); }
 
 
 //=======================================================================================================================================================================================================================
@@ -80,7 +80,7 @@ glm::vec3 camera_t::position()
 // It is stored as a matrix of doubles to tame down numerical instabilities.
 //=======================================================================================================================================================================================================================
 
-void hyperbolic_camera_t::translate(const glm::dvec3& shift) {};
+void hyperbolic_camera_t::translate(const glm::dvec3& shift) {}
 
 //=======================================================================================================================================================================================================================
 // hyperbolic translation along Z is equivalent to ZW - Lorentz rotation
@@ -111,10 +111,10 @@ void hyperbolic_camera_t::move_forward(double distance)
     view_matrix[2].w = m23;
     view_matrix[3].z = m32; 
     view_matrix[3].w = m33;
-};
+}
 
 void hyperbolic_camera_t::move_backward(double distance) 
-    { move_forward(-distance); };
+    { move_forward(-distance); }
 
 //=======================================================================================================================================================================================================================
 // hyperbolic translation along X is equivalent to XW - Lorentz rotation
@@ -145,10 +145,10 @@ void hyperbolic_camera_t::straight_left(double distance)
     view_matrix[2][3] = m23;
     view_matrix[3][0] = m30; 
     view_matrix[3][3] = m33;    
-};
+}
 
 void hyperbolic_camera_t::straight_right(double distance)
-    { straight_left(-distance); };
+    { straight_left(-distance); }
 
 
 void hyperbolic_camera_t::rotateXY(const glm::dvec2& direction, double dt)
@@ -168,10 +168,10 @@ void hyperbolic_camera_t::rotateXY(const glm::dvec2& direction, double dt)
                                                         - sndx,             - sndy,    cs, 0.0,
                                                            0.0,                0.0,   0.0, 1.0);
     view_matrix = rotation_matrix * view_matrix;
-};
+}
 
 void hyperbolic_camera_t::infinite_perspective(float view_angle, float aspect_ratio, float znear)
-    { projection_matrix = glm::infinitePerspective (view_angle, aspect_ratio, znear); };
+    { projection_matrix = glm::infinitePerspective (view_angle, aspect_ratio, znear); }
 
 glm::mat4 hyperbolic_camera_t::projection_view_matrix()
-    { return projection_matrix * glm::mat4(view_matrix); };
+    { return projection_matrix * glm::mat4(view_matrix); }

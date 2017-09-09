@@ -1,26 +1,18 @@
-/********************************************************************************/ /**
- \file      OVR_CAPI_Prototypes.h
- \brief     Internal CAPI prototype listing macros
- \copyright Copyright 2016 Oculus VR, LLC. All Rights reserved.
- ************************************************************************************/
-
+//========================================================================================================================================================================================================================
+// Internal CAPI prototype listing macros
+// Copyright 2016 Oculus VR, LLC. All Rights reserved.
+//========================================================================================================================================================================================================================
 #ifndef OVR_CAPI_Prototypes_h
 #define OVR_CAPI_Prototypes_h
 
 #include "OVR_CAPI.h"
 
-
-//
+//========================================================================================================================================================================================================================
 // OVR_LIST_*_APIS - apply passed in macros to a list of API entrypoints
-//
 // The _ macro argument is applied for all current API versions
 // The X macro argument is applied for back-compat API versions
-//
 // The tuple passed to either macro is (ReturnType, FunctionName, OptionalVersion, ParameterList)
-//
-
-
-// clang-format off
+//========================================================================================================================================================================================================================
 
 #define OVR_LIST_PUBLIC_APIS(_,X) \
 X(ovrBool, ovr_InitializeRenderingShimVersion, , (int requestedMinorVersion)) \
@@ -120,7 +112,9 @@ _(ovrResult, ovr_SetExternalCameraProperties, , (ovrSession session, const char*
 
 #define OVR_LIST_INTERNAL_APIS(_,X)
 
+//========================================================================================================================================================================================================================
 // We need to forward declare the ovrSensorData type here, as it won't be in a public OVR_CAPI.h header.
+//========================================================================================================================================================================================================================
 struct ovrSensorData_;
 typedef struct ovrSensorData_ ovrSensorData;
 
@@ -128,12 +122,9 @@ typedef struct ovrSensorData_ ovrSensorData;
 _(ovrTrackingState, ovr_GetTrackingStateWithSensorData, , (ovrSession session, double absTime, ovrBool latencyMarker, ovrSensorData* sensorData)) \
 _(ovrResult, ovr_GetDevicePoses, , (ovrSession session, ovrTrackedDeviceType* deviceTypes, int deviceCount, double absTime, ovrPoseStatef* outDevicePoses))
 
-// clang-format on
-
-//
+//========================================================================================================================================================================================================================
 // OVR_LIST_APIS - master list of all API entrypoints
-//
-
+//========================================================================================================================================================================================================================
 #define OVR_LIST_APIS(_, X)    \
   OVR_LIST_PUBLIC_APIS(_, X)   \
   OVR_LIST_WIN32_APIS(_, X)    \
