@@ -32,14 +32,106 @@
 #include "polyhedron.hpp"
 #include "surface.hpp"
 
+//=======================================================================================================================================================================================================================
+// Euclidean space camera bound to vr device
+//=======================================================================================================================================================================================================================
+struct hmd_camera_t
+{
+    double linear_speed;
+    double angular_speed;
+
+    //===================================================================================================================================================================================================================
+    // VR device relative (to sensor) position and orientation
+    //===================================================================================================================================================================================================================
+    glm::mat4 orientation;
+    glm::mat4 translation;
+    glm::mat4 hmd_view_matrix;
+
+    //===================================================================================================================================================================================================================
+    // Mouse / keyboard control accumulated position and orientation
+    //===================================================================================================================================================================================================================
+    glm::mat4 view_matrix;
+
+    //===================================================================================================================================================================================================================
+    // Local HMD-eye view transfomation matrices, assumed to be set once
+    //===================================================================================================================================================================================================================
+    glm::mat4 eye_view_matrix[ovrEye_Count];
+
+    hmd_camera_t(const double linear_speed = 2.0, const double angular_speed = 0.125, const glm::mat4& view_matrix = glm::mat4(1.0f))
+        : linear_speed(linear_speed), angular_speed(angular_speed), view_matrix(view_matrix)
+    {
+        orientation = glm::mat4(1.0f);
+        translation = glm::mat4(0.0f);
+    }
+
+    void move_forward(double dt)
+        { view_matrix[3] += float(linear_speed * dt) * orientation[2]; }
+
+    void move_backward(double dt)
+        { view_matrix[3] -= float(linear_speed * dt) * orientation[2]; }
+
+
+    void straight_right(double dt)
+        { view_matrix[3] -= float(linear_speed * dt) * orientation[0]; }
+
+    void straight_left(double dt)
+        { view_matrix[3] += float(linear_speed * dt) * orientation[0]; }
+
+    void rotateXY(const glm::dvec2& direction, double dt)
+    {
+        double theta = angular_speed * dt;
+        double dx = -direction.x;
+        double dy = direction.y;
+        double cs = glm::cos(theta);
+        double sn = glm::sin(theta);
+        double _1mcs = 1.0 - cs;
+        float sndx = sn * dx;
+        float sndy = sn * dy;
+        float _1mcsdx = _1mcs * dx;
+        float _1mcsdy = _1mcs * dy;
+        glm::mat4 rotation_matrix = glm::mat4 (1.0f - dx * _1mcsdx,      - dy * _1mcsdx,  sndx, 0.0f, 
+                                                    - dx * _1mcsdy, 1.0f - dy * _1mcsdy,  sndy, 0.0f,
+                                                            - sndx,              - sndy,    cs, 0.0f,
+                                                              0.0f,                0.0f,  0.0f, 1.0f);
+        view_matrix = rotation_matrix * view_matrix;
+    }
+
+    glm::mat4 camera_matrix()
+        { return glm::inverse(view_matrix); }
+
+    void set_hmd_view_matrix(const glm::quat& rotation, const glm::vec3& position)
+    {
+        orientation = glm::mat4_cast(rotation);
+        translation = glm::translate(position);
+        hmd_view_matrix = glm::inverse(orientation) * glm::inverse(translation);
+    }
+
+    void set_eye_local_matrix(ovrEyeType eye, const glm::quat& rotation, const glm::vec3& position)
+    {
+        glm::mat4 local_orientation = glm::mat4_cast(rotation);
+        glm::mat4 local_translation = glm::translate(position);
+        eye_view_matrix[eye] = glm::inverse(local_orientation) * glm::inverse(local_translation);
+    }    
+
+    glm::mat4 get_eye_view_matrix(ovrEyeType eye)
+    {
+        return eye_view_matrix[eye] * hmd_view_matrix * view_matrix;
+    }
+
+    glm::vec3 position() const
+        { return -glm::inverse(glm::mat3(view_matrix)) * glm::vec3(view_matrix[3]); }
+};
+
+//=======================================================================================================================================================================================================================
+// Euclidean space camera bound to vr device
+//=======================================================================================================================================================================================================================
 struct demo_window_t : public glfw_window_t
 {
-    camera_t camera;
+    hmd_camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     { 
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
@@ -66,79 +158,19 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-//=======================================================================================================================================================================================================================
-// Euclidean space camera
-//=======================================================================================================================================================================================================================
-
-struct hmd_camera_t
-{
-    double linear_speed;
-    double angular_speed;
-
-    glm::mat4 view_matrix;
-    glm::mat4 projection_matrix;
-
-    hmd_camera_t(const double linear_speed = 2.0, const double angular_speed = 0.125, const glm::mat4& view_matrix = glm::mat4(1.0f))
-        : linear_speed(linear_speed), angular_speed(angular_speed), view_matrix(view_matrix) {};
-
-    void translate(const glm::vec3& shift)
-        { view_matrix[3] -= glm::vec4(shift, 0.0f); }
-
-    void move_forward(double dt)
-        { view_matrix[3][2] += linear_speed * dt; }
-
-    void move_backward(double dt)
-        { view_matrix[3][2] -= linear_speed * dt; }
-
-
-    void straight_right(double dt)
-        { view_matrix[3][0] -= linear_speed * dt; }
-
-    void straight_left(double dt)
-        { view_matrix[3][0] += linear_speed * dt; }
-
-    void rotateXY(const glm::dvec2& direction, double dt)
-    {
-        double theta = angular_speed * dt;
-        double dx = -direction.x;
-        double dy = direction.y;
-        double cs = glm::cos(theta);
-        double sn = glm::sin(theta);
-        double _1mcs = 1.0 - cs;
-        float sndx = sn * dx;
-        float sndy = sn * dy;
-        float _1mcsdx = _1mcs * dx;
-        float _1mcsdy = _1mcs * dy;
-        glm::mat4 rotation_matrix = glm::mat4 (1.0f - dx * _1mcsdx,      - dy * _1mcsdx,  sndx, 0.0f, 
-                                                    - dx * _1mcsdy, 1.0f - dy * _1mcsdy,  sndy, 0.0f,
-                                                            - sndx,              - sndy,    cs, 0.0f,
-                                                              0.0f,                0.0f,  0.0f, 1.0f);
-        view_matrix = rotation_matrix * view_matrix;
-    }
-
-
-    void infinite_perspective(float view_angle, float aspect_ratio, float znear)
-        { projection_matrix = glm::infinitePerspective (view_angle, aspect_ratio, znear); }
-
-    glm::mat4 projection_view_matrix()
-        { return projection_matrix * view_matrix; }
-    glm::mat4 camera_matrix()
-        { return glm::inverse(view_matrix); }
-    glm::vec3 position()
-        { return -glm::inverse(glm::mat3(view_matrix)) * glm::vec3(view_matrix[3]); }
-};
 
 glm::mat4 perspective(const ovrFovPort& fov, float zNear, float zFar)
 {
     float x_scale  = 2.0f / (fov.LeftTan + fov.RightTan);
     float x_offset = 0.5f * (fov.LeftTan - fov.RightTan) * x_scale;
-    float y_scale  = 2.0f / (fov.UpTan   + fov.DownTan);
-    float y_offset = 0.5f * (fov.UpTan   - fov.DownTan) * y_scale;
+    float y_scale  = 2.0f / (fov.UpTan + fov.DownTan);
+    float y_offset = 0.5f * (fov.UpTan - fov.DownTan) * y_scale;
+    float dz = zNear - zFar;
 
-    return glm::mat4(glm::vec4(  x_scale,     0.0f,                                   0.0f,  0.0f),
-                     glm::vec4(     0.0f,  y_scale,                                   0.0f,  0.0f),
-                     glm::vec4(-x_offset, y_offset,        (zNear + zFar) / (zNear - zFar), -1.0f),
-                     glm::vec4(     0.0f,     0.0f, 2.0f * (zFar * zNear) / (zNear - zFar),  0.0f)); 
+    return glm::mat4(glm::vec4(  x_scale,     0.0f,                       0.0f,  0.0f),
+                     glm::vec4(     0.0f,  y_scale,                       0.0f,  0.0f),
+                     glm::vec4(-x_offset, y_offset,        (zNear + zFar) / dz, -1.0f),
+                     glm::vec4(     0.0f,     0.0f, 2.0f * (zFar * zNear) / dz,  0.0f)); 
 }
 
 glm::mat4 infinite_perspective(const ovrFovPort& fov, float zNear)
@@ -160,21 +192,41 @@ glm::mat4 infinite_perspective(const ovrFovPort& fov, float zNear)
 
 struct ovr_hmd_t
 {
+    //===================================================================================================================================================================================================================
+    // device and session variables
+    //===================================================================================================================================================================================================================
     ovrSession session;
     ovrGraphicsLuid luid;
     ovrHmdDesc hmd_desc;
-    ovrViewScaleDesc _viewScaleDesc;
-    ovrLayerEyeFov _sceneLayer;
-    ovrTextureSwapChain _eyeTexture;
-    ovrMirrorTexture _mirrorTexture;
-    ovrEyeRenderDesc _eyeRenderDescs[2];
 
-    glm::mat4 _eyeProjections[2];
-
+    //===================================================================================================================================================================================================================
+    // rendering API variables
+    //===================================================================================================================================================================================================================
     int swapchain_length;
 
     glm::ivec2 target_size;
+    ovrTextureSwapChain target_texture;
+
     glm::ivec2 mirror_size;
+    ovrMirrorTexture mirror_texture;
+
+    //===================================================================================================================================================================================================================
+    // geometric variables : 
+    //===================================================================================================================================================================================================================
+    ovrEyeRenderDesc _eyeRenderDescs[ovrEye_Count];
+    ovrViewScaleDesc _viewScaleDesc;
+    ovrLayerEyeFov _sceneLayer;
+
+    glm::mat4 projection_matrix[ovrEye_Count];
+
+    glm::quat head_rotation;
+    glm::vec3 head_position;
+
+    glm::quat eye_rotation[ovrEye_Count];
+    glm::vec3 eye_position[ovrEye_Count];
+
+    glm::quat eye_rotation_rel[ovrEye_Count];
+    glm::vec3 eye_position_rel[ovrEye_Count];
 
     ovr_hmd_t()
         : target_size(0)
@@ -182,9 +234,9 @@ struct ovr_hmd_t
         ovrResult result;
         ovrErrorInfo errorInfo;
 
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
         // Initialize the library
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
         debug_msg("Initializing Octulus Library ...");
         result = ovr_Initialize(0);
         if(result < 0)
@@ -193,9 +245,9 @@ struct ovr_hmd_t
             exit_msg("ovr_Initialize failed : code = %d. %s", result, errorInfo.ErrorString);
         }
 
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
         // Create session = get access to the device
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
         debug_msg("Creating OVR session ...");
         result = ovr_Create(&session, &luid);
         if(result < 0)
@@ -204,46 +256,57 @@ struct ovr_hmd_t
             exit_msg("ovr_Create failed : code = %d. %s", result, errorInfo.ErrorString);
         }
 
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
         // Get and log device description
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
         debug_msg("Requesting HMD description ...");
         hmd_desc = ovr_GetHmdDesc(session);
         dump_info();
 
-        //===================================================================================================================================================================================================================
-        // Fill in necessary structures
-        //===================================================================================================================================================================================================================
+        //===============================================================================================================================================================================================================
+        // Determine texture size and set up rendering description structure
+        //===============================================================================================================================================================================================================
         _viewScaleDesc.HmdSpaceToWorldScaleInMeters = 1.0f;
 
         memset(&_sceneLayer, 0, sizeof(ovrLayerEyeFov));
         _sceneLayer.Header.Type = ovrLayerType_EyeFov;
-        _sceneLayer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft;
+        _sceneLayer.Header.Flags = ovrLayerFlag_TextureOriginAtBottomLeft; // | ovrLayerFlag_HighQuality
 
         for (ovrEyeType eye = ovrEyeType::ovrEye_Left; eye < ovrEyeType::ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
         {
             _eyeRenderDescs[eye] = ovr_GetRenderDesc(session, eye, hmd_desc.DefaultEyeFov[eye]);
-            _eyeProjections[eye] = infinite_perspective(_eyeRenderDescs[eye].Fov, 0.5f);        
+            projection_matrix[eye] = infinite_perspective(_eyeRenderDescs[eye].Fov, 0.5f);        
             _viewScaleDesc.HmdToEyePose[eye] = _eyeRenderDescs[eye].HmdToEyePose;
-        
-            ovrFovPort& fov = _sceneLayer.Fov[eye] = _eyeRenderDescs[eye].Fov;
-            ovrSizei eyeSize = ovr_GetFovTextureSize(session, eye, fov, 1.0f);
-            _sceneLayer.Viewport[eye].Size = eyeSize;
-            _sceneLayer.Viewport[eye].Pos = { target_size.x, 0 };
 
-            target_size.y = std::max(target_size.y, eyeSize.h);
-            target_size.x += eyeSize.w;
+            eye_rotation_rel[eye] = glm::make_quat(&_viewScaleDesc.HmdToEyePose[eye].Orientation.x);
+            eye_position_rel[eye] = glm::make_vec3(&_viewScaleDesc.HmdToEyePose[eye].Position.x);
+
+            const glm::quat& rotation = eye_rotation_rel[eye];
+            const glm::vec3& position = eye_position_rel[eye];
+
+            debug_msg("HmdToEyePose[%u] : Orientation = Quat {%.5f, %.5f, %.5f, %.5f}", eye, rotation.x, rotation.y, rotation.z, rotation.w);
+            debug_msg("                   Position    = Vec3 {%.5f, %.5f, %.5f}", position.x, position.y, position.z);
+
+            _sceneLayer.Fov[eye] = _eyeRenderDescs[eye].Fov;
+            ovrSizei texture_size = ovr_GetFovTextureSize(session, eye, _eyeRenderDescs[eye].Fov, 1.0f);
+            _sceneLayer.Viewport[eye] = ovrRecti 
+            {
+                .Pos = { .x = target_size.x, .y = 0 }, 
+                .Size = texture_size
+            };
+
+            target_size.x += texture_size.w;
+            target_size.y = std::max(target_size.y, texture_size.h);
         }
 
         mirror_size = target_size / 2;        
 
-        debug_msg("target_size  = %d x %d.", target_size.x, target_size.y);
+        debug_msg("target_size = %d x %d.", target_size.x, target_size.y);
         debug_msg("mirror_size = %d x %d.", mirror_size.x, mirror_size.y);
     }    
 
     void create_swap_chain()
     {
-
         ovrTextureSwapChainDesc desc = 
         {
             .Type = ovrTexture_2D,
@@ -258,12 +321,13 @@ struct ovr_hmd_t
             .BindFlags = 0
         };
 
-        ovrResult result = ovr_CreateTextureSwapChainGL(session, &desc, &_eyeTexture);
-        _sceneLayer.ColorTexture[0] = _eyeTexture;
+        ovrResult result = ovr_CreateTextureSwapChainGL(session, &desc, &target_texture);
+        _sceneLayer.ColorTexture[ovrEye_Left]  = target_texture;
+        _sceneLayer.ColorTexture[ovrEye_Right] = target_texture;
         if (result < 0)
             exit_msg("Failed to create swap textures");
 
-        result = ovr_GetTextureSwapChainLength(session, _eyeTexture, &swapchain_length);
+        result = ovr_GetTextureSwapChainLength(session, target_texture, &swapchain_length);
         if (result < 0)
             exit_msg("Unable to count swap chain textures");
 
@@ -273,9 +337,9 @@ struct ovr_hmd_t
         debug_msg("Swapchain length :: %u", swapchain_length);
         for (int i = 0; i < swapchain_length; ++i)
         {
-            GLuint chainTexId;
-            ovr_GetTextureSwapChainBufferGL(session, _eyeTexture, i, &chainTexId);
-            glBindTexture(GL_TEXTURE_2D, chainTexId);
+            GLuint texture_id;
+            ovr_GetTextureSwapChainBufferGL(session, target_texture, i, &texture_id);
+            glBindTexture(GL_TEXTURE_2D, texture_id);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -286,7 +350,7 @@ struct ovr_hmd_t
 
     void create_mirror_texture()
     {
-        ovrMirrorTextureDesc mirrorDesc = 
+        ovrMirrorTextureDesc mirror_texture_desc = 
         {
             .Format = OVR_FORMAT_R8G8B8A8_UNORM_SRGB,
             .Width  = mirror_size.x,
@@ -294,35 +358,57 @@ struct ovr_hmd_t
             .MiscFlags = 0
         };
 
-        if (ovr_CreateMirrorTextureGL(session, &mirrorDesc, &_mirrorTexture) < 0)
+        if (ovr_CreateMirrorTextureGL(session, &mirror_texture_desc, &mirror_texture) < 0)
             exit_msg("Could not create mirror texture");
+    }
+
+    void update_tracking(int frame)
+    {
+        double frame_time = ovr_GetPredictedDisplayTime(session, frame);
+        ovrTrackingState tracking_state = ovr_GetTrackingState(session, frame_time, true);
+
+        const ovrPosef& head_pose = tracking_state.HeadPose.ThePose;
+        head_rotation = glm::make_quat(&head_pose.Orientation.x);
+        head_position = glm::make_vec3(&head_pose.Position.x);
+
+        eye_rotation[ovrEye_Left ] = head_rotation * eye_rotation_rel[ovrEye_Left ];
+        eye_rotation[ovrEye_Right] = head_rotation * eye_rotation_rel[ovrEye_Right];
+
+        eye_position[ovrEye_Left ] = head_position + head_rotation * eye_position_rel[ovrEye_Left ];
+        eye_position[ovrEye_Right] = head_position + head_rotation * eye_position_rel[ovrEye_Right];
+
+        _sceneLayer.SensorSampleTime = ovr_GetTimeInSeconds();
     }
 
     void set_viewport(ovrEyeType eye)
     {
         const ovrRecti& viewport = _sceneLayer.Viewport[eye];
         glViewport(viewport.Pos.x, viewport.Pos.y, viewport.Size.w, viewport.Size.h);
+        const glm::quat& rotation = eye_rotation[eye];
+        const glm::quat& position = eye_position[eye];
+        _sceneLayer.RenderPose[eye].Orientation = ovrQuatf { .x = rotation.x , .y = rotation.y, .z = rotation.z, .w = rotation.w};
+        _sceneLayer.RenderPose[eye].Position = ovrVector3f { .x = position.x , .y = position.y, .z = position.z };
     }
 
     GLuint mirror_texture_id()
     {
         GLuint texture_id;
-        ovr_GetMirrorTextureBufferGL(session, _mirrorTexture, &texture_id);
+        ovr_GetMirrorTextureBufferGL(session, mirror_texture, &texture_id);
         return texture_id;
     }
 
     GLuint swapchain_texture_id()
     {
         int index;
-        ovr_GetTextureSwapChainCurrentIndex(session, _eyeTexture, &index);
+        ovr_GetTextureSwapChainCurrentIndex(session, target_texture, &index);
         GLuint texture_id;
-        ovr_GetTextureSwapChainBufferGL(session, _eyeTexture, index, &texture_id);
+        ovr_GetTextureSwapChainBufferGL(session, target_texture, index, &texture_id);
         return texture_id;
     }
 
     void submit_frame(int frame)
     {
-        ovr_CommitTextureSwapChain(session, _eyeTexture);
+        ovr_CommitTextureSwapChain(session, target_texture);
         ovrLayerHeader* layer_header = &_sceneLayer.Header;
         ovr_SubmitFrame(session, frame, &_viewScaleDesc, &layer_header, 1);
     }
@@ -477,6 +563,8 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     ovr_hmd.create_swap_chain();
     ovr_hmd.create_mirror_texture();
+    window.camera.set_eye_local_matrix(ovrEye_Left,  ovr_hmd.eye_rotation_rel[ovrEye_Left ], ovr_hmd.eye_position_rel[ovrEye_Left ]);
+    window.camera.set_eye_local_matrix(ovrEye_Right, ovr_hmd.eye_rotation_rel[ovrEye_Right], ovr_hmd.eye_position_rel[ovrEye_Right]);
 
     //===================================================================================================================================================================================================================
     // Set up the framebuffer objects : one for oculus usage and one for screen blitting
@@ -525,7 +613,7 @@ int main(int argc, char** argv)
     const float cube_size = 10.0f;
     const float light_radius = 5.0f;
 
-    room_t granite_room(cube_size);    
+    room_t granite_room(cube_size);
 
     //===================================================================================================================================================================================================================
     // Main rendering loop
@@ -535,10 +623,10 @@ int main(int argc, char** argv)
         window.new_frame();
 
         //===============================================================================================================================================================================================================
-        // update eyes position
+        // update tracking data : head and eyes positions and orientation and set up eyes view matrices
         //===============================================================================================================================================================================================================
-        ovrPosef eyePoses[2];
-        ovr_GetEyePoses(ovr_hmd.session, window.frame, true, ovr_hmd._viewScaleDesc.HmdToEyePose, eyePoses, &ovr_hmd._sceneLayer.SensorSampleTime);
+        ovr_hmd.update_tracking(window.frame);
+        window.camera.set_hmd_view_matrix(ovr_hmd.head_rotation, ovr_hmd.head_position);
 
         //===============================================================================================================================================================================================================
         // render the scene for both eyes
@@ -557,15 +645,9 @@ int main(int argc, char** argv)
         {
             ovr_hmd.set_viewport(eye);
 
-            ovr_hmd._sceneLayer.RenderPose[eye] = eyePoses[eye];
-			glm::mat4 projection_matrix = ovr_hmd._eyeProjections[eye];
+			glm::mat4 projection_matrix = ovr_hmd.projection_matrix[eye];
+            glm::mat4 view_matrix = window.camera.get_eye_view_matrix(eye);
 
-            glm::vec3 position = glm::make_vec3(&eyePoses[eye].Position.x);
-            glm::quat ori_quat = glm::make_quat(&eyePoses[eye].Orientation.x);
-            glm::mat4 orientation = glm::mat4_cast(ori_quat);
-            glm::mat4 translation = glm::translate(position);
-            glm::mat4 view_matrix = glm::inverse(orientation) * glm::inverse(translation) * window.camera.view_matrix;
-    
             glm::vec3 camera_ws = window.camera.position();
             glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
     
@@ -573,7 +655,6 @@ int main(int argc, char** argv)
             uni_light_ws  = light_ws;
             uni_camera_ws = camera_ws;
             granite_room.render();
-    
         }
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);

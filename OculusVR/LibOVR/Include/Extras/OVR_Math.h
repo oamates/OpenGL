@@ -1902,7 +1902,7 @@ template <class T> class Pose
     Vector3<T> Apply(const Vector3<T>& v) const 
         { return Transform(v); }
 
-    Pose operator*(const Pose& other) const 
+    Pose operator * (const Pose& other) const 
         { return Pose(Rotation * other.Rotation, Apply(other.Translation)); }
 
     Pose Inverted() const 
