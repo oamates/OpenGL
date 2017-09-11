@@ -5,7 +5,7 @@ layout (std140, binding = 0) uniform attractor_block
     vec4 attractor[2];
 };
 
-layout (local_size_x = 128) in;
+layout (local_size_x = 1024) in;
 
 layout (rgba32f, binding = 0) uniform imageBuffer velocity_buffer;
 layout (rgba32f, binding = 1) uniform imageBuffer position_buffer;

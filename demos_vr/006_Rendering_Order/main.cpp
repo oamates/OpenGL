@@ -119,6 +119,12 @@ struct hmd_camera_t
         const glm::mat4& vmatrix = eye_view_matrix[eye];
         return -glm::inverse(glm::mat3(vmatrix)) * glm::vec3(vmatrix[3]);
     }
+
+    glm::vec3 head_position() const
+    {
+        glm::mat4 vmatrix = hmd_view_matrix * view_matrix;
+        return -glm::inverse(glm::mat3(vmatrix)) * glm::vec3(vmatrix[3]);
+    }
 };
 
 //=======================================================================================================================================================================================================================
@@ -127,6 +133,7 @@ struct hmd_camera_t
 struct demo_window_t : public glfw_window_t
 {
     hmd_camera_t camera;
+    bool position_changed = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -139,10 +146,10 @@ struct demo_window_t : public glfw_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
-        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
-        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
-        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) { camera.move_forward(frame_dt);   position_changed = true; }
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) { camera.move_backward(frame_dt);  position_changed = true; }
+        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) { camera.straight_right(frame_dt); position_changed = true; }
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) { camera.straight_left(frame_dt);  position_changed = true; }
 
         if (action != GLFW_RELEASE) return;
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, 1);
@@ -532,84 +539,149 @@ int main(int argc, char** argv)
     glGenFramebuffers(1, &mirror_fbo_id);
 
     //===================================================================================================================================================================================================================
-    // create programs : one for particle compute, the other for render
+    // create shaders and uniforms
     //===================================================================================================================================================================================================================
-    glsl_program_t particle_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/particle.cs"));
-    uniform_t uniform_dt = particle_compute["dt"];
-    GLint uniform_time = particle_compute["time"];
+    glsl_program_t sorter0(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter0.cs"));
+    sorter0.enable();
+    uniform_t uni_s0_camera_ws = sorter0["camera_ws"];
 
-    glsl_program_t particle_render(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/particle_render.vs"),
-                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/particle_render.fs"));
-    uniform_t uni_pv_matrix = particle_render["projection_view_matrix"];
+    glsl_program_t sorter1(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/sorter1.cs"));
+    sorter1.enable();
+    uniform_t uni_s1_camera_ws = sorter1["camera_ws"];
+
+    glsl_program_t alpha_blender(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ab.vs"),
+                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ab.gs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ab.fs"));
+
+    alpha_blender.enable();
+
+    uniform_t uni_ab_pv_matrix = alpha_blender["projection_view_matrix"];
+    uniform_t uni_ab_camera_z  = alpha_blender["camera_z"];
+    uniform_t uni_ab_camera_ws = alpha_blender["camera_ws"];
+    uniform_t uni_ab_light_ws  = alpha_blender["light_ws"];
+    uniform_t uni_ab_time      = alpha_blender["time"];
+
+    alpha_blender["diffuse_tex"] = 0;
+    alpha_blender["bump_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // point data initialization 
     //===================================================================================================================================================================================================================
-    const int PARTICLE_GROUP_SIZE  = 1024;
-    const int PARTICLE_GROUP_COUNT = 8192;
-    const int PARTICLE_COUNT       = PARTICLE_GROUP_SIZE * PARTICLE_GROUP_COUNT;
-    const int ATTRACTOR_COUNT      = 2;
-
-    float attractor_masses[ATTRACTOR_COUNT];
-
-    GLuint vao_id, position_buffer, velocity_buffer, attractor_buffer;
+    GLuint vao_id, pbo_id, vbo_id, ibo_id;
 
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
-    glGenBuffers(1, &position_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
-    glBufferData(GL_ARRAY_BUFFER, PARTICLE_COUNT * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
 
-    glm::vec4* positions = (glm::vec4*) glMapBufferRange(GL_ARRAY_BUFFER, 0, PARTICLE_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    GLuint GROUP_SIZE = 128;
+    GLuint GROUP_COUNT = 16;
+    GLuint POINT_COUNT = GROUP_SIZE * GROUP_COUNT;
+    
+    std::vector<glm::mat3> point_frame;
+    std::vector<glm::vec4> point_positions;
 
-    for (int i = 0; i < PARTICLE_COUNT; i++)
-        positions[i] = glm::vec4(glm::ballRand(100.0f), glm::gaussRand(0.0f, 1.0f));
+    int pX = 79, pY = 83, pZ = 89;
+    int seed = 31337;
 
-    glUnmapBuffer(GL_ARRAY_BUFFER);
+    for(GLuint i = 0; i < POINT_COUNT; ++i)
+    {
+        seed += 7919;
+        glm::ivec3 q = glm::ivec3(seed % pX, seed % pY, seed % pZ);
+
+        float r = glm::gaussRand(0.0f, 1.0f);
+        float radius = 0.125f / (1.0f + r * r);
+        glm::vec3 center = glm::vec3(q) - 0.5f * glm::vec3(pX - 1, pY - 1, pZ - 1) + glm::sphericalRand(radius);
+
+        point_positions.push_back(glm::vec4(1.75f * center, glm::linearRand(0.0f, 1.0f)));
+
+        glm::vec3 axis_x = glm::sphericalRand(1.0f);
+        glm::vec3 axis_y = glm::normalize(glm::cross(axis_x, glm::sphericalRand(1.0f)));
+        glm::vec3 axis_z = glm::sphericalRand(1.0f);
+        point_frame.push_back(glm::mat3(axis_x, axis_y, axis_z));
+    }
+
+    glGenBuffers(1, &pbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, pbo_id);
+    glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::vec4), point_positions.data(), GL_STATIC_DRAW);
+
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glGenBuffers(1, &velocity_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, velocity_buffer);
-    glBufferData(GL_ARRAY_BUFFER, PARTICLE_COUNT * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
+    GLuint position_tbo_id;
+    glGenTextures(1, &position_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, position_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, pbo_id);
+    glBindImageTexture(1, position_tbo_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);    
 
-    glm::vec4* velocities = (glm::vec4*) glMapBufferRange(GL_ARRAY_BUFFER, 0, PARTICLE_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, POINT_COUNT * sizeof(glm::mat3), point_frame.data(), GL_STATIC_DRAW);
 
-    for (int i = 0; i < PARTICLE_COUNT; i++)
-        velocities[i] = glm::vec4(glm::gaussRand(0.0f, 10.0f) * glm::sphericalRand(1.0f), 0.0f);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glEnableVertexAttribArray(3);
 
-    glUnmapBuffer(GL_ARRAY_BUFFER);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3), (const GLvoid*) 0);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3), (const GLvoid*) 12);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(glm::mat3), (const GLvoid*) 24);
 
-    GLuint position_tbo, velocity_tbo;
-    glGenTextures(1, &position_tbo);
-    glBindTexture(GL_TEXTURE_BUFFER, position_tbo);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, position_buffer);
+    //===================================================================================================================================================================================================================
+    // prepare position buffer texture
+    //===================================================================================================================================================================================================================
+    glGenBuffers(1, &ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, POINT_COUNT * sizeof(GLuint), 0, GL_DYNAMIC_COPY);
 
-    glGenTextures(1, &velocity_tbo);
-    glBindTexture(GL_TEXTURE_BUFFER, velocity_tbo);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, velocity_buffer);
+    GLuint* indices = (GLuint*) glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, POINT_COUNT * sizeof(GLuint), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    for (GLuint i = 0; i < POINT_COUNT; i++) indices[i] = i; 
+    glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 
-    glGenBuffers(1, &attractor_buffer);
-    glBindBuffer(GL_UNIFORM_BUFFER, attractor_buffer);
-    glBufferData(GL_UNIFORM_BUFFER, ATTRACTOR_COUNT * sizeof(glm::vec4), 0, GL_STATIC_DRAW);
+    GLuint indices_tbo_id;
+    glGenTextures(1, &indices_tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, indices_tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, ibo_id);
+    glBindImageTexture(0, indices_tbo_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32I);    
 
-    for (int i = 0; i < ATTRACTOR_COUNT; i++)
-        attractor_masses[i] = 1.5f + glm::abs(glm::gaussRand(0.0f, 12.0f));
+    //===================================================================================================================================================================================================================
+    // Load diffuse texture
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
+    GLuint diff_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm_alpha.png");
 
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, attractor_buffer);
-    glBindImageTexture(0, velocity_tbo, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(1, position_tbo, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glActiveTexture(GL_TEXTURE1);
+    GLuint bump_tex_id = image::png::texture2d("../../../resources/plato_tex2d/cube_symm_bump.png");
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : 
     // * background color -- dark blue
-    // * DEPTH_TEST disabled
-    // * Blending enabled
+    // * DEPTH_TEST enabled, GL_LESS - accept fragment if it closer to the camera than the former one
     //===================================================================================================================================================================================================================
-    glClearColor(0.01f, 0.0f, 0.05f, 0.0f);
-    glDisable(GL_DEPTH_TEST);
+    glClearColor(0.01f, 0.00f, 0.05f, 1.0f);                                                                                // dark blue background
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    glDisable(GL_DEPTH_TEST);
+    glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA /* GL_ONE, GL_ZERO */);
+
+    //===================================================================================================================================================================================================================
+    // create and run CS to do the initial index buffer sorting w.r.t distance to camera
+    //===================================================================================================================================================================================================================
+    glsl_program_t bitonic_sorter(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/bitonic_sort.cs"));
+
+    bitonic_sorter.enable();
+    uniform_t uni_bs_stage = bitonic_sorter["stage"];
+    uniform_t uni_bs_pass  = bitonic_sorter["pass"];
+
+    int stages = 0;
+    for(unsigned int t = POINT_COUNT; t > 1; t >>= 1) ++stages;
+
+    for(int stage = 0; stage < stages; ++stage)
+    {
+        uni_bs_stage = stage;
+        for(int pass = 0; pass < stage + 1; ++pass)
+        {
+            uni_bs_pass = pass;
+            glDispatchCompute(GROUP_COUNT / 2, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+    }
 
     //===================================================================================================================================================================================================================
     // main rendering loop
@@ -624,27 +696,9 @@ int main(int argc, char** argv)
         ovr_hmd.update_tracking(window.frame);
         window.camera.set_hmd_view_matrix(ovr_hmd.head_rotation, ovr_hmd.head_position);
 
-        //===============================================================================================================================================================================================================
-        // update particle positions
-        //===============================================================================================================================================================================================================
         float time = window.frame_ts;
-        float dt = glm::min(25.0 * window.frame_dt, 2.0);
-
-        glm::vec4* attractors = (glm::vec4*) glMapBufferRange(GL_UNIFORM_BUFFER, 0, ATTRACTOR_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
-        for (int i = 0; i < ATTRACTOR_COUNT; i++)
-        {
-            attractors[i] = glm::vec4(glm::sin(time * (i + 4) * 0.05f + 1.44f) * 25.0f,
-                                      glm::sin(time * (i + 7) * 0.09f + 1.44f) * 25.0f,
-                                      glm::sin(time * (i + 3) * 0.03f + 1.44f) * 25.0f,
-                                      attractor_masses[i]);
-        }
-
-        glUnmapBuffer(GL_UNIFORM_BUFFER);
-        particle_compute.enable();
-        uniform_dt = dt;
-        uniform_time = time;
-        glDispatchCompute(PARTICLE_GROUP_COUNT, 1, 1);
+        float angle = 0.125 * time;
+        glm::vec3 light_ws = 15.0f * glm::vec3(glm::cos(angle), glm::sin(angle), 0.0f);
 
         //===============================================================================================================================================================================================================
         // bind swapchain texture ...
@@ -657,7 +711,7 @@ int main(int argc, char** argv)
         // ... and render the scene for both eyes
         //===============================================================================================================================================================================================================
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        particle_render.enable();
+        alpha_blender.enable();
         for (ovrEyeType eye = ovrEyeType::ovrEye_Left; eye < ovrEyeType::ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
         {
             ovr_hmd.set_viewport(eye);
@@ -665,9 +719,32 @@ int main(int argc, char** argv)
             const glm::mat4& view_matrix = window.camera.eye_view_matrix[eye];
             glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
 
-            uni_pv_matrix = projection_view_matrix;
-            glBindVertexArray(vao_id);
-            glDrawArrays(GL_POINTS, 0, PARTICLE_COUNT);
+            glm::vec3 camera_z = glm::vec3(view_matrix[0][2], view_matrix[1][2], view_matrix[2][2]);
+            glm::vec3 camera_ws = window.camera.position(eye);
+
+            uni_ab_pv_matrix = projection_view_matrix;
+            uni_ab_camera_z = camera_z;
+            uni_ab_camera_ws = camera_ws;
+            uni_ab_light_ws = light_ws;
+            uni_ab_time = time;
+
+            glDrawElements(GL_POINTS, POINT_COUNT, GL_UNSIGNED_INT, 0);
+        }
+
+        if (window.position_changed)
+        {
+            glm::vec3 camera_ws = window.camera.head_position();
+            sorter0.enable();
+            uni_s0_camera_ws = camera_ws;
+            glDispatchCompute(GROUP_COUNT / 2, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);            
+
+            sorter1.enable();
+            uni_s1_camera_ws = camera_ws;
+            glDispatchCompute(GROUP_COUNT / 2, 1, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            window.position_changed = false;
         }
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);

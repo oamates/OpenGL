@@ -24,9 +24,7 @@
 #include "glfw_window.hpp"
 #include "camera.hpp"
 #include "image.hpp"
-#include "plato.hpp"
-#include "polyhedron.hpp"
-#include "surface.hpp"
+#include "glsl_noise.hpp"
 
 glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 {
@@ -47,7 +45,7 @@ glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 struct hmd_camera_t
 {
     double linear_speed;
-    double angular_speed;
+    double angular_speed;    
 
     //===================================================================================================================================================================================================================
     // VR device relative (to sensor) position and orientation
@@ -119,6 +117,12 @@ struct hmd_camera_t
         const glm::mat4& vmatrix = eye_view_matrix[eye];
         return -glm::inverse(glm::mat3(vmatrix)) * glm::vec3(vmatrix[3]);
     }
+
+    glm::vec3 head_position() const
+    {
+        glm::mat4 vmatrix = hmd_view_matrix * view_matrix;
+        return -glm::inverse(glm::mat3(vmatrix)) * glm::vec3(vmatrix[3]);
+    }
 };
 
 //=======================================================================================================================================================================================================================
@@ -127,6 +131,7 @@ struct hmd_camera_t
 struct demo_window_t : public glfw_window_t
 {
     hmd_camera_t camera;
+    bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -139,10 +144,10 @@ struct demo_window_t : public glfw_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
-        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);  
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt); 
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
-        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt); 
 
         if (action != GLFW_RELEASE) return;
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, 1);
@@ -485,6 +490,52 @@ struct ovr_hmd_t
     }
 };
 
+
+glm::vec3 tri(const glm::vec3& x)
+{
+    return glm::abs(glm::fract(x) - glm::vec3(0.5f));
+}
+
+float potential(const glm::vec3& p)
+{    
+    glm::vec3 q = p;
+    glm::vec3 oq = tri(1.1f * q + tri(1.1f * glm::vec3(q.z, q.x, q.y)));
+    float ground = q.z + 3.5f + glm::dot(oq, glm::vec3(0.067));
+    q += (oq - glm::vec3(0.25f)) * 0.3f;
+    q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
+    float canyon = 0.95f * (glm::length(p) - 1.05f);
+    float sphere = 11.0f - glm::length(p);
+    return glm::min(glm::min(ground, canyon), sphere);
+}
+
+glm::vec3 gradient(const glm::vec3& p)
+{
+    const float delta = 0.075f;
+
+    const glm::vec3 dX = glm::vec3(delta, 0.0f, 0.0f);
+    const glm::vec3 dY = glm::vec3(0.0f, delta, 0.0f);
+    const glm::vec3 dZ = glm::vec3(0.0f, 0.0f, delta);
+
+    glm::vec3 dF = glm::vec3
+    (
+        potential(p + dX) - potential(p - dX),
+        potential(p + dY) - potential(p - dY),
+        potential(p + dZ) - potential(p - dZ)
+    );
+
+    return glm::normalize(dF);
+}
+
+glm::vec3 move(glm::vec3& position, glm::vec3& velocity, float dt)
+{
+    glm::vec3 v0 = gradient(position);
+    glm::vec3 v1 = velocity;
+
+    glm::vec3 v = glm::normalize(v1 + v0);
+    velocity = v;
+    position = position + dt * v;
+}
+
 //=======================================================================================================================================================================================================================
 //  Program entry point
 //=======================================================================================================================================================================================================================
@@ -532,84 +583,57 @@ int main(int argc, char** argv)
     glGenFramebuffers(1, &mirror_fbo_id);
 
     //===================================================================================================================================================================================================================
-    // create programs : one for particle compute, the other for render
+    // Shader and uniform variables initialization
     //===================================================================================================================================================================================================================
-    glsl_program_t particle_compute(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/particle.cs"));
-    uniform_t uniform_dt = particle_compute["dt"];
-    GLint uniform_time = particle_compute["time"];
+    glsl_program_t ray_marcher(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ray_marcher.vs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
+    ray_marcher.enable();
+    uniform_t uni_camera_matrix = ray_marcher["camera_matrix"];
+    uniform_t uni_camera_ws = ray_marcher["camera_ws"];
+    uniform_t uni_light_ws = ray_marcher["light_ws"];
+    uniform_t uni_time = ray_marcher["time"];
 
-    glsl_program_t particle_render(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/particle_render.vs"),
-                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/particle_render.fs"));
-    uniform_t uni_pv_matrix = particle_render["projection_view_matrix"];
+    glm::vec2 focal_scale[ovrEye_Count] = 
+    {
+        glm::vec2(1.0f / ovr_hmd.projection_matrix[ovrEye_Left ][0][0], 1.0f / ovr_hmd.projection_matrix[ovrEye_Left ][1][1]),
+        glm::vec2(1.0f / ovr_hmd.projection_matrix[ovrEye_Right][0][0], 1.0f / ovr_hmd.projection_matrix[ovrEye_Right][1][1]),
+    };
+
+    glm::vec2 focal_shift[ovrEye_Count] = 
+    {
+        glm::vec2(1.0f / ovr_hmd.projection_matrix[ovrEye_Left ][2][0], 1.0f / ovr_hmd.projection_matrix[ovrEye_Left ][2][1]),
+        glm::vec2(1.0f / ovr_hmd.projection_matrix[ovrEye_Right][2][0], 1.0f / ovr_hmd.projection_matrix[ovrEye_Right][2][1]),
+    };
+
+    ray_marcher["focal_scale"] = focal_scale;
+    ray_marcher["focal_shift"] = focal_shift;
+    ray_marcher["noise_tex"] = 1;
+    ray_marcher["stone_tex"] = 2;
 
     //===================================================================================================================================================================================================================
-    // point data initialization 
+    // Load noise textures - for very fast 2d noise calculation
     //===================================================================================================================================================================================================================
-    const int PARTICLE_GROUP_SIZE  = 1024;
-    const int PARTICLE_GROUP_COUNT = 8192;
-    const int PARTICLE_COUNT       = PARTICLE_GROUP_SIZE * PARTICLE_GROUP_COUNT;
-    const int ATTRACTOR_COUNT      = 2;
+    glActiveTexture(GL_TEXTURE1);
+    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
+    glActiveTexture(GL_TEXTURE2);
+    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
-    float attractor_masses[ATTRACTOR_COUNT];
-
-    GLuint vao_id, position_buffer, velocity_buffer, attractor_buffer;
-
+    //===================================================================================================================================================================================================================
+    // OpenGL rendering parameters setup
+    //===================================================================================================================================================================================================================
+    GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
-    glGenBuffers(1, &position_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, position_buffer);
-    glBufferData(GL_ARRAY_BUFFER, PARTICLE_COUNT * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
 
-    glm::vec4* positions = (glm::vec4*) glMapBufferRange(GL_ARRAY_BUFFER, 0, PARTICLE_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    glm::vec3 light_ws = glm::sphericalRand(11.0f);
+    glm::vec3 light_velocity = glm::sphericalRand(1.0f);
+    float p = potential(light_ws);
 
-    for (int i = 0; i < PARTICLE_COUNT; i++)
-        positions[i] = glm::vec4(glm::ballRand(100.0f), glm::gaussRand(0.0f, 1.0f));
-
-    glUnmapBuffer(GL_ARRAY_BUFFER);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
-    glGenBuffers(1, &velocity_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, velocity_buffer);
-    glBufferData(GL_ARRAY_BUFFER, PARTICLE_COUNT * sizeof(glm::vec4), 0, GL_DYNAMIC_COPY);
-
-    glm::vec4* velocities = (glm::vec4*) glMapBufferRange(GL_ARRAY_BUFFER, 0, PARTICLE_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
-    for (int i = 0; i < PARTICLE_COUNT; i++)
-        velocities[i] = glm::vec4(glm::gaussRand(0.0f, 10.0f) * glm::sphericalRand(1.0f), 0.0f);
-
-    glUnmapBuffer(GL_ARRAY_BUFFER);
-
-    GLuint position_tbo, velocity_tbo;
-    glGenTextures(1, &position_tbo);
-    glBindTexture(GL_TEXTURE_BUFFER, position_tbo);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, position_buffer);
-
-    glGenTextures(1, &velocity_tbo);
-    glBindTexture(GL_TEXTURE_BUFFER, velocity_tbo);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, velocity_buffer);
-
-    glGenBuffers(1, &attractor_buffer);
-    glBindBuffer(GL_UNIFORM_BUFFER, attractor_buffer);
-    glBufferData(GL_UNIFORM_BUFFER, ATTRACTOR_COUNT * sizeof(glm::vec4), 0, GL_STATIC_DRAW);
-
-    for (int i = 0; i < ATTRACTOR_COUNT; i++)
-        attractor_masses[i] = 1.5f + glm::abs(glm::gaussRand(0.0f, 12.0f));
-
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, attractor_buffer);
-    glBindImageTexture(0, velocity_tbo, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(1, position_tbo, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-
-    //===================================================================================================================================================================================================================
-    // OpenGL rendering parameters setup : 
-    // * background color -- dark blue
-    // * DEPTH_TEST disabled
-    // * Blending enabled
-    //===================================================================================================================================================================================================================
-    glClearColor(0.01f, 0.0f, 0.05f, 0.0f);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    while(p < 0.5f)
+    {
+        move(light_ws, light_velocity, 0.125f);
+        p = potential(light_ws);
+    }
 
     //===================================================================================================================================================================================================================
     // main rendering loop
@@ -624,27 +648,18 @@ int main(int argc, char** argv)
         ovr_hmd.update_tracking(window.frame);
         window.camera.set_hmd_view_matrix(ovr_hmd.head_rotation, ovr_hmd.head_position);
 
-        //===============================================================================================================================================================================================================
-        // update particle positions
-        //===============================================================================================================================================================================================================
         float time = window.frame_ts;
-        float dt = glm::min(25.0 * window.frame_dt, 2.0);
-
-        glm::vec4* attractors = (glm::vec4*) glMapBufferRange(GL_UNIFORM_BUFFER, 0, ATTRACTOR_COUNT * sizeof(glm::vec4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-
-        for (int i = 0; i < ATTRACTOR_COUNT; i++)
+        if (!window.pause)
         {
-            attractors[i] = glm::vec4(glm::sin(time * (i + 4) * 0.05f + 1.44f) * 25.0f,
-                                      glm::sin(time * (i + 7) * 0.09f + 1.44f) * 25.0f,
-                                      glm::sin(time * (i + 3) * 0.03f + 1.44f) * 25.0f,
-                                      attractor_masses[i]);
-        }
+            move(light_ws, light_velocity, window.frame_dt);
+            float p = potential(light_ws);
 
-        glUnmapBuffer(GL_UNIFORM_BUFFER);
-        particle_compute.enable();
-        uniform_dt = dt;
-        uniform_time = time;
-        glDispatchCompute(PARTICLE_GROUP_COUNT, 1, 1);
+            while(p < 0.5f)
+            {
+                move(light_ws, light_velocity, 0.125f);
+                p = potential(light_ws);
+            }
+        }
 
         //===============================================================================================================================================================================================================
         // bind swapchain texture ...
@@ -654,21 +669,29 @@ int main(int argc, char** argv)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //===============================================================================================================================================================================================================
-        // ... and render the scene for both eyes
+        // render raymarch scene
         //===============================================================================================================================================================================================================
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        particle_render.enable();
-        for (ovrEyeType eye = ovrEyeType::ovrEye_Left; eye < ovrEyeType::ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
-        {
-            ovr_hmd.set_viewport(eye);
-            const glm::mat4& projection_matrix = ovr_hmd.projection_matrix[eye];
-            const glm::mat4& view_matrix = window.camera.eye_view_matrix[eye];
-            glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
+        ray_marcher.enable();
 
-            uni_pv_matrix = projection_view_matrix;
-            glBindVertexArray(vao_id);
-            glDrawArrays(GL_POINTS, 0, PARTICLE_COUNT);
-        }
+        uni_time = time;
+        uni_light_ws = light_ws;
+
+        glm::mat4 camera_matrix[ovrEye_Count] = 
+        {
+            glm::inverse(window.camera.eye_view_matrix[ovrEye_Left ]),
+            glm::inverse(window.camera.eye_view_matrix[ovrEye_Right])
+        };
+        uni_camera_matrix = camera_matrix;
+
+        glm::vec3 camera_ws[ovrEye_Count] = 
+        {
+            glm::vec3(camera_matrix[ovrEye_Left ][3]),
+            glm::vec3(camera_matrix[ovrEye_Right][3])
+        };
+        uni_camera_ws = camera_ws;
+
+        glBindVertexArray(vao_id);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
 
@@ -692,6 +715,10 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // destroy GLFW window and terminate the library
     //===================================================================================================================================================================================================================
+    glDeleteTextures(1, &noise_tex);
+    glDeleteTextures(1, &stone_tex);
+    glDeleteVertexArrays(1, &vao_id);
+
     glfw::terminate();
     return 0;
 }

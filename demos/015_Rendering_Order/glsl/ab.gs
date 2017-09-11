@@ -48,7 +48,7 @@ out vec3 light;
 out vec2 uv;
 out float hue;
 
-const float cube_size = 2.75;
+const float cube_size = 2.25;
 
 void main()
 {
