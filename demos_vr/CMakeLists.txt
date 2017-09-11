@@ -1,7 +1,7 @@
 add_subdirectory (001_Octulus_Initialization)
 add_subdirectory (002_Tracker)
 add_subdirectory (003_Room)
-add_subdirectory (004_Hello_Rift)
+add_subdirectory (004_Plato_Solids)
 add_subdirectory (005_Rift_Attractor)
 add_subdirectory (006_Crytek_Sponza)
 

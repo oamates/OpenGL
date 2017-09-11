@@ -27,8 +27,8 @@ void main()
     tangent_y = tangent_y_in;
     normal = normal_in;
     
-	gl_Position = projection_view_matrix * position_ws;
-	uv = uv_in;
+    gl_Position = projection_view_matrix * position_ws;
+    uv = uv_in;
 }
 
 

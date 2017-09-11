@@ -38,7 +38,7 @@ void polyhedron::generate_pft2_vao(const glm::vec3* positions, const glm::vec3* 
 //=======================================================================================================================================================================================================================
 // Generates position + frame + texture coordinate buffer for one of the five regular plato solids
 //=======================================================================================================================================================================================================================
-void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces)
+void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces, float scale, bool invert_normals)
 {
     int E = V + F - 2;
     int Q = (2 * E) / F;
@@ -72,17 +72,25 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
     {
         glm::vec3 face_center = positions[faces[index]];
         for (int j = 1; j < Q; ++j) face_center += positions[faces[index + j]];
-        face_center /= Q;
+        face_center *= (scale / Q);
         glm::mat2x3 tangent_basis = glm::mat2x3(positions[faces[index + 0]] - positions[faces[index + 1]], positions[faces[index + 0]] - positions[faces[index + 2]]);
         glm::mat2x3 tangent_xy = tangent_basis * uvs_basis_inv;    
-        glm::vec3 normal = normals[i];
+        glm::vec3 normal = invert_normals ? -normals[i] : normals[i];
 
         for (int j = 0; j < Q; ++j)
         {
-            vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);  
-            vertices[buffer_index++] = vertex_pft2_t(positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);  
+            if (invert_normals)
+            {
+                vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);  
+                vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);  
+            }
+            else
+            {
+                vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);  
+                vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);  
+            }
             int k = (j == Q - 1) ? 0 : j + 1;
-            vertices[buffer_index++] = vertex_pft2_t(positions[faces[index + k]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[k]);  
+            vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + k]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[k]);  
         }
         index += Q;
     }
@@ -96,7 +104,7 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
 //=======================================================================================================================================================================================================================
 // Generates position + frame + texture coordinate buffer for one of the five regular plato solids
 //=======================================================================================================================================================================================================================
-void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces)
+void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces, float scale, bool invert_normals)
 {
     int E = V + F - 2;
     int Q = (2 * E) / F;
@@ -120,15 +128,23 @@ void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, cons
     {
         glm::vec3 face_center = positions[faces[index]];
         for (int j = 1; j < Q; ++j) face_center += positions[faces[index + j]];
-        face_center /= Q;
+        face_center *= (scale / Q);
 
-        glm::vec3 normal = normals[i];
+        glm::vec3 normal = invert_normals ? -normals[i] : normals[i];
         for (int j = 0; j < Q; ++j)
         {
-            vertices[buffer_index++] = vertex_pnt2_t(face_center, normal, square_center);
-            vertices[buffer_index++] = vertex_pnt2_t(positions[faces[index + j]], normal, square_center + 0.5f * polygon[j]);
+            if (invert_normals)
+            {
+                vertices[buffer_index++] = vertex_pnt2_t(scale * positions[faces[index + j]], normal, square_center + 0.5f * polygon[j]);
+                vertices[buffer_index++] = vertex_pnt2_t(face_center, normal, square_center);
+            }
+            else
+            {
+                vertices[buffer_index++] = vertex_pnt2_t(face_center, normal, square_center);
+                vertices[buffer_index++] = vertex_pnt2_t(scale * positions[faces[index + j]], normal, square_center + 0.5f * polygon[j]);
+            }
             int k = (j == Q - 1) ? 0 : j + 1;
-            vertices[buffer_index++] = vertex_pnt2_t(positions[faces[index + k]], normal, square_center + 0.5f * polygon[k]);
+            vertices[buffer_index++] = vertex_pnt2_t(scale * positions[faces[index + k]], normal, square_center + 0.5f * polygon[k]);
         };
         index += Q;
     }

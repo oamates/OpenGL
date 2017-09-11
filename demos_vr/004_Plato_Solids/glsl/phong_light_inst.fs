@@ -29,13 +29,14 @@ void main()
 
     if (dp > 0.0f) cos_alpha = clamp(dot(e, r), 0.0f, 1.0f);
 
-    vec3 diffuse_color = pow(texture(diffuse_tex, uv).rgb, vec3(2.2));
-    vec3 ambient_color = 0.25 * diffuse_color;
+
+    vec3 diffuse_color = texture(diffuse_tex, uv).rgb;
+    vec3 ambient_color = 0.125 * diffuse_color;
     vec3 specular_color = vec3(1.0f);
 
     vec3 color =  ambient_color
-                + 3.75f * diffuse_color * cos_theta / (1.0 + 1.65 * light_distance)
-                + 1.50f * specular_color * pow(cos_alpha, 40) / (1.0 + 1.65 * light_distance);
+                + diffuse_color * cos_theta / (1.0 + 0.125 * light_distance)
+                + specular_color * pow(cos_alpha, 60) / (1.5 + 0.25 * light_distance);
 
     FragmentColor = vec4(color, 1.0f);
 }
