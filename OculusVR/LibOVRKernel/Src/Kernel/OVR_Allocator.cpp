@@ -1,28 +1,17 @@
-/************************************************************************************
-
-Filename    :   OVR_Allocator.cpp
-Content     :   Installable memory allocator implementation
-Created     :   September 19, 2012
-Notes       :
-
-Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
-
-Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License");
-you may not use the Oculus VR Rift SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
-
-You may obtain a copy of the License at
-
-http://www.oculusvr.com/licenses/LICENSE-3.3
-
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-************************************************************************************/
+//========================================================================================================================================================================================================================
+// Installable memory allocator implementation
+// Created : September 19, 2012
+// Copyright 2014 Oculus VR, LLC All Rights reserved.
+//
+// Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); you may not use the Oculus VR Rift SDK except in compliance with the License,
+// which is provided at the time of installation or download, or which otherwise accompanies this software in either electronic or hard copy form.
+//
+// You may obtain a copy of the License at http://www.oculusvr.com/licenses/LICENSE-3.3
+//
+// Unless required by applicable law or agreed to in writing, the Oculus VR SDK distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and limitations under the License.
+//========================================================================================================================================================================================================================
 
 #include "OVR_Allocator.h"
 #include "OVR_DebugHelp.h"
@@ -49,7 +38,8 @@ limitations under the License.
     #include <unistd.h>
     #include <sys/mman.h>
     #include <execinfo.h>
-    #include <malloc/malloc.h>
+    #include <malloc.h>
+    //#include <stdlib.h>
 #endif
 
 #if !defined(OVR_DEBUG_TRACE)
@@ -60,16 +50,14 @@ limitations under the License.
     #endif
 #endif
 
-//-----------------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** OVR_DEBUG_CRT_PRESENT
 //
 // Defined as 0 or 1. 0 means release CRT is present (release build).
-// Indicates if the debug version or the CRT will be linked into the application.
-// If it's present then malloc hooking will need to include the debug malloc functions
-// that are present in the debug CRT. If it's not present then we need to not include
-// them, as they won't be present.
+// Indicates if the debug version or the CRT will be linked into the application. If it's present then malloc hooking will need to include the debug 
+// malloc functions that are present in the debug CRT. If it's not present then we need to not include them, as they won't be present.
 // You can't modify this value' it's a property of the build environment.
-//
+//========================================================================================================================================================================================================================
 #if !defined(OVR_DEBUG_CRT_PRESENT)
     #if defined(_DEBUG)
         #define OVR_DEBUG_CRT_PRESENT 1
@@ -78,103 +66,88 @@ limitations under the License.
     #endif
 #endif
 
-//-----------------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** OVR_STATIC_CRT_PRESENT
 //
 // Defined as 0 or 1. 0 means DLL CRT, static means static CRT.
 // Indicates if the CRT being compiled against is the static CRT or the DLL CRT.
 // You can't modify this value' it's a property of the build environment.
-//
+//========================================================================================================================================================================================================================
 #if !defined(OVR_STATIC_CRT_PRESENT)
-#if defined(_DLL) // VC++ defines _DLL if you are building against the DLL CRT.
-#define OVR_STATIC_CRT_PRESENT 0
-#else
-#define OVR_STATIC_CRT_PRESENT 1
-#endif
+    #if defined(_DLL) // VC++ defines _DLL if you are building against the DLL CRT.
+        #define OVR_STATIC_CRT_PRESENT 0
+    #else
+        #define OVR_STATIC_CRT_PRESENT 1
+    #endif
 #endif
 
-//-----------------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** OVR_ALLOCATOR_DEBUG_PAGE_HEAP_ENABLED
 //
-// Defined as 0 or 1.
-// If enabled then we use our debug page heap instead of a regular heap by default.
-// However, even if this is disabled it can still be enabled at runtime by manually
-// setting the appropriate environment variable/registry key.
-// The debug page heap is available only with 64 bit platforms, as the page use is
-// too high for some 32 bit platforms.
-//
+// Defined as 0 or 1. If enabled then we use our debug page heap instead of a regular heap by default.
+// However, even if this is disabled it can still be enabled at runtime by manually setting the appropriate environment variable/registry key.
+// The debug page heap is available only with 64 bit platforms, as the page use is too high for some 32 bit platforms.
+//========================================================================================================================================================================================================================
 #ifndef OVR_ALLOCATOR_DEBUG_PAGE_HEAP_ENABLED
-#if defined(OVR_BUILD_DEBUG)
-#define OVR_ALLOCATOR_DEBUG_PAGE_HEAP_ENABLED \
-  0 // Disabled while we are working on getting our VS2015 build working. Currently OAF usage of
-// this feature makes the app slow.
-#else
-#define OVR_ALLOCATOR_DEBUG_PAGE_HEAP_ENABLED 0
-#endif
+    #if defined(OVR_BUILD_DEBUG)
+        // Disabled while we are working on getting our VS2015 build working. Currently OAF usage of this feature makes the app slow.
+        #define OVR_ALLOCATOR_DEBUG_PAGE_HEAP_ENABLED 0 
+    #else
+        #define OVR_ALLOCATOR_DEBUG_PAGE_HEAP_ENABLED 0
+    #endif
 #endif
 
-//-----------------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** OVR_ALLOCATOR_TRACKING_ENABLED
 //
-// Defined as 0 or 1.
-// If enabled then memory is tracked by default and reports on it can be done at runtime.
-// However, even if this is disabled it can still be enabled at runtime by manually
-// setting the appropriate environment variable/registry key.
-//
+// Defined as 0 or 1. If enabled then memory is tracked by default and reports on it can be done at runtime.
+// However, even if this is disabled it can still be enabled at runtime by manually setting the appropriate environment variable/registry key.
+//========================================================================================================================================================================================================================
 #ifndef OVR_ALLOCATOR_TRACKING_ENABLED
-#if defined(OVR_BUILD_DEBUG)
-#define OVR_ALLOCATOR_TRACKING_ENABLED 1
-#else
-#define OVR_ALLOCATOR_TRACKING_ENABLED 0
-#endif
+    #if defined(OVR_BUILD_DEBUG)
+        #define OVR_ALLOCATOR_TRACKING_ENABLED 1
+    #else
+        #define OVR_ALLOCATOR_TRACKING_ENABLED 0
+    #endif
 #endif
 
-//-----------------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** OVR_REDIRECT_CRT_MALLOC
 //
-// Defined as 0 or 1.
-// If enabled and if a default allocator is used, then the malloc family of functions
-// is redirected to the default allocator. This allows memory tracking of malloc in
-// addition to operator new.
-//
+// Defined as 0 or 1. If enabled and if a default allocator is used, then the malloc family of functions
+// is redirected to the default allocator. This allows memory tracking of malloc in addition to operator new.
+//========================================================================================================================================================================================================================
 #ifndef OVR_REDIRECT_CRT_MALLOC
-#if defined(_MSC_VER) && defined(_DEBUG) && (_MSC_VER >= 1900) && \
-    OVR_STATIC_CRT_PRESENT // Not supported for DLL CRT until we can figure out how to work around
-// some difficulties.
-#define OVR_REDIRECT_CRT_MALLOC 0 // Disabled until we are confident in it.
-#else
-#define OVR_REDIRECT_CRT_MALLOC 0
-#endif
+    #if defined(_MSC_VER) && defined(_DEBUG) && (_MSC_VER >= 1900) && OVR_STATIC_CRT_PRESENT 
+        // Not supported for DLL CRT until we can figure out how to work around some difficulties.
+        #define OVR_REDIRECT_CRT_MALLOC 0 // Disabled until we are confident in it.
+    #else
+        #define OVR_REDIRECT_CRT_MALLOC 0
+    #endif
 #endif
 
-//-----------------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** CRT internal symbols we use.
-//
+//========================================================================================================================================================================================================================
 #if defined(_MSC_VER)
+
 #if OVR_STATIC_CRT_PRESENT
-#if (_MSC_VER < 1900)
-extern "C" HANDLE _crtheap;
+    #if (_MSC_VER < 1900)
+        extern "C" HANDLE _crtheap;
+    #else
+        extern "C" void __cdecl __acrt_lock(int lock);
+        extern "C" void __cdecl __acrt_unlock(int lock);
+        extern "C" HANDLE __acrt_heap;
+    #endif
 #else
-extern "C" void __cdecl __acrt_lock(int lock);
-extern "C" void __cdecl __acrt_unlock(int lock);
-extern "C" HANDLE __acrt_heap;
-#endif
-#else
-// The CRT locks are not accessible from outside the MSVCRT DLL.
-// Maybe it's privately exported through an export table via ordinal number, though.
-#if (_MSC_VER >= 1900)
-extern "C" void __cdecl __acrt_lock(int /*lock*/) {
-  OVR_FAIL();
-} // We don't currently have a way to access this, but we don't support this pattern of usage
-// anyway.
-extern "C" void __cdecl __acrt_unlock(int /*lock*/) {
-  OVR_FAIL();
-}
-extern "C" HANDLE __cdecl __acrt_get_msvcrt_heap_handle() {
-  OVR_FAIL();
-  return NULL;
-}
-#endif
+    // The CRT locks are not accessible from outside the MSVCRT DLL.
+    // Maybe it's privately exported through an export table via ordinal number, though.
+    #if (_MSC_VER >= 1900)
+        extern "C" void __cdecl __acrt_lock(int /*lock*/) { OVR_FAIL(); } 
+        // We don't currently have a way to access this, but we don't support this pattern of usage anyway.
+        extern "C" void __cdecl __acrt_unlock(int /*lock*/) { OVR_FAIL(); }
+        extern "C" HANDLE __cdecl __acrt_get_msvcrt_heap_handle() { OVR_FAIL(); return NULL; }
+    #endif
 #endif
 
 static const uint8_t no_mans_land_fill = 0xFD;
@@ -184,95 +157,97 @@ static const size_t align_gap_size = sizeof(void*);
 static const long request_number_for_ignore_blocks = 0;
 static const int line_number_for_ignore_blocks = static_cast<int>(0xFEDCBABC);
 
-inline HANDLE GetCRTHeapHandle() {
+inline HANDLE GetCRTHeapHandle()
+{
 #if OVR_STATIC_CRT_PRESENT
-#if (_MSC_VER < 1900) // If VS2013 or earlier...
-  return _crtheap;
+    #if (_MSC_VER < 1900) // If VS2013 or earlier...
+        return _crtheap;
+    #else
+        return __acrt_heap;
+    #endif
 #else
-  return __acrt_heap;
-#endif
-#else
-#if (_MSC_VER < 1900) // If VS2013 or earlier...
-#error "Need to find the function that does this"
-#else
-  return __acrt_get_msvcrt_heap_handle();
-#endif
+    #if (_MSC_VER < 1900) // If VS2013 or earlier...
+        #error "Need to find the function that does this"
+    #else
+        return __acrt_get_msvcrt_heap_handle();
+    #endif
 #endif
 }
 
 #if OVR_DEBUG_CRT_PRESENT
 // We need to replicate a couple items from the debug CRT heap. This may change with
 // future VC++ versions, though that's unlikely and wouldn't likely change by much.
-struct CrtMemBlockHeader {
-  CrtMemBlockHeader* block_header_next;
-  CrtMemBlockHeader* block_header_prev;
-  const char* file_name;
-  int line_number;
+struct CrtMemBlockHeader
+{
+    CrtMemBlockHeader* block_header_next;
+    CrtMemBlockHeader* block_header_prev;
+    const char* file_name;
+    int line_number;
 #if defined(_WIN64) || (_MSC_VER >= 1900)
-  int block_use;
-  size_t data_size;
+    int block_use;
+    size_t data_size;
 #else
-  size_t data_size;
-  int block_use;
+    size_t data_size;
+    int block_use;
 #endif
-  long request_number;
-  unsigned char gap[4];
-  // unsigned char    data[data_size]; // User pointer.
-  // unsigned char    another_gap[4];
+    long request_number;
+    unsigned char gap[4];
+    // unsigned char    data[data_size]; // User pointer.
+    // unsigned char    another_gap[4];
 };
 
-static const CrtMemBlockHeader* header_from_block(const void* block) {
-  return (static_cast<const CrtMemBlockHeader*>(block) - 1);
-}
+static const CrtMemBlockHeader* header_from_block(const void* block)
+    { return (static_cast<const CrtMemBlockHeader*>(block) - 1); }
 
 // Clone of _malloc_dbg
 #if (_MSC_VER >= 1900)
-static void* block_from_header(void* header) {
-  return (static_cast<CrtMemBlockHeader*>(header) + 1);
+
+static void* block_from_header(void* header)
+    { return (static_cast<CrtMemBlockHeader*>(header) + 1); }
+
+extern "C" void* crt_malloc_dbg(size_t size, int /*blockUse*/, const char* /*file*/, int /*line*/)
+{
+    struct AutoLock
+    {
+        AutoLock()
+            { __acrt_lock(0); }
+        ~AutoLock()
+            { __acrt_unlock(0); }
+    } autoLock;
+    void* block = nullptr;
+
+    if (size > (size_t)((_HEAP_MAXREQ - no_mans_land_size) - sizeof(CrtMemBlockHeader)))
+    {
+        errno = ENOMEM;
+        return nullptr;
+    }
+
+    size_t const block_size = sizeof(CrtMemBlockHeader) + size + no_mans_land_size;
+    CrtMemBlockHeader* header = static_cast<CrtMemBlockHeader*>(HeapAlloc(GetCRTHeapHandle(), 0, block_size));
+
+    if (!header)
+    {
+        errno = ENOMEM;
+        return nullptr;
+    }
+
+    // Set this block to be ignored by the debug heap. This makes it somewhat invisible.
+    header->block_header_next = nullptr;
+    header->block_header_prev = nullptr;
+    header->file_name = nullptr;
+    header->line_number = line_number_for_ignore_blocks;
+    header->data_size = size;
+    header->block_use = _IGNORE_BLOCK;
+    header->request_number = request_number_for_ignore_blocks;
+
+    memset(header->gap, no_mans_land_fill, no_mans_land_size);
+    memset((char*)block_from_header(header) + size, no_mans_land_fill, no_mans_land_size);
+    memset(block_from_header(header), clean_land_fill, size);
+
+    block = block_from_header(header);
+    return block;
 }
 
-extern "C" void* crt_malloc_dbg(size_t size, int /*blockUse*/, const char* /*file*/, int /*line*/) {
-  struct AutoLock {
-    AutoLock() {
-      __acrt_lock(0);
-    }
-    ~AutoLock() {
-      __acrt_unlock(0);
-    }
-  } autoLock;
-  void* block = nullptr;
-
-  if (size > (size_t)((_HEAP_MAXREQ - no_mans_land_size) - sizeof(CrtMemBlockHeader))) {
-    errno = ENOMEM;
-    return nullptr;
-  }
-
-  size_t const block_size = sizeof(CrtMemBlockHeader) + size + no_mans_land_size;
-  CrtMemBlockHeader* header =
-      static_cast<CrtMemBlockHeader*>(HeapAlloc(GetCRTHeapHandle(), 0, block_size));
-
-  if (!header) {
-    errno = ENOMEM;
-    return nullptr;
-  }
-
-  // Set this block to be ignored by the debug heap. This makes it somewhat invisible.
-  header->block_header_next = nullptr;
-  header->block_header_prev = nullptr;
-  header->file_name = nullptr;
-  header->line_number = line_number_for_ignore_blocks;
-  header->data_size = size;
-  header->block_use = _IGNORE_BLOCK;
-  header->request_number = request_number_for_ignore_blocks;
-
-  memset(header->gap, no_mans_land_fill, no_mans_land_size);
-  memset((char*)block_from_header(header) + size, no_mans_land_fill, no_mans_land_size);
-  memset(block_from_header(header), clean_land_fill, size);
-
-  block = block_from_header(header);
-
-  return block;
-}
 #else
 #if OVR_STATIC_CRT_PRESENT
 extern "C" void* __cdecl _nh_malloc_dbg(
@@ -2762,169 +2737,163 @@ void* DefaultHeap::ReallocAligned(void* p, size_t newSize, size_t newAlign) {
   return pNew;
 }
 
-//------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** OSHeap
-//
-
+//========================================================================================================================================================================================================================
 OSHeap::OSHeap() : Heap(nullptr) {}
 
-OSHeap::~OSHeap() {
-  OSHeap::Shutdown();
-}
+OSHeap::~OSHeap()
+    { OSHeap::Shutdown(); }
 
-bool OSHeap::Init() {
+bool OSHeap::Init()
+{
 #if defined(_WIN32)
-  Heap = GetProcessHeap(); // This never fails.
+    // This never fails.
+    Heap = GetProcessHeap();
 #endif
-  return true;
+    return true;
 }
 
-void OSHeap::Shutdown() {
-  // Do not free this heap. Its lifetime is maintained by the OS.
-  Heap = nullptr;
+void OSHeap::Shutdown()
+{
+    // Do not free this heap. Its lifetime is maintained by the OS.
+    Heap = nullptr;
 }
 
-void* OSHeap::Alloc(size_t size) {
+void* OSHeap::Alloc(size_t size)
+{
 #if defined(_WIN32)
-  return HeapAlloc(Heap, 0, size);
+    return HeapAlloc(Heap, 0, size);
 #else
-  return malloc(size);
+    return malloc(size);
 #endif
 }
 
-void* OSHeap::AllocAligned(size_t size, size_t align) {
+void* OSHeap::AllocAligned(size_t size, size_t align)
+{
 #if defined(_WIN32)
-  (void)align;
-  // We need to solve this if we are to support aligned memory. We'll need to allocate exta memory
-  // up front, return an internal pointer, and store info to find the base pointer.
-  OVR_FAIL_M("OSHeap::AllocAligned not yet supported.");
-  return HeapAlloc(Heap, 0, size);
+    (void) align;
+    // We need to solve this if we are to support aligned memory. We'll need to allocate exta memory
+    // up front, return an internal pointer, and store info to find the base pointer.
+    OVR_FAIL_M("OSHeap::AllocAligned not yet supported.");
+    return HeapAlloc(Heap, 0, size);
 #else
-  void* p;
-  int result = posix_memalign(&p, align, size);
-  (void)result;
-  return p;
+    void* p;
+    int result = posix_memalign(&p, align, size);
+    (void)result;
+    return p;
 #endif
 }
 
-size_t OSHeap::GetAllocSize(const void* p) const {
+size_t OSHeap::GetAllocSize(const void* p) const
+{
 #if defined(_WIN32)
-  return HeapSize(Heap, 0, p);
+    return HeapSize(Heap, 0, p);
+#elif defined(__linux__)
+    return malloc_usable_size(const_cast<void*> (p));
 #else
-  return malloc_size(p);
+    return malloc_size(p);
 #endif
 }
 
-size_t OSHeap::GetAllocAlignedSize(const void* p, size_t /*align*/) const {
+size_t OSHeap::GetAllocAlignedSize(const void* p, size_t /*align*/) const
+{
 #if defined(_WIN32)
-  // We need to solve this if we are to support aligned memory.
-  OVR_FAIL_M("OSHeap::AllocAligned not yet supported.");
-  return HeapSize(Heap, 0, p);
+    OVR_FAIL_M("OSHeap::AllocAligned not yet supported.");              // We need to solve this if we are to support aligned memory.
+    return HeapSize(Heap, 0, p);
+#elif defined(__linux__)
+    return malloc_usable_size(const_cast<void*> (p));
 #else
-  return malloc_size(p);
+    return malloc_size(p);
 #endif
 }
 
-void OSHeap::Free(void* p) {
+void OSHeap::Free(void* p)
+{
 #if defined(_WIN32)
-  BOOL result = HeapFree(Heap, 0, p);
-  OVR_ASSERT_AND_UNUSED(result, result);
+    BOOL result = HeapFree(Heap, 0, p);
+    OVR_ASSERT_AND_UNUSED(result, result);
 #else
-  free(p);
+    free(p);
 #endif
 }
 
-void OSHeap::FreeAligned(void* p) {
+void OSHeap::FreeAligned(void* p)
+{
 #if defined(_WIN32)
-  OVR_FAIL_M("OSHeap::AllocAligned not yet supported.");
-  BOOL result = HeapFree(Heap, 0, p);
-  OVR_ASSERT_AND_UNUSED(result, result);
+    OVR_FAIL_M("OSHeap::AllocAligned not yet supported.");
+    BOOL result = HeapFree(Heap, 0, p);
+    OVR_ASSERT_AND_UNUSED(result, result);
 #else
-  free(p);
+    free(p);
 #endif
 }
 
-void* OSHeap::Realloc(void* p, size_t newSize) {
+void* OSHeap::Realloc(void* p, size_t newSize)
+{
 #if defined(_WIN32)
-  return HeapReAlloc(Heap, 0, p, newSize);
+    return HeapReAlloc(Heap, 0, p, newSize);
 #else
-  return realloc(p, newSize);
+    return realloc(p, newSize);
 #endif
 }
 
-void* OSHeap::ReallocAligned(void* p, size_t newSize, size_t /*newAlign*/) {
+void* OSHeap::ReallocAligned(void* p, size_t newSize, size_t /*newAlign*/)
+{
 #if defined(_WIN32)
-  // We need to solve this if we are to support aligned memory.
-  return HeapReAlloc(Heap, 0, p, newSize);
+    return HeapReAlloc(Heap, 0, p, newSize);                            // We need to solve this if we are to support aligned memory.
 #else
-  OVR_FAIL(); // This isn't supported properly currently.
-  return realloc(p, newSize);
+    OVR_FAIL();                                                         // This isn't supported properly currently.
+    return realloc(p, newSize);
 #endif
 }
 
-//------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** SafeMMapAlloc / SafeMMapFree
-//
-
-void* SafeMMapAlloc(size_t size) {
+//========================================================================================================================================================================================================================
+void* SafeMMapAlloc(size_t size)
+{
 #if defined(_WIN32)
-  return VirtualAlloc(
-      nullptr,
-      size,
-      MEM_RESERVE | MEM_COMMIT,
-      PAGE_READWRITE); // size is rounded up to a page. // Returned memory is 0-filled.
-
+    // size is rounded up to a page. Returned memory is 0-filled.
+    return VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE); 
 #elif defined(OVR_OS_MAC) || defined(OVR_OS_UNIX)
-#if !defined(MAP_FAILED)
-#define MAP_FAILED ((void*)-1)
-#endif
+    #if !defined(MAP_FAILED)
+        #define MAP_FAILED ((void*) -1)
+    #endif
 
-  void* result = mmap(
-      nullptr,
-      size,
-      PROT_READ | PROT_WRITE,
-      MAP_PRIVATE | MAP_ANON,
-      -1,
-      0); // Returned memory is 0-filled.
-  if (result == MAP_FAILED) // mmap returns MAP_FAILED (-1) upon failure.
-    result = nullptr;
-  return result;
+    void* result = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0); // Returned memory is 0-filled.
+    if (result == MAP_FAILED)                       // mmap returns MAP_FAILED (-1) upon failure.
+        result = nullptr;
+    return result;
 #endif
 }
 
-void SafeMMapFree(const void* memory, size_t size) {
+void SafeMMapFree(const void* memory, size_t size)
+{
 #if defined(_WIN32)
-  OVR_UNUSED(size);
-  VirtualFree(const_cast<void*>(memory), 0, MEM_RELEASE);
-
+    OVR_UNUSED(size);
+    VirtualFree(const_cast<void*>(memory), 0, MEM_RELEASE);
 #elif defined(OVR_OS_MAC) || defined(OVR_OS_UNIX)
-  size_t pageSize = getpagesize();
-  size = (((size + (pageSize - 1)) / pageSize) * pageSize);
-  munmap(const_cast<void*>(memory), size); // Must supply the size to munmap.
+    size_t pageSize = getpagesize();
+    size = (((size + (pageSize - 1)) / pageSize) * pageSize);
+    munmap(const_cast<void*>(memory), size); // Must supply the size to munmap.
 #endif
 }
 
-//------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** DebugPageHeap
+//========================================================================================================================================================================================================================
+static size_t AlignSizeUp(size_t value, size_t alignment)
+    { return ((value + (alignment - 1)) & ~(alignment - 1)); }
 
-static size_t AlignSizeUp(size_t value, size_t alignment) {
-  return ((value + (alignment - 1)) & ~(alignment - 1));
-}
+static size_t AlignSizeDown(size_t value, size_t alignment)
+    { return (value & ~(alignment - 1)); }
 
-static size_t AlignSizeDown(size_t value, size_t alignment) {
-  return (value & ~(alignment - 1));
-}
+template <typename Pointer> Pointer AlignPointerUp(Pointer p, size_t alignment)
+    { return reinterpret_cast<Pointer>(((reinterpret_cast<size_t>(p) + (alignment - 1)) & ~(alignment - 1))); }
 
-template <typename Pointer>
-Pointer AlignPointerUp(Pointer p, size_t alignment) {
-  return reinterpret_cast<Pointer>(
-      ((reinterpret_cast<size_t>(p) + (alignment - 1)) & ~(alignment - 1)));
-}
-
-template <typename Pointer>
-Pointer AlignPointerDown(Pointer p, size_t alignment) {
-  return reinterpret_cast<Pointer>(reinterpret_cast<size_t>(p) & ~(alignment - 1));
-}
+template <typename Pointer> Pointer AlignPointerDown(Pointer p, size_t alignment)
+    { return reinterpret_cast<Pointer>(reinterpret_cast<size_t>(p) & ~(alignment - 1)); }
 
 const size_t kFreedBlockArrayMaxSizeDefault = 16384;
 
@@ -2960,177 +2929,169 @@ DebugPageHeap::DebugPageHeap()
   SetMaxDelayedFreeCount(kFreedBlockArrayMaxSizeDefault);
 }
 
-DebugPageHeap::~DebugPageHeap() {
-  Shutdown();
-}
+DebugPageHeap::~DebugPageHeap() 
+    { Shutdown(); }
 
-bool DebugPageHeap::Init() {
-  // Nothing to do.
-  return true;
-}
+bool DebugPageHeap::Init()
+    { return true; }
 
-void DebugPageHeap::Shutdown() {
-  Lock::Locker autoLock(&Lock);
-
-  for (size_t i = 0; i < FreedBlockArraySize; i++) {
-    if (FreedBlockArray[i].BlockPtr) {
-      FreePageMemory(FreedBlockArray[i].BlockPtr, FreedBlockArray[i].BlockSize);
-      FreedBlockArray[i].Clear();
+void DebugPageHeap::Shutdown()
+{
+    Lock::Locker autoLock(&Lock);
+    for (size_t i = 0; i < FreedBlockArraySize; i++)
+    {
+        if (FreedBlockArray[i].BlockPtr)
+        {
+            FreePageMemory(FreedBlockArray[i].BlockPtr, FreedBlockArray[i].BlockSize);
+            FreedBlockArray[i].Clear();
+        }
     }
-  }
-
-  SetMaxDelayedFreeCount(0);
-  FreedBlockArraySize = 0;
-  FreedBlockArrayOldest = 0;
+    SetMaxDelayedFreeCount(0);
+    FreedBlockArraySize = 0;
+    FreedBlockArrayOldest = 0;
 }
 
-void DebugPageHeap::EnableOverrunDetection(
-    bool enableOverrunDetection,
-    bool enableOverrunGuardBytes) {
-  // Assert that no allocations have been made, which is a requirement for changing these
-  // properties. Otherwise future deallocations of these allocations can fail to work properly
-  // because these settings have changed behind their back.
-  OVR_ASSERT_M(
-      AllocationCount == 0,
-      "DebugPageHeap::EnableOverrunDetection called when DebugPageHeap is not in a newly initialized state.");
+void DebugPageHeap::EnableOverrunDetection(bool enableOverrunDetection, bool enableOverrunGuardBytes)
+{
+    // Assert that no allocations have been made, which is a requirement for changing these properties. Otherwise future deallocations of these 
+    // allocations can fail to work properly because these settings have changed behind their back.
+    OVR_ASSERT_M(AllocationCount == 0, "DebugPageHeap::EnableOverrunDetection called when DebugPageHeap is not in a newly initialized state.");
 
-  OverrunPageEnabled = enableOverrunDetection;
-  OverrunGuardBytesEnabled =
-      (enableOverrunDetection && enableOverrunGuardBytes); // Set OverrunGuardBytesEnabled to false
-  // if enableOverrunDetection is false.
+    OverrunPageEnabled = enableOverrunDetection;
+    // Set OverrunGuardBytesEnabled to false if enableOverrunDetection is false.
+    OverrunGuardBytesEnabled = (enableOverrunDetection && enableOverrunGuardBytes); 
 }
 
-void DebugPageHeap::SetMaxDelayedFreeCount(size_t maxDelayedFreeCount) {
-  if (FreedBlockArray) {
-    SafeMMapFree(FreedBlockArray, FreedBlockArrayMaxSize * sizeof(Block));
-    FreedBlockArrayMaxSize = 0;
-  }
+void DebugPageHeap::SetMaxDelayedFreeCount(size_t maxDelayedFreeCount)
+{
+    if (FreedBlockArray)
+    {
+        SafeMMapFree(FreedBlockArray, FreedBlockArrayMaxSize * sizeof(Block));
+        FreedBlockArrayMaxSize = 0;
+    }
 
-  if (maxDelayedFreeCount) {
-    FreedBlockArray = (Block*)SafeMMapAlloc(maxDelayedFreeCount * sizeof(Block));
-    OVR_ASSERT(FreedBlockArray);
+    if (maxDelayedFreeCount)
+    {
+        FreedBlockArray = (Block*)SafeMMapAlloc(maxDelayedFreeCount * sizeof(Block));
+        OVR_ASSERT(FreedBlockArray);
 
-    if (FreedBlockArray) {
-      FreedBlockArrayMaxSize = maxDelayedFreeCount;
+        if (FreedBlockArray)
+        {
+            FreedBlockArrayMaxSize = maxDelayedFreeCount;
 #if defined(OVR_BUILD_DEBUG)
-      memset(FreedBlockArray, 0, maxDelayedFreeCount * sizeof(Block));
+            memset(FreedBlockArray, 0, maxDelayedFreeCount * sizeof(Block));
 #endif
+        }
     }
-  }
 }
 
-size_t DebugPageHeap::GetMaxDelayedFreeCount() const {
-  return FreedBlockArrayMaxSize;
-}
+size_t DebugPageHeap::GetMaxDelayedFreeCount() const 
+    { return FreedBlockArrayMaxSize; }
 
-void* DebugPageHeap::Alloc(size_t size) {
+void* DebugPageHeap::Alloc(size_t size)
+{
 #if defined(_WIN32)
-  return AllocAligned(size, DefaultAlignment);
+    return AllocAligned(size, DefaultAlignment);
 #else
-  return malloc(size);
+    return malloc(size);
 #endif
 }
 
-void* DebugPageHeap::AllocAligned(size_t size, size_t align) {
+void* DebugPageHeap::AllocAligned(size_t size, size_t align)
+{
 #if defined(_WIN32)
-  OVR_ASSERT(align <= PageSize);
+    OVR_ASSERT(align <= PageSize);
 
-  Lock::Locker autoLock(&Lock);
+    Lock::Locker autoLock(&Lock);
 
-  if (align < DefaultAlignment)
-    align = DefaultAlignment;
+    if (align < DefaultAlignment)
+        align = DefaultAlignment;
 
-  // The actual needed size may be a little less than this, but it's hard to tell how the size and
-  // alignments will play out.
-  size_t maxRequiredSize = AlignSizeUp(size, align) + SizeStorageSize;
+    // The actual needed size may be a little less than this, but it's hard to tell how the size and alignments will play out.
+    size_t maxRequiredSize = AlignSizeUp(size, align) + SizeStorageSize;
 
-  if (align > SizeStorageSize) {
     // Must do: more sophisticated fitting, as maxRequiredSize is potentially too small.
-    OVR_ASSERT(SizeStorageSize <= align);
-  }
+    if (align > SizeStorageSize)
+        OVR_ASSERT(SizeStorageSize <= align);
+        
+    size_t blockSize = AlignSizeUp(maxRequiredSize, PageSize);
 
-  size_t blockSize = AlignSizeUp(maxRequiredSize, PageSize);
+    if (OverrunPageEnabled)
+        blockSize += PageSize; // We add another page which will be uncommitted, so any read or write with it will except.
 
-  if (OverrunPageEnabled)
-    blockSize += PageSize; // We add another page which will be uncommitted, so any read or write
-  // with it will except.
+    void* pBlockPtr;
 
-  void* pBlockPtr;
+    if ((FreedBlockArraySize == FreedBlockArrayMaxSize) &&
+         FreedBlockArrayMaxSize && // If there is an old block we can recycle...
+        (FreedBlockArray[FreedBlockArrayOldest].BlockSize == blockSize)) // We require it to be the
+        // exact size, as there would be some headaches for us if it was over-sized.
+    {
+        // Convert this memory from PAGE_NOACCESS back to PAGE_READWRITE.
+        pBlockPtr = EnablePageMemory(FreedBlockArray[FreedBlockArrayOldest].BlockPtr, blockSize);
+        FreedBlockArray[FreedBlockArrayOldest].Clear();
 
-  if ((FreedBlockArraySize == FreedBlockArrayMaxSize) &&
-      FreedBlockArrayMaxSize && // If there is an old block we can recycle...
-      (FreedBlockArray[FreedBlockArrayOldest].BlockSize == blockSize)) // We require it to be the
-  // exact size, as there would
-  // be some headaches for us
-  // if it was over-sized.
-  {
-    pBlockPtr = EnablePageMemory(
-        FreedBlockArray[FreedBlockArrayOldest].BlockPtr,
-        blockSize); // Convert this memory from PAGE_NOACCESS back to PAGE_READWRITE.
-    FreedBlockArray[FreedBlockArrayOldest].Clear();
+        if (++FreedBlockArrayOldest == FreedBlockArrayMaxSize)
+            FreedBlockArrayOldest = 0;
+    }
+    else
+    {
+        pBlockPtr = AllocCommittedPageMemory(blockSize); // Allocate a new block of one or more pages (via VirtualAlloc).
+    }
 
-    if (++FreedBlockArrayOldest == FreedBlockArrayMaxSize)
-      FreedBlockArrayOldest = 0;
-  } else {
-    pBlockPtr = AllocCommittedPageMemory(
-        blockSize); // Allocate a new block of one or more pages (via VirtualAlloc).
-  }
+    if (pBlockPtr)
+    {
+        void* pUserPtr = GetUserPosition(pBlockPtr, blockSize, size, align);
+        size_t* pSizePos = GetSizePosition(pUserPtr);
+        pSizePos[UserSizeIndex] = size;
+        pSizePos[BlockSizeIndex] = blockSize;
+        AllocationCount++;
+        return pUserPtr;
+    }
 
-  if (pBlockPtr) {
-    void* pUserPtr = GetUserPosition(pBlockPtr, blockSize, size, align);
-    size_t* pSizePos = GetSizePosition(pUserPtr);
-
-    pSizePos[UserSizeIndex] = size;
-    pSizePos[BlockSizeIndex] = blockSize;
-    AllocationCount++;
-
-    return pUserPtr;
-  }
-
-  return nullptr;
+    return nullptr;
 #else
-  OVR_ASSERT_AND_UNUSED(align <= DefaultAlignment, align);
-  return DebugPageHeap::Alloc(size);
+    OVR_ASSERT_AND_UNUSED(align <= DefaultAlignment, align);
+    return DebugPageHeap::Alloc(size);
 #endif
 }
 
-size_t DebugPageHeap::GetUserSize(const void* p) {
+size_t DebugPageHeap::GetUserSize(const void* p)
+{
 #if defined(_WIN32)
-  return GetSizePosition(p)[UserSizeIndex];
+    return GetSizePosition(p)[UserSizeIndex];
 #elif defined(__APPLE__)
-  return malloc_size(p);
+    return malloc_size(p);
 #else
-  return malloc_usable_size(const_cast<void*>(p));
+    return malloc_usable_size(const_cast<void*>(p));
 #endif
 }
 
-size_t DebugPageHeap::GetBlockSize(const void* p) {
+size_t DebugPageHeap::GetBlockSize(const void* p)
+{
 #if defined(_WIN32)
-  return GetSizePosition(p)[BlockSizeIndex];
+    return GetSizePosition(p)[BlockSizeIndex];
 #else
-  OVR_UNUSED(p);
-  return 0;
+    OVR_UNUSED(p);
+    return 0;
 #endif
 }
 
-size_t* DebugPageHeap::GetSizePosition(const void* p) {
-  // No thread safety required as per our design, as we assume that anybody
-  // who owns a pointer returned by Alloc cannot have another thread take it away.
-
-  // We assume the pointer is a valid pointer allocated by this allocator.
-  // We store some size values into the memory returned to the user, a few bytes before it.
-  size_t value = reinterpret_cast<size_t>(p);
-  size_t valuePos = (value - SizeStorageSize);
-  size_t* pSize = reinterpret_cast<size_t*>(valuePos);
-
-  return pSize;
+size_t* DebugPageHeap::GetSizePosition(const void* p)
+{
+    // No thread safety required as per our design, as we assume that anybody who owns a pointer returned by Alloc cannot have another thread take it away.
+    // We assume the pointer is a valid pointer allocated by this allocator. We store some size values into the memory returned to the user, a few bytes before it.
+    size_t value = reinterpret_cast<size_t>(p);
+    size_t valuePos = (value - SizeStorageSize);
+    size_t* pSize = reinterpret_cast<size_t*>(valuePos);
+    return pSize;
 }
 
-void* DebugPageHeap::Realloc(void* p, size_t newSize) {
+void* DebugPageHeap::Realloc(void* p, size_t newSize)
+{
 #if defined(_WIN32)
-  return ReallocAligned(p, newSize, DefaultAlignment);
+    return ReallocAligned(p, newSize, DefaultAlignment);
 #else
-  return realloc(p, newSize);
+    return realloc(p, newSize);
 #endif
 }
 
@@ -3434,16 +3395,12 @@ void DebugPageHeap::FreePageMemory(void* pPageMemory, size_t /*blockSize*/) {
 #endif
 }
 
-//------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ***** Allocator debug commands
-//
-//------------------------------------------------------------------------
-
-// AllocatorTraceDbgCmd
+//========================================================================================================================================================================================================================
 const char* allocatorTraceDbgCmdName = "Allocator.Trace";
 const char* allocatorTraceDbgCmdUsage = "<filepath> [filter specification]";
-const char* allocatorTraceDbgCmdDesc =
-    "Triggers the logging of the default allocator heap, with an optional filter.";
+const char* allocatorTraceDbgCmdDesc = "Triggers the logging of the default allocator heap, with an optional filter.";
 const char* allocatorTraceDbgCmdDoc =
     "Triggers the logging of the default allocator heap, with an optional filter.\n"
     "The filter is a string which accepts a set of comparisons expressed in postfix (RPN).\n"
@@ -3465,73 +3422,76 @@ const char* allocatorTraceDbgCmdDoc =
     "    Allocator.Trace C:\\temp\\trace.txt \"time > 50000\"                  Trace allocations done in the first 50000 nanoseconds\n"
     "    Allocator.Trace C:\\temp\\trace.txt \"tag == geometry\"              Trace only allocations tagged as geometry\n"
     "    Allocator.Trace C:\\temp\\trace.txt \"ThreadName has vision\"         Trace only allocations from threads with \"vision\" in the name\n";
-int AllocatorTraceDbgCmd(const std::vector<std::string>& args, std::string* output) {
-  OVR_DISABLE_MSVC_WARNING(4996) // 4996: This function or variable may be unsafe.
 
-  OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
-  if (allocator) {
-    std::stringstream strStream;
+int AllocatorTraceDbgCmd(const std::vector<std::string>& args, std::string* output)
+{
+    OVR_DISABLE_MSVC_WARNING(4996) // 4996: This function or variable may be unsafe.
 
-    if (!allocator->IsTrackingEnabled()) {
-      output->append(
-          "Allocator tracking is not enabled. To enable, use the Allocator.EnableTracking command or set the DWORD HKEY_LOCAL_MACHINE\\SOFTWARE\\Oculus\\HeapTrackingEnabled reg key before starting the application.");
-      return -1; // Exit because even if tracking was enabled at some point earlier, all records
-      // would have been cleared with it was disabled.
-    }
+    OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
+    if (allocator)
+    {
+        std::stringstream strStream;
 
-    if (args.size() < 2) {
-      output->append(
-          "Filepath first argument is required but was not supplied. See example usage.");
-      return -1;
-    }
+        if (!allocator->IsTrackingEnabled())
+        {
+            output->append("Allocator tracking is not enabled. To enable, use the Allocator.EnableTracking command or set the DWORD HKEY_LOCAL_MACHINE\\SOFTWARE\\Oculus\\HeapTrackingEnabled reg key before starting the application.");
+            return -1; // Exit because even if tracking was enabled at some point earlier, all records would have been cleared with it was disabled.
+        }
 
-    std::string filePath = args[1];
-    FILE* file;
-    errno_t err = 0;
+        if (args.size() < 2)
+        {
+            output->append("Filepath first argument is required but was not supplied. See example usage.");
+            return -1;
+        }
+
+        std::string filePath = args[1];
+        FILE* file;
 
 #if defined(_WIN32)
-    err = fopen_s(&file, filePath.c_str(), "w");
+        errno_t err = fopen_s(&file, filePath.c_str(), "w");
 #else
-    file = fopen(filePath.c_str(), "w");
-    err = file ? 0 : -1;
+        file = fopen(filePath.c_str(), "w");
+        int err = file ? 0 : -1;
 #endif
 
-    if (err || !file) {
-      strStream << "Failed to open " << filePath;
-      *output = strStream.str();
-      return -1;
+        if (err || !file)
+        {
+            strStream << "Failed to open " << filePath;
+            *output = strStream.str();
+            return -1;
+        }
+
+        struct Context
+        {
+            FILE* file;
+            uint64_t allocationCount;
+        } context = {file, 0};
+
+        OVR::HeapIterationFilterRPN::TraceTrackedAllocations(
+            allocator,
+            (args.size() >= 3) ? args[2].c_str() : "",
+            [](uintptr_t contextStruct, const char* text) -> void
+            {
+                Context* pContext = reinterpret_cast<Context*>(contextStruct);
+                pContext->allocationCount++;
+                fwrite(text, 1, strlen(text), pContext->file);
+                fwrite("\n\n", 1, 2, pContext->file);
+            },
+            (uintptr_t) &context
+        );
+        strStream << context.allocationCount << " allocations reported to " << filePath;
+
+        std::string str = strStream.str();
+        output->append(str.data(), str.length());
+        // We don't directly assign string objects because currently we are crossing a DLL boundary between these two strings.
+
+        fclose(file);
+        return 0;
     }
 
-    struct Context {
-      FILE* file;
-      uint64_t allocationCount;
-    } context = {file, 0};
-
-    OVR::HeapIterationFilterRPN::TraceTrackedAllocations(
-        allocator,
-        (args.size() >= 3) ? args[2].c_str() : "",
-        [](uintptr_t contextStruct, const char* text) -> void {
-          Context* pContext = reinterpret_cast<Context*>(contextStruct);
-          pContext->allocationCount++;
-          fwrite(text, 1, strlen(text), pContext->file);
-          fwrite("\n\n", 1, 2, pContext->file);
-        },
-        (uintptr_t)&context);
-    strStream << context.allocationCount << " allocations reported to " << filePath;
-
-    std::string str = strStream.str();
-    output->append(str.data(), str.length()); // We don't directly assign string objects because
-    // currently we are crossing a DLL boundary between
-    // these two strings.
-
-    fclose(file);
-    return 0;
-  }
-
-  output->append("Allocator not found.");
-  return -1;
-
-  OVR_RESTORE_MSVC_WARNING()
+    output->append("Allocator not found.");
+    return -1;
+    OVR_RESTORE_MSVC_WARNING()
 }
 
 // AllocatorEnableTrackingDbgCmd
@@ -3548,18 +3508,19 @@ const char* allocatorEnableTrackingDbgCmdDoc =
     "    ... (wait for some time)\n"
     "    Allocator.Trace C:\\temp\\trace.txt\n";
 
-int AllocatorEnableTrackingDbgCmd(const std::vector<std::string>&, std::string* output) {
-  OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
-  if (allocator) {
-    if (allocator->EnableTracking(true))
-      output->append("Allocator tracking enabled.");
+int AllocatorEnableTrackingDbgCmd(const std::vector<std::string>&, std::string* output)
+{
+    OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
+    if (allocator)
+    {
+        if (allocator->EnableTracking(true))
+            output->append("Allocator tracking enabled.");
+        else
+            output->append("Allocator tracking couldn't be enabled due to an allocator settings conflict.");
+    }
     else
-      output->append(
-          "Allocator tracking couldn't be enabled due to an allocator settings conflict.");
-  } else
-    output->append("Allocator not found.");
-
-  return (allocator ? 0 : -1);
+        output->append("Allocator not found.");
+    return (allocator ? 0 : -1);
 }
 
 // AllocatorDisableTrackingDbgCmd
@@ -3571,90 +3532,84 @@ const char* allocatorDisableTrackingDbgCmdDoc =
     "Has no effect and reports success if there is no change.\n"
     "Example usage:\n"
     "    Allocator.DisableTracking\n";
-int AllocatorDisableTrackingDbgCmd(const std::vector<std::string>&, std::string* output) {
-  OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
+int AllocatorDisableTrackingDbgCmd(const std::vector<std::string>&, std::string* output)
+{
+    OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
 
-  if (allocator) {
-    if (allocator->EnableTracking(false))
-      output->append("Allocator tracking disabled.");
+    if (allocator)
+    {
+        if (allocator->EnableTracking(false))
+            output->append("Allocator tracking disabled.");
+        else
+            output->append("Allocator tracking couldn't be disabled due to an allocator settings conflict.");
+    }
     else
-      output->append(
-          "Allocator tracking couldn't be disabled due to an allocator settings conflict.");
-  } else
-    output->append("Allocator not found.");
+        output->append("Allocator not found.");
 
-  return (allocator ? 0 : -1);
+    return (allocator ? 0 : -1);
 }
 
 // AllocatorReportStateDbgCmd
 const char* allocatorReportStateDbgCmdName = "Allocator.ReportState";
 const char* allocatorReportStateDbgCmdUsage = "(no arguments)";
-const char* allocatorReportStateDbgCmdDesc =
-    "Reports the general state and settings of the global Allocator.";
-const char* allocatorReportStateDbgCmdDoc =
-    "Reports the general state and settings of the global Allocator.\n"
-    "Example usage:\n"
-    "    Allocator.ReportState\n";
-int AllocatorReportStateDbgCmd(const std::vector<std::string>&, std::string* output) {
-  OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
+const char* allocatorReportStateDbgCmdDesc = "Reports the general state and settings of the global Allocator.";
+const char* allocatorReportStateDbgCmdDoc = "Reports the general state and settings of the global Allocator.\nExample usage:\n    Allocator.ReportState\n";
 
-  if (allocator) {
-    bool trackingEnabled = allocator->IsTrackingEnabled();
-    bool debugPageHeapEnabled = allocator->IsDebugPageHeapEnabled();
-    bool osHeapEnabled = allocator->IsOSHeapEnabled();
-    bool mallocRedirectEnabled = allocator->IsMallocRedirectEnabled();
-    bool traceOnShutdownEnabled = allocator->IsAllocationTraceOnShutdownEnabled();
-    uint64_t heapTimeNs = allocator->GetCurrentHeapTimeNs();
-    uint64_t heapCounter = allocator->GetCounter();
-    uint64_t heapTrackedCount = 0;
-    uint64_t heapTrackedVolume = 0;
+int AllocatorReportStateDbgCmd(const std::vector<std::string>&, std::string* output)
+{
+    OVR::Allocator* allocator = OVR::Allocator::GetInstance(false);
 
-    // We could report more detail that the following if desired. The following blocks the heap
-    // briefly for other threads.
-    for (const OVR::AllocMetadata* amd = allocator->IterateHeapBegin(); amd;
-         amd = allocator->IterateHeapNext()) {
-      heapTrackedCount++;
-      heapTrackedVolume += amd->BlockSize;
-    }
-    allocator->IterateHeapEnd();
+    if (allocator) {
+        bool trackingEnabled = allocator->IsTrackingEnabled();
+        bool debugPageHeapEnabled = allocator->IsDebugPageHeapEnabled();
+        bool osHeapEnabled = allocator->IsOSHeapEnabled();
+        bool mallocRedirectEnabled = allocator->IsMallocRedirectEnabled();
+        bool traceOnShutdownEnabled = allocator->IsAllocationTraceOnShutdownEnabled();
+        uint64_t heapTimeNs = allocator->GetCurrentHeapTimeNs();
+        uint64_t heapCounter = allocator->GetCounter();
+        uint64_t heapTrackedCount = 0;
+        uint64_t heapTrackedVolume = 0;
+
+        // We could report more detail that the following if desired. The following blocks the heap briefly for other threads.
+        for (const OVR::AllocMetadata* amd = allocator->IterateHeapBegin(); amd; amd = allocator->IterateHeapNext())
+        {
+            heapTrackedCount++;
+            heapTrackedVolume += amd->BlockSize;
+        }
+        allocator->IterateHeapEnd();
 #if defined(_DLL)
-    const char* crtName = "DLL CRT";
+        const char* crtName = "DLL CRT";
 #else
-    const char* crtName = "static CRT";
+        const char* crtName = "static CRT";
 #endif
 
 #if defined(_DEBUG)
-    const char* buildName = "debug build";
+        const char* buildName = "debug build";
 #else
-    const char* buildName = "release build";
+        const char* buildName = "release build";
 #endif
 
-    std::stringstream strStream;
+        std::stringstream strStream;
 
-    strStream << "Memory tracking: " << (trackingEnabled ? "enabled." : "disabled.") << std::endl;
-    strStream << "Underlying heap: "
-              << (debugPageHeapEnabled ? "debug page heap."
-                                       : (osHeapEnabled ? "os heap." : "malloc-based heap."))
-              << std::endl;
-    strStream << "malloc redirection: " << (mallocRedirectEnabled ? "" : "not ") << "enabled."
-              << std::endl;
-    strStream << "Shutdown trace: " << (traceOnShutdownEnabled ? "" : "not ") << "enabled."
-              << std::endl;
-    strStream << "Heap time (ns): " << heapTimeNs << std::endl;
-    strStream << "Heap counter: " << heapCounter << std::endl;
-    strStream << "Heap allocated count: " << heapTrackedCount << std::endl;
-    strStream << "Heap allocated volume: " << heapTrackedVolume << std::endl;
-    strStream << "CRT type: " << crtName << std::endl;
-    strStream << "Build type: " << buildName << std::endl;
+        strStream << "Memory tracking: " << (trackingEnabled ? "enabled." : "disabled.") << std::endl;
+        strStream << "Underlying heap: " << (debugPageHeapEnabled ? "debug page heap." : (osHeapEnabled ? "os heap." : "malloc-based heap.")) << std::endl;
+        strStream << "malloc redirection: " << (mallocRedirectEnabled ? "" : "not ") << "enabled." << std::endl;
+        strStream << "Shutdown trace: " << (traceOnShutdownEnabled ? "" : "not ") << "enabled." << std::endl;
+        strStream << "Heap time (ns): " << heapTimeNs << std::endl;
+        strStream << "Heap counter: " << heapCounter << std::endl;
+        strStream << "Heap allocated count: " << heapTrackedCount << std::endl;
+        strStream << "Heap allocated volume: " << heapTrackedVolume << std::endl;
+        strStream << "CRT type: " << crtName << std::endl;
+        strStream << "Build type: " << buildName << std::endl;
 
-    std::string str = strStream.str();
-    output->append(str.data(), str.length()); // We don't directly assign string objects because
-    // currently we are crossing a DLL boundary between
-    // these two strings.
-  } else
-    output->append("Allocator not found.");
+        std::string str = strStream.str();
+        output->append(str.data(), str.length());
+        // We don't directly assign string objects because currently we are crossing a DLL boundary between these two strings.
+    }
+    else
+        output->append("Allocator not found.");
 
-  return (allocator ? 0 : -1);
+    return (allocator ? 0 : -1);
 }
 
 } // namespace OVR

@@ -1,28 +1,19 @@
-/************************************************************************************
+//========================================================================================================================================================================================================================
+// Various operations to get information about the system
+// Created  : September 26, 2014
+// Authors  : Kevin Jenkins
+// Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
+//
+// Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); you may not use the Oculus VR Rift SDK except in compliance with the License,
+// which is provided at the time of installation or download, or which otherwise accompanies this software in either electronic or hard copy form.
+//
+// You may obtain a copy of the License at http://www.oculusvr.com/licenses/LICENSE-3.3
+//
+// Unless required by applicable law or agreed to in writing, the Oculus VR SDK distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and limitations under the License.
+//========================================================================================================================================================================================================================
 
-Filename    :   Util_SystemInfo.cpp
-Content     :   Various operations to get information about the system
-Created     :   September 26, 2014
-Author      :   Kevin Jenkins
-
-Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
-
-Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License");
-you may not use the Oculus VR Rift SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
-
-You may obtain a copy of the License at
-
-http://www.oculusvr.com/licenses/LICENSE-3.3
-
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-************************************************************************************/
 #ifndef _WIN32_WINNT
     #define _WIN32_WINNT 0x0601 /* Windows 7+ */
 #endif
@@ -36,7 +27,7 @@ limitations under the License.
 #include "Kernel/OVR_Error.h"
 
 #if defined(OVR_OS_LINUX)
-#include <sys/utsname.h>
+    #include <sys/utsname.h>
 #endif
 
 // Includes used for GetBaseOVRPath()
@@ -58,18 +49,17 @@ limitations under the License.
     #pragma comment(lib, "Wtsapi32.lib") // WTSQuerySessionInformation
     #pragma comment(lib, "pdh.lib") // PDH
 #elif defined(OVR_OS_MS) // Other Microsoft OSs
-// Nothing, thanks.
+    // Nothing, thanks.
 #else
-#include <dirent.h>
-#include <sys/stat.h>
+    #include <dirent.h>
+    #include <sys/stat.h>
 
-#ifdef OVR_OS_LINUX
-#include <unistd.h>
-#include <pwd.h>
-#elif defined(OVR_OS_MAC)
-#include <libproc.h>
-#endif
-
+    #ifdef OVR_OS_LINUX
+        #include <unistd.h>
+        #include <pwd.h>
+    #elif defined(OVR_OS_MAC)
+        #include <libproc.h>
+    #endif
 #endif
 
 namespace OVR {
@@ -138,15 +128,14 @@ uint64_t GetGuidInt()
     {
         lastTime = Timer::GetTicksNanos();
         Thread::MSleep(1);
-        // Note this does not actually sleep for "only" 1 millisecond
-        // necessarily.  Since we do not call timeBeginPeriod(1) explicitly
+        // Note this does not actually sleep for "only" 1 millisecond necessarily.  Since we do not call timeBeginPeriod(1) explicitly
         // before invoking this function it may be sleeping for 10+ milliseconds.
         thisTime = Timer::GetTicksNanos();
         uint64_t diff = thisTime - lastTime;
         unsigned int diff4Bits = (unsigned int)(diff & 15);
         diff4Bits <<= 32 - 4;
         diff4Bits >>= j * 4;
-        ((char*)&g)[j] ^= diff4Bits;
+        ((char*) &g)[j] ^= diff4Bits;
     }
     return g;
 }
@@ -177,9 +166,8 @@ const char* GetProcessInfo()
 
 #ifdef OVR_OS_WIN32
 
-String OSVersionAsString() {
-   return GetSystemFileVersionStringW(L"\\kernel32.dll");
-}
+String OSVersionAsString()
+    { return GetSystemFileVersionStringW(L"\\kernel32.dll"); }
 
 String GetSystemFileVersionStringW(const wchar_t filePath[MAX_PATH])
 {
@@ -213,42 +201,39 @@ String GetFileVersionStringW(const wchar_t filePath[MAX_PATH])
         }
         else
         {
-        if (!GetFileVersionInfoW(filePath, 0, dwSize, pVersionInfo.get())) {
-            OVR_DEBUG_LOG(("Error in GetFileVersionInfo: %d (for %s)", GetLastError(), String(filePath).ToCStr()));
-            result = "Cannot get version info";
-        }
-        else
-        {
-            VS_FIXEDFILEINFO* pFileInfo = NULL;
-            UINT pLenFileInfo = 0;
-            if (!VerQueryValueW(pVersionInfo.get(), L"\\", (LPVOID*)&pFileInfo, &pLenFileInfo))
+            if (!GetFileVersionInfoW(filePath, 0, dwSize, pVersionInfo.get()))
             {
-                OVR_DEBUG_LOG(("Error in VerQueryValueW: %d (for %s)", GetLastError(), String(filePath).ToCStr()));
-                result = "File has no version info";
+                OVR_DEBUG_LOG(("Error in GetFileVersionInfo: %d (for %s)", GetLastError(), String(filePath).ToCStr()));
+                result = "Cannot get version info";
             }
             else
             {
-                int major = (pFileInfo->dwFileVersionMS >> 16) & 0xffff;
-                int minor = (pFileInfo->dwFileVersionMS) & 0xffff;
-                int hotfix = (pFileInfo->dwFileVersionLS >> 16) & 0xffff;
-                int other = (pFileInfo->dwFileVersionLS) & 0xffff;
+                VS_FIXEDFILEINFO* pFileInfo = NULL;
+                UINT pLenFileInfo = 0;
+                if (!VerQueryValueW(pVersionInfo.get(), L"\\", (LPVOID*)&pFileInfo, &pLenFileInfo))
+                {
+                    OVR_DEBUG_LOG(("Error in VerQueryValueW: %d (for %s)", GetLastError(), String(filePath).ToCStr()));
+                    result = "File has no version info";
+                }
+                else
+                {
+                    int major = (pFileInfo->dwFileVersionMS >> 16) & 0xffff;
+                    int minor = (pFileInfo->dwFileVersionMS) & 0xffff;
+                    int hotfix = (pFileInfo->dwFileVersionLS >> 16) & 0xffff;
+                    int other = (pFileInfo->dwFileVersionLS) & 0xffff;
 
-                char str[128];
-                snprintf(str, 128, "%d.%d.%d.%d", major, minor, hotfix, other);
-
-                result = str;
+                    char str[128];
+                    snprintf(str, 128, "%d.%d.%d.%d", major, minor, hotfix, other);
+                    result = str;
+                }
             }
         }
     }
-}
-
-  return result;
+    return result;
 }
 
 String GetCameraDriverVersion()
-{
-    return GetSystemFileVersionStringW(L"\\drivers\\OCUSBVID.sys");
-}
+    { return GetSystemFileVersionStringW(L"\\drivers\\OCUSBVID.sys"); }
 
 // From http://stackoverflow.com/questions/9524309/enumdisplaydevices-function-not-working-for-me
 void GetGraphicsCardList(Array<String>& gpus)
@@ -436,10 +421,10 @@ std::string GetProcessPath(pid_t processId, bool fileNameOnly, bool enableErrorR
 
     int readResult = readlink(linkPath, procPath, OVR_ARRAY_COUNT(procPath));
 
-    if ((readResult != -1) || (readResult >= int(OVR_ARRAY_COUNT(procPath))))
+    if ((readResult != -1) || (readResult < int(OVR_ARRAY_COUNT(procPath))))
     {
         // If the file was deleted, its name will have "(deleted)" after it, which we may want to deal with.
-        procPath[result] = '\0';
+        procPath[readResult] = '\0';
         OVR_UNUSED(fileNameOnly); // To do.
     } 
     else
@@ -501,52 +486,50 @@ std::string GetProcessPath(HANDLE processHandle, bool fileNameOnly, bool enableE
 }
 #endif
 
-// Same as GetProcessPath, except scrubs the returned process path string if it's something we have
-// deemed
+// Same as GetProcessPath, except scrubs the returned process path string if it's something we have deemed
 // cannot be reported in our log, usually due to privacy measures we have enacted.
 std::string GetLoggableProcessPath(pid_t processId, bool fileNameOnly)
 {
     std::string processPath = GetProcessPath(processId, fileNameOnly, true);
 
-  // The following is currently disabled, as we decided to not redact side-loaded file names from
-  // the server log, and added a ReadMe.txt to the log folder which has a disclaimer about this.
-  //
-  //#ifdef OVR_INTERNAL_CODE
-  //    // For internal builds, we do no scrubbing.
-  //#else
-  //    // For public builds we scrub the process path if it's side-loaded.
-  //    if (IsProcessSideLoaded(GetProcessPath(processId, false)))
-  //        processPath = "(side-loaded app)";
-  //#endif
+    // The following is currently disabled, as we decided to not redact side-loaded file names from
+    // the server log, and added a ReadMe.txt to the log folder which has a disclaimer about this.
+    //
+    //#ifdef OVR_INTERNAL_CODE
+    //    // For internal builds, we do no scrubbing.
+    //#else
+    //    // For public builds we scrub the process path if it's side-loaded.
+    //    if (IsProcessSideLoaded(GetProcessPath(processId, false)))
+    //        processPath = "(side-loaded app)";
+    //#endif
 
     return processPath;
 }
 
 #if defined(_WIN32)
-// Same as GetProcessPath, except scrubs the returned process path string if it's something we have
-// deemed
+// Same as GetProcessPath, except scrubs the returned process path string if it's something we have deemed
 // cannot be reported in our log, usually due to privacy measures we have enacted.
 std::string GetLoggableProcessPath(HANDLE processHandle, bool fileNameOnly)
 {
     std::string processPath = GetProcessPath(processHandle, fileNameOnly, true);
 
-  // The current design, which may change, is that we allow logging of process file paths in public
-  // builds.
-  //#ifdef OVR_INTERNAL_CODE
-  //    // For internal builds, we do no scrubbing.
-  //#else
-  //    // For public builds we scrub the process path if it's side-loaded.
-  //    if (IsProcessSideLoaded(processPath))
-  //        processPath = "(side-loaded app)";
-  //#endif
+    // The current design, which may change, is that we allow logging of process file paths in public
+    // builds.
+    //#ifdef OVR_INTERNAL_CODE
+    //    // For internal builds, we do no scrubbing.
+    //#else
+    //    // For public builds we scrub the process path if it's side-loaded.
+    //    if (IsProcessSideLoaded(processPath))
+    //        processPath = "(side-loaded app)";
+    //#endif
 
     return processPath;
 }
 #endif
 
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Get a path under BaseOVRPath
-
+//========================================================================================================================================================================================================================
 String GetOVRPath(const wchar_t* subPath, bool create_dir)
 {
   #if defined(_WIN32)
@@ -571,9 +554,9 @@ String GetOVRPath(const wchar_t* subPath, bool create_dir)
   #endif
 }
 
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Get the path for local app data.
-
+//========================================================================================================================================================================================================================
 String GetBaseOVRPath(bool create_dir) 
 {
   #if defined(OVR_OS_WIN32)
@@ -847,12 +830,9 @@ bool GetDefaultFirmwarePath(String& firmwarePath)
     return true;
 }
 
-//-----------------------------------------------------------------------------
-// GetFirmwarePath
-//
-// This function searches for likely locations of the firmware.zip file when
-// the file path is not specified by the user.
-
+//========================================================================================================================================================================================================================
+// GetFirmwarePath :: this function searches for likely locations of the firmware.zip file when the file path is not specified by the user.
+//========================================================================================================================================================================================================================
 #ifdef OVR_OS_MS
 
 // We search the following paths relative to the executable:
@@ -892,36 +872,27 @@ bool GetFirmwarePath(std::wstring* outPath)
 
     std::wstring basePath = GetModulePath();
 
-  // Remove trailing slash.
+    // Remove trailing slash.
     std::wstring::size_type lastSlashOffset = basePath.find_last_of(L"/\\", std::wstring::npos, 2);
-    if (lastSlashOffset == std::string::npos) {
-        // Abort if no trailing slash.
+    if (lastSlashOffset == std::string::npos)                       // Abort if no trailing slash.
         return false;
-    }
+        
     basePath = basePath.substr(0, lastSlashOffset + 1);
-
-  // For each relative path to test,
-    for (int i = 0; i < RelativePathsCount; ++i) 
+    
+    for (int i = 0; i < RelativePathsCount; ++i)                    // For each relative path to test,
     {
-    // Concatenate the relative path on the base path (base path contains a trailing slash)
-        std::wstring candidatePath = basePath + FWRelativePaths[i];
-
-        // If a file exists at this location,
-        if (::PathFileExistsW(candidatePath.c_str()))
+        std::wstring candidatePath = basePath + FWRelativePaths[i]; // Concatenate the relative path on the base path (base path contains a trailing slash)
+        if (::PathFileExistsW(candidatePath.c_str()))               // If a file exists at this location,
         {
             // Return the path if requested.
             if (outPath)
-            {
                 *outPath = candidatePath;
-            }
-
             return true;
         }
     }
 #else
     OVR_UNUSED(outPath);
 #endif // OVR_OS_MS
-
     return false;
 }
 
@@ -1004,39 +975,38 @@ static const int RFL2RelativePathsCount = OVR_ARRAY_COUNT(RFL2RelativePaths);
 
 #endif // WIN32
 
-bool GetRFL2Path(std::wstring* outPath) {
+bool GetRFL2Path(std::wstring* outPath)
+{
 #ifdef OVR_OS_MS
+    std::wstring basePath = GetModulePath();
 
-  std::wstring basePath = GetModulePath();
+    // Remove trailing slash.
+    std::wstring::size_type lastSlashOffset = basePath.find_last_of(L"/\\", std::wstring::npos, 2);
+    if (lastSlashOffset == std::string::npos)               // Abort if no trailing slash.
+        return false;
+            
+    basePath = basePath.substr(0, lastSlashOffset + 1);
 
-  // Remove trailing slash.
-  std::wstring::size_type lastSlashOffset = basePath.find_last_of(L"/\\", std::wstring::npos, 2);
-  if (lastSlashOffset == std::string::npos) {
-    // Abort if no trailing slash.
-    return false;
-  }
-  basePath = basePath.substr(0, lastSlashOffset + 1);
+    // For each relative path to test,
+    for (int i = 0; i < RFL2RelativePathsCount; ++i)
+    {
+        // Concatenate the relative path on the base path (base path contains a trailing slash)
+        std::wstring candidatePath = basePath + RFL2RelativePaths[i];
 
-  // For each relative path to test,
-  for (int i = 0; i < RFL2RelativePathsCount; ++i) {
-    // Concatenate the relative path on the base path (base path contains a trailing slash)
-    std::wstring candidatePath = basePath + RFL2RelativePaths[i];
-
-    // If a file exists at this location,
-    if (::PathFileExistsW(candidatePath.c_str())) {
-      // Return the path if requested.
-      if (outPath) {
-        *outPath = candidatePath;
-      }
-
-      return true;
+        // If a file exists at this location,
+        if (::PathFileExistsW(candidatePath.c_str()))
+        {
+            // Return the path if requested.
+            if (outPath)
+                *outPath = candidatePath;
+            return true;
+        }
     }
-  }
 #else
-  OVR_UNUSED(outPath);
-//#error "FIXME"
+    OVR_UNUSED(outPath);
+    //#error "FIXME"
 #endif // OVR_OS_MS
-  return false;
+    return false;
 }
 
 #ifdef OVR_OS_MS

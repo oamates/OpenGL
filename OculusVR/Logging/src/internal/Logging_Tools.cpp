@@ -1,28 +1,18 @@
-/************************************************************************************
-
-Filename    :   Logging_Tools.cpp
-Content     :   Tools for Logging
-Created     :   Oct 26, 2015
-Authors     :   Chris Taylor
-
-Copyright   :   Copyright 2015-2016 Oculus VR, LLC All Rights reserved.
-
-Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); 
-you may not use the Oculus VR Rift SDK except in compliance with the License, 
-which is provided at the time of installation or download, or which 
-otherwise accompanies this software in either electronic or hard copy form.
-
-You may obtain a copy of the License at
-
-http://www.oculusvr.com/licenses/LICENSE-3.3 
-
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK 
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-************************************************************************************/
+//========================================================================================================================================================================================================================
+// Tools for Logging
+// Created : Oct 26, 2015
+// Author : Chris Taylor
+// Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
+//
+// Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); you may not use the Oculus VR Rift SDK except in compliance with the License,
+// which is provided at the time of installation or download, or which otherwise accompanies this software in either electronic or hard copy form.
+//
+// You may obtain a copy of the License at http://www.oculusvr.com/licenses/LICENSE-3.3
+//
+// Unless required by applicable law or agreed to in writing, the Oculus VR SDK distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and limitations under the License.
+//========================================================================================================================================================================================================================
 
 #ifdef _MSC_VER
     #pragma warning(disable: 4530) // C++ exception handler used, but unwind semantics are not enabled
@@ -34,12 +24,12 @@ limitations under the License.
 #include <time.h>
 
 #include <chrono>
-#include <codecvt>
 #include <vector>
 #include <locale>
 
 #if defined(_MSC_VER)
     #include <filesystem> // Pre-release C++ filesystem support.
+    #include <codecvt>
 #endif
 
 #if defined(__APPLE__)
@@ -51,36 +41,33 @@ limitations under the License.
 
 namespace ovrlog {
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Terminator
-
+//========================================================================================================================================================================================================================
 Terminator::Terminator() :
     Terminated(false),
     TerminateEvent()
-{
-}
+    { }
 
-Terminator::~Terminator()
-{
-}
+Terminator::~Terminator() 
+    { }
 
 bool Terminator::Initialize()
 {
     Terminated = false;
 
-    #if defined(_WIN32)
-        if (TerminateEvent.IsValid())
-        {
-            ::ResetEvent(TerminateEvent.Get());
-            return true;
-        }
+  #if defined(_WIN32)
+    if (TerminateEvent.IsValid())
+    {
+        ::ResetEvent(TerminateEvent.Get());
+        return true;
+    }
 
-        TerminateEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    #else
-        // To do: Implement this.
-        assert(false);
-    #endif
+    TerminateEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  #else
+    // To do: Implement this.
+    assert(false);
+  #endif
     
     return TerminateEvent.IsValid();
 }
@@ -91,12 +78,12 @@ void Terminator::Terminate()
 
     if (TerminateEvent.IsValid())
     {
-        #if defined(_WIN32)
-            ::SetEvent(TerminateEvent.Get());
-        #else
-            // To do: Implement this.
-            assert(false);
-        #endif
+      #if defined(_WIN32)
+        ::SetEvent(TerminateEvent.Get());
+      #else
+        // To do: Implement this.
+        assert(false);
+      #endif
     }
 }
 
@@ -106,24 +93,19 @@ bool Terminator::WaitOn(OvrLogHandle hEvent, uint32_t timeoutMsec)
     if (Terminated || !TerminateEvent.IsValid())
         return false;
 
-    #if defined(_WIN32)
-        HANDLE events[2] = { hEvent, TerminateEvent.Get() };
+  #if defined(_WIN32)
+    HANDLE events[2] = { hEvent, TerminateEvent.Get() };
+    DWORD result = ::WaitForMultipleObjects(2, events, FALSE, timeoutMsec);
 
-        DWORD result = ::WaitForMultipleObjects(2, events, FALSE, timeoutMsec);
-
-        if (Terminated)
-            return false;
-
-        if (result == WAIT_TIMEOUT)
-            return false;
-        if (result == WAIT_OBJECT_0)
-            return true;
-    #else
-        // To do: Implement this.
-        (void)hEvent;
-        (void)timeoutMsec;
-        assert(false);
-    #endif
+    if (Terminated) return false;
+    if (result == WAIT_TIMEOUT) return false;
+    if (result == WAIT_OBJECT_0) return true;
+  #else
+    // To do: Implement this.
+    (void)hEvent;
+    (void)timeoutMsec;
+    assert(false);
+  #endif
     
     return false;
 }
@@ -134,91 +116,80 @@ bool Terminator::WaitSleep(int milliseconds)
     if (Terminated || !TerminateEvent.IsValid())
         return false;
 
-    #if defined(_WIN32)
-        ::WaitForSingleObject(TerminateEvent.Get(), milliseconds); // Ignore return value
-    #else
-        // To do: Implement this.
-        (void)milliseconds;
-        assert(false);
-    #endif
-
-    
+  #if defined(_WIN32)
+    ::WaitForSingleObject(TerminateEvent.Get(), milliseconds); // Ignore return value
+  #else
+    // To do: Implement this.
+    (void)milliseconds;
+    assert(false);
+  #endif  
     return !Terminated;
 }
 
 
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Lock
-
+//========================================================================================================================================================================================================================
 Lock::Lock() :
-#if defined(_WIN32)
+  #if defined(_WIN32)
     cs{}
-#else
+  #else
 	m()
-#endif
+  #endif
 {
-#if defined(_WIN32)
+  #if defined(_WIN32)
     static const DWORD kSpinCount = 1000;
     ::InitializeCriticalSectionAndSpinCount(&cs, kSpinCount);
-#endif
+  #endif
 }
 
 Lock::~Lock()
 {
-#if defined(_WIN32)
+  #if defined(_WIN32)
     ::DeleteCriticalSection(&cs);
-#endif
+  #endif
 }
 
 bool Lock::TryEnter()
 {
-#if defined(_WIN32)
+  #if defined(_WIN32)
     return ::TryEnterCriticalSection(&cs) != FALSE;
-#else
+  #else
 	return m.try_lock();
-#endif
+  #endif
 }
 
 void Lock::Enter()
 {
-#if defined(_WIN32)
+  #if defined(_WIN32)
     ::EnterCriticalSection(&cs);
-#else
+  #else
 	m.lock();
-#endif
+  #endif
 }
 
 void Lock::Leave()
 {
-#if defined(_WIN32)
+  #if defined(_WIN32)
     ::LeaveCriticalSection(&cs);
-#else
+  #else
 	m.unlock();
-#endif
+  #endif
 }
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Locker
-
+//========================================================================================================================================================================================================================
 Locker::Locker(Lock* lock) :
     TheLock(lock)
-{
-    if (TheLock)
-        TheLock->Enter();
-}
+    { if (TheLock) TheLock->Enter(); }
 
 Locker::Locker(Lock& lock) :
     TheLock(&lock)
-{
-    if (TheLock)
-        TheLock->Enter();
-}
+    { if (TheLock) TheLock->Enter(); }
 
 Locker::~Locker()
-{
-    Clear();
-}
+    { Clear(); }
 
 bool Locker::TrySet(Lock* lock)
 {
@@ -232,14 +203,11 @@ bool Locker::TrySet(Lock* lock)
 }
 
 bool Locker::TrySet(Lock& lock)
-{
-    return TrySet(&lock);
-}
+    { return TrySet(&lock); }
 
 void Locker::Set(Lock* lock)
 {
     Clear();
-
     if (lock)
     {
         lock->Enter();
@@ -248,9 +216,7 @@ void Locker::Set(Lock* lock)
 }
 
 void Locker::Set(Lock& lock)
-{
-    return Set(&lock);
-}
+    { return Set(&lock); }
 
 void Locker::Clear()
 {
@@ -261,19 +227,15 @@ void Locker::Clear()
     }
 }
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // AutoHandle
-
+//========================================================================================================================================================================================================================
 AutoHandle::AutoHandle(OvrLogHandle handle) :
     TheHandle(handle)
-{
-}
+    { }
 
 AutoHandle::~AutoHandle()
-{
-    Clear();
-}
+    { Clear(); }
 
 void AutoHandle::operator=(OvrLogHandle handle)
 {
@@ -285,55 +247,48 @@ void AutoHandle::Clear()
 {
     if (TheHandle)
     {
-        #if defined(_WIN32)
-            ::CloseHandle(TheHandle);
-        #else
-            // To do: Implement this.
-            assert(false);
-        #endif
-        
+      #if defined(_WIN32)
+        ::CloseHandle(TheHandle);
+      #else
+        // To do: Implement this.
+        assert(false);
+      #endif
         TheHandle = nullptr;
     }
 }
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Time
-
 // To do: Move to using only std::chrono in the future.
-// Also, it may be better to use a class instead of independent functions to
-// get time and frequency.
-
-// Returns the timer's seconds per cycle.
-// Get the number to multiply by timestamps to convert to seconds.
+// Also, it may be better to use a class instead of independent functions to get time and frequency.
+// Returns the timer's seconds per cycle. Get the number to multiply by timestamps to convert to seconds.
+//========================================================================================================================================================================================================================
 double GetTimestampFrequencyInverse()
 {
-    static double PerfFrequencyInverse = 0.;
-
-    if (PerfFrequencyInverse == 0.) {
-  #if defined(_WIN32)
+    static double PerfFrequencyInverse = 0.0;
+    if (PerfFrequencyInverse == 0.0)
+    {
+      #if defined(_WIN32)
         static LARGE_INTEGER freq = {};
         if (!::QueryPerformanceFrequency(&freq) || freq.QuadPart == 0) 
             return -1.0;
 
         PerfFrequencyInverse = 1.0 / (double)freq.QuadPart;
-  #else
+      #else
         // On OSX this period is 1 nanosecond, though that doesn't necessarily mean precision is 1 nanosecond.
         PerfFrequencyInverse = (double)std::chrono::high_resolution_clock::period::num / (double)std::chrono::high_resolution_clock::period::den;
-  #endif
+      #endif
     }
     return PerfFrequencyInverse;
 }
 
-// Returns the timer's current cycle count.
-// Get current time as a timestamp
+// Returns the timer's current cycle count. Get current time as a timestamp
 timestamp_t GetTimestamp()
 {
   #if defined(_WIN32)
     LARGE_INTEGER timeStamp;
     if (!::QueryPerformanceCounter(&timeStamp))
         return 0;
-
     return timeStamp.QuadPart;
   #else
     timestamp_t t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
@@ -361,29 +316,27 @@ std::string GetLogFilenameDatestamp()
 }
 
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Tools
-
+//========================================================================================================================================================================================================================
 bool IsDebuggerAttached()
 {
-    #if defined(_WIN32)
-        return ::IsDebuggerPresent() != FALSE;
-    #elif defined(__APPLE__)
-        int               mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
-        struct kinfo_proc info;
-        size_t            size = sizeof(info);
-
-        info.kp_proc.p_flag = 0;
-        sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, nullptr, 0);
-
-        return ((info.kp_proc.p_flag & P_TRACED) != 0);
+  #if defined(_WIN32)
+    return ::IsDebuggerPresent() != FALSE;
+  #elif defined(__APPLE__)
+    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+    struct kinfo_proc info;
+    size_t size = sizeof(info);
+    info.kp_proc.p_flag = 0;
+    sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, nullptr, 0);
+    return ((info.kp_proc.p_flag & P_TRACED) != 0);
 
     #elif defined(PT_TRACE_ME) && !defined(__android__)
         return (ptrace(PT_TRACE_ME, 0, 1, 0) < 0);
     #else
         // We have some platform-specific code elsewhere.
-        #error "IsDebuggerAttached: Need to get platform-specific code for this."
+        #warning "IsDebuggerAttached: Need to get platform-specific code for this."
+        return false;
     #endif
 }
 

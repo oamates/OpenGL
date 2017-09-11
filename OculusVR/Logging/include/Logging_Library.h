@@ -1,29 +1,18 @@
-/************************************************************************************
-
-Filename    :   Logging.h
-Content     :   Logging system
-Created     :   Oct 26, 2015
-Authors     :   Chris Taylor
-
-Copyright   :   Copyright 2015-2016 Oculus VR, LLC All Rights reserved.
-
-Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License");
-you may not use the Oculus VR Rift SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
-
-You may obtain a copy of the License at
-
-http://www.oculusvr.com/licenses/LICENSE-3.3
-
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-************************************************************************************/
-
+//========================================================================================================================================================================================================================
+// Logging system
+// Created : Oct 26, 2015
+// Author : Chris Taylor
+// Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
+//
+// Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); you may not use the Oculus VR Rift SDK except in compliance with the License,
+// which is provided at the time of installation or download, or which otherwise accompanies this software in either electronic or hard copy form.
+//
+// You may obtain a copy of the License at http://www.oculusvr.com/licenses/LICENSE-3.3
+//
+// Unless required by applicable law or agreed to in writing, the Oculus VR SDK distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and limitations under the License.
+//========================================================================================================================================================================================================================
 #pragma once
 
 #pragma warning(push)
@@ -37,6 +26,7 @@ limitations under the License.
 #include <set>
 #include <map>
 #include <time.h>
+#include <cstdarg>
 
 #pragma warning(push)
 
@@ -57,60 +47,44 @@ class Configurator;
 typedef uint32_t Log_Level_t;
 typedef uint32_t Write_Option_t;
 
-//-----------------------------------------------------------------------------
-// Log Level
-//
-// Log message priority is indicated by its level.  The level can inform how
-// prominently it is displayed on the console window or whether or not a
-// message is displayed at all.
-
+//========================================================================================================================================================================================================================
+// Log Level : message priority is indicated by its level.  The level can inform how prominently it is displayed on the console 
+// window or whether or not a message is displayed at all.
+//========================================================================================================================================================================================================================
 enum class Level : Log_Level_t
 {
-
-    // Trace message.  This is a message that can potentially happen once per
-    // camera/HMD frame and are probably being reviewed after they are recorded
-    // since they will scroll by too fast otherwise.
+    // Trace message. This is a message that can potentially happen once per camera/HMD frame and are probably being reviewed after they are 
+    // recorded since they will scroll by too fast otherwise.
     Trace,
 
-    // Debug message.  This is a verbose log level that can be selectively
-    // turned on by the user in the case of perceived problems to help
-    // root-cause the problems.  This log level is intended to be used for
-    // messages that happen less often than once per camera/HMD frame,
+    // Debug message.  This is a verbose log level that can be selectively turned on by the user in the case of perceived problems to help
+    // root-cause the problems.  This log level is intended to be used for messages that happen less often than once per camera/HMD frame,
     // such that they can be human readable.
     Debug,
 
-    // Info messages, which should be the default message type for infrequent
-    // messages used during subsystem initialization and/or shutdown.  This
-    // log level is fairly visible so should be used sparingly.  Expect users to
-    // have these turned on, so avoid printing anything here that would obscure
-    // Warning and Error messages.
+    // Info messages, which should be the default message type for infrequent messages used during subsystem initialization and/or shutdown. 
+    // This log level is fairly visible so should be used sparingly. Expect users to have these turned on, so avoid printing anything here 
+    // that would obscure Warning and Error messages.
     Info,
 
-    // Warning message, which is also displayed almost everywhere.  For most
-    // purposes it is as visible as an Error message, so it should also be used
-    // very selectively.  The main difference from Error level is informational
-    // as it is just as visible.
+    // Warning message, which is also displayed almost everywhere. For most purposes it is as visible as an Error message, so it should also 
+    // be used very selectively.  The main difference from Error level is informational as it is just as visible.
     Warning,
 
-    // Highest level of logging.  If any logging is going on it will include this
-    // message.  For this reason, please avoid using the Error level unless the
-    // message should be displayed absolutely everywhere.
+    // Highest level of logging. If any logging is going on it will include this message. For this reason, please avoid using the Error level 
+    // unless the message should be displayed absolutely everywhere.
     Error,
 
-    // Number of error levels
-    Count, // Used to static assert where updates must happen in code.
+    // Number of error levels, used to static assert where updates must happen in code.
+    Count
 };
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Line of Code
-//
-// C++11 Trait that can be used to insert the file and line number into a log
-// message.  Often times it is a good idea to put these at the start of a log
-// message so that the user can click on them to have the code editor IDE jump
-// to that line of code.
-
+// C++11 Trait that can be used to insert the file and line number into a log message. Often times it is a good idea to put these at the start 
+// of a log message so that the user can click on them to have the code editor IDE jump to that line of code.
 // Log Line of Code FileLineInfo object.
+//========================================================================================================================================================================================================================
 #if defined(LOGGING_DEBUG)
     #define LOGGING_FILE_LINE_STRING_ __FILE__ "(" LOGGING_STRINGIZE(__LINE__) ")"
     #define LOGGING_LOC LOGGING_FILE_LINE_STRING_
@@ -118,54 +92,38 @@ enum class Level : Log_Level_t
     #define LOGGING_LOC "(no LOC)"
 #endif
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // LogStringBuffer
-//
 // Thread-local buffer for constructing a log message.
-
+//========================================================================================================================================================================================================================
 struct LogStringBuffer
 {
-    // Raw pointer to subsystem name
-    const char* SubsystemName;
+    const char* SubsystemName;                                                      // Raw pointer to subsystem name
+    Level MessageLogLevel;                                                          // Message log level
+    std::stringstream Stream;                                                       // Buffer containing string as it is constructed
+    bool Relogged;                                                                  // Flag indicating that the message is being relogged.
 
-    // Message log level
-    Level MessageLogLevel;
-
-    // Buffer containing string as it is constructed
-    std::stringstream Stream;
-    // TBD: We can optimize this better than std::string
-    // TBD: We can remember the last log string size to avoid extra allocations.
-
-    // Flag indicating that the message is being relogged.
-    // This is useful to prevent double-logging messages.
-    bool Relogged;
-
-    // Ctor
     LogStringBuffer(const char* subsystem, Level level) :
         SubsystemName(subsystem),
         MessageLogLevel(level),
         Stream(),
         Relogged(false)
-    {
-    }
+        { }
 };
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // LogStringize Override
-//
-// This is the function that user code can override to control how special types
-// are serialized into the log messages.
+// This is the function that user code can override to control how special types are serialized into the log messages.
+//========================================================================================================================================================================================================================
 /*
 // Delete logging a shared_ptr
-template<typename T>
-LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::shared_ptr<T>& thing) {
-  (void)buffer;
-  (void)thing;
-//#if !defined(__clang__)
-  static_assert(false, "Don't log a shared_ptr, log *ptr (or ptr.get() for the raw pointer value).");
-//#endif
+template<typename T> LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::shared_ptr<T>& thing)
+{
+    (void)buffer;
+    (void)thing;
+    //#if !defined(__clang__)
+        static_assert(false, "Don't log a shared_ptr, log *ptr (or ptr.get() for the raw pointer value).");
+    //#endif
 }
 
 // Delete logging a unique_ptr
@@ -178,48 +136,41 @@ LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::unique_ptr<
 //#endif
 }
 */
-template<typename T>
-LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const T& first)
-{
-    buffer.Stream << first;
-}
+template<typename T> LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const T& first)
+    { buffer.Stream << first; }
 
+//========================================================================================================================================================================================================================
 // Overrides for various types we want to handle specially:
+//========================================================================================================================================================================================================================
+template<> LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const bool& first)
+    { buffer.Stream << (first ? "true" : "false"); }
 
-template<>
-LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const bool& first)
-{
-    buffer.Stream << (first ? "true" : "false");
-}
+template<> void LogStringize(LogStringBuffer& buffer, wchar_t const * const & first);
 
-template<>
-void LogStringize(LogStringBuffer& buffer, wchar_t const * const & first);
-
-template<int N>
-LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const wchar_t(&first)[N])
+template<int N> LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const wchar_t(&first)[N])
 {
     const wchar_t* str = first;
     LogStringize(buffer, str);
 }
 
-template<>
-LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::wstring& first)
+template<> LOGGING_INLINE void LogStringize(LogStringBuffer& buffer, const std::wstring& first)
 {
     const wchar_t* str = first.c_str();
     LogStringize(buffer, str);
 }
 
 
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Log Output Worker Thread
-//
-// Worker thread that produces the output.
-// Call AddPlugin() to register an output plugin.
+// Worker thread that produces the output. Call AddPlugin() to register an output plugin.
+//========================================================================================================================================================================================================================
 
+//========================================================================================================================================================================================================================
 // User-defined output plugin
+//========================================================================================================================================================================================================================
 class OutputPlugin
 {
-public:
+  public:
     virtual ~OutputPlugin() {}
 
     // Return a unique string naming this output plugin.
@@ -229,20 +180,18 @@ public:
     virtual void Write(Level level, const char* subsystem, const char* header, const char* utf8msg) = 0;
 };
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Used by channel to specify how to write
+//========================================================================================================================================================================================================================
 enum class WriteOption : Write_Option_t
 {
-    // Default log write
-    Default,
-
-    // Dangerously ignore the queue limit
-    DangerouslyIgnoreQueueLimit
+    Default,                                                        // Default log write
+    DangerouslyIgnoreQueueLimit                                     // Dangerously ignore the queue limit
 };
 
-
+//========================================================================================================================================================================================================================
 // Iterate through the list of channels before the CRT has initialized
+//========================================================================================================================================================================================================================
 #pragma pack(push,1)
 struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; bool *UserOverrodeMinimumOutputLevel; ChannelNode* Next, *Prev; };
 #pragma pack(pop)
@@ -257,8 +206,10 @@ struct ChannelNode { const char* SubsystemName; Log_Level_t* Level; bool *UserOv
 #endif
 
 
+//========================================================================================================================================================================================================================
 // Export the function to access OutputWorker::Write(). This is used by the Channel class
 // to allow writing with OutputWorker possibly in a separate module
+//========================================================================================================================================================================================================================
 extern "C"
 {
     OVR_EXPORTED_FUNCTION extern void OutputWorkerOutputFunctionC(const char* subsystemName, Log_Level_t messageLogLevel, const char* stream, bool relogged, Write_Option_t option);
@@ -274,63 +225,53 @@ extern "C"
     typedef void(*ConfiguratorUnregisterType)(ChannelNode* channelNode);
 }
 
+//========================================================================================================================================================================================================================
 // Shutdown the logging system and release memory
+//========================================================================================================================================================================================================================
 void ShutdownLogging();
 
+//========================================================================================================================================================================================================================
 // Log Output Worker Thread
+//========================================================================================================================================================================================================================
 class OutputWorker
 {
-    OutputWorker(); // Use GetInstance() to get the singleton instance.
+    OutputWorker();                                                     // Use GetInstance() to get the singleton instance.
 
-public:
+  public:
     static OutputWorker* GetInstance();
-
     ~OutputWorker();
 
     void InstallDefaultOutputPlugins();
-
-    // Start/stop logging output (started automatically)
-    void Start();
+    void Start();                                                       // Start/stop logging output (started automatically)
     void Stop();
+    void Flush();                                                       // Blocks until all log messages before this function call are completed.
 
-    // Blocks until all log messages before this function call are completed.
-    void Flush();
-
-    // Write a log buffer to the output
     void Write(const char* subsystemName, Level messageLogLevel, const char* stream, bool relogged, WriteOption option);
 
-    // Plugin management
-    void AddPlugin(std::shared_ptr<OutputPlugin> plugin);
+    void AddPlugin(std::shared_ptr<OutputPlugin> plugin);               // Plugin management
     void RemovePlugin(std::shared_ptr<OutputPlugin> plugin);
     std::shared_ptr<OutputPlugin> GetPlugin(const char* const pluginName);
-
-    // Disable all output
-    void DisableAllPlugins();
-
-    // Get the lock used for the channels.
-    Lock* GetChannelsLock();
-
-    // Our time type
-    #if defined(WIN32)
-        typedef SYSTEMTIME LogTime;
-    #else
-        typedef time_t LogTime;  // To do: Make this a C++ time with better resolution than time_t.
-    #endif
+    void DisableAllPlugins();                                           // Disable all output
+    Lock* GetChannelsLock();                                            // Get the lock used for the channels.
+    
+  #if defined(WIN32)                                                    // Our time type
+    typedef SYSTEMTIME LogTime;
+  #else
+    typedef time_t LogTime;                                             // To do: Make this a C++ time with better resolution than time_t.
+  #endif
     
     static LogTime GetCurrentLogTime();
     
 private:
-    // Is the logger running in a debugger?
-    bool IsInDebugger;
+    
+    bool IsInDebugger;                                                  // Is the logger running in a debugger?
+    Lock ChannelsLock;                                                  // It's here so so we know it is valid in the scope of ~OutputWorker
 
-    // It's here so so we know it is valid in the scope of ~OutputWorker
-    Lock ChannelsLock;
+    
+    Lock PluginsLock;                                                   // Plugins
+    std::set<std::shared_ptr<OutputPlugin>> Plugins;
 
-    // Plugins
-    Lock PluginsLock;
-    std::set< std::shared_ptr<OutputPlugin> > Plugins;
-
-    // Worker Log Buffer
+    /*  Worker Log Buffer */
     struct QueuedLogMessage
     {
         QueuedLogMessage(const char* subsystemName, Level messageLogLevel, const char* stream, const LogTime& time);
@@ -343,30 +284,25 @@ private:
         OvrLogHandle      FlushEvent;
     };
 
-    // Maximum number of logs that we allow in the queue at a time.
-    // If we go beyond this limit, we keep a count of additional logs that were lost.
+    // Maximum number of logs that we allow in the queue at a time. If we go beyond this limit, we keep a count of additional logs that were lost.
     static const int WorkQueueLimit = 1000;
 
-    AutoHandle        WorkerWakeEvent;      // Event letting the worker thread know the queue is not empty
-    Lock              WorkQueueLock;        // Lock guarding the work queue
-    QueuedLogMessage* WorkQueueHead;        // Head of linked list of work that is queued
-    QueuedLogMessage* WorkQueueTail;        // Tail of linked list of work that is queued
-    int               WorkQueueSize;        // Size of the linked list of queued work
-    int               WorkQueueOverrun;     // Number of log messages that exceeded the limit
-    // The work queue size is used to avoid overwhelming the logging thread, since it takes 1-2 milliseconds
-    // to log out each message it can easily fall behind a large amount of logs.  Lost log messages are added
-    // to the WorkQueueOverrun count so that they can be reported as "X logs were lost".
+    AutoHandle        WorkerWakeEvent;                                  // Event letting the worker thread know the queue is not empty
+    Lock              WorkQueueLock;                                    // Lock guarding the work queue
+    QueuedLogMessage* WorkQueueHead;                                    // Head of linked list of work that is queued
+    QueuedLogMessage* WorkQueueTail;                                    // Tail of linked list of work that is queued
+    int               WorkQueueSize;                                    // Size of the linked list of queued work
+    int               WorkQueueOverrun;                                 // Number of log messages that exceeded the limit
+
+    // The work queue size is used to avoid overwhelming the logging thread, since it takes 1-2 milliseconds to log out each message it can easily 
+    // fall behind a large amount of logs. Lost log messages are added to the WorkQueueOverrun count so that they can be reported as "X logs were lost".
 
     inline void WorkQueueAdd(QueuedLogMessage* msg)
     {
         if (WorkQueueTail)
-        {
             WorkQueueTail->Next = msg;
-        }
         else
-        {
             WorkQueueHead = msg;
-        }
         WorkQueueTail = msg;
         ++WorkQueueSize;
     }
@@ -385,26 +321,21 @@ private:
     Terminator WorkerTerminator;
     AutoHandle LoggingThread;
 
-    // Append level and subsystem name to timestamp buffer
-    // The buffer should point to the ending null terminator of
-    // the timstamp string.
-    static void AppendHeader(char* buffer, size_t bufferBytes,
-                             Level level, const char* subsystemName);
+    // Append level and subsystem name to timestamp buffer The buffer should point to the ending null terminator of the timstamp string.
+    static void AppendHeader(char* buffer, size_t bufferBytes, Level level, const char* subsystemName);
 
     void ProcessQueuedMessages();
-
     void FlushDbgViewLogImmediately(const char* subsystemName, Level messageLogLevel, const char* stream);
 };
 
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // ErrorSilencer
-//
 // This will demote errors to warnings in the log until it goes out of scope.
-// Helper class that allows error silencing to be done several function calls
-// up the stack and checked down the stack.
+// Helper class that allows error silencing to be done several function calls up the stack and checked down the stack.
+//========================================================================================================================================================================================================================
 class ErrorSilencer
 {
-public:
+  public:
     // Returns a bitfield of SilenceOptions that are currently in effect
     static int GetSilenceOptions();
 
@@ -439,26 +370,20 @@ private:
     int Options = 0;
 };
 
-
-//-----------------------------------------------------------------------------
-// Channel
-//
-// One named logging channel.
-
+//========================================================================================================================================================================================================================
+// Channel. One named logging channel.
+//========================================================================================================================================================================================================================
 class Channel
 {
-public:
-    // This name string pointer must not go out of scope for the entire lifetime
-    // of the logging output worker.
-    // We recommend that the name string must be a string literal not a string
-    // allocated on the heap at runtime.
+  public:
+    // This name string pointer must not go out of scope for the entire lifetime of the logging output worker.
+    // We recommend that the name string must be a string literal not a string allocated on the heap at runtime.
     Channel(const char* nameString);
     Channel(const Channel& other);
     ~Channel();
 
-    // Add an extra prefix to all log messages generated by the channel.
-    // This function is *not* thread-safe.  Logging from another thread while changing
-    // the prefix can cause crashes.
+    // Add an extra prefix to all log messages generated by the channel. This function is *not* thread-safe. 
+    // Logging from another thread while changing the prefix can cause crashes.
     std::string GetPrefix() const;
     void SetPrefix(const std::string& prefix);
 
@@ -472,148 +397,99 @@ public:
     Level GetMinimumOutputLevel() const;
 
     LOGGING_INLINE bool Active(Level level) const
-    {
-        return MinimumOutputLevel <= (uint32_t)level;
-    }
+        { return MinimumOutputLevel <= (uint32_t)level; }
 
-    template<typename... Args>
-    LOGGING_INLINE void Log(Level level, Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void Log(Level level, Args&&... args) const
     {
         if (Active(level))
-        {
             doLog(level, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogError(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogError(Args&&... args) const
     {
         if (Active(Level::Error))
-        {
             doLog(Level::Error, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogWarning(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogWarning(Args&&... args) const
     {
         if (Active(Level::Warning))
-        {
             doLog(Level::Warning, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogInfo(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogInfo(Args&&... args) const
     {
         if (Active(Level::Info))
-        {
             doLog(Level::Info, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogDebug(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogDebug(Args&&... args) const
     {
         if (Active(Level::Debug))
-        {
             doLog(Level::Debug, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogTrace(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogTrace(Args&&... args) const
     {
         if (Active(Level::Trace))
-        {
             doLog(Level::Trace, std::forward<Args>(args)...);
-        }
     }
 
     // printf style log functions
-    template<typename... Args>
-    LOGGING_INLINE void LogF(Level level, Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogF(Level level, Args&&... args) const
     {
         if (Active(level))
-        {
             doLogF(level, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogErrorF(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogErrorF(Args&&... args) const
     {
         if (Active(Level::Error))
-        {
             doLogF(Level::Error, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogWarningF(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogWarningF(Args&&... args) const
     {
         if (Active(Level::Warning))
-        {
             doLogF(Level::Warning, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogInfoF(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogInfoF(Args&&... args) const
     {
         if (Active(Level::Info))
-        {
             doLogF(Level::Info, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogDebugF(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogDebugF(Args&&... args) const
     {
         if (Active(Level::Debug))
-        {
             doLogF(Level::Debug, std::forward<Args>(args)...);
-        }
     }
 
-    template<typename... Args>
-    LOGGING_INLINE void LogTraceF(Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void LogTraceF(Args&&... args) const
     {
         if (Active(Level::Trace))
-        {
             doLogF(Level::Trace, std::forward<Args>(args)...);
-        }
     }
 
     // DANGER DANGER DANGER
     // This function forces a log message to be recorded even if the log queue is full.
-    // This is dangerous because the caller can run far ahead of the output writer thread
-    // and cause a large amount of memory to be allocated and logging tasks can take many
-    // minutes to flush afterwards.  It should only be used when the data is critical.
-    template<typename... Args>
-    LOGGING_INLINE void DangerousForceLog(Level level, Args&&... args) const
+    // This is dangerous because the caller can run far ahead of the output writer thread and cause a large amount of memory to be allocated and 
+    // logging tasks can take many minutes to flush afterwards. It should only be used when the data is critical.
+    template<typename... Args> LOGGING_INLINE void DangerousForceLog(Level level, Args&&... args) const
     {
         if (Active(level))
         {
             int silenceOptions = ErrorSilencer::GetSilenceOptions();
             if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
-            {
                 return;
-            }
 
             if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
-            {
-                // Demote to debug
                 level = Level::Debug;
-            }
             else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
-            {
-                // Demote to warning
                 level = Level::Warning;
-            }
 
             LogStringBuffer buffer(SubsystemName, level);
-
             writeLogBuffer(buffer, Prefix, args...);
 
             // Submit buffer to logging subsystem
@@ -621,11 +497,11 @@ public:
             OutputWorkerOutputFunction(buffer.SubsystemName, (Log_Level_t)buffer.MessageLogLevel, tmp.c_str(), buffer.Relogged, (Write_Option_t)WriteOption::DangerouslyIgnoreQueueLimit);
         }
     }
-    // DANGER DANGER DANGER
 
 private:
-    //-------------------------------------------------------------------------
+    //====================================================================================================================================================================================================================
     // Internal Implementation
+    //====================================================================================================================================================================================================================
 
     Channel() {}
 
@@ -635,70 +511,41 @@ private:
     // A linked list is used to avoid CRT new / delete during startup as this is called from the constructor
     ChannelNode Node;
 
-    // Level at which this channel will log.
-    Log_Level_t MinimumOutputLevel;
-
-    // Channel name string
-    const char* SubsystemName;
-
-    // Optional prefix
-    std::string Prefix;
-
-    // So changing Prefix is threadsafe
-    mutable Lock PrefixLock;
-
+    Log_Level_t MinimumOutputLevel;                                             // Level at which this channel will log.
+    const char* SubsystemName;                                                  // Channel name string
+    std::string Prefix;                                                         // Optional prefix
+    mutable Lock PrefixLock;                                                    // So changing Prefix is threadsafe
     bool UserOverrodeMinimumOutputLevel;
-
-    // Target of doLog function
-    static OutputWorkerOutputFunctionType OutputWorkerOutputFunction;
-
-    // Target of OnChannelLevelChange
-    static ConfiguratorOnChannelLevelChangeType ConfiguratorOnChannelLevelChange;
-
-    // Target of Register
-    static ConfiguratorRegisterType ConfiguratorRegister;
-
-    // Target of Unregister
-    static ConfiguratorUnregisterType ConfiguratorUnregister;
+    
+    static OutputWorkerOutputFunctionType OutputWorkerOutputFunction;                   // Target of doLog function
+    static ConfiguratorOnChannelLevelChangeType ConfiguratorOnChannelLevelChange;       // Target of OnChannelLevelChange
+    static ConfiguratorRegisterType ConfiguratorRegister;                               // Target of Register
+    static ConfiguratorUnregisterType ConfiguratorUnregister;                           // Target of Unregister
 
     void GetFunctionPointers();
 
-    template<typename T>
-    LOGGING_INLINE void writeLogBuffer(LogStringBuffer& buffer, T&& arg) const
-    {
-        LogStringize(buffer, arg);
-    }
+    template<typename T> LOGGING_INLINE void writeLogBuffer(LogStringBuffer& buffer, T&& arg) const
+        { LogStringize(buffer, arg); }
 
-    template<typename T, typename... Args>
-    LOGGING_INLINE void writeLogBuffer(LogStringBuffer& buffer, T&& arg, Args&&... args) const
+    template<typename T, typename... Args> LOGGING_INLINE void writeLogBuffer(LogStringBuffer& buffer, T&& arg, Args&&... args) const
     {
         writeLogBuffer(buffer, arg);
         writeLogBuffer(buffer, args...);
     }
 
     // Unroll arguments
-    template<typename... Args>
-    LOGGING_INLINE void doLog(Level level, Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void doLog(Level level, Args&&... args) const
     {
         int silenceOptions = ErrorSilencer::GetSilenceOptions();
         if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
-        {
             return;
-        }
 
         if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
-        {
-            // Demote to debug
             level = Level::Debug;
-        }
         else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
-        {
-            // Demote to warning
             level = Level::Warning;
-        }
 
         LogStringBuffer buffer(SubsystemName, level);
-
         writeLogBuffer(buffer, Prefix, args...);
 
         // Submit buffer to logging subsystem
@@ -706,26 +553,24 @@ private:
         OutputWorkerOutputFunction(buffer.SubsystemName, (Log_Level_t)buffer.MessageLogLevel, tmp.c_str(), buffer.Relogged, (Write_Option_t)WriteOption::Default);
     }
 
-    // Returns the buffer capacity required to printf the given format+arguments.
-    // Returns -1 if the format is invalid.
+    // Returns the buffer capacity required to printf the given format + arguments. Returns -1 if the format is invalid.
     static int GetPrintfLengthV(const char* format, va_list argList)
     {
         int size;
 
-    #if defined(_MSC_VER) // Microsoft doesn't support C99-Standard vsnprintf, so need to use _vscprintf.
-        size = _vscprintf(format, argList); // Returns the required strlen, or -1 if format error.
+    #if defined(_MSC_VER)                               // Microsoft doesn't support C99-Standard vsnprintf, so need to use _vscprintf.
+        size = _vscprintf(format, argList);             // Returns the required strlen, or -1 if format error.
     #else
-        size = vsnprintf(nullptr, 0, format, argList); // Returns the required strlen, or negative if format error.
+        size = vsnprintf(nullptr, 0, format, argList);  // Returns the required strlen, or negative if format error.
     #endif
 
-        if (size > 0) // If we can 0-terminate the output...
-            ++size; // Add one to account for terminating null.
+        if (size > 0)                                   // If we can 0-terminate the output...
+            ++size;                                     // Add one to account for terminating null.
         else
             size = -1;
 
         return size;
     }
-
 
     static int GetPrintfLength(const char* format, ...)
     {
@@ -736,26 +581,16 @@ private:
         return size;
     }
 
-
-    template<typename... Args>
-    LOGGING_INLINE void doLogF(Level level, Args&&... args) const
+    template<typename... Args> LOGGING_INLINE void doLogF(Level level, Args&&... args) const
     {
         int silenceOptions = ErrorSilencer::GetSilenceOptions();
         if (silenceOptions & ErrorSilencer::CompletelySilenceLogs)
-        {
             return;
-        }
 
         if (level > Level::Debug && (silenceOptions & ErrorSilencer::DemoteToDebug))
-        {
-            // Demote to debug
             level = Level::Debug;
-        }
         else if (level == Level::Error && (silenceOptions & ErrorSilencer::DemoteErrorsToWarnings))
-        {
-            // Demote to warning
             level = Level::Warning;
-        }
 
         LogStringBuffer buffer(SubsystemName, level);
 
@@ -799,65 +634,44 @@ private:
     }
 };
 
-
-//-----------------------------------------------------------------------------
+//========================================================================================================================================================================================================================
 // Log Configurator
-//
 // Centralized object that can configure and enumerate all the channels.
-
+//========================================================================================================================================================================================================================
 class ConfiguratorPlugin
 {
-public:
+  public:
     ConfiguratorPlugin();
     virtual ~ConfiguratorPlugin();
-
-    // Modify the channel level if it is set, otherwise leave it as-is.
-    virtual void RestoreChannelLevel(const char* name, Level& level) = 0;
-
-    // Sets the channel level
-    virtual void SaveChannelLevel(const char* name, Level level) = 0;
+    virtual void RestoreChannelLevel(const char* name, Level& level) = 0;       // Modify the channel level if it is set, otherwise leave it as-is.
+    virtual void SaveChannelLevel(const char* name, Level level) = 0;           // Sets the channel level
 };
 
 class Configurator
 {
     friend class Channel;
     friend class OutputWorker;
-    Configurator(); // Call GetInstance() to get the singleton instance.
+    Configurator();                                                             // Call GetInstance() to get the singleton instance.
 
-public:
-    // Get singleton instance for logging configurator
-    static Configurator* GetInstance();
-
+  public:
+    
+    static Configurator* GetInstance();                                         // Get singleton instance for logging configurator
     ~Configurator();
 
     void SetGlobalMinimumLogLevel(Level level);
 
-    inline void SilenceLogging()
-    {
-        // Set the minimum logging level higher than any actual message.
-        SetGlobalMinimumLogLevel(Level::Count);
-    }
+    inline void SilenceLogging()                                                // Set the minimum logging level higher than any actual message.
+        { SetGlobalMinimumLogLevel(Level::Count); }
 
     void SetPlugin(std::shared_ptr<ConfiguratorPlugin> plugin);
+    void GetChannels(std::vector< std::pair<std::string, Level> > &channels);   // Get all channels - note channels do not necessarily have unique names
+    void SetChannel(std::string channelName, Level level);                      // Set all channels with channelName to level
+    void OnChannelLevelChange(const char* channelName, Log_Level_t level);      // Internal: Invoked through callbacks
+    void RestoreChannelLogLevel(const char* channelName);                       // Internal: Load log level for a channel from disk, set all channels with this name to this level
+    void RestoreChannelLogLevel(ChannelNode* channelNode);                      // Internal: Load log level for a channel from disk, set this channel to this level
+    void RestoreAllChannelLogLevels();                                          // Internal: Iterate through all channels and store them
 
-    // Get all channels - note channels do not necessarily have unique names
-    void GetChannels(std::vector< std::pair<std::string, Level> > &channels);
-
-    // Set all channels with channelName to level
-    void SetChannel(std::string channelName, Level level);
-
-    // Internal: Invoked through callbacks
-    void OnChannelLevelChange(const char* channelName, Log_Level_t level);
-
-    // Internal: Load log level for a channel from disk, set all channels with this name to this level
-    void RestoreChannelLogLevel(const char* channelName);
-
-    // Internal: Load log level for a channel from disk, set this channel to this level
-    void RestoreChannelLogLevel(ChannelNode* channelNode);
-
-    // Internal: Iterate through all channels and store them
-    void RestoreAllChannelLogLevels();
-private:
+  private:
 
     void RestoreAllChannelLogLevelsNoLock();
 

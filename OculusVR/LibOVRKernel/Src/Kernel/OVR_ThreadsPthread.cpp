@@ -1,28 +1,16 @@
-/************************************************************************************
-
-Filename    :   OVR_ThreadsPthread.cpp
-Content     :
-Created     :
-Notes       :
-
-Copyright   :   Copyright 2014-2016 Oculus VR, LLC All Rights reserved.
-
-Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License");
-you may not use the Oculus VR Rift SDK except in compliance with the License,
-which is provided at the time of installation or download, or which
-otherwise accompanies this software in either electronic or hard copy form.
-
-You may obtain a copy of the License at
-
-http://www.oculusvr.com/licenses/LICENSE-3.3
-
-Unless required by applicable law or agreed to in writing, the Oculus VR SDK
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-************************************************************************************/
+//========================================================================================================================================================================================================================
+// Pthread-based thread-related (safe) functionality
+// Copyright 2014 Oculus VR, LLC All Rights reserved.
+//
+// Licensed under the Oculus VR Rift SDK License Version 3.3 (the "License"); you may not use the Oculus VR Rift SDK except in compliance with the License,
+// which is provided at the time of installation or download, or which otherwise accompanies this software in either electronic or hard copy form.
+//
+// You may obtain a copy of the License at http://www.oculusvr.com/licenses/LICENSE-3.3
+//
+// Unless required by applicable law or agreed to in writing, the Oculus VR SDK distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and limitations under the License.
+//========================================================================================================================================================================================================================
 
 #if !defined(_WIN32) // Skip the entire file under Windows
 
@@ -51,103 +39,114 @@ limitations under the License.
 
 namespace OVR {
 
-// ***** Mutex implementation
+//========================================================================================================================================================================================================================
+// *** Internal Mutex implementation class
+//========================================================================================================================================================================================================================
+class MutexImpl : public NewOverrideBase
+{
+    // System mutex or semaphore
+    pthread_mutex_t SMutex;
+    bool Recursive;
+    unsigned LockCount;
+    pthread_t LockedBy;
 
-// *** Internal Mutex implementation structure
+  public:
+    // Constructor/destructor
+    MutexImpl(Mutex* pmutex, bool recursive = true);
+    ~MutexImpl();
 
-class MutexImpl : public NewOverrideBase {
-  // System mutex or semaphore
-  pthread_mutex_t SMutex;
-  bool Recursive;
-  unsigned LockCount;
-  pthread_t LockedBy;
+    // Locking functions
+    void DoLock();
+    bool TryLock();
+    void Unlock(Mutex* pmutex);
 
- public:
-  // Constructor/destructor
-  MutexImpl(Mutex* pmutex, bool recursive = 1);
-  ~MutexImpl();
-
-  // Locking functions
-  void DoLock();
-  bool TryLock();
-  void Unlock(Mutex* pmutex);
-  // Returns 1 if the mutes is currently locked
-  bool IsLockedByAnotherThread(Mutex* pmutex);
-  bool IsSignaled() const;
+    // Returns true if the mutes is currently locked
+    bool IsLockedByAnotherThread(Mutex* pmutex);
+    bool IsSignaled() const;
 };
 
 pthread_mutexattr_t Lock::RecursiveAttr;
-bool Lock::RecursiveAttrInit = 0;
+bool Lock::RecursiveAttrInit = false;
 
+//========================================================================================================================================================================================================================
 // *** Constructor/destructor
-MutexImpl::MutexImpl(Mutex* pmutex, bool recursive) {
-  OVR_UNUSED(pmutex);
-  Recursive = recursive;
-  LockCount = 0;
+//========================================================================================================================================================================================================================
+MutexImpl::MutexImpl(Mutex* pmutex, bool recursive)
+{
+    OVR_UNUSED(pmutex);
+    Recursive = recursive;
+    LockCount = 0;
 
-  if (Recursive) {
-    if (!Lock::RecursiveAttrInit) {
-      pthread_mutexattr_init(&Lock::RecursiveAttr);
-      pthread_mutexattr_settype(&Lock::RecursiveAttr, PTHREAD_MUTEX_RECURSIVE);
-      Lock::RecursiveAttrInit = 1;
+    if (Recursive)
+    {
+        if (!Lock::RecursiveAttrInit)
+        {
+            pthread_mutexattr_init(&Lock::RecursiveAttr);
+            pthread_mutexattr_settype(&Lock::RecursiveAttr, PTHREAD_MUTEX_RECURSIVE);
+            Lock::RecursiveAttrInit = 1;
+        }
+        pthread_mutex_init(&SMutex, &Lock::RecursiveAttr);
     }
-
-    pthread_mutex_init(&SMutex, &Lock::RecursiveAttr);
-  } else
-    pthread_mutex_init(&SMutex, 0);
+    else
+        pthread_mutex_init(&SMutex, 0);
 }
 
-MutexImpl::~MutexImpl() {
-  pthread_mutex_destroy(&SMutex);
-}
+MutexImpl::~MutexImpl()
+    { pthread_mutex_destroy(&SMutex); }
 
+//========================================================================================================================================================================================================================
 // Lock and try lock
-void MutexImpl::DoLock() {
-  while (pthread_mutex_lock(&SMutex))
-    ;
-  LockCount++;
-  LockedBy = pthread_self();
-}
-
-bool MutexImpl::TryLock() {
-  if (!pthread_mutex_trylock(&SMutex)) {
+//========================================================================================================================================================================================================================
+void MutexImpl::DoLock()
+{
+    while (pthread_mutex_lock(&SMutex));
     LockCount++;
     LockedBy = pthread_self();
-    return 1;
-  }
-
-  return 0;
 }
 
-void MutexImpl::Unlock(Mutex* pmutex) {
-  OVR_UNUSED(pmutex);
-  OVR_ASSERT(pthread_self() == LockedBy && LockCount > 0);
-
-  // unsigned lockCount;
-  LockCount--;
-  // lockCount = LockCount;
-
-  pthread_mutex_unlock(&SMutex);
+bool MutexImpl::TryLock()
+{
+    if (!pthread_mutex_trylock(&SMutex))
+    {
+        LockCount++;
+        LockedBy = pthread_self();
+        return true;
+    }
+    return false;
 }
 
-bool MutexImpl::IsLockedByAnotherThread(Mutex* pmutex) {
-  OVR_UNUSED(pmutex);
-  // There could be multiple interpretations of IsLocked with respect to current thread
-  if (LockCount == 0)
-    return 0;
-  if (pthread_self() != LockedBy)
-    return 1;
-  return 0;
+void MutexImpl::Unlock(Mutex* pmutex)
+{
+    OVR_UNUSED(pmutex);
+    OVR_ASSERT(pthread_self() == LockedBy && LockCount > 0);
+
+    // unsigned lockCount;
+    LockCount--;
+    // lockCount = LockCount;
+
+    pthread_mutex_unlock(&SMutex);
 }
 
-bool MutexImpl::IsSignaled() const {
-  // An mutex is signaled if it is not locked ANYWHERE
-  // Note that this is different from IsLockedByAnotherThread function,
-  // that takes current thread into account
-  return LockCount == 0;
+bool MutexImpl::IsLockedByAnotherThread(Mutex* pmutex)
+{
+    OVR_UNUSED(pmutex);
+    // There could be multiple interpretations of IsLocked with respect to current thread
+    if (LockCount == 0)
+        return false;
+    if (pthread_self() != LockedBy)
+        return true;
+    return false;
 }
 
+bool MutexImpl::IsSignaled() const
+{
+    // A mutex is signaled if it is not locked ANYWHERE. It is different from IsLockedByAnotherThread function, that takes current thread into account
+    return LockCount == 0;
+}
+
+//========================================================================================================================================================================================================================
 // *** Actual Mutex class implementation
+//========================================================================================================================================================================================================================
 
 // NOTE: RefCount mode already thread-safe for all waitables.
 Mutex::Mutex(bool recursive) : pImpl(new MutexImpl(this, recursive)) {}
@@ -155,83 +154,89 @@ Mutex::Mutex(bool recursive) : pImpl(new MutexImpl(this, recursive)) {}
 Mutex::~Mutex() {}
 
 // Lock and try lock
-void Mutex::DoLock() {
-  pImpl->DoLock();
-}
-bool Mutex::TryLock() {
-  return pImpl->TryLock();
-}
-void Mutex::Unlock() {
-  pImpl->Unlock(this);
-}
-bool Mutex::IsLockedByAnotherThread() {
-  return pImpl->IsLockedByAnotherThread(this);
-}
+void Mutex::DoLock()
+    { pImpl->DoLock(); }
+bool Mutex::TryLock()
+    { return pImpl->TryLock(); }
 
-//-----------------------------------------------------------------------------------
+void Mutex::Unlock()
+    { pImpl->Unlock(this); }
+
+bool Mutex::IsLockedByAnotherThread()
+    { return pImpl->IsLockedByAnotherThread(this); }
+
+//========================================================================================================================================================================================================================
 // ***** Event
+//========================================================================================================================================================================================================================
+bool Event::Wait(unsigned delay)
+{
+    std::unique_lock<std::mutex> locker(StateMutex);
 
-bool Event::Wait(unsigned delay) {
-  std::unique_lock<std::mutex> locker(StateMutex);
+    // Do the correct amount of waiting
+    if (delay == OVR_WAIT_INFINITE)
+    {
+        while (!State)
+            StateWaitCondition.wait(locker);
+    }
+    else if (delay)
+    {
+        if (!State)
+            StateWaitCondition.wait_for(locker, std::chrono::milliseconds(delay));
+    }
 
-  // Do the correct amount of waiting
-  if (delay == OVR_WAIT_INFINITE) {
-    while (!State)
-      StateWaitCondition.wait(locker);
-  } else if (delay) {
-    if (!State)
-      StateWaitCondition.wait_for(locker, std::chrono::milliseconds(delay));
-  }
-
-  bool state = State;
-  // Take care of temporary 'pulsing' of a state
-  if (Temporary) {
-    Temporary = false;
-    State = false;
-  }
-  return state;
+    bool state = State;
+    // Take care of temporary 'pulsing' of a state
+    if (Temporary)
+    {
+        Temporary = false;
+        State = false;
+    }
+    return state;
 }
 
-void Event::updateState(bool newState, bool newTemp, bool mustNotify) {
-  std::unique_lock<std::mutex> lock(StateMutex);
-  State = newState;
-  Temporary = newTemp;
-  if (mustNotify) {
-    lock.unlock();
-    StateWaitCondition.notify_all();
-  }
+void Event::updateState(bool newState, bool newTemp, bool mustNotify)
+{
+    std::unique_lock<std::mutex> lock(StateMutex);
+    State = newState;
+    Temporary = newTemp;
+    if (mustNotify)
+    {
+        lock.unlock();
+        StateWaitCondition.notify_all();
+    }
 }
 
-ThreadId GetCurrentThreadId() {
-  return (void*)pthread_self();
-}
+ThreadId GetCurrentThreadId()
+    { return (void*) pthread_self(); }
 
+//========================================================================================================================================================================================================================
 // *** Sleep functions
-
-/* static */
-bool Thread::MSleep(unsigned msecs) {
-  usleep(msecs * 1000);
-  return 1;
+//========================================================================================================================================================================================================================
+bool Thread::MSleep(unsigned msecs)
+{
+    usleep(msecs * 1000);
+    return true;
 }
 
-void Thread::SetCurrentThreadName(const char* name) {
+void Thread::SetCurrentThreadName(const char* name)
+{
 #if defined(OVR_OS_APPLE)
-  pthread_setname_np(name);
+    pthread_setname_np(name);
 #else
-  pthread_setname_np(pthread_self(), name);
+    pthread_setname_np(pthread_self(), name);
 #endif
 }
 
-void Thread::GetCurrentThreadName(char* name, size_t nameCapacity) {
-  name[0] = 0;
+void Thread::GetCurrentThreadName(char* name, size_t nameCapacity)
+{
+    name[0] = 0;
 #if !defined(OVR_OS_ANDROID)
-  // Android does not have pthread_getname_np (or an equivalent)
-  pthread_getname_np(pthread_self(), name, nameCapacity);
+    // Android does not have pthread_getname_np (or an equivalent)
+    pthread_getname_np(pthread_self(), name, nameCapacity);
 #endif
 }
 
 } // namespace OVR
 
 #endif // OVR_ENABLE_THREADS
-
 #endif // _WIN32
