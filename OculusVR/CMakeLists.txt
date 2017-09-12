@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.1)
 project( LibOVR )
 
+set(CMAKE_CXX_STANDARD 11)
+
 add_definitions(-DUNICODE -D_UNICODE -DMINGW_HAS_SECURE_API -DNOMINMAX)
 
 include_directories( LibOVR/Include LibOVR/Src Logging/include ${CMAKE_SOURCE_DIR} )

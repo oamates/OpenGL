@@ -1,5 +1,5 @@
 //========================================================================================================================================================================================================================
-// OCULUS DEMO 005 : Attractor
+// OCULUS DEMO 008 : Stencil Shadows + Multiple Viewports via Geometry Shader 
 //========================================================================================================================================================================================================================
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
@@ -24,7 +24,12 @@
 #include "glfw_window.hpp"
 #include "camera.hpp"
 #include "image.hpp"
-#include "glsl_noise.hpp"
+#include "plato.hpp"
+#include "polyhedron.hpp"
+#include "surface.hpp"
+#include "torus.hpp"
+
+#include "edge.hpp"
 
 glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 {
@@ -45,7 +50,7 @@ glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 struct hmd_camera_t
 {
     double linear_speed;
-    double angular_speed;    
+    double angular_speed;
 
     //===================================================================================================================================================================================================================
     // VR device relative (to sensor) position and orientation
@@ -131,12 +136,14 @@ struct hmd_camera_t
 struct demo_window_t : public glfw_window_t
 {
     hmd_camera_t camera;
-    bool pause = false;
+    bool dynamic_light = false;
+    double light_ts;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     { 
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        light_ts = frame_ts;        
     }
 
     //===================================================================================================================================================================================================================
@@ -144,13 +151,16 @@ struct demo_window_t : public glfw_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);  
-        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt); 
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
-        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt); 
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
-        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
-            pause = !pause;
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE)) 
+        {
+            dynamic_light = !dynamic_light;
+            light_ts = frame_ts;
+        }
 
         if (action != GLFW_RELEASE) return;
         if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, 1);
@@ -493,50 +503,24 @@ struct ovr_hmd_t
     }
 };
 
-
-glm::vec3 tri(const glm::vec3& x)
+vertex_pf_t torus_func(const glm::vec2& uv)
 {
-    return glm::abs(glm::fract(x) - glm::vec3(0.5f));
-}
+    vertex_pf_t vertex;
 
-float potential(const glm::vec3& p)
-{    
-    glm::vec3 q = p;
-    glm::vec3 oq = tri(1.1f * q + tri(1.1f * glm::vec3(q.z, q.x, q.y)));
-    float ground = q.z + 3.5f + glm::dot(oq, glm::vec3(0.067));
-    q += (oq - glm::vec3(0.25f)) * 0.3f;
-    q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
-    float canyon = 0.95f * (glm::length(p) - 1.05f);
-    float sphere = 11.0f - glm::length(p);
-    return glm::min(glm::min(ground, canyon), sphere);
-}
+    float cos_2piu = glm::cos(constants::two_pi * uv.x);
+    float sin_2piu = glm::sin(constants::two_pi * uv.x);
+    float cos_2piv = glm::cos(constants::two_pi * uv.y);
+    float sin_2piv = glm::sin(constants::two_pi * uv.y);
 
-glm::vec3 gradient(const glm::vec3& p)
-{
-    const float delta = 0.075f;
+    float R = 2.7f;
+    float r = 0.97f;
 
-    const glm::vec3 dX = glm::vec3(delta, 0.0f, 0.0f);
-    const glm::vec3 dY = glm::vec3(0.0f, delta, 0.0f);
-    const glm::vec3 dZ = glm::vec3(0.0f, 0.0f, delta);
+    vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv, 2.1f + (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
+    vertex.tangent_x = glm::vec3(-sin_2piu * cos_2piv, -sin_2piu * sin_2piv, cos_2piu);
+    vertex.tangent_y = glm::vec3(-sin_2piv, cos_2piv, 0.0f);
+    vertex.normal = glm::vec3(cos_2piu * cos_2piv, cos_2piu * sin_2piv, sin_2piu);
 
-    glm::vec3 dF = glm::vec3
-    (
-        potential(p + dX) - potential(p - dX),
-        potential(p + dY) - potential(p - dY),
-        potential(p + dZ) - potential(p - dZ)
-    );
-
-    return glm::normalize(dF);
-}
-
-glm::vec3 move(glm::vec3& position, glm::vec3& velocity, float dt)
-{
-    glm::vec3 v0 = gradient(position);
-    glm::vec3 v1 = velocity;
-
-    glm::vec3 v = glm::normalize(v1 + v0);
-    velocity = v;
-    position = position + dt * v;
+    return vertex;
 }
 
 //=======================================================================================================================================================================================================================
@@ -557,7 +541,7 @@ int main(int argc, char** argv)
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Ray Marcher", 4, 4, 3, ovr_hmd.mirror_size.x, ovr_hmd.mirror_size.y, false);
+    demo_window_t window("Rift Attractor", 4, 4, 3, ovr_hmd.mirror_size.x, ovr_hmd.mirror_size.y, false);
 
     //===================================================================================================================================================================================================================
     // Create texture swapchain and mirror texture for displaying in the app window
@@ -578,65 +562,97 @@ int main(int argc, char** argv)
     glGenRenderbuffers(1, &rbo_id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_id);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo_id);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, ovr_hmd.target_size.x, ovr_hmd.target_size.y);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, ovr_hmd.target_size.x, ovr_hmd.target_size.y);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_id);
+    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo_id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
     glGenFramebuffers(1, &mirror_fbo_id);
 
     //===================================================================================================================================================================================================================
-    // Shader and uniform variables initialization
+    // z-buffer fill shader programs : for positoin-frame type vertices
     //===================================================================================================================================================================================================================
-    glsl_program_t ray_marcher(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ray_marcher.vs"),
-                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
-    ray_marcher.enable();
-    uniform_t uni_camera_matrix = ray_marcher["camera_matrix"];
-    uniform_t uni_camera_ws = ray_marcher["camera_ws"];
-    uniform_t uni_light_ws = ray_marcher["light_ws"];
-    uniform_t uni_time = ray_marcher["time"];
-    uniform_t uni_focal_scale = ray_marcher["focal_scale"];
-    uniform_t uni_focal_shift = ray_marcher["focal_shift"];
-
-    ray_marcher["noise_tex"] = 1;
-    ray_marcher["stone_tex"] = 2;
-
-    glm::vec2 focal_scale[ovrEye_Count] = 
-    {
-        glm::vec2(1.0f / ovr_hmd.projection_matrix[ovrEye_Left ][0][0], 1.0f / ovr_hmd.projection_matrix[ovrEye_Left ][1][1]),
-        glm::vec2(1.0f / ovr_hmd.projection_matrix[ovrEye_Right][0][0], 1.0f / ovr_hmd.projection_matrix[ovrEye_Right][1][1]),
-    };
-
-    glm::vec2 focal_shift[ovrEye_Count] = 
-    {
-        glm::vec2(ovr_hmd.projection_matrix[ovrEye_Left ][2][0], ovr_hmd.projection_matrix[ovrEye_Left ][2][1]),
-        glm::vec2(ovr_hmd.projection_matrix[ovrEye_Right][2][0], ovr_hmd.projection_matrix[ovrEye_Right][2][1]),
-    };
+    glsl_program_t ambient_zfill_pf(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ambient_zfill_pf.vs"),
+                                    glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ambient_zfill_pf.gs"),
+                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ambient_zfill_pf.fs"));
+    ambient_zfill_pf.dump_info();
+    uniform_t uni_zfill_pf_pvmatrix = ambient_zfill_pf["projection_view_matrix"];
 
     //===================================================================================================================================================================================================================
-    // Load noise textures - for very fast 2d noise calculation
+    // shadow volume generating shader program
     //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE1);
-    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
-    glActiveTexture(GL_TEXTURE2);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    glsl_program_t shadow_volume(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/shadow_volume.vs"),
+                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/shadow_volume.gs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/shadow_volume.fs"));
+    shadow_volume.dump_info();
+    uniform_t uni_sv_pvmatrix = shadow_volume["projection_view_matrix"];
+    uniform_t uni_sv_light_ws = shadow_volume["light_ws"];
 
     //===================================================================================================================================================================================================================
-    // OpenGL rendering parameters setup
+    // phong lighting for position + tangent frame vertices
+    // procedural (possibly tri-linear blended) texturing assumed
     //===================================================================================================================================================================================================================
-    GLuint vao_id;
+    glsl_program_t phong_lighting_pf(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_lighting_pf.vs"),
+                                     glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/phong_lighting_pf.gs"),
+                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_lighting_pf.fs"));
+    phong_lighting_pf.dump_info();
+    phong_lighting_pf.enable();
+    uniform_t uni_pl_pf_pvmatrix  = phong_lighting_pf["projection_view_matrix"];
+    uniform_t uni_pl_pf_camera_ws = phong_lighting_pf["camera_ws"];
+    uniform_t uni_pl_pf_light_ws  = phong_lighting_pf["light_ws"];
+
+    //===================================================================================================================================================================================================================
+    // generate torus with adjacency index buffer
+    //===================================================================================================================================================================================================================
+    torus_t torus;
+    adjacency_vao_t torus_adjacency;
+    torus.generate_vao<vertex_pf_t>(torus_func, 37, 67, &torus_adjacency);
+
+    //===================================================================================================================================================================================================================
+    // generate icosahedron with adjacency index buffer
+    //===================================================================================================================================================================================================================
+    GLuint V = plato::icosahedron::V;
+    GLuint F = plato::icosahedron::F;
+
+    GLuint vao_id, vbo_id;
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, V * sizeof(glm::vec3), plato::icosahedron::vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    
+    ibo_t adjacency_ibo = build_adjacency_ibo<GLuint>((glm::uvec3*) &plato::icosahedron::triangles[0], F);                          
 
-    glm::vec3 light_ws = glm::sphericalRand(11.0f);
-    glm::vec3 light_velocity = glm::sphericalRand(1.0f);
-    float p = potential(light_ws);
+    //===================================================================================================================================================================================================================
+    // generate standard position + normal + uv icosahedron data 
+    //===================================================================================================================================================================================================================
+    polyhedron icosahedron;
+    icosahedron.regular_pnt2_vao(12, 20, plato::icosahedron::vertices, plato::icosahedron::normals, plato::icosahedron::faces);
 
-    while(p < 0.5f)
-    {
-        move(light_ws, light_velocity, 0.125f);
-        p = potential(light_ws);
-    }
+    const float cube_size = 23.33;
+    room_t granite_room(cube_size);    
+
+    GLuint cube_texture_id        = image::png::texture2d("../../../resources/tex2d/marble.png");
+    GLuint icosahedron_texture_id = image::png::texture2d("../../../resources/plato_tex2d/icosahedron.png");
+    glActiveTexture(GL_TEXTURE0);
+
+    //===================================================================================================================================================================================================================
+    // global OpenGL state
+    //===================================================================================================================================================================================================================
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    const float light_radius = 12.5f;
+    glm::vec3 light_ws = glm::vec3(light_radius, 0.0f, 0.0f);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(-1);
+
+    /* granite room */
+    const float cube_size = 17.5f;
+    polyhedron granite_room;
+    granite_room.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
 
     //===================================================================================================================================================================================================================
     // main rendering loop
@@ -652,53 +668,105 @@ int main(int argc, char** argv)
         window.camera.set_hmd_view_matrix(ovr_hmd.head_rotation, ovr_hmd.head_position);
 
         float time = window.frame_ts;
-        if (!window.pause)
-        {
-            move(light_ws, light_velocity, window.frame_dt);
-            float p = potential(light_ws);
+        float angle = 0.125 * time;
+        glm::vec3 light_ws = 15.0f * glm::vec3(glm::cos(angle), glm::sin(angle), 0.0f);
 
-            while(p < 0.5f)
-            {
-                move(light_ws, light_velocity, 0.125f);
-                p = potential(light_ws);
-            }
+        if (window.dynamic_light) 
+        {
+            double time = window.frame_ts;
+            double dt = time - window.light_ts;
+            double cs = glm::cos(0.25f * dt); 
+            double sn = glm::sin(0.25f * dt);
+            light_ws = glm::vec3(light_ws.x * cs - light_ws.y * sn, light_ws.x * sn + light_ws.y * cs, 0.0f);
+            window.light_ts = time;
         }
 
         //===============================================================================================================================================================================================================
-        // bind swapchain texture ...
+        // bind swapchain texture
         //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_id);
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ovr_hmd.swapchain_texture_id(), 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //===============================================================================================================================================================================================================
-        // render raymarch scene
+        // render the scene for both eyes simultaneously
         //===============================================================================================================================================================================================================
-        glBindVertexArray(vao_id);
-        ray_marcher.enable();
-        uni_time = time;
-        uni_light_ws = light_ws;
-
-        for (ovrEyeType eye = ovrEyeType::ovrEye_Left; eye < ovrEyeType::ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
+        glm::mat4 projection_view_matrix[ovrEye_Count] = 
         {
-            ovr_hmd.set_viewport(eye);            
-            glm::mat4 cmatrix4x4 = glm::inverse(window.camera.eye_view_matrix[eye]);
-            glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
-            glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
+            ovr_hmd.projection_matrix[ovrEye_Left ] * window.camera.eye_view_matrix[ovrEye_Left ],
+            ovr_hmd.projection_matrix[ovrEye_Left ] * window.camera.eye_view_matrix[ovrEye_Right]
+        };
 
-            uni_camera_matrix = camera_matrix;
-            uni_camera_ws = camera_ws;
-            uni_focal_scale = focal_scale[eye];
-            uni_focal_shift = focal_shift[eye];
+        //===============================================================================================================================================================================================================
+        // render scene with ambient lights only and fill z-buffer with depth values
+        //===============================================================================================================================================================================================================        
+        ambient_zfill_pf.enable();
+        uni_zfill_pf_pvmatrix = projection_view_matrix;
+      
+        glBindTexture(GL_TEXTURE_2D, icosahedron_texture_id);                           /* trilinear blend texture */
+        icosahedron.render();
 
-            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        }
+        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
+        granite_room.render();
 
-        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
+        torus.render();
+
+        //===============================================================================================================================================================================================================
+        // pass the geometry of shadow casters through shadow volume generating geometry shader program
+        // stencil test must be enabled but must always pass (only the depth test matters) otherwise stencil buffer will not be modified
+        //===============================================================================================================================================================================================================
+        glDepthMask(GL_FALSE);                                                          // enable depth writes
+        glDisable(GL_CULL_FACE);                                                        // disable cull-face as we need both front and back faces to be rasterized
+        glDrawBuffer(GL_NONE);                                                          // disable color writes, maybe not be needed as fragment shader does not output anything anyway
+        glEnable(GL_STENCIL_TEST);                                                      // enable stencil test and ...
+        glStencilFunc(GL_ALWAYS, 0, 0xFFFFFFFF);                                        // ... set it to always pass
+        glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
+        glStencilOpSeparate(GL_BACK,  GL_KEEP, GL_DECR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
+                
+        shadow_volume.enable();
+        uni_sv_pvmatrix = projection_view_matrix;
+        uni_sv_light_ws = light_ws;     
+
+        glBindVertexArray(vao_id);                                                      // render objects that generate shadow volume only
+        adjacency_ibo.render(); 
+        torus_adjacency.render();
+
+        //===============================================================================================================================================================================================================
+        // render light diffuse and specular components into lit areas where stencil value is zero
+        //===============================================================================================================================================================================================================
+        glEnable(GL_CULL_FACE);                                                         // cullface can be enabled back at this point
+
+        glDrawBuffer(GL_BACK);                                                          // enable color buffer writes
+        glEnable(GL_BLEND);                                                             // ambient component is already in the color buffer
+        glBlendEquation(GL_FUNC_ADD);                                                   // and we want to just add the diffuse and specular components to 
+        glBlendFunc(GL_ONE, GL_ONE);                                                    // lit areas
+
+        glStencilFunc(GL_EQUAL, 0, 0xFFFFFFFF);                                         // stencil test must be enabled and the scene be rendered to area where stencil value is zero
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);                                         // prevent update to the stencil buffer
+
+        phong_lighting_pf.enable();
+        uni_pl_pf_pvmatrix  = projection_view_matrix;
+        uni_pl_pf_camera_ws = camera_ws;
+        uni_pl_pf_light_ws  = light_ws;
+
+        glBindTexture(GL_TEXTURE_2D, icosahedron_texture_id);                           /* trilinear blend texture */
+        icosahedron.render();
+
+        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
+        granite_room.render();
+
+        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
+        torus.render();
+
+        glDepthMask(GL_TRUE);                                                           // enable depth writes for next render cycle,
+        glDisable(GL_BLEND);                                                            // disable blending, and ...
+        glDisable(GL_STENCIL_TEST);                                                     //  ... disable stencil test
 
         //===============================================================================================================================================================================================================
         // submit the texture to vr device
         //===============================================================================================================================================================================================================
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
         ovr_hmd.submit_frame(window.frame);
 
         //===============================================================================================================================================================================================================
@@ -716,10 +784,6 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // destroy GLFW window and terminate the library
     //===================================================================================================================================================================================================================
-    glDeleteTextures(1, &noise_tex);
-    glDeleteTextures(1, &stone_tex);
-    glDeleteVertexArrays(1, &vao_id);
-
     glfw::terminate();
     return 0;
 }

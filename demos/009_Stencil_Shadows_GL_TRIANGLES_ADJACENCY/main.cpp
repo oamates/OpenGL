@@ -130,17 +130,13 @@ vertex_pf_t torus_func(const glm::vec2& uv)
     float R = 2.7f;
     float r = 0.97f;
 
-    vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv,
-                                2.1f + (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
-
+    vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv, 2.1f + (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
     vertex.tangent_x = glm::vec3(-sin_2piu * cos_2piv, -sin_2piu * sin_2piv, cos_2piu);
     vertex.tangent_y = glm::vec3(-sin_2piv, cos_2piv, 0.0f);
-
     vertex.normal = glm::vec3(cos_2piu * cos_2piv, cos_2piu * sin_2piv, sin_2piu);
 
     return vertex;
-};
-
+}
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -156,61 +152,61 @@ int main(int argc, char *argv[])
 
     demo_window_t window("Stencil shadows via GL_TRIANGLES_ADJACENCY primitive", 8, 3, 3, 1920, 1080, true);
 
-	//===================================================================================================================================================================================================================
-	// z-buffer fill shader programs : for pnt2-type and pf-type vertices
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // z-buffer fill shader programs : for pnt2-type and pf-type vertices
+    //===================================================================================================================================================================================================================
     glsl_program_t ambient_zfill_pnt2(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ambient_zfill_pnt2.vs"),
                                       glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ambient_zfill_pnt2.fs"));
     ambient_zfill_pnt2.dump_info();
-	uniform_t uni_azfill_pnt2_pvmatrix = ambient_zfill_pnt2["projection_view_matrix"];
+    uniform_t uni_azfill_pnt2_pvmatrix = ambient_zfill_pnt2["projection_view_matrix"];
     ambient_zfill_pnt2.enable();
     ambient_zfill_pnt2["diffuse_texture"] = 0;
 
     glsl_program_t ambient_zfill_pf(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ambient_zfill_pf.vs"),
                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ambient_zfill_pf.fs"));
     ambient_zfill_pf.dump_info();
-	uniform_t uni_azfill_pf_pvmatrix = ambient_zfill_pf["projection_view_matrix"];
+    uniform_t uni_azfill_pf_pvmatrix = ambient_zfill_pf["projection_view_matrix"];
 
-	//===================================================================================================================================================================================================================
-	// shadow volume generating shader program
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // shadow volume generating shader program
+    //===================================================================================================================================================================================================================
     glsl_program_t shadow_volume(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/shadow_volume.vs"),
                                  glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/shadow_volume.gs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/shadow_volume.fs"));
     shadow_volume.dump_info();
-	uniform_t uni_sv_pvmatrix = shadow_volume["projection_view_matrix"];
-	uniform_t uni_sv_light_ws = shadow_volume["light_ws"];
+    uniform_t uni_sv_pvmatrix = shadow_volume["projection_view_matrix"];
+    uniform_t uni_sv_light_ws = shadow_volume["light_ws"];
 
-	//===================================================================================================================================================================================================================
-	// phong lighting : diffuse + specular for pnt2-type and pf-type vertices
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // phong lighting : diffuse + specular for pnt2-type and pf-type vertices
+    //===================================================================================================================================================================================================================
     glsl_program_t phong_lighting_pnt2(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_lighting_pnt2.vs"),
                                        glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_lighting_pnt2.fs"));
     phong_lighting_pnt2.dump_info();
     phong_lighting_pnt2.enable();
-	uniform_t uni_pl_pnt2_pvmatrix  = phong_lighting_pnt2["projection_view_matrix"];
-	uniform_t uni_pl_pnt2_camera_ws = phong_lighting_pnt2["camera_ws"];
-	uniform_t uni_pl_pnt2_light_ws  = phong_lighting_pnt2["light_ws"];
+    uniform_t uni_pl_pnt2_pvmatrix  = phong_lighting_pnt2["projection_view_matrix"];
+    uniform_t uni_pl_pnt2_camera_ws = phong_lighting_pnt2["camera_ws"];
+    uniform_t uni_pl_pnt2_light_ws  = phong_lighting_pnt2["light_ws"];
     phong_lighting_pnt2["diffuse_texture"] = 0;
 
     glsl_program_t phong_lighting_pf(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_lighting_pf.vs"),
                                      glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_lighting_pf.fs"));
     phong_lighting_pf.dump_info();
     phong_lighting_pf.enable();
-	uniform_t uni_pl_pf_pvmatrix  = phong_lighting_pf["projection_view_matrix"];
-	uniform_t uni_pl_pf_camera_ws = phong_lighting_pf["camera_ws"];
-	uniform_t uni_pl_pf_light_ws  = phong_lighting_pf["light_ws"];
+    uniform_t uni_pl_pf_pvmatrix  = phong_lighting_pf["projection_view_matrix"];
+    uniform_t uni_pl_pf_camera_ws = phong_lighting_pf["camera_ws"];
+    uniform_t uni_pl_pf_light_ws  = phong_lighting_pf["light_ws"];
 
-	//===================================================================================================================================================================================================================
-	// generate torus with adjacency index buffer
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // generate torus with adjacency index buffer
+    //===================================================================================================================================================================================================================
     torus_t torus;
     adjacency_vao_t torus_adjacency;
     torus.generate_vao<vertex_pf_t>(torus_func, 37, 67, &torus_adjacency);
 
-	//===================================================================================================================================================================================================================
-	// generate icosahedron with adjacency index buffer
-	//===================================================================================================================================================================================================================
+    //===================================================================================================================================================================================================================
+    // generate icosahedron with adjacency index buffer
+    //===================================================================================================================================================================================================================
 
     GLuint V = plato::icosahedron::V;
     GLuint F = plato::icosahedron::F;
@@ -297,7 +293,7 @@ int main(int argc, char *argv[])
         glStencilFunc(GL_ALWAYS, 0, 0xFFFFFFFF);                                        // ... set it to always pass
         glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
         glStencilOpSeparate(GL_BACK,  GL_KEEP, GL_DECR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
-		        
+                
         shadow_volume.enable();
         uni_sv_pvmatrix = projection_view_matrix;
         uni_sv_light_ws = light_ws;     
@@ -312,9 +308,9 @@ int main(int argc, char *argv[])
         glEnable(GL_CULL_FACE);                                                         // cullface can be enabled back at this point
 
         glDrawBuffer(GL_BACK);                                                          // enable color buffer writes
-     	glEnable(GL_BLEND);                                                             // ambient component is already in the color buffer
-		glBlendEquation(GL_FUNC_ADD);                                                   // and we want to just add the diffuse and specular components to 
-		glBlendFunc(GL_ONE, GL_ONE);                                                    // lit areas
+        glEnable(GL_BLEND);                                                             // ambient component is already in the color buffer
+        glBlendEquation(GL_FUNC_ADD);                                                   // and we want to just add the diffuse and specular components to 
+        glBlendFunc(GL_ONE, GL_ONE);                                                    // lit areas
 
         glStencilFunc(GL_EQUAL, 0, 0xFFFFFFFF);                                         // stencil test must be enabled and the scene be rendered to area where stencil value is zero
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);                                         // prevent update to the stencil buffer

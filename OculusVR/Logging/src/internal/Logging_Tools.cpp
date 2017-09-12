@@ -26,10 +26,10 @@
 #include <chrono>
 #include <vector>
 #include <locale>
+#include <codecvt>
 
 #if defined(_MSC_VER)
     #include <filesystem> // Pre-release C++ filesystem support.
-    #include <codecvt>
 #endif
 
 #if defined(__APPLE__)

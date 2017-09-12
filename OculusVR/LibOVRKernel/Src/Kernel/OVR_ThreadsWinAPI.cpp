@@ -48,6 +48,7 @@ class MutexImpl : public NewOverrideBase
     void Unlock(Mutex* pmutex);
     // Returns 1 if the mutes is currently locked
     bool IsLockedByAnotherThread(Mutex* pmutex);
+    bool IsSignaled() const;
 };
 
 //========================================================================================================================================================================================================================
