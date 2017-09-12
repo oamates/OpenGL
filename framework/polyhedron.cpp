@@ -155,6 +155,48 @@ void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, cons
     free(vertices);
 }
 
+//=======================================================================================================================================================================================================================
+// Generates position + normal buffer for one of the five regular plato solids
+//=======================================================================================================================================================================================================================
+void polyhedron::regular_pn_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces, float scale, bool invert_normals)
+{
+    int E = V + F - 2;
+    int Q = (2 * E) / F;
+    GLuint vertex_count = 6 * E;
+
+    debug_msg("V = %d. F = %d. Q = %d. vertex_count = %d", V, F, Q, vertex_count);
+
+    vertex_pn_t* vertices = (vertex_pn_t*) malloc(vertex_count * sizeof(vertex_pn_t));
+
+    int index = 0, buffer_index = 0;
+
+    for (int i = 0; i < F; ++i) 
+    {
+        glm::vec3 normal = invert_normals ? -normals[i] : normals[i];
+        for (int j = 0; j < Q - 2; ++j)
+        {
+            vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index]], normal);
+            if (invert_normals)
+            {
+                vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 1]], normal);
+                vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 2]], normal);
+            }
+            else
+            {
+                vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 1]], normal);
+                vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 2]], normal);
+            }
+        };
+        index += Q;
+    }
+
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+    vbo.init(vertices, vertex_count);
+    free(vertices);
+}
+
+
 void polyhedron::render()
 {
     glBindVertexArray(vao_id);

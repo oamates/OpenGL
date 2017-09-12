@@ -1,4 +1,5 @@
 #include "vao.hpp"
+
 #include "log.hpp"
 
 template<typename index_t> struct edge_t
@@ -9,8 +10,17 @@ template<typename index_t> struct edge_t
     edge_t(index_t a, index_t b, uint32_t face) : a(a), b(b), face(face) {}
 };
 
+template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* faces, uint32_t F);
 
-template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* faces, uint32_t F)                          
+template<typename index_t> vao_t build_adjacency_vao(const glm::vec3* vertices, const glm::tvec3<index_t>* faces, uint32_t V, uint32_t F)
+{
+    vao_t vao;
+    vao.vbo.init<vertex_p_t>((vertex_p_t*) vertices, V);
+    vao.ibo = build_adjacency_ibo<index_t>(faces, F);
+    return vao;    
+}
+
+template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* faces, uint32_t F)
 {
     uint32_t E = F + F + F;
     edge_t<index_t>* edges = (edge_t<index_t>*) malloc(E * sizeof(edge_t<index_t>));                                                                                                                                      

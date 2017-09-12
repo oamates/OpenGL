@@ -21,6 +21,7 @@ namespace plato {
         const int F = 4;
         const int E = 6;
         const int V = 4;
+        const int T = F;
 
         const glm::vec3 vertices[V] = 
         {
@@ -44,6 +45,15 @@ namespace plato {
             1, 3, 2,    2, 3, 0
         };
 
+        const glm::uvec3 triangles[T] =
+        {
+            glm::uvec3(0, 1, 2),
+            glm::uvec3(0, 3, 1),
+            glm::uvec3(1, 3, 2),
+            glm::uvec3(2, 3, 0)
+        };
+
+
     }; // namespace tetrahedron 
 
     //===================================================================================================================================================================================================================
@@ -55,7 +65,8 @@ namespace plato {
         const int F = 6;
         const int E = 12;
         const int V = 8;
-        const int Q = 6;        
+        const int Q = 6;
+        const int T = 2 * F;
 
         const glm::vec3 vertices[V] = 
         {
@@ -63,7 +74,6 @@ namespace plato {
             inv_sqrt3 * glm::vec3( 1.0f, -1.0f, -1.0f),
             inv_sqrt3 * glm::vec3(-1.0f,  1.0f, -1.0f),
             inv_sqrt3 * glm::vec3( 1.0f,  1.0f, -1.0f),
-
             inv_sqrt3 * glm::vec3(-1.0f, -1.0f,  1.0f),
             inv_sqrt3 * glm::vec3( 1.0f, -1.0f,  1.0f),
             inv_sqrt3 * glm::vec3(-1.0f,  1.0f,  1.0f),
@@ -85,6 +95,16 @@ namespace plato {
             0, 2, 3, 1,     4, 5, 7, 6,                                                                 // faces parallel to xy plane : the face [0231] and the face [4576]
             0, 4, 6, 2,     1, 3, 7, 5,                                                                 // faces parallel to yz plane : the face [0462] and the face [1375]
             0, 1, 5, 4,     2, 6, 7, 3                                                                  // faces parallel to zx plane : the face [0154] and the face [2673]
+        };
+
+        const glm::uvec3 triangles[T] =
+        {
+            glm::uvec3(0, 2, 3), glm::uvec3(0, 3, 1),
+            glm::uvec3(4, 5, 7), glm::uvec3(4, 7, 6),
+            glm::uvec3(0, 4, 6), glm::uvec3(0, 6, 2),
+            glm::uvec3(1, 3, 7), glm::uvec3(1, 7, 5),
+            glm::uvec3(0, 1, 5), glm::uvec3(0, 5, 4),
+            glm::uvec3(2, 6, 7), glm::uvec3(2, 7, 3)
         };
 
         //===============================================================================================================================================================================================================
@@ -142,6 +162,7 @@ namespace plato {
         const int F = 8;                                                                                        
         const int E = 12;
         const int V = 6;
+        const int T = F;
 
         const glm::vec3 vertices[V] = 
         {
@@ -170,7 +191,19 @@ namespace plato {
         {
             1, 3, 5,    5, 2, 1,    5, 3, 0,    0, 2, 5,
             1, 2, 4,    4, 3, 1,    0, 3, 4,    4, 2, 0
-        };                                                                                                     
+        };
+
+        const glm::uvec3 triangles[T] =
+        {
+            glm::uvec3(1, 3, 5),    
+            glm::uvec3(5, 2, 1),    
+            glm::uvec3(5, 3, 0),    
+            glm::uvec3(0, 2, 5),
+            glm::uvec3(1, 2, 4),
+            glm::uvec3(4, 3, 1),    
+            glm::uvec3(0, 3, 4),    
+            glm::uvec3(4, 2, 0)
+        };
 
     }; // namespace octahedron
 
@@ -179,6 +212,7 @@ namespace plato {
         const int F = 12;
         const int E = 30;
         const int V = 20;
+        const int T = 3 * F;
 
         const glm::vec3 vertices[V] = 
         {
@@ -234,6 +268,22 @@ namespace plato {
             18, 19,  7, 15,  3,     19, 18,  2, 13,  6                                                      // pair of pentagon faces forming pyramid on the front zx - face of cube
         };                                                                                                     
 
+        const glm::uvec3 triangles[T] = 
+        {
+            glm::uvec3( 8,  9,  1), glm::uvec3( 8,  1, 16), glm::uvec3( 8, 16,  0),      
+            glm::uvec3( 9,  8,  2), glm::uvec3( 9,  2, 18), glm::uvec3( 9, 18,  3),
+            glm::uvec3(10, 11,  7), glm::uvec3(10,  7, 19), glm::uvec3(10, 19,  6),     
+            glm::uvec3(11, 10,  4), glm::uvec3(11,  4, 17), glm::uvec3(11, 17,  5),
+            glm::uvec3(12, 13,  2), glm::uvec3(12,  2,  8), glm::uvec3(12,  8,  0),
+            glm::uvec3(13, 12,  4), glm::uvec3(13,  4, 10), glm::uvec3(13, 10,  6),
+            glm::uvec3(14, 15,  7), glm::uvec3(14,  7, 11), glm::uvec3(14, 11,  5),     
+            glm::uvec3(15, 14,  1), glm::uvec3(15,  1,  9), glm::uvec3(15,  9,  3),
+            glm::uvec3(16, 17,  4), glm::uvec3(16,  4, 12), glm::uvec3(16, 12,  0),
+            glm::uvec3(17, 16,  1), glm::uvec3(17,  1, 14), glm::uvec3(17, 14,  5),
+            glm::uvec3(18, 19,  7), glm::uvec3(18,  7, 15), glm::uvec3(18, 15,  3),
+            glm::uvec3(19, 18,  2), glm::uvec3(19,  2, 13), glm::uvec3(19, 13,  6)
+        };                                                                                                     
+
     }; // namespace dodecahedron
 
     namespace icosahedron {
@@ -242,6 +292,8 @@ namespace plato {
         const int E = 30;
         const int V = 12;
         const int Q = 10;
+        const int T = F;
+
 
         const float inv_length = 0.52573111211913360602566908484787660729;                                  // sqrt(2) / sqrt(5 + sqrt(5))
 
@@ -262,7 +314,7 @@ namespace plato {
         };
 
 
-        const glm::vec3 normals[] = 
+        const glm::vec3 normals[F] = 
         {
             inv_sqrt3 * glm::vec3(-inv_phi,      0.0,     -phi),
             inv_sqrt3 * glm::vec3( inv_phi,      0.0,     -phi),
@@ -294,7 +346,7 @@ namespace plato {
             7,  3, 11,      8,  4, 10,      5,  8, 10,      6,  9, 11,      9,  7, 11
         };
 
-        const glm::uvec3 triangles[F] = 
+        const glm::uvec3 triangles[T] =
         {
             glm::uvec3(2,  0,  8),
             glm::uvec3(0,  2,  9),
@@ -315,8 +367,8 @@ namespace plato {
             glm::uvec3(8,  4, 10),
             glm::uvec3(5,  8, 10),
             glm::uvec3(6,  9, 11),
-            glm::uvec3(9,  7, 11) 
-        };       
+            glm::uvec3(9,  7, 11)
+        };
                  
         //===============================================================================================================================================================================================================
         // quads, edges and edge_indices are initial arrays for parallelizable spherical surface generating algorithms

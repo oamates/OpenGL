@@ -15,7 +15,7 @@
 //========================================================================================================================================================================================================================
 
 #ifdef _MSC_VER
-    #pragma warning(disable: 4530) // C++ exception handler used, but unwind semantics are not enabled
+    #pragma warning(disable: 4530)                      // C++ exception handler used, but unwind semantics are not enabled
 #endif
 
 #include "Logging_Tools.h"
@@ -26,10 +26,13 @@
 #include <chrono>
 #include <vector>
 #include <locale>
-#include <codecvt>
+
+#ifdef _WIN32
+    #include <codecvt>
+#endif
 
 #if defined(_MSC_VER)
-    #include <filesystem> // Pre-release C++ filesystem support.
+    #include <filesystem>                               // Pre-release C++ filesystem support.
 #endif
 
 #if defined(__APPLE__)
@@ -134,7 +137,7 @@ Lock::Lock() :
   #if defined(_WIN32)
     cs{}
   #else
-	m()
+    m()
   #endif
 {
   #if defined(_WIN32)
@@ -155,7 +158,7 @@ bool Lock::TryEnter()
   #if defined(_WIN32)
     return ::TryEnterCriticalSection(&cs) != FALSE;
   #else
-	return m.try_lock();
+    return m.try_lock();
   #endif
 }
 
@@ -164,7 +167,7 @@ void Lock::Enter()
   #if defined(_WIN32)
     ::EnterCriticalSection(&cs);
   #else
-	m.lock();
+    m.lock();
   #endif
 }
 
@@ -173,7 +176,7 @@ void Lock::Leave()
   #if defined(_WIN32)
     ::LeaveCriticalSection(&cs);
   #else
-	m.unlock();
+    m.unlock();
   #endif
 }
 

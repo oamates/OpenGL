@@ -25,9 +25,11 @@ struct polyhedron
     // functions to generate regular plato solids with :
     //  * position + frame + texture coordinate buffer
     //  * position + normal + texture coordinate buffer 
+    //  * position + normal
     //===================================================================================================================================================================================================================
     void regular_pft2_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces, float scale = 1.0f, bool invert_normals = false);
     void regular_pnt2_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces, float scale = 1.0f, bool invert_normals = false);
+    void regular_pn_vao(int V, int F, const glm::vec3* positions, const glm::vec3* normals, const int* faces, float scale = 1.0f, bool invert_normals = false);
 
     void render();
     void instanced_render(GLsizei primcount);

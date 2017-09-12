@@ -464,19 +464,19 @@ struct ovr_hmd_t
             debug_msg("\t\tYaw drift correction       : %s", hmd_desc.AvailableTrackingCaps & ovrTrackingCap_MagYawCorrection ? "on" : "off");
             debug_msg("\t\tPositional tracking        : %s", hmd_desc.AvailableTrackingCaps & ovrTrackingCap_Position         ? "on" : "off");
 
-        for (int i = 0; i < ovrEye_Count; ++i)
+        for (ovrEyeType eye = ovrEye_Left; eye < ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
         {
-            debug_msg("\tLenses info : lens #%d :", i);
+            debug_msg("\tLenses info : lens #%d :", eye);
             debug_msg("\t\tDefault FOV : up(%.2f), down(%.2f), left(%.2f), right(%.2f)", 
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].UpTan),
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].DownTan),
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].LeftTan),
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].RightTan));
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].UpTan),
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].DownTan),
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].LeftTan),
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].RightTan));
             debug_msg("\t\tMax FOV : up(%.2f), down(%.2f), left(%.2f), right(%.2f)", 
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].UpTan),
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].DownTan),
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].LeftTan),
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].RightTan));
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].UpTan),
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].DownTan),
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].LeftTan),
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].RightTan));
         }   
 
         debug_msg("\tResolution = %d x %d.", hmd_desc.Resolution.w, hmd_desc.Resolution.h);

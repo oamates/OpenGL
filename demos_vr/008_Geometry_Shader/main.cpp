@@ -24,8 +24,10 @@
 #include "glfw_window.hpp"
 #include "camera.hpp"
 #include "image.hpp"
+#include "vertex.hpp"
 #include "plato.hpp"
 #include "polyhedron.hpp"
+#include "vao.hpp"
 #include "surface.hpp"
 #include "torus.hpp"
 
@@ -394,16 +396,20 @@ struct ovr_hmd_t
         eye_position[ovrEye_Right] = head_position + head_rotation * eye_position_rel[ovrEye_Right];
 
         _sceneLayer.SensorSampleTime = ovr_GetTimeInSeconds();
+
+        for (ovrEyeType eye = ovrEye_Left; eye < ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
+        {
+            const glm::quat& rotation = eye_rotation[eye];
+            const glm::quat& position = eye_position[eye];
+            _sceneLayer.RenderPose[eye].Orientation = ovrQuatf { .x = rotation.x , .y = rotation.y, .z = rotation.z, .w = rotation.w};
+            _sceneLayer.RenderPose[eye].Position = ovrVector3f { .x = position.x , .y = position.y, .z = position.z };
+        }        
     }
 
     void set_viewport(ovrEyeType eye)
     {
         const ovrRecti& viewport = _sceneLayer.Viewport[eye];
         glViewport(viewport.Pos.x, viewport.Pos.y, viewport.Size.w, viewport.Size.h);
-        const glm::quat& rotation = eye_rotation[eye];
-        const glm::quat& position = eye_position[eye];
-        _sceneLayer.RenderPose[eye].Orientation = ovrQuatf { .x = rotation.x , .y = rotation.y, .z = rotation.z, .w = rotation.w};
-        _sceneLayer.RenderPose[eye].Position = ovrVector3f { .x = position.x , .y = position.y, .z = position.z };
     }
 
     GLuint mirror_texture_id()
@@ -474,19 +480,19 @@ struct ovr_hmd_t
             debug_msg("\t\tYaw drift correction       : %s", hmd_desc.AvailableTrackingCaps & ovrTrackingCap_MagYawCorrection ? "on" : "off");
             debug_msg("\t\tPositional tracking        : %s", hmd_desc.AvailableTrackingCaps & ovrTrackingCap_Position         ? "on" : "off");
 
-        for (int i = 0; i < ovrEye_Count; ++i)
+        for (ovrEyeType eye = ovrEye_Left; eye < ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
         {
-            debug_msg("\tLenses info : lens #%d :", i);
+            debug_msg("\tLenses info : lens #%d :", eye);
             debug_msg("\t\tDefault FOV : up(%.2f), down(%.2f), left(%.2f), right(%.2f)", 
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].UpTan),
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].DownTan),
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].LeftTan),
-                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[i].RightTan));
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].UpTan),
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].DownTan),
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].LeftTan),
+                    constants::one_rad * glm::atan(hmd_desc.DefaultEyeFov[eye].RightTan));
             debug_msg("\t\tMax FOV : up(%.2f), down(%.2f), left(%.2f), right(%.2f)", 
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].UpTan),
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].DownTan),
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].LeftTan),
-                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[i].RightTan));
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].UpTan),
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].DownTan),
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].LeftTan),
+                    constants::one_rad * glm::atan(hmd_desc.MaxEyeFov[eye].RightTan));
         }   
 
         debug_msg("\tResolution = %d x %d.", hmd_desc.Resolution.w, hmd_desc.Resolution.h);
@@ -503,9 +509,9 @@ struct ovr_hmd_t
     }
 };
 
-vertex_pf_t torus_func(const glm::vec2& uv)
+vertex_pn_t torus_func(const glm::vec2& uv)
 {
-    vertex_pf_t vertex;
+    vertex_pn_t vertex;
 
     float cos_2piu = glm::cos(constants::two_pi * uv.x);
     float sin_2piu = glm::sin(constants::two_pi * uv.x);
@@ -516,8 +522,6 @@ vertex_pf_t torus_func(const glm::vec2& uv)
     float r = 0.97f;
 
     vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv, 2.1f + (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
-    vertex.tangent_x = glm::vec3(-sin_2piu * cos_2piv, -sin_2piu * sin_2piv, cos_2piu);
-    vertex.tangent_y = glm::vec3(-sin_2piv, cos_2piv, 0.0f);
     vertex.normal = glm::vec3(cos_2piu * cos_2piv, cos_2piu * sin_2piv, sin_2piu);
 
     return vertex;
@@ -572,11 +576,15 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // z-buffer fill shader programs : for positoin-frame type vertices
     //===================================================================================================================================================================================================================
-    glsl_program_t ambient_zfill_pf(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ambient_zfill_pf.vs"),
-                                    glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ambient_zfill_pf.gs"),
-                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ambient_zfill_pf.fs"));
-    ambient_zfill_pf.dump_info();
-    uniform_t uni_zfill_pf_pvmatrix = ambient_zfill_pf["projection_view_matrix"];
+    glsl_program_t ambient_zfill(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ambient_zfill.vs"),
+                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/ambient_zfill.gs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/ambient_zfill.fs"));
+    ambient_zfill.dump_info();
+    ambient_zfill.enable();
+    uniform_t uni_zf_pvmatrix = ambient_zfill["projection_view_matrix"];
+    uniform_t uni_zf_shift    = ambient_zfill["shift"];
+    ambient_zfill["tb_tex"] = 0;
+
 
     //===================================================================================================================================================================================================================
     // shadow volume generating shader program
@@ -587,56 +595,67 @@ int main(int argc, char** argv)
     shadow_volume.dump_info();
     uniform_t uni_sv_pvmatrix = shadow_volume["projection_view_matrix"];
     uniform_t uni_sv_light_ws = shadow_volume["light_ws"];
+    uniform_t uni_sv_shift    = shadow_volume["shift"];
 
     //===================================================================================================================================================================================================================
     // phong lighting for position + tangent frame vertices
     // procedural (possibly tri-linear blended) texturing assumed
     //===================================================================================================================================================================================================================
-    glsl_program_t phong_lighting_pf(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_lighting_pf.vs"),
-                                     glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/phong_lighting_pf.gs"),
-                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_lighting_pf.fs"));
-    phong_lighting_pf.dump_info();
-    phong_lighting_pf.enable();
-    uniform_t uni_pl_pf_pvmatrix  = phong_lighting_pf["projection_view_matrix"];
-    uniform_t uni_pl_pf_camera_ws = phong_lighting_pf["camera_ws"];
-    uniform_t uni_pl_pf_light_ws  = phong_lighting_pf["light_ws"];
+    glsl_program_t phong_light(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_light.vs"),
+                               glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/phong_light.gs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_light.fs"));
+    phong_light.dump_info();
+    phong_light.enable();
+    uniform_t uni_pl_pvmatrix  = phong_light["projection_view_matrix"];
+    uniform_t uni_pl_camera_ws = phong_light["camera_ws"];
+    uniform_t uni_pl_light_ws  = phong_light["light_ws"];
+    uniform_t uni_pl_shift     = phong_light["shift"];
+    phong_light["tb_tex"] = 0;
 
     //===================================================================================================================================================================================================================
-    // generate torus with adjacency index buffer
+    // cube room and its inhabitants ...
+    //===================================================================================================================================================================================================================
+    const float room_size = 17.5f;
+    polyhedron room;
+    room.regular_pn_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, room_size, true);
+
+    //===================================================================================================================================================================================================================
+    // ... torus with adjacency index buffer
     //===================================================================================================================================================================================================================
     torus_t torus;
     adjacency_vao_t torus_adjacency;
-    torus.generate_vao<vertex_pf_t>(torus_func, 37, 67, &torus_adjacency);
+    torus.generate_vao<vertex_pn_t>(torus_func, 37, 67, &torus_adjacency);
+
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(-1);
 
     //===================================================================================================================================================================================================================
-    // generate icosahedron with adjacency index buffer
+    // ... and 5 plato solids with their adjacency index buffer
     //===================================================================================================================================================================================================================
-    GLuint V = plato::icosahedron::V;
-    GLuint F = plato::icosahedron::F;
+    polyhedron tetrahedron, cube, octahedron, dodecahedron, icosahedron;
 
-    GLuint vao_id, vbo_id;
-    glGenVertexArrays(1, &vao_id);
-    glBindVertexArray(vao_id);
-    glGenBuffers(1, &vbo_id);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-    glBufferData(GL_ARRAY_BUFFER, V * sizeof(glm::vec3), plato::icosahedron::vertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    tetrahedron.regular_pn_vao (plato::tetrahedron::V,  plato::tetrahedron::F,  plato::tetrahedron::vertices,  plato::tetrahedron::normals,  plato::tetrahedron::faces);
+    cube.regular_pn_vao        (plato::cube::V,         plato::cube::F,         plato::cube::vertices,         plato::cube::normals,         plato::cube::faces);
+    octahedron.regular_pn_vao  (plato::octahedron::V,   plato::octahedron::F,   plato::octahedron::vertices,   plato::octahedron::normals,   plato::octahedron::faces);
+    dodecahedron.regular_pn_vao(plato::dodecahedron::V, plato::dodecahedron::F, plato::dodecahedron::vertices, plato::dodecahedron::normals, plato::dodecahedron::faces);
+    icosahedron.regular_pn_vao (plato::icosahedron::V,  plato::icosahedron::F,  plato::icosahedron::vertices,  plato::icosahedron::normals,  plato::icosahedron::faces);
     
-    ibo_t adjacency_ibo = build_adjacency_ibo<GLuint>((glm::uvec3*) &plato::icosahedron::triangles[0], F);                          
+    vao_t tetrahedron_adjacency  = build_adjacency_vao<GLuint>(plato::tetrahedron::vertices,  plato::tetrahedron::triangles,  plato::tetrahedron::V,  plato::tetrahedron::F);
+    vao_t cube_adjacency         = build_adjacency_vao<GLuint>(plato::cube::vertices,         plato::cube::triangles,         plato::cube::V,         plato::cube::F);
+    vao_t octahedron_adjacency   = build_adjacency_vao<GLuint>(plato::octahedron::vertices,   plato::octahedron::triangles,   plato::octahedron::V,   plato::octahedron::F);
+    vao_t dodecahedron_adjacency = build_adjacency_vao<GLuint>(plato::dodecahedron::vertices, plato::dodecahedron::triangles, plato::dodecahedron::V, plato::dodecahedron::F);
+    vao_t icosahedron_adjacency  = build_adjacency_vao<GLuint>(plato::icosahedron::vertices,  plato::icosahedron::triangles,  plato::icosahedron::V,  plato::icosahedron::F);
 
     //===================================================================================================================================================================================================================
-    // generate standard position + normal + uv icosahedron data 
+    // load different material textures for trilinear blending
     //===================================================================================================================================================================================================================
-    polyhedron icosahedron;
-    icosahedron.regular_pnt2_vao(12, 20, plato::icosahedron::vertices, plato::icosahedron::normals, plato::icosahedron::faces);
-
-    const float cube_size = 23.33;
-    room_t granite_room(cube_size);    
-
-    GLuint cube_texture_id        = image::png::texture2d("../../../resources/tex2d/marble.png");
-    GLuint icosahedron_texture_id = image::png::texture2d("../../../resources/plato_tex2d/icosahedron.png");
-    glActiveTexture(GL_TEXTURE0);
+    GLuint clay_tex_id        = image::png::texture2d("../../../resources/tex2d/clay.png");
+    GLuint crystalline_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png");
+    GLuint marble_tex_id      = image::png::texture2d("../../../resources/tex2d/marble.png");
+    GLuint ice_tex_id         = image::png::texture2d("../../../resources/tex2d/ice2.png");
+    GLuint pink_stone_tex_id  = image::png::texture2d("../../../resources/tex2d/pink_stone.png");
+    GLuint plumbum_tex_id     = image::png::texture2d("../../../resources/tex2d/plumbum.png");
+    GLuint emerald_tex_id     = image::png::texture2d("../../../resources/tex2d/emerald.png");
 
     //===================================================================================================================================================================================================================
     // global OpenGL state
@@ -644,15 +663,10 @@ int main(int argc, char** argv)
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    const float light_radius = 12.5f;
-    glm::vec3 light_ws = glm::vec3(light_radius, 0.0f, 0.0f);
-    glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
+    glActiveTexture(GL_TEXTURE0);
 
-    /* granite room */
-    const float cube_size = 17.5f;
-    polyhedron granite_room;
-    granite_room.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
+    const float shift = 5.0;
+    const float light_radius = 12.5f;
 
     //===================================================================================================================================================================================================================
     // main rendering loop
@@ -669,7 +683,7 @@ int main(int argc, char** argv)
 
         float time = window.frame_ts;
         float angle = 0.125 * time;
-        glm::vec3 light_ws = 15.0f * glm::vec3(glm::cos(angle), glm::sin(angle), 0.0f);
+        glm::vec3 light_ws = light_radius * glm::vec3(glm::cos(angle), glm::sin(angle), 0.0f);
 
         if (window.dynamic_light) 
         {
@@ -688,29 +702,59 @@ int main(int argc, char** argv)
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ovr_hmd.swapchain_texture_id(), 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        ovrRecti& leftVp = ovr_hmd._sceneLayer.Viewport[ovrEye_Left];
+        glViewportIndexedf(0, leftVp.Pos.x, leftVp.Pos.y, leftVp.Size.w, leftVp.Size.h);
+        ovrRecti& rightVp = ovr_hmd._sceneLayer.Viewport[ovrEye_Right];
+        glViewportIndexedf(1, rightVp.Pos.x, rightVp.Pos.y, rightVp.Size.w, rightVp.Size.h);
+
         //===============================================================================================================================================================================================================
         // render the scene for both eyes simultaneously
         //===============================================================================================================================================================================================================
         glm::mat4 projection_view_matrix[ovrEye_Count] = 
         {
             ovr_hmd.projection_matrix[ovrEye_Left ] * window.camera.eye_view_matrix[ovrEye_Left ],
-            ovr_hmd.projection_matrix[ovrEye_Left ] * window.camera.eye_view_matrix[ovrEye_Right]
+            ovr_hmd.projection_matrix[ovrEye_Right] * window.camera.eye_view_matrix[ovrEye_Right]
+        };
+
+        glm::vec3 camera_ws[ovrEye_Count] =
+        {
+            window.camera.position(ovrEye_Left ),
+            window.camera.position(ovrEye_Right)
         };
 
         //===============================================================================================================================================================================================================
         // render scene with ambient lights only and fill z-buffer with depth values
         //===============================================================================================================================================================================================================        
-        ambient_zfill_pf.enable();
-        uni_zfill_pf_pvmatrix = projection_view_matrix;
-      
-        glBindTexture(GL_TEXTURE_2D, icosahedron_texture_id);                           /* trilinear blend texture */
-        icosahedron.render();
+        ambient_zfill.enable();
+        uni_zf_pvmatrix = projection_view_matrix;
 
-        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
-        granite_room.render();
+        uni_zf_shift = glm::vec3(0.0, 0.0,  shift);
+        glBindTexture(GL_TEXTURE_2D, clay_tex_id);
+        tetrahedron.render();
 
-        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
+        uni_zf_shift = glm::vec3(0.0, 0.0, -shift);
+        glBindTexture(GL_TEXTURE_2D, crystalline_tex_id);
+        cube.render();
+
+        uni_zf_shift = glm::vec3(0.0,  shift, 0.0);
+        glBindTexture(GL_TEXTURE_2D, marble_tex_id);
+        octahedron.render();
+
+        uni_zf_shift = glm::vec3(0.0, -shift, 0.0);
+        glBindTexture(GL_TEXTURE_2D, ice_tex_id);
+        dodecahedron.render();
+
+        uni_zf_shift = glm::vec3( shift, 0.0, 0.0);
+        glBindTexture(GL_TEXTURE_2D, pink_stone_tex_id);
+        icosahedron.render(); 
+
+        uni_zf_shift = glm::vec3(-shift, 0.0, 0.0);
+        glBindTexture(GL_TEXTURE_2D, plumbum_tex_id);
         torus.render();
+
+        uni_zf_shift = glm::vec3(0.0);
+        glBindTexture(GL_TEXTURE_2D, emerald_tex_id);
+        room.render();
 
         //===============================================================================================================================================================================================================
         // pass the geometry of shadow casters through shadow volume generating geometry shader program
@@ -723,14 +767,29 @@ int main(int argc, char** argv)
         glStencilFunc(GL_ALWAYS, 0, 0xFFFFFFFF);                                        // ... set it to always pass
         glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
         glStencilOpSeparate(GL_BACK,  GL_KEEP, GL_DECR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
-                
+
         shadow_volume.enable();
         uni_sv_pvmatrix = projection_view_matrix;
-        uni_sv_light_ws = light_ws;     
+        uni_sv_light_ws = light_ws;
 
-        glBindVertexArray(vao_id);                                                      // render objects that generate shadow volume only
-        adjacency_ibo.render(); 
+        uni_sv_shift = glm::vec3(0.0, 0.0,  shift);
+        tetrahedron_adjacency.render();
+
+        uni_sv_shift = glm::vec3(0.0, 0.0, -shift);
+        cube_adjacency.render();
+
+        uni_sv_shift = glm::vec3(0.0,  shift, 0.0);
+        octahedron_adjacency.render();
+
+        uni_sv_shift = glm::vec3(0.0, -shift, 0.0);
+        dodecahedron_adjacency.render();
+
+        uni_sv_shift = glm::vec3( shift, 0.0, 0.0);
+        icosahedron_adjacency.render(); 
+
+        uni_sv_shift = glm::vec3(-shift, 0.0, 0.0);
         torus_adjacency.render();
+
 
         //===============================================================================================================================================================================================================
         // render light diffuse and specular components into lit areas where stencil value is zero
@@ -745,19 +804,39 @@ int main(int argc, char** argv)
         glStencilFunc(GL_EQUAL, 0, 0xFFFFFFFF);                                         // stencil test must be enabled and the scene be rendered to area where stencil value is zero
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);                                         // prevent update to the stencil buffer
 
-        phong_lighting_pf.enable();
-        uni_pl_pf_pvmatrix  = projection_view_matrix;
-        uni_pl_pf_camera_ws = camera_ws;
-        uni_pl_pf_light_ws  = light_ws;
+        phong_light.enable();
+        uni_pl_pvmatrix  = projection_view_matrix;
+        uni_pl_camera_ws = camera_ws;
+        uni_pl_light_ws  = light_ws;
 
-        glBindTexture(GL_TEXTURE_2D, icosahedron_texture_id);                           /* trilinear blend texture */
-        icosahedron.render();
+        uni_pl_shift = glm::vec3(0.0, 0.0,  shift);
+        glBindTexture(GL_TEXTURE_2D, clay_tex_id);
+        tetrahedron.render();
 
-        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
-        granite_room.render();
+        uni_pl_shift = glm::vec3(0.0, 0.0, -shift);
+        glBindTexture(GL_TEXTURE_2D, crystalline_tex_id);
+        cube.render();
 
-        glBindTexture(GL_TEXTURE_2D, cube_texture_id);                                  /* trilinear blend texture */
+        uni_pl_shift = glm::vec3(0.0,  shift, 0.0);
+        glBindTexture(GL_TEXTURE_2D, marble_tex_id);
+        octahedron.render();
+
+        uni_pl_shift = glm::vec3(0.0, -shift, 0.0);
+        glBindTexture(GL_TEXTURE_2D, ice_tex_id);
+        dodecahedron.render();
+
+        uni_pl_shift = glm::vec3( shift, 0.0, 0.0);
+        glBindTexture(GL_TEXTURE_2D, pink_stone_tex_id);
+        icosahedron.render(); 
+
+        uni_pl_shift = glm::vec3(-shift, 0.0, 0.0);
+        glBindTexture(GL_TEXTURE_2D, plumbum_tex_id);
         torus.render();
+
+        uni_pl_shift = glm::vec3(0.0);
+        glBindTexture(GL_TEXTURE_2D, emerald_tex_id);
+        room.render();
+
 
         glDepthMask(GL_TRUE);                                                           // enable depth writes for next render cycle,
         glDisable(GL_BLEND);                                                            // disable blending, and ...
