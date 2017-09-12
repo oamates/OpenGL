@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 
 layout (triangles_adjacency) in;                                    // six vertices in
 layout (triangle_strip, max_vertices = 36) out;
@@ -32,8 +32,8 @@ void main()
     vec3 e45 = position_ws[5] - position_ws[4];
 
     // six vertices of the infinite prism for each viewport
-    vec4 v0l[ovrEye_Count], v0l[ovrEye_Count], v0l[ovrEye_Count],
-         v0l[ovrEye_Count], v0l[ovrEye_Count], v0l[ovrEye_Count],
+    vec4 v0l[ovrEye_Count], v2l[ovrEye_Count], v4l[ovrEye_Count],
+         v0i[ovrEye_Count], v2i[ovrEye_Count], v4i[ovrEye_Count];
 
     for (int e = 0; e < ovrEye_Count; ++e)
     {

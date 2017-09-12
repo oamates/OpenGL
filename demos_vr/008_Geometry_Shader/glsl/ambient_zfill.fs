@@ -1,8 +1,9 @@
-#version 330 core
+#version 430 core
 
 in vec3 position;
 in vec3 normal;
 
+uniform vec3 light_ws;
 uniform sampler2D tb_tex;
 
 out vec4 FragmentColor;

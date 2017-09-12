@@ -15,6 +15,8 @@ template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* 
 template<typename index_t> vao_t build_adjacency_vao(const glm::vec3* vertices, const glm::tvec3<index_t>* faces, uint32_t V, uint32_t F)
 {
     vao_t vao;
+    glGenVertexArrays(1, &vao.id);
+    glBindVertexArray(vao.id);
     vao.vbo.init<vertex_p_t>((vertex_p_t*) vertices, V);
     vao.ibo = build_adjacency_ibo<index_t>(faces, F);
     return vao;    
@@ -110,8 +112,9 @@ template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* 
     // fill adjacent edge indices, -1 will indicate boundary edges                                                                                                                                                        
     //====================================================================================================================================================================================================================
     ibo_t ibo;
-    ibo.init(GL_TRIANGLES_ADJACENCY, (const index_t*)0, 6 * F);
+    ibo.init(GL_TRIANGLES_ADJACENCY, (const index_t*) 0, 6 * F);
     index_t* buffer = (index_t*) ibo_t::map();
+
 
     for (uint32_t index = 0, f = 0; f < F; ++f)                                                                                                                                                                                      
     {
@@ -188,6 +191,7 @@ template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* 
             break;                                                                                                                                                                                                    
         }                                                                                                                                                                                                             
     }
+
     free(edges);
     ibo_t::unmap();
     return ibo; 

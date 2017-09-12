@@ -581,6 +581,7 @@ int main(int argc, char** argv)
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32, ovr_hmd.target_size.x, ovr_hmd.target_size.y);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_id);
+
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
     glGenFramebuffers(1, &mirror_fbo_id);

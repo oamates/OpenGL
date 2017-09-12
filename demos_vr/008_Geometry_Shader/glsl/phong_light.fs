@@ -41,7 +41,7 @@ vec3 bump_normal(vec3 p, vec3 n)
 void main()
 {
     vec3 v = normalize(camera_ws[gl_ViewportIndex] - position);
-    vec3 l = normalize(light_ws  - position);
+    vec3 l = normalize(light_ws - position);
 
     vec3 diffuse_color = tex3d(position, normal);
     vec3 n = bump_normal(position, normal);

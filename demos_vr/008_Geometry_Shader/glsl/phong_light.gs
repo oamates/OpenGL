@@ -21,8 +21,7 @@ void main()
         {
             position = position_ws[j];
             normal = normal_ws[j];
-
-            gl_Position = projection_view_matrix * vec4(position, 1.0f);
+            gl_Position = projection_view_matrix[vp] * vec4(position, 1.0f);
             EmitVertex();
         }
         EndPrimitive();

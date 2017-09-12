@@ -582,6 +582,7 @@ int main(int argc, char** argv)
     ambient_zfill.dump_info();
     ambient_zfill.enable();
     uniform_t uni_zf_pvmatrix = ambient_zfill["projection_view_matrix"];
+    uniform_t uni_zf_light_ws = ambient_zfill["light_ws"];
     uniform_t uni_zf_shift    = ambient_zfill["shift"];
     ambient_zfill["tb_tex"] = 0;
 
@@ -627,7 +628,9 @@ int main(int argc, char** argv)
     torus.generate_vao<vertex_pn_t>(torus_func, 37, 67, &torus_adjacency);
 
     glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
+    debug_msg("torus.vao.ibo.pri = %u", torus.vao.ibo.pri);
+    debug_msg("torus_adjacency.ibo.pri = %u", torus_adjacency.ibo.pri);
+    glPrimitiveRestartIndex(torus.vao.ibo.pri);
 
     //===================================================================================================================================================================================================================
     // ... and 5 plato solids with their adjacency index buffer
@@ -640,11 +643,11 @@ int main(int argc, char** argv)
     dodecahedron.regular_pn_vao(plato::dodecahedron::V, plato::dodecahedron::F, plato::dodecahedron::vertices, plato::dodecahedron::normals, plato::dodecahedron::faces);
     icosahedron.regular_pn_vao (plato::icosahedron::V,  plato::icosahedron::F,  plato::icosahedron::vertices,  plato::icosahedron::normals,  plato::icosahedron::faces);
     
-    vao_t tetrahedron_adjacency  = build_adjacency_vao<GLuint>(plato::tetrahedron::vertices,  plato::tetrahedron::triangles,  plato::tetrahedron::V,  plato::tetrahedron::F);
-    vao_t cube_adjacency         = build_adjacency_vao<GLuint>(plato::cube::vertices,         plato::cube::triangles,         plato::cube::V,         plato::cube::F);
-    vao_t octahedron_adjacency   = build_adjacency_vao<GLuint>(plato::octahedron::vertices,   plato::octahedron::triangles,   plato::octahedron::V,   plato::octahedron::F);
-    vao_t dodecahedron_adjacency = build_adjacency_vao<GLuint>(plato::dodecahedron::vertices, plato::dodecahedron::triangles, plato::dodecahedron::V, plato::dodecahedron::F);
-    vao_t icosahedron_adjacency  = build_adjacency_vao<GLuint>(plato::icosahedron::vertices,  plato::icosahedron::triangles,  plato::icosahedron::V,  plato::icosahedron::F);
+    vao_t tetrahedron_adjacency  = build_adjacency_vao<GLuint>(plato::tetrahedron::vertices,  plato::tetrahedron::triangles,  plato::tetrahedron::V,  plato::tetrahedron::T);
+    vao_t cube_adjacency         = build_adjacency_vao<GLuint>(plato::cube::vertices,         plato::cube::triangles,         plato::cube::V,         plato::cube::T);
+    vao_t octahedron_adjacency   = build_adjacency_vao<GLuint>(plato::octahedron::vertices,   plato::octahedron::triangles,   plato::octahedron::V,   plato::octahedron::T);
+    vao_t dodecahedron_adjacency = build_adjacency_vao<GLuint>(plato::dodecahedron::vertices, plato::dodecahedron::triangles, plato::dodecahedron::V, plato::dodecahedron::T);
+    vao_t icosahedron_adjacency  = build_adjacency_vao<GLuint>(plato::icosahedron::vertices,  plato::icosahedron::triangles,  plato::icosahedron::V,  plato::icosahedron::T);
 
     //===================================================================================================================================================================================================================
     // load different material textures for trilinear blending
@@ -666,7 +669,7 @@ int main(int argc, char** argv)
     glActiveTexture(GL_TEXTURE0);
 
     const float shift = 5.0;
-    const float light_radius = 12.5f;
+    const float light_radius = 0.475 * room_size;
 
     //===================================================================================================================================================================================================================
     // main rendering loop
@@ -700,13 +703,15 @@ int main(int argc, char** argv)
         //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_id);
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ovr_hmd.swapchain_texture_id(), 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         ovrRecti& leftVp = ovr_hmd._sceneLayer.Viewport[ovrEye_Left];
         glViewportIndexedf(0, leftVp.Pos.x, leftVp.Pos.y, leftVp.Size.w, leftVp.Size.h);
         ovrRecti& rightVp = ovr_hmd._sceneLayer.Viewport[ovrEye_Right];
         glViewportIndexedf(1, rightVp.Pos.x, rightVp.Pos.y, rightVp.Size.w, rightVp.Size.h);
 
+        glActiveTexture(GL_TEXTURE0);
         //===============================================================================================================================================================================================================
         // render the scene for both eyes simultaneously
         //===============================================================================================================================================================================================================
@@ -727,6 +732,7 @@ int main(int argc, char** argv)
         //===============================================================================================================================================================================================================        
         ambient_zfill.enable();
         uni_zf_pvmatrix = projection_view_matrix;
+        uni_zf_light_ws = light_ws;
 
         uni_zf_shift = glm::vec3(0.0, 0.0,  shift);
         glBindTexture(GL_TEXTURE_2D, clay_tex_id);
@@ -757,12 +763,13 @@ int main(int argc, char** argv)
         room.render();
 
         //===============================================================================================================================================================================================================
-        // pass the geometry of shadow casters through shadow volume generating geometry shader program
+        // pass the geometry of shadow casters through shadow volume generating program
         // stencil test must be enabled but must always pass (only the depth test matters) otherwise stencil buffer will not be modified
         //===============================================================================================================================================================================================================
-        glDepthMask(GL_FALSE);                                                          // enable depth writes
-        glDisable(GL_CULL_FACE);                                                        // disable cull-face as we need both front and back faces to be rasterized
         glDrawBuffer(GL_NONE);                                                          // disable color writes, maybe not be needed as fragment shader does not output anything anyway
+
+        glDepthMask(GL_FALSE);                                                          // disable depth writes
+        glDisable(GL_CULL_FACE);                                                        // disable cull-face as we need both front and back faces to be rasterized
         glEnable(GL_STENCIL_TEST);                                                      // enable stencil test and ...
         glStencilFunc(GL_ALWAYS, 0, 0xFFFFFFFF);                                        // ... set it to always pass
         glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
@@ -787,16 +794,14 @@ int main(int argc, char** argv)
         uni_sv_shift = glm::vec3( shift, 0.0, 0.0);
         icosahedron_adjacency.render(); 
 
-        uni_sv_shift = glm::vec3(-shift, 0.0, 0.0);
-        torus_adjacency.render();
-
+        /* uni_sv_shift = glm::vec3(-shift, 0.0, 0.0);
+        torus_adjacency.render(); */
 
         //===============================================================================================================================================================================================================
         // render light diffuse and specular components into lit areas where stencil value is zero
         //===============================================================================================================================================================================================================
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
         glEnable(GL_CULL_FACE);                                                         // cullface can be enabled back at this point
-
-        glDrawBuffer(GL_BACK);                                                          // enable color buffer writes
         glEnable(GL_BLEND);                                                             // ambient component is already in the color buffer
         glBlendEquation(GL_FUNC_ADD);                                                   // and we want to just add the diffuse and specular components to 
         glBlendFunc(GL_ONE, GL_ONE);                                                    // lit areas
@@ -836,7 +841,6 @@ int main(int argc, char** argv)
         uni_pl_shift = glm::vec3(0.0);
         glBindTexture(GL_TEXTURE_2D, emerald_tex_id);
         room.render();
-
 
         glDepthMask(GL_TRUE);                                                           // enable depth writes for next render cycle,
         glDisable(GL_BLEND);                                                            // disable blending, and ...

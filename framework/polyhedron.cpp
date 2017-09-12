@@ -178,8 +178,8 @@ void polyhedron::regular_pn_vao(int V, int F, const glm::vec3* positions, const 
             vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index]], normal);
             if (invert_normals)
             {
-                vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 1]], normal);
                 vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 2]], normal);
+                vertices[buffer_index++] = vertex_pn_t(scale * positions[faces[index + j + 1]], normal);
             }
             else
             {
@@ -207,9 +207,9 @@ void polyhedron::instanced_render(GLsizei primcount)
 {
     glBindVertexArray(vao_id);
     vbo.instanced_render(GL_TRIANGLES, primcount);
-};
+}
 
 polyhedron::~polyhedron()
 {
     glDeleteVertexArrays(1, &vao_id);
-};
+}

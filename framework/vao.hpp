@@ -21,7 +21,7 @@ struct ibo_t
     GLuint size;
     GLuint pri;
 
-    ibo_t () : id(0) {};
+    ibo_t () : id(0), pri(-1) {};
 
     ibo_t& operator = (ibo_t&& other)
     {
@@ -29,6 +29,7 @@ struct ibo_t
         type = other.type;
         mode = other.mode;
         size = other.size;
+        pri = other.pri;
         return *this;
     }
 
@@ -38,6 +39,7 @@ struct ibo_t
         type = other.type;
         mode = other.mode;
         size = other.size;
+        pri = other.pri;
         other.id = 0;
     }
 
@@ -317,6 +319,9 @@ struct vao_t
 
     void render()
     {
+        printf("vao::render:: id = %u, ibo_id = %u, ibo_type = %u, ibo_mode = %u, ibo_size = %u, ibo_pri = %u\n", 
+            id, ibo.id, ibo.type, ibo.mode, ibo.size, ibo.pri); 
+        fflush(stdout);
         bind();
         ibo.render();
     }
