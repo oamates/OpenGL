@@ -1,5 +1,4 @@
 #include "vao.hpp"
-
 #include "log.hpp"
 
 template<typename index_t> struct edge_t

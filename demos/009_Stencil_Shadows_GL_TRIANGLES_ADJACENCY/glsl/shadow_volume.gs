@@ -17,12 +17,15 @@ void main()
     vec3 e24 = position_ws[4] - position_ws[2];                     // vector BC
     vec3 e40 = position_ws[0] - position_ws[4];                     // vector CA
 
-    vec3 l0 = normalize(position_ws[0] - light_ws);                 // from light to A
+
+
     vec3 normal = cross(e02, e24);
 
-    if (dot(l0, normal) > 0) return;                                // handle only light facing triangles
+    // handle only light facing triangles
+    if (dot(position_ws[0] + position_ws[2] + position_ws[4] - 3.0 * light_ws, normal) > 0) return;                                
 
 
+    vec3 l0 = normalize(position_ws[0] - light_ws);                 // from light to A
     vec3 l2 = normalize(position_ws[2] - light_ws);                 // from light to B
     vec3 l4 = normalize(position_ws[4] - light_ws);                 // from light to C
 

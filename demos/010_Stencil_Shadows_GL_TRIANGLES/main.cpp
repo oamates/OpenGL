@@ -1,5 +1,5 @@
 //========================================================================================================================================================================================================================
-// DEMO 009 : Stencil shadows via GL_TRIANGLES primitive
+// DEMO 010 : Stencil shadows via GL_TRIANGLES primitive
 //========================================================================================================================================================================================================================
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
@@ -33,15 +33,13 @@ struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
 
-    bool static_light = true;
-    double light_ts;
+    bool dynamic_light = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
-        light_ts = frame_ts;
     }  
 
     //===================================================================================================================================================================================================================
@@ -55,10 +53,7 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
         if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE)) 
-        {
-            static_light = !static_light;
-            light_ts = frame_ts;
-        }
+            dynamic_light = !dynamic_light;
     }
 
     void on_mouse_move() override
@@ -131,12 +126,9 @@ vertex_pf_t torus_func(const glm::vec2& uv)
     float R = 2.7f;
     float r = 0.97f;
 
-    vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv,
-                                (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
-
+    vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv, (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
     vertex.tangent_x = glm::vec3(-sin_2piu * cos_2piv, -sin_2piu * sin_2piv, cos_2piu);
     vertex.tangent_y = glm::vec3(-sin_2piv, cos_2piv, 0.0f);
-
     vertex.normal = glm::vec3(cos_2piu * cos_2piv, cos_2piu * sin_2piv, sin_2piu);
 
     return vertex;
@@ -175,9 +167,9 @@ int main(int argc, char *argv[])
 	//===================================================================================================================================================================================================================
 	// shadow volume generating shader program
 	//===================================================================================================================================================================================================================
-    glsl_program_t shadow_volume(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/shadow_volume.vs"),
-                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/shadow_volume.gs"),
-                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/shadow_volume.fs"));
+    glsl_program_t shadow_volume(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/working_shadow/shadow_volume.vs"),
+                                 glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/working_shadow/shadow_volume.gs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/working_shadow/shadow_volume.fs"));
     shadow_volume.dump_info();
 	uniform_t uni_sv_pvmatrix = shadow_volume["projection_view_matrix"];
 	uniform_t uni_sv_light_ws = shadow_volume["light_ws"];
@@ -230,6 +222,8 @@ int main(int argc, char *argv[])
     // main loop
     //===================================================================================================================================================================================================================
 
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
     while(!window.should_close())
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -237,14 +231,16 @@ int main(int argc, char *argv[])
 
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
-        if (!window.static_light) 
+
+        float time = window.frame_ts;
+
+        if (window.dynamic_light) 
         {
-            double time = window.frame_ts;
-            double dt = time - window.light_ts;
-            double cs = glm::cos(0.25f * dt); 
-            double sn = glm::sin(0.25f * dt);
-            light_ws = glm::vec3(light_ws.x * cs - light_ws.y * sn, light_ws.x * sn + light_ws.y * cs, 0.0f);
-            window.light_ts = time;
+            float cs0 = glm::cos(0.251f * time); 
+            float sn0 = glm::sin(0.251f * time);
+            float cs1 = glm::cos(0.317f * time); 
+            float sn1 = glm::sin(0.317f * time);
+            light_ws = light_radius * glm::vec3(cs0 * cs1, cs0 * sn1, sn0);
         }
         
         //===============================================================================================================================================================================================================
@@ -265,7 +261,9 @@ int main(int argc, char *argv[])
         // pass the geometry of shadow casters through shadow volume generating geometry shader program
         // stencil test must be enabled but must always pass (only the depth test matters) otherwise stencil buffer will not be modified
         //===============================================================================================================================================================================================================
-        glDepthMask(GL_FALSE);                                                          // enable depth writes
+        shadow_volume.enable();
+
+        glDepthMask(GL_FALSE);                                                          // disable depth writes
         glDisable(GL_CULL_FACE);                                                        // disable cull-face as we need both front and back faces to be rasterized
         glDrawBuffer(GL_NONE);                                                          // disable color writes, maybe not be needed as fragment shader does not output anything anyway
         glEnable(GL_STENCIL_TEST);                                                      // enable stencil test and ...
@@ -273,7 +271,6 @@ int main(int argc, char *argv[])
         glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
         glStencilOpSeparate(GL_BACK,  GL_KEEP, GL_DECR_WRAP, GL_KEEP);                  // invert stencil value when either front or back shadow face is rasterized ...
 		        
-        shadow_volume.enable();
         uni_sv_pvmatrix = projection_view_matrix;
         uni_sv_light_ws = light_ws;     
 

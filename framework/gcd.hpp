@@ -8,8 +8,8 @@ template<typename uint_t> uint_t gcd(uint_t u, uint_t v)
     int shift;
     for (shift = 0; ((u | v) & 1) == 0; ++shift)
     {
-         u >>= 1;
-         v >>= 1;
+        u >>= 1;
+        v >>= 1;
     }
  
     while ((u & 1) == 0) u >>= 1;
