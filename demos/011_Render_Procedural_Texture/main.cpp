@@ -68,56 +68,6 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-struct room_t
-{
-    GLuint vao_id;    
-    vbo_t vbo;
-
-    room_t(float size)
-    {
-        vertex_pnt2_t vertices[36];
-
-        glm::vec2 unit_square[4] = 
-        {
-            glm::vec2(0.0f, 0.0f),
-            glm::vec2(1.0f, 0.0f),
-            glm::vec2(1.0f, 1.0f),
-            glm::vec2(0.0f, 1.0f)
-        };
-
-        int index = 0;
-        int vindex = 0;
-
-        for(int i = 0; i < 6; ++i)
-        {
-            int A = plato::cube::faces[vindex++];
-            int B = plato::cube::faces[vindex++];
-            int C = plato::cube::faces[vindex++];
-            int D = plato::cube::faces[vindex++];
-            glm::vec3 normal = -plato::cube::normals[i];
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[B], normal, unit_square[1]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[D], normal, unit_square[3]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
-        }
-
-        glGenVertexArrays(1, &vao_id);
-        glBindVertexArray(vao_id);
-        vbo.init(vertices, 36);
-    }
-
-    void render()
-    {
-        glBindVertexArray(vao_id);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-
-    ~room_t()
-        { glDeleteVertexArrays(1, &vao_id); };
-};
-
 struct texture_renderer_t
 {
     GLuint diffuse_texture_unit;
@@ -427,8 +377,10 @@ int main(int argc, char *argv[])
         Q = knots[i].Q;
         torus_knot[i].generate_vao<vertex_pft2_t>(torusPQ_func, 200, 40);
     }
-    const float cube_size = 53.33;
-    room_t granite_room(cube_size);    
+
+    const float cube_size = 40.0;
+    polyhedron granite_room;
+    granite_room.regular_pnt2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
 
     glActiveTexture(GL_TEXTURE14);
     GLuint cube_texture_id = image::png::texture2d("../../../resources/tex2d/marble.png");

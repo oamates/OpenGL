@@ -1,3 +1,6 @@
+#ifndef _adjacency_included_130589460189463784356108734568107346589172568071346
+#define _adjacency_included_130589460189463784356108734568107346589172568071346
+
 #include "vao.hpp"
 #include "log.hpp"
 
@@ -193,3 +196,5 @@ template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* 
     ibo_t::unmap();
     return ibo; 
 }
+
+#endif // _adjacency_included_130589460189463784356108734568107346589172568071346

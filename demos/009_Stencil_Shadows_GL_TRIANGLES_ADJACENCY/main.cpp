@@ -24,23 +24,20 @@
 #include "image.hpp"
 #include "polyhedron.hpp"
 #include "torus.hpp"
-
-#include "edge.hpp"
+#include "adjacency.hpp"
 
 
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
 
-    bool static_light = true;
-    double light_ts;
+    bool dynamic_light = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
-        light_ts = frame_ts;
     }    
 
     //===================================================================================================================================================================================================================
@@ -53,11 +50,8 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
-        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE)) 
-        {
-            static_light = !static_light;
-            light_ts = frame_ts;
-        }
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+            dynamic_light = !dynamic_light;
     }
 
     void on_mouse_move() override
@@ -66,56 +60,6 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
-};
-
-struct room_t
-{
-    GLuint vao_id;    
-    vbo_t vbo;
-
-    room_t(float size)
-    {
-        vertex_pnt2_t vertices[36];
-
-        glm::vec2 unit_square[4] = 
-        {
-            glm::vec2(0.0f, 0.0f),
-            glm::vec2(1.0f, 0.0f),
-            glm::vec2(1.0f, 1.0f),
-            glm::vec2(0.0f, 1.0f)
-        };
-
-        int index = 0;
-        int vindex = 0;
-
-        for(int i = 0; i < 6; ++i)
-        {
-            int A = plato::cube::faces[vindex++];
-            int B = plato::cube::faces[vindex++];
-            int C = plato::cube::faces[vindex++];
-            int D = plato::cube::faces[vindex++];
-            glm::vec3 normal = -plato::cube::normals[i];
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[B], normal, unit_square[1]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[D], normal, unit_square[3]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
-        }
-
-        glGenVertexArrays(1, &vao_id);
-        glBindVertexArray(vao_id);
-        vbo.init(vertices, 36);
-    }
-
-    void render()
-    {
-        glBindVertexArray(vao_id);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-
-    ~room_t()
-        { glDeleteVertexArrays(1, &vao_id); };
 };
 
 vertex_pf_t torus_func(const glm::vec2& uv)
@@ -202,7 +146,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     torus_t torus;
     adjacency_vao_t torus_adjacency;
-    torus.generate_vao<vertex_pf_t>(torus_func, 7, 7, &torus_adjacency);
+    torus.generate_vao<vertex_pf_t>(torus_func, 27, 41, &torus_adjacency);
 
     //===================================================================================================================================================================================================================
     // generate icosahedron with adjacency index buffer
@@ -228,8 +172,9 @@ int main(int argc, char *argv[])
     polyhedron icosahedron;
     icosahedron.regular_pnt2_vao(12, 20, plato::icosahedron::vertices, plato::icosahedron::normals, plato::icosahedron::faces);
 
-    const float cube_size = 23.33;
-    room_t granite_room(cube_size);    
+    const float cube_size = 40.0;
+    polyhedron granite_room;
+    granite_room.regular_pnt2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
 
     GLuint cube_texture_id        = image::png::texture2d("../../../resources/tex2d/marble.png");
     GLuint icosahedron_texture_id = image::png::texture2d("../../../resources/plato_tex2d/icosahedron.png");
@@ -241,7 +186,7 @@ int main(int argc, char *argv[])
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    const float light_radius = 12.5f;
+    const float light_radius = 14.5f;
     glm::vec3 light_ws = glm::vec3(light_radius, 0.0f, 0.0f);
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex(-1);
@@ -257,14 +202,16 @@ int main(int argc, char *argv[])
 
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
-        if (!window.static_light) 
+
+        float time = window.frame_ts;
+
+        if (window.dynamic_light) 
         {
-            double time = window.frame_ts;
-            double dt = time - window.light_ts;
-            double cs = glm::cos(0.25f * dt); 
-            double sn = glm::sin(0.25f * dt);
-            light_ws = glm::vec3(light_ws.x * cs - light_ws.y * sn, light_ws.x * sn + light_ws.y * cs, 0.0f);
-            window.light_ts = time;
+            float cs0 = glm::cos(0.251f * time); 
+            float sn0 = glm::sin(0.251f * time);
+            float cs1 = glm::cos(0.317f * time); 
+            float sn1 = glm::sin(0.317f * time);
+            light_ws = light_radius * glm::vec3(cs0 * cs1, cs0 * sn1, sn0);
         }
         
         //===============================================================================================================================================================================================================

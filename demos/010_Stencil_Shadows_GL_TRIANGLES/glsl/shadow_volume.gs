@@ -3,88 +3,74 @@
 layout (triangles) in;
 layout (triangle_strip, max_vertices = 8) out;
 
-in vec3 position_ws[];
-in vec3 normal_ws[];
 in float dp[];
 in vec4 vl[];
 in vec4 vi[];
 
-uniform vec3 light_ws;
-uniform mat4 projection_view_matrix;
-
-const float bias = 0.0001425f;
-
-//==============================================================================================================================================================
-// dp[i0] < 0, dp[i1] < 0, dp[i2] >= 0, (i0, i1, i2) is the right triple
-//==============================================================================================================================================================
-void Emit8(int i0, int i1, int i2)              
+vec4 interpolate_l(int i, int j)
 {
-    vec3 v02   = (dp[i2] * position_ws[i0] - dp[i0] * position_ws[i2]) / (dp[i2] - dp[i0]);
-    vec3 v12   = (dp[i2] * position_ws[i1] - dp[i1] * position_ws[i2]) / (dp[i2] - dp[i1]);
-    vec3 l02  = normalize(v02 - light_ws);
-    vec3 l12  = normalize(v12 - light_ws);
-    vec4 v02l = projection_view_matrix * vec4(v02 + bias * l02, 1.0f);
-    vec4 v12l = projection_view_matrix * vec4(v12 + bias * l12, 1.0f);
-    vec4 v02i = projection_view_matrix * vec4(l02, 0.0f);              
-    vec4 v12i = projection_view_matrix * vec4(l12, 0.0f);              
-
-    gl_Position = vl[i0]; EmitVertex();
-    gl_Position = vl[i1]; EmitVertex();
-    gl_Position = v02l;   EmitVertex();
-    gl_Position = v12l;   EmitVertex();
-    gl_Position = v02i;   EmitVertex();
-    gl_Position = v12i;   EmitVertex();
-    gl_Position = vi[i0]; EmitVertex();
-    gl_Position = vi[i1]; EmitVertex();
+    return (vl[i] * dp[j] - vl[j] * dp[i]) / (dp[j] - dp[i]);
 }
 
-//==============================================================================================================================================================
-// dp[i0] < 0, dp[i1] >= 0, dp[i2] >= 0, (i0, i1, i2) is the right triple
-//==============================================================================================================================================================
-void Emit6(int i0, int i1, int i2)
+vec4 interpolate_i(int i, int j)
 {
-    vec3 v01  = (dp[i1] * position_ws[i0] - dp[i0] * position_ws[i1]) / (dp[i1] - dp[i0]);
-    vec3 v02  = (dp[i2] * position_ws[i0] - dp[i0] * position_ws[i2]) / (dp[i2] - dp[i0]);
-    vec3 l01  = normalize(v01 - light_ws);
-    vec3 l02  = normalize(v02 - light_ws);
-    vec4 v01l = projection_view_matrix * vec4(v01 + bias * l01, 1.0f);         
-    vec4 v02l = projection_view_matrix * vec4(v02 + bias * l02, 1.0f);         
-    vec4 v01i = projection_view_matrix * vec4(l01, 0.0f);                       
-    vec4 v02i = projection_view_matrix * vec4(l02, 0.0f);                       
-        
-    gl_Position = vl[i0]; EmitVertex();
-    gl_Position = v01l;   EmitVertex();
-    gl_Position = v02l;   EmitVertex();
-    gl_Position = v01i;   EmitVertex();
-    gl_Position = v02i;   EmitVertex();
-    gl_Position = vi[i0]; EmitVertex();
+    return (vi[i] * dp[j] - vi[j] * dp[i]) / (dp[j] - dp[i]);
+}
+
+
+// {i, j, k} is a right triple : i is lit, j and k are in shadow
+void emit6(int i, int j, int k)
+{
+    gl_Position = vl[i];               EmitVertex();
+    gl_Position = interpolate_l(j, i); EmitVertex();
+    gl_Position = interpolate_l(k, i); EmitVertex();
+    gl_Position = interpolate_i(j, i); EmitVertex();
+    gl_Position = interpolate_i(k, i); EmitVertex();
+    gl_Position = vi[i];               EmitVertex();
+    EndPrimitive();
+}
+
+// {i, j, k} is a right triple : i and j are lit, k is in shadow
+void emit8(int i, int j, int k)
+{
+    gl_Position = vl[i];               EmitVertex();
+    gl_Position = vl[j];               EmitVertex();
+    gl_Position = interpolate_l(k, i); EmitVertex();
+    gl_Position = interpolate_l(k, j); EmitVertex();
+    gl_Position = interpolate_i(k, i); EmitVertex();
+    gl_Position = interpolate_i(k, j); EmitVertex();
+    gl_Position = vi[i];               EmitVertex();
+    gl_Position = vi[j];               EmitVertex();
+    EndPrimitive();
 }
 
 void main()
 {
-    if (dp[0] < 0.0f)                // - means the vertex is lit, + means the vertex is in shadow                    
+    if (dp[0] < 0.0f)                       // dp < 0 ~ the vertex is lit, dp >= 0 ~ the vertex is in shadow                    
     {
         if (dp[1] < 0.0f)                
         {
-            if (dp[2] < 0.0f)        // A-, B-, C-             
+            if (dp[2] < 0.0f)               // 0-, 1-, 2-             
             {
                 gl_Position = vl[0]; EmitVertex();
                 gl_Position = vl[1]; EmitVertex();
                 gl_Position = vl[2]; EmitVertex();
                 EndPrimitive();
+
+                gl_Position = vi[0]; EmitVertex();
                 gl_Position = vi[2]; EmitVertex();
                 gl_Position = vi[1]; EmitVertex();
-                gl_Position = vi[0]; EmitVertex();
+                EndPrimitive();
             }
-            else                     // A-, B-, C+
-                Emit8(0, 1, 2);
+            else                            // 0-, 1-, 2+
+                emit8(0, 1, 2);
         }
         else
         {
-            if (dp[2] < 0.0f)        // C-, A-, B+,            
-                Emit8(2, 0, 1);
-            else                     // A-, B+, C+
-                Emit6(0, 1, 2);
+            if (dp[2] < 0.0f)               // 2-, 0-, 1+,            
+                emit8(2, 0, 1);
+            else                            // 0-, 1+, 2+
+                emit6(0, 1, 2);
         }
             
     }
@@ -92,16 +78,16 @@ void main()
     {
         if (dp[1] < 0.0f)                
         {
-            if (dp[2] < 0.0f)        // B-, C-, A+
-                Emit8(1, 2, 0);           
-            else                    // B-, C+, A+
-                Emit6(1, 2, 0);
+            if (dp[2] < 0.0f)               // 1-, 2-, 0+           
+                emit8(1, 2, 0);
+            else                            // 1-, 2+, 0+
+                emit6(1, 2, 0);
         }
         else
         {
-            if (dp[2] < 0.0f)        // C-, A+, B+
-                Emit6(2, 0, 1);            
-            else                    // A+, B+, C+
+            if (dp[2] < 0.0f)               // 2-, 0+, 1+
+                emit6(2, 0, 1);
+            else                            // 0+, 1+, 2+
                 return;
         }
     }

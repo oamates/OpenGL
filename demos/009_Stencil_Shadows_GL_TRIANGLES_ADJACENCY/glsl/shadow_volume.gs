@@ -22,7 +22,7 @@ void main()
     vec3 normal = cross(e02, e24);
 
     // handle only light facing triangles
-    if (dot(position_ws[0] + position_ws[2] + position_ws[4] - 3.0 * light_ws, normal) > 0) return;                                
+    if (dot(position_ws[0] - light_ws, normal) > 0) return;                                
 
 
     vec3 l0 = normalize(position_ws[0] - light_ws);                 // from light to A

@@ -25,9 +25,7 @@
 #include "polyhedron.hpp"
 #include "vao.hpp"
 #include "torus.hpp"
-
-#include "edge.hpp"
-
+#include "adjacency.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
@@ -62,56 +60,6 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
-};
-
-struct room_t
-{
-    GLuint vao_id;    
-    vbo_t vbo;
-
-    room_t(float size)
-    {
-        vertex_pnt2_t vertices[36];
-
-        glm::vec2 unit_square[4] = 
-        {
-            glm::vec2(0.0f, 0.0f),
-            glm::vec2(1.0f, 0.0f),
-            glm::vec2(1.0f, 1.0f),
-            glm::vec2(0.0f, 1.0f)
-        };
-
-        int index = 0;
-        int vindex = 0;
-
-        for(int i = 0; i < 6; ++i)
-        {
-            int A = plato::cube::faces[vindex++];
-            int B = plato::cube::faces[vindex++];
-            int C = plato::cube::faces[vindex++];
-            int D = plato::cube::faces[vindex++];
-            glm::vec3 normal = -plato::cube::normals[i];
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[B], normal, unit_square[1]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[A], normal, unit_square[0]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[D], normal, unit_square[3]);
-            vertices[index++] = vertex_pnt2_t(size * plato::cube::vertices[C], normal, unit_square[2]);
-        }
-
-        glGenVertexArrays(1, &vao_id);
-        glBindVertexArray(vao_id);
-        vbo.init(vertices, 36);
-    }
-
-    void render()
-    {
-        glBindVertexArray(vao_id);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-    }
-
-    ~room_t()
-        { glDeleteVertexArrays(1, &vao_id); };
 };
 
 vertex_pf_t torus_func(const glm::vec2& uv)
@@ -198,11 +146,11 @@ int main(int argc, char *argv[])
 	// generate torus with adjacency index buffer
 	//===================================================================================================================================================================================================================
     torus_t torus;
-    torus.generate_vao<vertex_pf_t>(torus_func, 17, 27);
+    torus.generate_vao<vertex_pf_t>(torus_func, 27, 41);
 
-
-    const float cube_size = 23.33;
-    room_t granite_room(cube_size);    
+    const float cube_size = 40.0;
+    polyhedron granite_room;
+    granite_room.regular_pnt2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
 
     glActiveTexture(GL_TEXTURE0);
     GLuint cube_texture_id        = image::png::texture2d("../../../resources/tex2d/marble.png");
@@ -221,9 +169,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // main loop
     //===================================================================================================================================================================================================================
-
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
     while(!window.should_close())
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);

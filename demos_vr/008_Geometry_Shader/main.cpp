@@ -30,8 +30,7 @@
 #include "vao.hpp"
 #include "surface.hpp"
 #include "torus.hpp"
-
-#include "edge.hpp"
+#include "adjacency.hpp"
 
 glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 {
