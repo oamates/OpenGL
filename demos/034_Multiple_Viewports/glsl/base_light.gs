@@ -5,7 +5,6 @@ layout (triangle_strip, max_vertices = 3) out;
 
 uniform mat4 projection_matrix;
 uniform mat4 view_matrix[4];
-
 uniform vec3 camera_ws[4];
 uniform vec3 light_ws;
 
@@ -41,5 +40,5 @@ void main()
         vertex_out.texture_coord = vertex_in[i].uv;
         gl_Position = projection_matrix * view_matrix[gl_InvocationID] * vec4(vertex_in[i].position, 1.0f);
         EmitVertex();
-    };
+    }
 }

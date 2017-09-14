@@ -1,7 +1,7 @@
 #version 430 core
 
 layout (triangles_adjacency) in;                                    // six vertices in
-layout (triangle_strip, max_vertices = 36) out;
+layout (triangle_strip, max_vertices = 72) out;
 
 in vec3 position_ws[];
 
@@ -45,26 +45,28 @@ void main()
         v2i[e] = projection_view_matrix[e] * vec4(l2, 0.0f);
         v4i[e] = projection_view_matrix[e] * vec4(l4, 0.0f);
     }
-    
-    for (int vp = 0; vp < ovrEye_Count; ++vp)                       // emit the triangle itself, slightly biased toward infinity from light position
+
+    for (int vp = 0; vp < ovrEye_Count; ++vp)
     {
-        gl_ViewportIndex = vp;
+        
         gl_Position = v0l[vp]; EmitVertex();
         gl_Position = v2l[vp]; EmitVertex();
-        gl_Position = v4l[vp]; EmitVertex();
+        gl_Position = v4l[vp]; gl_ViewportIndex = vp; EmitVertex();
         EndPrimitive();
     }
+
+
 
     normal = cross(e01, e02);                                       // test the triangle adjacent to AB edge
     if ((dot(normal, l0) >= 0))
     {
         for (int vp = 0; vp < ovrEye_Count; ++vp)
         {
-            gl_ViewportIndex = vp;
+            
             gl_Position = v0l[vp]; EmitVertex();
             gl_Position = v0i[vp]; EmitVertex();
             gl_Position = v2l[vp]; EmitVertex();
-            gl_Position = v2i[vp]; EmitVertex();
+            gl_Position = v2i[vp]; gl_ViewportIndex = vp; EmitVertex();
             EndPrimitive();
         }
     }
@@ -74,11 +76,10 @@ void main()
     {
         for (int vp = 0; vp < ovrEye_Count; ++vp)
         {
-            gl_ViewportIndex = vp;
             gl_Position = v2l[vp]; EmitVertex();
             gl_Position = v2i[vp]; EmitVertex();
             gl_Position = v4l[vp]; EmitVertex();
-            gl_Position = v4i[vp]; EmitVertex();
+            gl_Position = v4i[vp]; gl_ViewportIndex = vp; EmitVertex();
             EndPrimitive();
         }
     }
@@ -88,11 +89,11 @@ void main()
     {
         for (int vp = 0; vp < ovrEye_Count; ++vp)
         {
-            gl_ViewportIndex = vp;
+            
             gl_Position = v4l[vp]; EmitVertex();
             gl_Position = v4i[vp]; EmitVertex();
             gl_Position = v0l[vp]; EmitVertex();
-            gl_Position = v0i[vp]; EmitVertex();
+            gl_Position = v0i[vp]; gl_ViewportIndex = vp; EmitVertex();
             EndPrimitive();
         }
     }

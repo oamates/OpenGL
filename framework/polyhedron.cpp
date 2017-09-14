@@ -44,12 +44,14 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
     int Q = (2 * E) / F;
     GLuint vertex_count = 6 * E;
 
+    //===================================================================================================================================================================================================================
     //                   V  F  E  Q
     // tetrahedron   ::  4  4  6  3
     // cube          ::  8  6 12  4
     // octahedron    ::  6  8 12  3
     // dodecahedron  :: 20 12 30  5
     // icosahedron   :: 12 20 30  3 
+    //===================================================================================================================================================================================================================
 
     debug_msg("V = %d. F = %d. Q = %d. vertex_count = %d", V, F, Q, vertex_count);
 
@@ -162,11 +164,9 @@ void polyhedron::regular_pn_vao(int V, int F, const glm::vec3* positions, const 
 {
     int E = V + F - 2;
     int Q = (2 * E) / F;
-    GLuint vertex_count = 6 * E;
-
-    debug_msg("V = %d. F = %d. Q = %d. vertex_count = %d", V, F, Q, vertex_count);
-
+    GLuint vertex_count = 6 * V - 12;
     vertex_pn_t* vertices = (vertex_pn_t*) malloc(vertex_count * sizeof(vertex_pn_t));
+    // debug_msg("V = %d. F = %d. E = %d. Q = %d. vertex_count = %d", V, F, E, Q, vertex_count);
 
     int index = 0, buffer_index = 0;
 
@@ -210,6 +210,4 @@ void polyhedron::instanced_render(GLsizei primcount)
 }
 
 polyhedron::~polyhedron()
-{
-    glDeleteVertexArrays(1, &vao_id);
-}
+    { glDeleteVertexArrays(1, &vao_id); }

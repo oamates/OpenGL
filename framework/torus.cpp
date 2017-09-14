@@ -29,7 +29,7 @@ template<typename vertex_t> void torus_t::generate_vao(typename maps<vertex_t>::
     //===================================================================================================================================================================================================================
     // allocate space for attribute and index buffers
     //===================================================================================================================================================================================================================
-    vertex_t* vertices = (vertex_t*) malloc(V * sizeof(vertex_pft2_t));
+    vertex_t* vertices = (vertex_t*) malloc(V * sizeof(vertex_t));
     GLuint* indices = (GLuint*) malloc(adjacency_vao_ptr ? adj_index_count * sizeof(GLuint) : index_count * sizeof(GLuint));
 
     glm::vec2 uv;
@@ -66,6 +66,8 @@ template<typename vertex_t> void torus_t::generate_vao(typename maps<vertex_t>::
         uv.y += delta_y;
     }
 
+    debug_msg("V = %u", V);
+    debug_msg("vbo_index = %u", vbo_index);
     debug_msg("index_count = %u", index_count);
     debug_msg("ibo_index = %u", ibo_index);
     vao.init(GL_TRIANGLE_STRIP, vertices, V, indices, index_count);
@@ -110,7 +112,8 @@ template<typename vertex_t> void torus_t::generate_vao(typename maps<vertex_t>::
         // assuming the vertex_t has position as its first attribute we use the same attribute buffer
         //===============================================================================================================================================================================================================
         glGenVertexArrays(1, &adjacency_vao_ptr->id);
-        glBindVertexArray(adjacency_vao_ptr->id);    
+        glBindVertexArray(adjacency_vao_ptr->id);
+        glBindBuffer(GL_ARRAY_BUFFER, vao.vbo.id);
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_t), 0);
 
@@ -148,6 +151,17 @@ template<typename vertex_t> void torus_t::generate_vao(typename maps<vertex_t>::
         }
         debug_msg("ibo_index = %d", ibo_index);
         debug_msg("adj_index_count = %d", adj_index_count);
+                printf("\n");
+                printf("\n");
+        for (int i = 0; i < adj_index_count; ++i)
+        {
+            GLuint idx = indices[i];
+            printf("%d, ", idx);
+            if (idx == -1)
+                printf("\n");
+        }
+                printf("\n");
+                printf("\n");
         adjacency_vao_ptr->ibo.init(GL_TRIANGLE_STRIP_ADJACENCY, indices, adj_index_count);
     }
     

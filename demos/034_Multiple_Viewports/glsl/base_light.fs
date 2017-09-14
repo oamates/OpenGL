@@ -1,7 +1,7 @@
 #version 410 core
 
-layout (binding = 0) uniform sampler2D diffuse_texture;
-layout (binding = 1) uniform sampler2D normal_texture;
+uniform sampler2D diffuse_tex;
+uniform sampler2D normal_tex;
 
 in GS_FS_VERTEX
 {
@@ -13,7 +13,7 @@ in GS_FS_VERTEX
     vec2 texture_coord;
 } vertex_in;
 
-layout (location = 0) out vec4 FragmentColor;
+out vec4 FragmentColor;
 
 void main()
 {
@@ -21,7 +21,7 @@ void main()
 	float light_distance = length(vertex_in.light_direction);
 	vec3 l = vertex_in.light_direction / light_distance; 										
 
-	vec3 components = texture2D(normal_texture, vertex_in.texture_coord).xyz - vec3(0.5f, 0.5f, 0.0f);
+	vec3 components = texture(normal_tex, vertex_in.texture_coord).xyz - vec3(0.5f, 0.5f, 0.0f);
 
 	vec3 n = normalize(components.x * vertex_in.tangent_x_direction
 	                 + components.y * vertex_in.tangent_y_direction
@@ -35,7 +35,7 @@ void main()
 	float cos_alpha = 0.0f;
 	if (dp > 0.0f) cos_alpha = clamp(dot(e, r), 0.0f, 1.0f);														
 
-    vec4 material_diffuse_color = texture2D(diffuse_texture, vertex_in.texture_coord);
+    vec4 material_diffuse_color = texture(diffuse_tex, vertex_in.texture_coord);
 	vec4 material_ambient_color = 0.1 * material_diffuse_color;
 	vec4 material_specular_color = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 

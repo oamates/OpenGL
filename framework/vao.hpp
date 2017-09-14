@@ -319,9 +319,6 @@ struct vao_t
 
     void render()
     {
-        printf("vao::render:: id = %u, ibo_id = %u, ibo_type = %u, ibo_mode = %u, ibo_size = %u, ibo_pri = %u\n", 
-            id, ibo.id, ibo.type, ibo.mode, ibo.size, ibo.pri); 
-        fflush(stdout);
         bind();
         ibo.render();
     }

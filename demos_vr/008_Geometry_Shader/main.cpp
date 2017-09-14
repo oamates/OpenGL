@@ -517,8 +517,8 @@ vertex_pn_t torus_func(const glm::vec2& uv)
     float cos_2piv = glm::cos(constants::two_pi * uv.y);
     float sin_2piv = glm::sin(constants::two_pi * uv.y);
 
-    float R = 2.7f;
-    float r = 0.97f;
+    float R = 1.17f;
+    float r = 0.37f;
 
     vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv, 2.1f + (R + r * cos_2piu) * sin_2piv, 3.0f + r * sin_2piu);
     vertex.normal = glm::vec3(cos_2piu * cos_2piv, cos_2piu * sin_2piv, sin_2piu);
@@ -627,9 +627,19 @@ int main(int argc, char** argv)
     torus.generate_vao<vertex_pn_t>(torus_func, 37, 67, &torus_adjacency);
 
     glEnable(GL_PRIMITIVE_RESTART);
-    debug_msg("torus.vao.ibo.pri = %u", torus.vao.ibo.pri);
-    debug_msg("torus_adjacency.ibo.pri = %u", torus_adjacency.ibo.pri);
     glPrimitiveRestartIndex(torus.vao.ibo.pri);
+
+    GLint pv;
+    glGetIntegerv(GL_LAYER_PROVOKING_VERTEX, &pv);
+    debug_msg("GL_LAYER_PROVOKING_VERTEX = %u", pv);
+    glGetIntegerv(GL_PROVOKING_VERTEX, &pv);
+    debug_msg("GL_PROVOKING_VERTEX = %u", pv);
+    glGetIntegerv(GL_VIEWPORT_INDEX_PROVOKING_VERTEX, &pv);
+    debug_msg("GL_VIEWPORT_INDEX_PROVOKING_VERTEX = %u", pv);
+
+    debug_msg("GL_FIRST_VERTEX_CONVENTION = %u", GL_FIRST_VERTEX_CONVENTION);
+    debug_msg("GL_LAST_VERTEX_CONVENTION = %u", GL_LAST_VERTEX_CONVENTION);
+    debug_msg("GL_UNDEFINED_VERTEX = %u", GL_UNDEFINED_VERTEX);
 
     //===================================================================================================================================================================================================================
     // ... and 5 plato solids with their adjacency index buffer
@@ -651,13 +661,13 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // load different material textures for trilinear blending
     //===================================================================================================================================================================================================================
-    GLuint clay_tex_id        = image::png::texture2d("../../../resources/tex2d/clay.png");
-    GLuint crystalline_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png");
-    GLuint marble_tex_id      = image::png::texture2d("../../../resources/tex2d/marble.png");
-    GLuint ice_tex_id         = image::png::texture2d("../../../resources/tex2d/ice2.png");
-    GLuint pink_stone_tex_id  = image::png::texture2d("../../../resources/tex2d/pink_stone.png");
-    GLuint plumbum_tex_id     = image::png::texture2d("../../../resources/tex2d/plumbum.png");
-    GLuint emerald_tex_id     = image::png::texture2d("../../../resources/tex2d/emerald.png");
+    GLuint clay_tex_id        = image::png::texture2d("../../../resources/tex2d/clay.png",        0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint crystalline_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint marble_tex_id      = image::png::texture2d("../../../resources/tex2d/marble.png",      0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint ice_tex_id         = image::png::texture2d("../../../resources/tex2d/ice2.png",        0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint pink_stone_tex_id  = image::png::texture2d("../../../resources/tex2d/pink_stone.png",  0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint plumbum_tex_id     = image::png::texture2d("../../../resources/tex2d/plumbum.png",     0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint emerald_tex_id     = image::png::texture2d("../../../resources/tex2d/emerald.png",     0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // global OpenGL state
@@ -780,7 +790,6 @@ int main(int argc, char** argv)
 
         uni_sv_shift = glm::vec3(0.0, 0.0,  shift);
         tetrahedron_adjacency.render();
-
         uni_sv_shift = glm::vec3(0.0, 0.0, -shift);
         cube_adjacency.render();
 
@@ -793,8 +802,8 @@ int main(int argc, char** argv)
         uni_sv_shift = glm::vec3( shift, 0.0, 0.0);
         icosahedron_adjacency.render(); 
 
-        /* uni_sv_shift = glm::vec3(-shift, 0.0, 0.0);
-        torus_adjacency.render(); */
+        uni_sv_shift = glm::vec3(-shift, 0.0, 0.0);
+//        torus_adjacency.render();
 
         //===============================================================================================================================================================================================================
         // render light diffuse and specular components into lit areas where stencil value is zero

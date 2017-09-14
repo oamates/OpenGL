@@ -192,6 +192,8 @@ template<typename index_t> ibo_t build_adjacency_ibo(const glm::tvec3<index_t>* 
             break;                                                                                                                                                                                                    
         }                                                                                                                                                                                                             
     }
+    
+    
     free(edges);
     ibo_t::unmap();
     return ibo; 

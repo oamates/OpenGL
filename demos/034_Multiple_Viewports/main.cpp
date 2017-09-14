@@ -18,7 +18,8 @@
 #include "shader.hpp"
 #include "vao.hpp"
 #include "vertex.hpp"
-#include "surface.hpp"
+#include "torus.hpp"
+#include "plato.hpp"
 #include "image.hpp"
 
 struct demo_window_t : public glfw_window_t
@@ -52,25 +53,26 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-glm::vec3 torus_func(const glm::vec2& uv)
+vertex_pft2_t torus_func(const glm::vec2& uv)
 {
     vertex_pft2_t vertex;
-    vertex.uv = uv;
 
-    float cos_2piu = glm::cos(constants::two_pi * uv.y + constants::pi);
-    float sin_2piu = glm::sin(constants::two_pi * uv.y + constants::pi);
+    float cos_2piu = glm::cos(constants::two_pi * uv.y);
+    float sin_2piu = glm::sin(constants::two_pi * uv.y);
     float cos_2piv = glm::cos(constants::two_pi * uv.x);
     float sin_2piv = glm::sin(constants::two_pi * uv.x);
 
-    float R = 0.7f;
-    float r = 0.3f;
+    float R = 2.7f;
+    float r = 0.97f;
 
-    glm::vec3 position = 100.0f * glm::vec3(
-                        (R + r * cos_2piu) * cos_2piv,
-                        (R + r * cos_2piu) * sin_2piv,
-                             r * sin_2piu);
+    vertex.position = glm::vec3((R + r * cos_2piu) * cos_2piv, (R + r * cos_2piu) * sin_2piv, r * sin_2piu);
 
-    return position;
+    vertex.tangent_x = glm::vec3(-sin_2piu * cos_2piv, -sin_2piu * sin_2piv, cos_2piu);
+    vertex.tangent_y = glm::vec3(-sin_2piv, cos_2piv, 0.0f);
+    vertex.normal = glm::vec3(cos_2piu * cos_2piv, cos_2piu * sin_2piv, sin_2piu);
+    vertex.uv = uv;
+
+    return vertex;
 }
 
 //=======================================================================================================================================================================================================================
@@ -96,16 +98,21 @@ int main(int argc, char *argv[])
                               glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/base_light.gs"),
                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/base_light.fs"));
 
-    uniform_t uniform_view_matrix       = base_light["view_matrix"];
+    base_light.enable();
     uniform_t uniform_projection_matrix = base_light["projection_matrix"];
+    uniform_t uniform_view_matrix       = base_light["view_matrix"];
     uniform_t uniform_camera_ws         = base_light["camera_ws"];
     uniform_t uniform_light_ws          = base_light["light_ws"];
+
+    base_light["diffuse_tex"] = 0;
+    base_light["normal_tex"] = 1;
+
 
     //===================================================================================================================================================================================================================
     // generate random texture
     //===================================================================================================================================================================================================================
-    surface_t torus1;
-    torus1.generate_pft2_vao(torus_func, 100, 100);
+    torus_t torus;
+    torus.generate_vao<vertex_pft2_t>(torus_func, 37, 67);
 
     glActiveTexture(GL_TEXTURE0);
     GLuint torus_diffuse_texture_id = image::png::texture2d("../../../resources/tex2d/torus.png");
@@ -120,7 +127,7 @@ int main(int argc, char *argv[])
     // * 4 different Viewports each having different view matrix
     //===================================================================================================================================================================================================================
     glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
+    glPrimitiveRestartIndex(0xFFFFFFFF);
     glClearColor(0.01f, 0.00f, 0.05f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -133,9 +140,31 @@ int main(int argc, char *argv[])
     glViewportIndexedf(2,   0.0f, half_y, half_x, half_y);
     glViewportIndexedf(3, half_x, half_y, half_x, half_y);
 
-    base_light.enable();
     uniform_projection_matrix = window.camera.projection_matrix;
-    const float light_radius = 70.0;
+    const float light_radius = 3.0;
+
+    glm::mat4 vm[4] = {
+        glm::lookAt(
+            glm::vec3(0.0f),
+            plato::tetrahedron::vertices[0],
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        ),
+        glm::lookAt(
+            glm::vec3(0.0f),
+            plato::tetrahedron::vertices[1],
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        ),
+        glm::lookAt(
+            glm::vec3(0.0f),
+            plato::tetrahedron::vertices[2],
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        ),
+        glm::lookAt(
+            glm::vec3(0.0f),
+            plato::tetrahedron::vertices[3],
+            glm::vec3(0.0f, 1.0f, 0.0f)
+        )        
+    };
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -146,20 +175,27 @@ int main(int argc, char *argv[])
         window.new_frame();
 
         float time = window.frame_ts;
-        glm::vec4 light_ws = glm::vec4(0.0f, light_radius * cos(0.5f * time), light_radius * sin(0.5f * time), 1.0f);
+        glm::vec3 light_ws = glm::vec3(0.0f, light_radius * cos(0.5f * time), light_radius * sin(0.5f * time));
 
-        glm::mat4 view_matrices[4] = {window.camera.view_matrix, 
-                                      window.camera.view_matrix, 
-                                      window.camera.view_matrix, 
-                                      window.camera.view_matrix};
-        glm::vec3 camera_ws = window.camera.position();
-        glm::vec3 camera_wss[4] = {camera_ws, camera_ws, camera_ws, camera_ws};
+        glm::mat4 view_matrix[4] = {
+            window.camera.view_matrix, //* vm[0], 
+            window.camera.view_matrix, //* vm[1], 
+            window.camera.view_matrix, //* vm[2], 
+            window.camera.view_matrix  //* vm[3]
+        };
 
-        glUniformMatrix4fv(uniform_view_matrix, 4, GL_FALSE, glm::value_ptr(view_matrices[0]));
-        glUniform3fv(uniform_camera_ws, 4, glm::value_ptr(camera_wss[0]));
+        glm::vec3 camera_ws[4] = {
+            -glm::inverse(glm::mat3(view_matrix[0])) * glm::vec3(view_matrix[0][3]),
+            -glm::inverse(glm::mat3(view_matrix[1])) * glm::vec3(view_matrix[1][3]),
+            -glm::inverse(glm::mat3(view_matrix[2])) * glm::vec3(view_matrix[2][3]),
+            -glm::inverse(glm::mat3(view_matrix[3])) * glm::vec3(view_matrix[3][3])
+        };
+
+        uniform_view_matrix = view_matrix;
+        uniform_camera_ws = camera_ws;
         uniform_light_ws = light_ws;
 
-        torus1.render();
+        torus.render();
 
         window.end_frame();
     }
