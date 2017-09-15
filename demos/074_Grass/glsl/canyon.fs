@@ -4,13 +4,13 @@ in vec2 uv;
 in vec3 view_cs;
 in vec3 view_ws;
 
-uniform float time;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
 uniform float z_near;
+uniform float time;
 
-uniform sampler2D noise_tex;
 uniform sampler2D stone_tex;
+uniform sampler2D grass_tex;
 
 out vec4 FragmentColor;
 
@@ -21,30 +21,11 @@ const vec3 rgb_power = vec3(0.299, 0.587, 0.114);
 //==============================================================================================================================================================
 // 3D value noise function
 //==============================================================================================================================================================
-#define TEXEL_SIZE 1.0 / 256.0
-#define HALF_TEXEL 1.0 / 512.0
-
 float hermite5(float x)
     { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
 
 vec3 hermite5(vec3 x)
     { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
-
-float hermite5(float a, float b, float x)
-{
-    float y = clamp((x - a) / (b - a), 0.0, 1.0);
-    return y * y * y * (10.0 + y * (6.0 * y - 15.0));
-}
-
-float vnoise(vec3 x)
-{
-    vec3 p = floor(x);
-    vec3 f = x - p;
-    f = hermite5(f);
-    vec2 uv = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
-    vec2 rg = texture(noise_tex, TEXEL_SIZE * uv + HALF_TEXEL).rg;
-    return mix(rg.g, rg.r, f.z);
-}
 
 //==============================================================================================================================================================
 // nvidia trilinear-blend texture
@@ -78,6 +59,13 @@ float sdf(vec3 p)
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
     return min(ground, canyon);
+}
+
+float ground_sdf(vec3 p)
+{    
+    vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
+    float ground = p.z + 3.5 + dot(op, vec3(0.067));
+    return ground;
 }
 
 //==============================================================================================================================================================
@@ -207,7 +195,7 @@ float soft_shadow_factor(in vec3 p, in vec3 n, in vec3 l, in float d)
         t = t - clamp(0.0f, 0.7f, h);
     }
 
-    return hermite5(dp) * f / (f + 0.125f);
+    return 0.5 + 0.5 * hermite5(dp) * f / (f + 0.125f);
 }
 
 //==============================================================================================================================================================
@@ -234,15 +222,22 @@ void main()
     vec3 l = light_ws - p;                                                          // light direction :: from fragment to light source
     float d = length(l);                                                            // distance from fragment to light
     l /= d;                                                                         // normalized light direction
-    float sf = soft_shadow_factor(p, b, l, d);                                      // calculate shadow factor
+    float sf = 0.9; // soft_shadow_factor(p, b, l, d);                                      // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // calculate ambient occlusion factor
     float atten = 1.0 / (1.0 + d * 0.007);                                          // light attenuation, based on the light distance
     float diffuse = max(dot(b, l), 0.0);                                            // diffuse lighting factor
     float specular = pow(max(dot(reflect(-l, b), -v), 0.0), 32.0);                  // specular lighting factor
     float fresnel = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 1.0);                     // Fresnel term for reflective glow
-    float ambience = (0.35 * ao + fresnel * fresnel * 0.25);                          // ambient light factor, based on occlusion and fresnel factors
+    float ambience = (0.35 * ao + fresnel * fresnel * 0.25);                        // ambient light factor, based on occlusion and fresnel factors
     vec3 texCol = tex3D(p, n);                                                      // trilinear blended color from input texture
+
+    //==========================================================================================================================================================
+    // white frost
+    //==========================================================================================================================================================
+    vec3 grass_color = texture(grass_tex, p.xy).rgb;
+    float gamma = exp(-20.0 * abs(ground_sdf(p)));
+    texCol = mix(texCol, grass_color, gamma);
 
     //==========================================================================================================================================================
     // white frost
@@ -271,10 +266,11 @@ void main()
     // the location of the fragment in camera space is t * normalize(view_cs);
     // the projective value of fragment depth is thus 
     // z_proj = 1.0 + 2 * z_near / z_aff
+    // the value in z-buffer is 0.5 + 0.5 * z_proj = 1.0 + z_near / z_aff
     //==========================================================================================================================================================
     vec3 position_cs = t * normalize(view_cs);
     float z_aff = position_cs.z;
-    gl_FragDepth = 1.0 + 2 * z_near / z_aff;   
+    gl_FragDepth = 1.0 + z_near / z_aff;   
 
     FragmentColor = vec4(pow(clamp(sceneCol, 0.0f, 1.0f), vec3(0.66f)), 1.0f);
 }

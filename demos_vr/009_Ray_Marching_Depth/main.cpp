@@ -23,7 +23,10 @@
 #include "glfw_window.hpp"
 #include "camera.hpp"
 #include "image.hpp"
-#include "glsl_noise.hpp"
+#include "polyhedron.hpp"
+#include "plato.hpp"
+
+const float z_near = 0.5f;
 
 glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 {
@@ -269,8 +272,9 @@ int main(int argc, char** argv)
     uniform_t uni_rm_focal_scale = ray_marcher["focal_scale"];
     uniform_t uni_rm_focal_shift = ray_marcher["focal_shift"];
 
-    ray_marcher["noise_tex"] = 1;
-    ray_marcher["stone_tex"] = 2;
+    ray_marcher["stone_tex"] = 0;
+    ray_marcher["grass_tex"] = 1;
+    ray_marcher["z_near"] = z_near;
 
     glm::vec2 focal_scale[ovrEye_Count] = 
     {
@@ -285,14 +289,6 @@ int main(int argc, char** argv)
     };
 
     //===================================================================================================================================================================================================================
-    // Load noise textures - for very fast 2d noise calculation
-    //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE1);
-    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
-    glActiveTexture(GL_TEXTURE2);
-    GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-
-    //===================================================================================================================================================================================================================
     // phong lighting model shader initialization : for room rendering
     //===================================================================================================================================================================================================================
     glsl_program_t phong_light(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_light.vs"),
@@ -302,14 +298,39 @@ int main(int argc, char** argv)
     uniform_t uni_pl_pv_matrix = phong_light["projection_view_matrix"];
     uniform_t uni_pl_light_ws  = phong_light["light_ws"];
     uniform_t uni_pl_camera_ws = phong_light["camera_ws"];
+    phong_light["diffuse_tex"] = 2;
+    phong_light["normal_tex"] = 3;
+    phong_light["shift"] = glm::vec3(0.0f, 0.0f, 2.75f);
 
-    phong_light["diffuse_tex"] = 3;
-    phong_light["normal_tex"] = 4;
+    //===================================================================================================================================================================================================================
+    // grass generating shader
+    //===================================================================================================================================================================================================================
+    glsl_program_t grass_generator(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/grass_gen.vs"),
+                                   glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/grass_gen.gs"),
+                                   glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/grass_gen.fs"));
 
-    glActiveTexture(GL_TEXTURE3);
+    grass_generator.enable();
+    uniform_t uni_gg_pv_matrix = grass_generator["projection_view_matrix"];
+    uniform_t uni_gg_light_ws  = grass_generator["light_ws"];
+    uniform_t uni_gg_camera_ws = grass_generator["camera_ws"];
+    uniform_t uni_gg_origin    = grass_generator["origin"];
+
+    const float inv_grass_scale = 32.0f;
+    grass_generator["grass_scale"] = 1.0f / inv_grass_scale;
+
+    //===================================================================================================================================================================================================================
+    // load textures
+    //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
+    GLuint stone_tex_id = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+    glActiveTexture(GL_TEXTURE1);
+    GLuint grass_tex_id = image::png::texture2d("../../../resources/tex2d/ground_grass.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+    glActiveTexture(GL_TEXTURE2);
     GLuint room_diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png");
 
-    glActiveTexture(GL_TEXTURE4);
+    glActiveTexture(GL_TEXTURE3);
     GLuint room_normal_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone_bump.png");
 
     //===================================================================================================================================================================================================================
@@ -328,6 +349,12 @@ int main(int argc, char** argv)
         move(light_ws, light_velocity, 0.125f);
         p = potential(light_ws);
     }
+
+    const float cube_size = 2.75;
+    polyhedron cube;
+    cube.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size);
+
+    glEnable(GL_DEPTH_TEST);
 
     //===================================================================================================================================================================================================================
     // main rendering loop
@@ -362,76 +389,62 @@ int main(int argc, char** argv)
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ovr_hmd.swapchain_texture_id(), 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        //===============================================================================================================================================================================================================
-        // render raymarch scene
-        //===============================================================================================================================================================================================================
-        glBindVertexArray(vao_id);
-        ray_marcher.enable();
-        uni_time = time;
-        uni_light_ws = light_ws;
-        glEnable(GL_DEPTH_TEST);
-
         for (ovrEyeType eye = ovrEyeType::ovrEye_Left; eye < ovrEyeType::ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
         {
             ovr_hmd.set_viewport(eye);            
 
-            //===========================================================================================================================================================================================================
-            // render raymarch scene
-            //===========================================================================================================================================================================================================
-            ray_marcher.enable();
+
+            glm::mat4 projection_matrix = ovr_hmd.projection_matrix[eye];
+            glm::mat4 view_matrix = window.camera.eye_view_matrix[eye];
+            glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
             glm::mat4 cmatrix4x4 = glm::inverse(window.camera.eye_view_matrix[eye]);
             glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
             glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
 
-            uni_camera_matrix = camera_matrix;
-            uni_camera_ws = camera_ws;
-            uni_focal_scale = focal_scale[eye];
-            uni_focal_shift = focal_shift[eye];
-
+            //===========================================================================================================================================================================================================
+            // render raymarch scene
+            //===========================================================================================================================================================================================================
             glDepthFunc(GL_ALWAYS);
+            ray_marcher.enable();
 
+            uni_rm_camera_matrix = camera_matrix;
+            uni_rm_light_ws = light_ws;
+            uni_rm_camera_ws = camera_ws;
+            uni_rm_focal_scale = focal_scale[eye];
+            uni_rm_focal_shift = focal_shift[eye];
+            uni_rm_time = time;
+
+            glBindVertexArray(vao_id);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    
-
-        uniform_time = time;
-        uniform_camera_matrix = camera_matrix;
-        uniform_camera_ws = camera_ws;
-        uniform_light_ws = light_ws;
-
-        glBindVertexArray(vao_id);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
             //===========================================================================================================================================================================================================
-            // render augmented objects
+            // render cube
             //===========================================================================================================================================================================================================
-        phong_light.enable();
+            glDepthFunc(GL_LESS);
+            phong_light.enable();
 
-        uni_pv_matrix = window.camera.projection_view_matrix();
-        uni_light_ws  = light_ws;
-        uni_camera_ws = camera_ws;
+            uni_pl_pv_matrix = projection_view_matrix;
+            uni_pl_light_ws  = light_ws;
+            uni_pl_camera_ws = camera_ws;
 
-        cube.render();
+            cube.render();
 
+            //===============================================================================================================================================================================================================
+            // render grass
+            //===============================================================================================================================================================================================================
+            grass_generator.enable();
+            glBindVertexArray(vao_id);
 
+            uni_gg_pv_matrix = projection_view_matrix;
+            uni_gg_light_ws  = light_ws;
+            uni_gg_camera_ws = camera_ws;
 
+            const int half_res = 256;
+            const int full_res = 2 * half_res + 1;
+            uni_gg_origin = glm::ivec2(inv_grass_scale * camera_ws.x, inv_grass_scale * camera_ws.x) - glm::ivec2(half_res);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-       }
+            glDrawArraysInstanced(GL_POINTS, 0, full_res, full_res);
+        }
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
 
@@ -455,9 +468,11 @@ int main(int argc, char** argv)
     //===================================================================================================================================================================================================================
     // destroy GLFW window and terminate the library
     //===================================================================================================================================================================================================================
-    glDeleteTextures(1, &noise_tex);
-    glDeleteTextures(1, &stone_tex);
     glDeleteVertexArrays(1, &vao_id);
+    glDeleteTextures(1, &stone_tex_id);
+    glDeleteTextures(1, &grass_tex_id);
+    glDeleteTextures(1, &room_diffuse_tex_id);
+    glDeleteTextures(1, &room_normal_tex_id);
 
     glfw::terminate();
     return 0;
