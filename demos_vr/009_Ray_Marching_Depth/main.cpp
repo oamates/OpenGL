@@ -262,12 +262,12 @@ int main(int argc, char** argv)
     glsl_program_t ray_marcher(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/ray_marcher.vs"),
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
     ray_marcher.enable();
-    uniform_t uni_camera_matrix = ray_marcher["camera_matrix"];
-    uniform_t uni_camera_ws = ray_marcher["camera_ws"];
-    uniform_t uni_light_ws = ray_marcher["light_ws"];
-    uniform_t uni_time = ray_marcher["time"];
-    uniform_t uni_focal_scale = ray_marcher["focal_scale"];
-    uniform_t uni_focal_shift = ray_marcher["focal_shift"];
+    uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
+    uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
+    uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
+    uniform_t uni_rm_time = ray_marcher["time"];
+    uniform_t uni_rm_focal_scale = ray_marcher["focal_scale"];
+    uniform_t uni_rm_focal_shift = ray_marcher["focal_shift"];
 
     ray_marcher["noise_tex"] = 1;
     ray_marcher["stone_tex"] = 2;
@@ -291,6 +291,26 @@ int main(int argc, char** argv)
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
     glActiveTexture(GL_TEXTURE2);
     GLuint stone_tex = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+    //===================================================================================================================================================================================================================
+    // phong lighting model shader initialization : for room rendering
+    //===================================================================================================================================================================================================================
+    glsl_program_t phong_light(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_light.vs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_light.fs"));
+
+    phong_light.enable();
+    uniform_t uni_pl_pv_matrix = phong_light["projection_view_matrix"];
+    uniform_t uni_pl_light_ws  = phong_light["light_ws"];
+    uniform_t uni_pl_camera_ws = phong_light["camera_ws"];
+
+    phong_light["diffuse_tex"] = 3;
+    phong_light["normal_tex"] = 4;
+
+    glActiveTexture(GL_TEXTURE3);
+    GLuint room_diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png");
+
+    glActiveTexture(GL_TEXTURE4);
+    GLuint room_normal_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone_bump.png");
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
@@ -349,10 +369,16 @@ int main(int argc, char** argv)
         ray_marcher.enable();
         uni_time = time;
         uni_light_ws = light_ws;
+        glEnable(GL_DEPTH_TEST);
 
         for (ovrEyeType eye = ovrEyeType::ovrEye_Left; eye < ovrEyeType::ovrEye_Count; eye = static_cast<ovrEyeType>(eye + 1))
         {
             ovr_hmd.set_viewport(eye);            
+
+            //===========================================================================================================================================================================================================
+            // render raymarch scene
+            //===========================================================================================================================================================================================================
+            ray_marcher.enable();
             glm::mat4 cmatrix4x4 = glm::inverse(window.camera.eye_view_matrix[eye]);
             glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
             glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
@@ -362,8 +388,50 @@ int main(int argc, char** argv)
             uni_focal_scale = focal_scale[eye];
             uni_focal_shift = focal_shift[eye];
 
+            glDepthFunc(GL_ALWAYS);
+
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        }
+    
+
+        uniform_time = time;
+        uniform_camera_matrix = camera_matrix;
+        uniform_camera_ws = camera_ws;
+        uniform_light_ws = light_ws;
+
+        glBindVertexArray(vao_id);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+            //===========================================================================================================================================================================================================
+            // render augmented objects
+            //===========================================================================================================================================================================================================
+        phong_light.enable();
+
+        uni_pv_matrix = window.camera.projection_view_matrix();
+        uni_light_ws  = light_ws;
+        uni_camera_ws = camera_ws;
+
+        cube.render();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       }
 
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
 

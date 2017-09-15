@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 add_definitions(-DUNICODE -D_UNICODE -DMINGW_HAS_SECURE_API -DNOMINMAX)
 
-include_directories( LibOVR/Include LibOVR/Src Logging/include ${CMAKE_SOURCE_DIR} )
+include_directories(LibOVR/Include LibOVR/Src Logging/include ${CMAKE_SOURCE_DIR})
 
 file(GLOB LIBOVR_FILES
     LibOVR/Include/*.h
@@ -33,7 +33,7 @@ endif()
 add_definitions(-DOVR_BUILD_SHIPPING)
 
 # add_definitions(-DOVR_DLL_BUILD) # shared only
-add_library( LibOVR STATIC ${LIBOVR_FILES} )
+add_library(LibOVR STATIC ${LIBOVR_FILES})
 
 if(WIN32)
     target_link_libraries(

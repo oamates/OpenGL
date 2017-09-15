@@ -7,11 +7,16 @@
 #include <glm/glm.hpp>
 
 #include "log.hpp"
+#include "gl_info.hpp"
+#include "glfw_window.hpp"
 #include "constants.hpp"
+
+#include "ovr/ovr_hmd.hpp"
 
 void ovr_hmd_info(const ovrHmdDesc& hmd_desc)
 {
     /* Basic device information */
+
     const char* type_str;
     switch (hmd_desc.Type)
     {
@@ -72,6 +77,7 @@ void ovr_hmd_info(const ovrHmdDesc& hmd_desc)
     debug_msg("\tResolution = %d x %d.", hmd_desc.Resolution.w, hmd_desc.Resolution.h);
     debug_msg("\tRefresh rate = %f cycles per second.", hmd_desc.DisplayRefreshRate);
 }
+
 
 int main(int argc, char** argv)
 {

@@ -105,9 +105,7 @@ endif()
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # LibOVR and Oculus Rift demos
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-message("Path = ${PROJECT_SOURCE_DIR}/OculusVR")
 set(OCULUS_LIBRARIES_PATH "${PROJECT_SOURCE_DIR}/OculusVR")
-
-add_subdirectory ("${OCULUS_LIBRARIES_PATH}")
-include_directories("${OCULUS_LIBRARIES_PATH}/LibOVR/Include")
+add_subdirectory (${OCULUS_LIBRARIES_PATH})
+include_directories(${OCULUS_LIBRARIES_PATH}/LibOVR/Include)
 add_subdirectory (demos_vr)
