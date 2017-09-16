@@ -9,11 +9,8 @@ uniform vec3 camera_ws;
 uniform vec3 light_ws;
 uniform float time;
 uniform float Ns;
+
 out vec4 FragmentColor;
-
-
-
-
 
 
 //==============================================================================================================================================================

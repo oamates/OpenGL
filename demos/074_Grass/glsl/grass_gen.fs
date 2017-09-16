@@ -10,23 +10,18 @@ in vec3 normal;
 
 out vec4 FragmentColor;
 
-vec3 tex3D(vec3 p, vec3 n)
+vec3 grass_tex(vec3 p, vec3 n)
 {
     p += 10.0 * n;
-    n = max(abs(n) - 0.35f, 0.0f);
-    n /= dot(n, vec3(1.0f));
-    vec3 tx = texture(blade_tex, p.zy).xyz;
-    vec3 ty = texture(blade_tex, p.xz).xyz;
-    vec3 tz = texture(blade_tex, p.xy).xyz;
-    vec3 c = tx * tx * n.x + ty * ty * n.y + tz * tz * n.z;
-    return pow(c, vec3(0.56));
+    vec3 txz = texture(blade_tex, p.xz).rgb;
+    return txz;
 }
 
 void main()
 {
     vec3 l = normalize(light_ws - position);
     float q = 0.5f + 0.5f * abs(dot(normal, l));
-    vec3 color = tex3D(position, normal).rgb;
+    vec3 color = grass_tex(position, normal);
     FragmentColor = vec4(q * color, 1.0f);
 }
 
