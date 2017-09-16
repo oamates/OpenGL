@@ -26,7 +26,8 @@
 #include "polyhedron.hpp"
 #include "plato.hpp"
 
-const float z_near = 0.5f;
+const float z_near = 0.5;
+const float inv_grass_scale = 32.0f;
 
 glm::mat4 rotation_matrix(const glm::vec3& axis, float angle)
 {
@@ -315,7 +316,7 @@ int main(int argc, char** argv)
     uniform_t uni_gg_camera_ws = grass_generator["camera_ws"];
     uniform_t uni_gg_origin    = grass_generator["origin"];
 
-    const float inv_grass_scale = 32.0f;
+    grass_generator["blade_tex"] = 4;
     grass_generator["grass_scale"] = 1.0f / inv_grass_scale;
 
     //===================================================================================================================================================================================================================
@@ -332,6 +333,9 @@ int main(int argc, char** argv)
 
     glActiveTexture(GL_TEXTURE3);
     GLuint room_normal_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone_bump.png");
+
+    glActiveTexture(GL_TEXTURE4);
+    GLuint grass_blades_tex_id = image::png::texture2d("../../../resources/tex2d/seamless_grass.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
@@ -393,7 +397,6 @@ int main(int argc, char** argv)
         {
             ovr_hmd.set_viewport(eye);            
 
-
             glm::mat4 projection_matrix = ovr_hmd.projection_matrix[eye];
             glm::mat4 view_matrix = window.camera.eye_view_matrix[eye];
             glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
@@ -439,7 +442,7 @@ int main(int argc, char** argv)
             uni_gg_light_ws  = light_ws;
             uni_gg_camera_ws = camera_ws;
 
-            const int half_res = 256;
+            const int half_res = 1024;
             const int full_res = 2 * half_res + 1;
             uni_gg_origin = glm::ivec2(inv_grass_scale * camera_ws.x, inv_grass_scale * camera_ws.x) - glm::ivec2(half_res);
 

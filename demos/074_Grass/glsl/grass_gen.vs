@@ -1,12 +1,12 @@
 #version 330 core
 
-uniform mat4 projection_view_matrix;
-
 uniform ivec2 origin;
 uniform float grass_scale;
 
+out vec3 position_ws;
 out vec3 axis_x;
 out vec3 axis_z;
+out float height;
 
 //==============================================================================================================================================================
 // hashing functions
@@ -20,6 +20,12 @@ vec3 hash3(ivec2 p)
 vec2 hash2(ivec2 p)
 {
     vec2 h = p.x * vec2(-12.571f, 41.547f) + p.y * vec2(-51.913f, 61.419f);
+    return fract(cos(h) * 43134.717f);
+}
+
+float hash(ivec2 p)
+{
+    float h = p.x * 47.547f - p.y * 11.419f;
     return fract(cos(h) * 43134.717f);
 }
 
@@ -66,15 +72,17 @@ void main()
     ivec2 h = origin + id;
     vec2 base = grass_scale * vec2(h) + hash2(h);
 
-    vec3 p = vec3(base, -3.5);
+    position_ws = vec3(base, -3.5);
     for(int i = 0; i < 4; ++i)
     {
-        float t = ground_sdf(p);
-        p.z -= t;
+        float t = ground_sdf(position_ws);
+        position_ws.z -= t;
     }
     
-    axis_z = calc_normal(p);
+    height = 0.5 + 0.5 * hash(h);
     axis_x = hash3(h);
+    axis_z = calc_normal(position_ws);
+    axis_z = normalize(axis_z + 0.5f * axis_x);
     axis_x = normalize(axis_x - dot(axis_x, axis_z) * axis_z);
 }
 

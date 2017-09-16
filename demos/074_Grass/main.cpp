@@ -20,6 +20,7 @@
 #include "polyhedron.hpp"
 
 const float z_near = 0.5;
+const float inv_grass_scale = 32.0f;
 
 struct demo_window_t : public glfw_window_t
 {
@@ -160,8 +161,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gg_light_ws  = grass_generator["light_ws"];
     uniform_t uni_gg_camera_ws = grass_generator["camera_ws"];
     uniform_t uni_gg_origin    = grass_generator["origin"];
-
-    const float inv_grass_scale = 32.0f;
+    grass_generator["blade_tex"] = 4;
     grass_generator["grass_scale"] = 1.0f / inv_grass_scale;
 
     //===================================================================================================================================================================================================================
@@ -178,6 +178,9 @@ int main(int argc, char *argv[])
 
     glActiveTexture(GL_TEXTURE3);
     GLuint room_normal_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone_bump.png");
+
+    glActiveTexture(GL_TEXTURE4);
+    GLuint grass_blades_tex_id = image::png::texture2d("../../../resources/tex2d/seamless_grass.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
 
     //===================================================================================================================================================================================================================
@@ -266,9 +269,9 @@ int main(int argc, char *argv[])
         uni_gg_light_ws  = light_ws;
         uni_gg_camera_ws = camera_ws;
 
-        const int half_res = 256;
+        const int half_res = 1024;
         const int full_res = 2 * half_res + 1;
-        uni_gg_origin = glm::ivec2(inv_grass_scale * camera_ws.x, inv_grass_scale * camera_ws.x) - glm::ivec2(half_res);
+        uni_gg_origin = glm::ivec2(inv_grass_scale * camera_ws.x, inv_grass_scale * camera_ws.y) - glm::ivec2(half_res);
         glDrawArraysInstanced(GL_POINTS, 0, full_res, full_res);
 
         window.end_frame();
