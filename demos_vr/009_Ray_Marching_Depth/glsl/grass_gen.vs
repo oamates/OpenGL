@@ -1,31 +1,47 @@
 #version 330 core
 
 uniform ivec2 origin;
-uniform float grass_scale;
+uniform float grid_scale;
 
 out vec3 position_ws;
 out vec3 axis_x;
 out vec3 axis_z;
-out float height;
+out vec3 hash;
+out float scale;
 
 //==============================================================================================================================================================
 // hashing functions
 //==============================================================================================================================================================
-vec3 hash3(ivec2 p)
+
+const vec3 hash_x[3] = vec3[3]
+(
+    vec3( 17.193f,  12.439f,  21.741f),
+    vec3(-27.881f, -11.127f,  93.237f),
+    vec3( 16.649f, -74.671f, -10.351f)
+);
+
+const vec3 hash_y[3] = vec3[3]
+(
+    vec3(-71.219f,  74.511f,  17.491f),
+    vec3( 13.829f, -77.467f, -27.913f),
+    vec3(-51.293f, -18.341f, -13.957f)
+);
+
+vec3 hash_0(ivec2 p)
 {
-    vec3 h = p.x * vec3(127.19f, -12.157f, 91.417f) + p.y * vec3(-513.29f, 77.441f, 13.491f);
+    vec3 h = p.x * hash_x[0] + p.y * hash_y[0];
     return fract(cos(h) * 43134.717f);
 }
 
-vec2 hash2(ivec2 p)
+vec3 hash_1(ivec2 p)
 {
-    vec2 h = p.x * vec2(-12.571f, 41.547f) + p.y * vec2(-51.913f, 61.419f);
+    vec3 h = p.x * hash_x[1] + p.y * hash_y[1];
     return fract(cos(h) * 43134.717f);
 }
 
-float hash(ivec2 p)
+vec3 hash_2(ivec2 p)
 {
-    float h = p.x * 47.547f - p.y * 11.419f;
+    vec3 h = p.x * hash_x[2] + p.y * hash_y[2];
     return fract(cos(h) * 43134.717f);
 }
 
@@ -68,22 +84,27 @@ vec3 calc_normal(in vec3 p)
 void main()
 {
     ivec2 id = ivec2(gl_VertexID, gl_InstanceID);
+    ivec2 grid_point = origin + id;
 
-    ivec2 h = origin + id;
-    vec2 base = grass_scale * vec2(h) + hash2(h);
+    vec3 h0 = hash_0(grid_point);
+    vec3 h1 = hash_1(grid_point);
+    vec3 h2 = hash_2(grid_point);
 
-    position_ws = vec3(base, -3.5);
+    position_ws = vec3(grid_scale * vec2(grid_point) + h0.xy, -3.5);
+
     for(int i = 0; i < 4; ++i)
     {
         float t = ground_sdf(position_ws);
         position_ws.z -= t;
     }
     
-    height = 0.5 + 0.5 * hash(h);
-    axis_x = hash3(h);
+    scale = 0.3 + 0.7 * h0.z;
+    axis_x = h1;
     axis_z = calc_normal(position_ws);
-    axis_z = normalize(axis_z + 0.5f * axis_x);
+    axis_z = normalize(axis_z + 0.25f * axis_x);
     axis_x = normalize(axis_x - dot(axis_x, axis_z) * axis_z);
+    hash = h2;
+
 }
 
 

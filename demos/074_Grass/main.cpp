@@ -1,5 +1,5 @@
 //========================================================================================================================================================================================================================
-// DEMO 050 : Ray Marching
+// DEMO 074 : Grass Rendering
 //========================================================================================================================================================================================================================
 #define GLM_FORCE_RADIANS 
 #define GLM_FORCE_NO_CTOR_INIT
@@ -18,9 +18,10 @@
 #include "image.hpp"
 #include "plato.hpp"
 #include "polyhedron.hpp"
+#include "glsl_noise.hpp"
 
 const float z_near = 0.5;
-const float inv_grass_scale = 32.0f;
+const float inv_grass_scale = 64.0f;
 
 struct demo_window_t : public glfw_window_t
 {
@@ -29,7 +30,7 @@ struct demo_window_t : public glfw_window_t
     bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), z_near);
@@ -116,7 +117,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Ray Marching", 4, 3, 3, 1920, 1080, true);
+    demo_window_t window("Grass Rendering", 4, 3, 3, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // raymarch shader and uniform variables initialization
@@ -133,21 +134,8 @@ int main(int argc, char *argv[])
     ray_marcher["focal_scale"] = focal_scale;
     ray_marcher["stone_tex"] = 0;
     ray_marcher["grass_tex"] = 1;
+    ray_marcher["clay_tex"] = 2;
     ray_marcher["z_near"] = z_near;
-
-    //===================================================================================================================================================================================================================
-    // phong lighting model shader initialization : for room rendering
-    //===================================================================================================================================================================================================================
-    glsl_program_t phong_light(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/phong_light.vs"),
-                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/phong_light.fs"));
-
-    phong_light.enable();
-    uniform_t uni_pl_pv_matrix = phong_light["projection_view_matrix"];
-    uniform_t uni_pl_light_ws  = phong_light["light_ws"];
-    uniform_t uni_pl_camera_ws = phong_light["camera_ws"];
-    phong_light["diffuse_tex"] = 2;
-    phong_light["normal_tex"]  = 3;
-    phong_light["shift"] = glm::vec3(0.0f, 0.0f, 2.75f);
 
     //===================================================================================================================================================================================================================
     // grass generating shader
@@ -161,7 +149,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gg_light_ws  = grass_generator["light_ws"];
     uniform_t uni_gg_camera_ws = grass_generator["camera_ws"];
     uniform_t uni_gg_origin    = grass_generator["origin"];
-    grass_generator["blade_tex"] = 4;
+    grass_generator["blade_tex"] = 3;
     grass_generator["grid_scale"] = 1.0f / inv_grass_scale;
 
     //===================================================================================================================================================================================================================
@@ -171,16 +159,14 @@ int main(int argc, char *argv[])
     GLuint stone_tex_id = image::png::texture2d("../../../resources/tex2d/moss.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     glActiveTexture(GL_TEXTURE1);
-    GLuint grass_tex_id = image::png::texture2d("../../../resources/tex2d/ground_grass.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint grass_tex_id = image::png::texture2d("../../../resources/tex2d/grass_dirt.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     glActiveTexture(GL_TEXTURE2);
-    GLuint room_diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png");
+    GLuint clay_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     glActiveTexture(GL_TEXTURE3);
-    GLuint room_normal_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone_bump.png");
-
-    glActiveTexture(GL_TEXTURE4);
     GLuint grass_blades_tex_id = image::png::texture2d("../../../resources/tex2d/grass_blade.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
 
 
     //===================================================================================================================================================================================================================
@@ -199,10 +185,6 @@ int main(int argc, char *argv[])
         move(light_ws, light_velocity, 0.125f);
         p = potential(light_ws);
     }
-
-    const float cube_size = 2.75;
-    polyhedron cube;
-    cube.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -244,32 +226,19 @@ int main(int argc, char *argv[])
         uni_rm_camera_ws = camera_ws;
         uni_rm_light_ws = light_ws;
 
-        glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
-        // render cube
+        // render grass
         //===============================================================================================================================================================================================================
         glDepthFunc(GL_LESS);
-        phong_light.enable();
-
-        uni_pl_pv_matrix = projection_view_matrix;
-        uni_pl_light_ws  = light_ws;
-        uni_pl_camera_ws = camera_ws;
-
-        cube.render();
-
-        //===============================================================================================================================================================================================================
-        // render raymarch scene
-        //===============================================================================================================================================================================================================
         grass_generator.enable();
-        glBindVertexArray(vao_id);
 
         uni_gg_pv_matrix = projection_view_matrix;
         uni_gg_light_ws  = light_ws;
         uni_gg_camera_ws = camera_ws;
 
-        const int half_res = 512;
+        const int half_res = 1024;
         const int full_res = 2 * half_res + 1;
         uni_gg_origin = glm::ivec2(inv_grass_scale * camera_ws.x, inv_grass_scale * camera_ws.y) - glm::ivec2(half_res);
         glDrawArraysInstanced(GL_POINTS, 0, full_res, full_res);
@@ -282,8 +251,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glDeleteTextures(1, &stone_tex_id);
     glDeleteTextures(1, &grass_tex_id);
-    glDeleteTextures(1, &room_diffuse_tex_id);
-    glDeleteTextures(1, &room_normal_tex_id);
+    glDeleteTextures(1, &grass_blades_tex_id);
     glDeleteVertexArrays(1, &vao_id);
 
     glfw::terminate();

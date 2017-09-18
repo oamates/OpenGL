@@ -7,21 +7,17 @@ uniform vec3 light_ws;
 
 in vec3 position;
 in vec3 normal;
+in vec2 uv;
 
 out vec4 FragmentColor;
-
-vec3 grass_tex(vec3 p, vec3 n)
-{
-    p += 10.0 * n;
-    vec3 txz = texture(blade_tex, p.xz).rgb;
-    return txz;
-}
 
 void main()
 {
     vec3 l = normalize(light_ws - position);
     float q = 0.5f + 0.5f * abs(dot(normal, l));
-    vec3 color = grass_tex(position, normal);
+    q *= (0.4f + 0.6f * uv.y);
+    vec3 color = texture(blade_tex, uv).rgb;
+
     FragmentColor = vec4(q * color, 1.0f);
 }
 

@@ -317,7 +317,7 @@ int main(int argc, char** argv)
     uniform_t uni_gg_origin    = grass_generator["origin"];
 
     grass_generator["blade_tex"] = 4;
-    grass_generator["grass_scale"] = 1.0f / inv_grass_scale;
+    grass_generator["grid_scale"] = 1.0f / inv_grass_scale;
 
     //===================================================================================================================================================================================================================
     // load textures
