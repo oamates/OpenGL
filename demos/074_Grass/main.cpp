@@ -149,6 +149,7 @@ int main(int argc, char *argv[])
     uniform_t uni_gg_light_ws  = grass_generator["light_ws"];
     uniform_t uni_gg_camera_ws = grass_generator["camera_ws"];
     uniform_t uni_gg_origin    = grass_generator["origin"];
+    uniform_t uni_gg_time      = grass_generator["time"];
     grass_generator["blade_tex"] = 3;
     grass_generator["grid_scale"] = 1.0f / inv_grass_scale;
 
@@ -211,7 +212,6 @@ int main(int argc, char *argv[])
         glm::mat4 cmatrix4x4 = glm::inverse(window.camera.view_matrix);
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
-        float t = 0.25f * time;
 
         //===============================================================================================================================================================================================================
         // render raymarch scene
@@ -232,6 +232,7 @@ int main(int argc, char *argv[])
         glDepthFunc(GL_LESS);
         grass_generator.enable();
 
+        uni_gg_time = time;
         uni_gg_pv_matrix = projection_view_matrix;
         uni_gg_light_ws  = light_ws;
         uni_gg_camera_ws = camera_ws;

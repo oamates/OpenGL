@@ -31,7 +31,7 @@ vec3 hsv2rgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-const float hue = 0.25;
+const float hue = 1.0 / 6.0;
 
 void main()
 {
@@ -39,7 +39,7 @@ void main()
     float q = (0.5f + 0.5f * uv.y) * (0.5f + 0.5f * abs(dot(normal, l)));
     vec3 rgb = texture(blade_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);
-    hsv.x = mix(hsv.x, hue, 0.5);
+    hsv.x = mix(hsv.x, hue, 0.75);
 //    hsv.y *= 0.75;
     hsv.z *= q;
 
