@@ -10,6 +10,7 @@ uniform float z_near;
 uniform float time;
 
 uniform sampler2D stone_tex;
+uniform sampler2D clay_tex;
 uniform sampler2D grass_tex;
 
 out vec4 FragmentColor;
@@ -54,7 +55,7 @@ vec3 tri(in vec3 x)
 float sdf(vec3 p)
 {    
     vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
-    float ground = p.z + 3.5 + dot(op, vec3(0.067));
+    float ground = p.z + dot(op, vec3(0.067));
     p += (op - 0.25) * 0.3;
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
@@ -64,7 +65,7 @@ float sdf(vec3 p)
 float ground_sdf(vec3 p)
 {    
     vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
-    float ground = p.z + 3.5 + dot(op, vec3(0.067));
+    float ground = p.z + dot(op, vec3(0.067));
     return ground;
 }
 
@@ -206,6 +207,40 @@ vec3 envMap(vec3 rd, vec3 n)
     return tex3D(rd, n);
 }
 
+
+//==============================================================================================================================================================
+// 2-dimensional value noise for grass density function
+//==============================================================================================================================================================
+vec2 hermite5(vec2 x)
+{
+    return x * x * x * (10.0 + x * (6.0 * x - 15.0));
+}
+
+float vnoise(vec2 P) 
+{
+    const float FACTOR_X = 127;
+    const float FACTOR_Y = 311;
+    const vec4 hash = vec4(0, FACTOR_X, FACTOR_Y, FACTOR_X + FACTOR_Y);
+
+    vec2 Pi = floor(P);
+    vec2 Pf = P - Pi;
+
+    vec4 h = dot(Pi, hash.yz) + hash;
+    vec2 Ps = hermite5(Pf);
+    h = fract(cos(h) * 43758.5453123);
+
+    vec2 val = mix(h.xy, h.zw, Ps.y);
+    return mix(val.x, val.y, Ps.x);
+}
+
+float density(vec2 p)
+{
+    vec2 q = 0.5 * p;
+    float v = vnoise(q) + 0.5 * vnoise(2.11 * q) + 0.25 * vnoise(4.17 * q);
+    return 0.507 * v;
+}
+
+
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
@@ -222,7 +257,7 @@ void main()
     vec3 l = light_ws - p;                                                          // light direction :: from fragment to light source
     float d = length(l);                                                            // distance from fragment to light
     l /= d;                                                                         // normalized light direction
-    float sf = 0.9; // soft_shadow_factor(p, b, l, d);                                      // calculate shadow factor
+    float sf = 0.8; //0.5 + 0.5 * soft_shadow_factor(p, b, l, d);                                      // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // calculate ambient occlusion factor
     float atten = 1.0 / (1.0 + d * 0.007);                                          // light attenuation, based on the light distance
@@ -235,9 +270,13 @@ void main()
     //==========================================================================================================================================================
     // white frost
     //==========================================================================================================================================================
+    vec3 clay_color = texture(clay_tex, p.xy).rgb;
     vec3 grass_color = texture(grass_tex, p.xy).rgb;
-    float gamma = exp(-20.0 * abs(ground_sdf(p)));
-    texCol = mix(texCol, grass_color, gamma);
+    float q = clamp(1.25 * density(p.xy), 0.0, 1.0);
+    q = hermite5(q);
+    vec3 ggg = (1 - pow(q, 0.4)) * mix(clay_color, grass_color, q);
+    float gamma = exp(-12.0 * abs(ground_sdf(p)));
+    texCol = mix(texCol, ggg, gamma);
 
     //==========================================================================================================================================================
     // white frost

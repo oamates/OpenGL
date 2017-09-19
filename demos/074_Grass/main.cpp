@@ -165,9 +165,7 @@ int main(int argc, char *argv[])
     GLuint clay_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
     glActiveTexture(GL_TEXTURE3);
-    GLuint grass_blades_tex_id = image::png::texture2d("../../../resources/tex2d/grass_blade.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-
-
+    GLuint grass_blades_tex_id = image::png::texture2d_array("../../../resources/tex2d/nature/grass/grass_blade_%u.png", 8);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
