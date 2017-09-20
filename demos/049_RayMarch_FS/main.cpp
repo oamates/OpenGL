@@ -66,6 +66,7 @@ struct demo_window_t : public imgui_window_t
 };
 
 
+
 glm::vec3 tri(const glm::vec3& x)
 {
     return glm::abs(glm::fract(x) - glm::vec3(0.5f));
@@ -113,10 +114,51 @@ glm::vec3 move(glm::vec3& position, float& p, float dt)
 }
 
 //=======================================================================================================================================================================================================================
+// finds lipshitz constant of a function in a ball of a given radius, making given number of random trials
+//=======================================================================================================================================================================================================================
+template<typename sdf_t> float lipshitz_norm(float R, int attempts)
+{
+    float norm = 0.0f;
+    sdf_t sdf;
+    for(int a = 0; a < attempts; ++a)
+    {
+        glm::vec3 p = glm::ballRand(R);
+        glm::vec3 q = glm::ballRand(R);
+
+        float f_p = sdf(p);
+        float f_q = sdf(q);
+
+        float b = abs(f_p - f_q) / glm::length(p - q);
+        if (b > norm)
+            norm = b;
+    }
+    return norm;
+}
+
+struct cave_sdf
+{
+    float operator () (const glm::vec3& p) const
+    {
+
+        glm::vec3 q = 2.0f * p;
+        glm::vec3 oq = tri(1.1f * q + tri(1.1f * glm::vec3(q.z, q.x, q.y)));
+        float ground = q.z + 3.5f + glm::dot(oq, glm::vec3(0.067));
+        q += (oq - glm::vec3(0.25f)) * 0.3f;
+        q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
+        float canyon = 0.95f * (glm::length(p) - 1.05f);
+        return glm::min(ground, canyon);
+    }
+};
+
+//=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+    float norm = lipshitz_norm<cave_sdf>(40.0f, 1024 * 1024 * 16);
+    debug_msg("Lipshitz norm of the cave function = %f", norm);
+    return 0;
+
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
