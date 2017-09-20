@@ -5,7 +5,6 @@ in vec3 view;
 flat in vec3 position;
 uniform vec2 focal_scale;
 
-uniform mat4 camera_matrix;
 uniform float time;
 uniform sampler2D value_texture;
 uniform sampler2D stone_texture;

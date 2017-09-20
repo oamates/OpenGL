@@ -92,7 +92,6 @@ glm::vec3 move(glm::vec3& position, glm::vec3& velocity, float dt)
 {
     glm::vec3 v0 = gradient(position);
     glm::vec3 v1 = velocity;
-
     glm::vec3 v = glm::normalize(v1 + v0);
     velocity = v;
     position = position + dt * v;

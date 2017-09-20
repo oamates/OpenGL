@@ -254,11 +254,8 @@ static void RenderDrawLists(ImDrawData* draw_data)
 // requested context version is not supported by OpenGL driver
 //=======================================================================================================================================================================================================================
 imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen, bool debug_context)
+    : frame(0), res_x(res_x), res_y(res_y)
 {
-    frame = 0;
-    imgui_window_t::res_x = res_x;
-    imgui_window_t::res_y = res_y;
-
     //===================================================================================================================================================================================================================
     // Set the number of antialiasing samples, OpenGL major and minor context version and
     // forward compatible core profile (deprecated functions not to be supported)
@@ -376,6 +373,9 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     //===================================================================================================================================================================================================================
     // OpenGL objects for UI rendering
     //===================================================================================================================================================================================================================
+    glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &texture_unit_max_index);
+    texture_unit_max_index--;
+    debug_msg("Will use GL_TEXTURE%u for imgui font.", texture_unit_max_index);
 
     const GLchar* vs_source =
         "#version 330 core\n"
@@ -415,8 +415,9 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glLinkProgram(ui_program_id);
     
     glUseProgram(ui_program_id);
-    glUniform1i(glGetUniformLocation(ui_program_id, "font_tex"), 0);
+    glUniform1i(glGetUniformLocation(ui_program_id, "font_tex"), texture_unit_max_index);
     uni_projection_matrix_id = glGetUniformLocation(ui_program_id, "projection_matrix");
+
     
     glGenVertexArrays(1, &ui_vao_id);
     glBindVertexArray(ui_vao_id);
@@ -433,18 +434,15 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ImDrawVert), (const GLvoid*) offsetof(ImDrawVert, col));
 
     //===================================================================================================================================================================================================================
-    //===================================================================================================================================================================================================================
-
-    //===================================================================================================================================================================================================================
     // create font texture and build texture atlas
     // load as RGBA 32-bits (75% of the memory is wasted, but default font is so small) because it is more likely to be compatible with user's existing shaders.
     // If your ImTextureId represent a higher-level concept than just a GL texture id, consider calling GetTexDataAsAlpha8() instead to save on GPU memory.
     //===================================================================================================================================================================================================================
     unsigned char* pixels;
     int width, height;
-    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);   
-    
-    glActiveTexture(GL_TEXTURE0);
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+
+    glActiveTexture(GL_TEXTURE0 + texture_unit_max_index);
     glGenTextures(1, &ui_font_tex_id);
     glBindTexture(GL_TEXTURE_2D, ui_font_tex_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -586,19 +584,14 @@ imgui_window_t::~imgui_window_t()
     glDeleteBuffers(1, &ui_ibo_id);
     glDeleteBuffers(1, &ui_vbo_id);
     glDeleteVertexArrays(1, &ui_vao_id);
-
     glDetachShader(ui_program_id, ui_vs_id);
     glDeleteShader(ui_vs_id);
-
     glDetachShader(ui_program_id, ui_fs_id);
     glDeleteShader(ui_fs_id);
-
     glDeleteProgram(ui_program_id);
-
     glDeleteTextures(1, &ui_font_tex_id);
     ImGui::GetIO().Fonts->TexID = 0;
     ImGui::Shutdown();
-
     glfwDestroyWindow(window);
 }
 
