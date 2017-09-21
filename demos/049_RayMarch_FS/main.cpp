@@ -20,6 +20,9 @@
 #include "shader.hpp"
 #include "glsl_noise.hpp"
 #include "image.hpp"
+#include "fbo.hpp"
+
+const float z_near = 1.0f;
 
 struct demo_window_t : public imgui_window_t
 {
@@ -30,7 +33,7 @@ struct demo_window_t : public imgui_window_t
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
           camera(5.0, 0.125, glm::mat4(1.0f))
     {
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), z_near);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);        
     }
 
@@ -118,8 +121,9 @@ glm::vec3 move(glm::vec3& position, float& p, float dt)
 //=======================================================================================================================================================================================================================
 template<typename sdf_t> float lipshitz_norm(float R, int attempts)
 {
-    float norm = 0.0f;
     sdf_t sdf;
+    float norm = 0.0f;
+
     for(int a = 0; a < attempts; ++a)
     {
         glm::vec3 p = glm::ballRand(R);
@@ -132,6 +136,7 @@ template<typename sdf_t> float lipshitz_norm(float R, int attempts)
         if (b > norm)
             norm = b;
     }
+
     return norm;
 }
 
@@ -139,13 +144,12 @@ struct cave_sdf
 {
     float operator () (const glm::vec3& p) const
     {
-
-        glm::vec3 q = 2.0f * p;
+        glm::vec3 q = p;
         glm::vec3 oq = tri(1.1f * q + tri(1.1f * glm::vec3(q.z, q.x, q.y)));
         float ground = q.z + 3.5f + glm::dot(oq, glm::vec3(0.067));
         q += (oq - glm::vec3(0.25f)) * 0.3f;
         q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
-        float canyon = 0.95f * (glm::length(p) - 1.05f);
+        float canyon = 0.947f * (glm::length(p) - 1.05f);
         return glm::min(ground, canyon);
     }
 };
@@ -155,9 +159,11 @@ struct cave_sdf
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
-    float norm = lipshitz_norm<cave_sdf>(40.0f, 1024 * 1024 * 16);
+    const int res_x = 1920;
+    const int res_y = 1080;
+
+    float norm = lipshitz_norm<cave_sdf>(40.0f, 1024 * 1024);
     debug_msg("Lipshitz norm of the cave function = %f", norm);
-    return 0;
 
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
@@ -166,7 +172,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("GLFW + OpenGL 3.3 + ImGui Example", 4, 3, 3, 1920, 1080);
+    demo_window_t window("GLFW + OpenGL 3.3 + ImGui Example", 4, 3, 3, res_x, res_y);
 
 
     //===================================================================================================================================================================================================================
@@ -182,11 +188,16 @@ int main(int argc, char *argv[])
 
     glm::vec2 focal_scale = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
     ray_marcher["focal_scale"] = focal_scale;
+    ray_marcher["z_near"] = z_near;
     ray_marcher["value_tex"] = 0;
     ray_marcher["stone_tex"] = 1;
+    ray_marcher["depth_tex"] = 2;
 
     //===================================================================================================================================================================================================================
-    // Load noise textures - for very fast 2d noise calculation
+    // Load/create textures 
+    //  - unit0 --- noise texture for very fast 2d/3d value noise calculation
+    //  - unit1 --- diffuse texture for cave walls coloring
+    //  - unit2 --- depth texture from previous path for iffuse texture for cave walls coloring
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
@@ -209,6 +220,13 @@ int main(int argc, char *argv[])
     while(p < 0.5);
 
     //===================================================================================================================================================================================================================
+    // Texture unit 2 will have depth texture bound with GL_DEPTH_COMPONENT32 internal format
+    //===================================================================================================================================================================================================================
+    fbo_depth_t geometry_fbo(res_x, res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
+    const float zero = 0.0f;
+    glClearTexImage(geometry_fbo.texture_id, 0, GL_DEPTH_COMPONENT, GL_FLOAT, &zero);
+
+    //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
     while(!window.should_close())
@@ -222,6 +240,8 @@ int main(int argc, char *argv[])
         // render the raymarch scene
         //===============================================================================================================================================================================================================
         glBindVertexArray(vao_id);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_ALWAYS);
 
         ray_marcher.enable();
 
@@ -243,6 +263,14 @@ int main(int argc, char *argv[])
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         //===============================================================================================================================================================================================================
+        // copy depth buffer to use on the next rendering pass for lower bound distance to object estimation
+        //===============================================================================================================================================================================================================
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+        geometry_fbo.bind(GL_DRAW_FRAMEBUFFER);
+        glBlitFramebuffer(0, 0, res_x, res_y, 0, 0, res_x, res_y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+        //===============================================================================================================================================================================================================
         // After end_frame call ::
         //  - GL_DEPTH_TEST is disabled
         //  - GL_CULL_FACE is disabled
@@ -258,3 +286,5 @@ int main(int argc, char *argv[])
     glfw::terminate();
     return 0;
 }
+
+

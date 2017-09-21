@@ -23,6 +23,7 @@
 #include "camera.hpp"
 #include "polyhedron.hpp"
 #include "image.hpp"
+#include "fbo.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
@@ -51,79 +52,6 @@ struct demo_window_t : public glfw_window_t
         double norm = glm::length(mouse_delta);
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
-    }
-};
-
-
-void check_status()
-{
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-    if (GL_FRAMEBUFFER_COMPLETE == status)
-    {
-        debug_msg("GL_FRAMEBUFFER is COMPLETE.");
-        return;
-    }
-
-    const char * msg;   
-    switch (status)
-    {
-        case GL_FRAMEBUFFER_UNDEFINED:                     msg = "GL_FRAMEBUFFER_UNDEFINED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:         msg = "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: msg = "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER."; break;
-        case GL_FRAMEBUFFER_UNSUPPORTED:                   msg = "GL_FRAMEBUFFER_UNSUPPORTED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:        msg = "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:      msg = "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS."; break;
-      default:
-        msg = "Unknown Framebuffer error.";
-    }
-
-    exit_msg("FBO incomplete : %s", msg);
-}
-
-//=======================================================================================================================================================================================================================
-// Setup 5 :: framebuffer with a single depth
-//=======================================================================================================================================================================================================================
-struct fbo_depth_t
-{
-    GLsizei res_x, res_y;
-
-    GLuint fbo_id;
-    GLuint texture_id;
-    
-    fbo_depth_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
-        : res_x(res_x), res_y(res_y)
-    {
-        debug_msg("Creating FBO with one %dx%d depth attachment. Internal format :: %u", res_x, res_y, internal_format);
-
-        glGenFramebuffers(1, &fbo_id);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
-
-        glActiveTexture(texture_unit);
-        glGenTextures(1, &texture_id);
-        glBindTexture(GL_TEXTURE_2D, texture_id);
-    
-        glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id, 0);
-
-        check_status();
-    }
-    
-    void bind()
-        { glBindFramebuffer(GL_FRAMEBUFFER, fbo_id); }
-    
-    ~fbo_depth_t() 
-    {
-        glDeleteTextures(1, &texture_id);
-        glDeleteFramebuffers(1, &fbo_id);
     }
 };
 
@@ -247,7 +175,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // render polyhedron back faces to depth texture
         //===============================================================================================================================================================================================================
-        backface_fbo.bind();
+        backface_fbo.bind(GL_FRAMEBUFFER);
 
         glClear(GL_DEPTH_BUFFER_BIT);
 

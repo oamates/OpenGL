@@ -7,51 +7,6 @@
 #include "log.hpp"
 
 //=======================================================================================================================================================================================================================
-// fbo_depth : FBO with a single depth texture attached
-//=======================================================================================================================================================================================================================
-
-fbo_depth_t::fbo_depth_t() : id(0), texture_id(0) {};
-
-fbo_depth_t::fbo_depth_t(GLsizei width, GLsizei height, GLenum internal_format)
-{
-    debug_msg("Creating depth FBO with depth 2d-texture (%d x %d) attachment.", width, height);
-    glGenFramebuffers(1, &id);
-    glBindFramebuffer(GL_FRAMEBUFFER, id);
-
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    
-    glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, width, height);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    check_status();
-    glViewport(0, 0, width, height);
-}
-
-void fbo_depth_t::bind()
-{
-    glBindFramebuffer(GL_FRAMEBUFFER, id);
-}
-
-void fbo_depth_t::bind_texture(GLenum texture_unit)
-{
-    glActiveTexture (texture_unit);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-}
-
-fbo_depth_t::~fbo_depth_t()
-{
-    glDeleteTextures(1, &texture_id);
-    glDeleteFramebuffers(1, &id);       
-}
-
-
-//=======================================================================================================================================================================================================================
 // fbo_color : FBO with just color attachments of type [target]
 // [target] should be one of the :: GL_TEXTURE_1D, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_1D_ARRAY, GL_TEXTURE_2D_ARRAY, 
 //                                  GL_TEXTURE_RECTANGLE, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_BUFFER, 

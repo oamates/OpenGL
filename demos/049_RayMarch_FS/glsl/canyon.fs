@@ -1,14 +1,17 @@
 #version 330 core
 
 in vec2 uv;
-in vec3 view;
+in vec3 view_cs;
+in vec3 view_ws;
 
 uniform float time;
+uniform float z_near;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
 
 uniform sampler2D value_tex;
 uniform sampler2D stone_tex;
+uniform sampler2D depth_tex;
 
 out vec4 FragmentColor;
 
@@ -43,8 +46,8 @@ float vnoise(vec3 x)
     vec3 p = floor(x);
     vec3 f = x - p;
     f = hermite5(f);
-    vec2 uv = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
-    vec2 rg = texture(value_tex, TEXEL_SIZE * uv + HALF_TEXEL).rg;
+    vec2 uv0 = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
+    vec2 rg = texture(value_tex, TEXEL_SIZE * uv0 + HALF_TEXEL).rg;
     return mix(rg.g, rg.r, f.z);
 }
 
@@ -102,23 +105,6 @@ vec3 bump_normal(in vec3 p, in vec3 n, float bf)
     vec3 g = rgb_power * m;
     g = (g - dot(tex3d(p, n), rgb_power)) / e.x;
     return normalize(n + g * bf);
-}
-
-//==============================================================================================================================================================
-// basic raymarching loop
-//==============================================================================================================================================================
-
-float trace(in vec3 p, in vec3 v)
-{    
-    float t = 0.0;
-    for(int i = 0; i < MAX_TRACE_ITER; i++)
-    {    
-        float d = sdf(p + t * v);
-        float d_abs = abs(d);
-        if(d_abs < (0.001 + 0.00025 * t) || t > HORIZON) break;
-        t += d;
-    }
-    return min(t, HORIZON);
 }
 
 //==============================================================================================================================================================
@@ -215,12 +201,41 @@ vec3 envMap(vec3 rd, vec3 n)
 }
 
 //==============================================================================================================================================================
+// basic raymarching loop
+//==============================================================================================================================================================
+
+float trace(vec3 p, vec3 v, float t0)
+{    
+    float t = t0;
+    for(int i = 0; i < MAX_TRACE_ITER; i++)
+    {    
+        float d = sdf(p + t * v);
+        float d_abs = abs(d);
+        if(d_abs < (0.001 + 0.00025 * t) || t > HORIZON) break;
+        t += d;
+    }
+    return min(t, HORIZON);
+}
+
+
+//==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
 {
-    vec3 v = normalize(view);                                                       // from eye to fragment (in camera-space)
-    float t = trace(camera_ws, v);                                                  // t is the distance from eye to fragment
+    //==========================================================================================================================================================
+    // read depth value from previous render cycle
+    // -z_aff = z_near / (1.0 - gl_FragDepth)
+    //==========================================================================================================================================================
+
+    float depth = texture(depth_tex, uv).x;
+    float mz_aff = z_near / (1.0 - depth);
+
+    mz_aff = max(mz_aff - 0.15, 0.0);
+    
+
+    vec3 v = normalize(view_ws);                                                    // from eye to fragment (in camera-space)
+    float t = trace(camera_ws, v, mz_aff);                                          // t is the distance from eye to fragment
     vec3 p = camera_ws + v * t;                                                     // fragment position in world space
     vec3 n = calc_normal(p);                                                        // fragment normal
     vec3 b = bump_normal(p, n, 0.0175);                                             // bumped normal, third parameter is bump factor
@@ -243,5 +258,16 @@ void main()
     vec3 diffuse_color = tex3d(p, n);                                               // trilinear blended color from input texture
 
 
+    //==========================================================================================================================================================
+    // view_cs is the view vector in camera space 
+    // the location of the fragment in camera space is t * normalize(view_cs);
+    // the projective value of fragment depth is thus 
+    // z_proj = 1.0 + 2 * z_near / z_aff
+    // the value in z-buffer is 0.5 + 0.5 * z_proj = 1.0 + z_near / z_aff
+    //==========================================================================================================================================================
+    vec3 position_cs = t * normalize(view_cs);
+    float z_aff = position_cs.z;
+    gl_FragDepth = 1.0 + z_near / z_aff;   
+
     FragmentColor = vec4(diffuse_color * diffuse, 1.0f);
-            }
+}

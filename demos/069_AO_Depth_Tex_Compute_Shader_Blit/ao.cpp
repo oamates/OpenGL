@@ -26,7 +26,7 @@
 #include "vao.hpp"
 #include "tess.hpp"
 #include "attribute.hpp"
-
+#include "fbo.hpp"
 
 std::default_random_engine generator;
 std::normal_distribution<float> gaussRand(0.0, 1.0);
@@ -179,49 +179,7 @@ void check_status()
     exit_msg("FBO incomplete : %s", msg);
 }
 
-//=======================================================================================================================================================================================================================
-// Setup 5 :: framebuffer with a single depth
-//=======================================================================================================================================================================================================================
-struct fbo_depth_t
-{
-    GLsizei res_x, res_y;
 
-    GLuint fbo_id;
-    GLuint texture_id;
-    
-    fbo_depth_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
-        : res_x(res_x), res_y(res_y)
-    {
-        debug_msg("Creating FBO with one %dx%d depth attachment. Internal format :: %u", res_x, res_y, internal_format);
-
-        glGenFramebuffers(1, &fbo_id);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
-
-        glActiveTexture(texture_unit);
-        glGenTextures(1, &texture_id);
-        glBindTexture(GL_TEXTURE_2D, texture_id);
-    
-        glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id, 0);
-
-        check_status();
-    }
-    
-    void bind()
-        { glBindFramebuffer(GL_FRAMEBUFFER, fbo_id); }
-    
-    ~fbo_depth_t() 
-    {
-        glDeleteTextures(1, &texture_id);
-        glDeleteFramebuffers(1, &fbo_id);
-    }
-};
 /*
 float factor(const glm::vec3& v)
 {

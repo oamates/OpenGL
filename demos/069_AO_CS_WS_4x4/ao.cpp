@@ -26,6 +26,7 @@
 #include "vao.hpp"
 #include "tess.hpp"
 #include "attribute.hpp"
+#include "fbo.hpp"
 
 
 std::default_random_engine generator;
@@ -128,36 +129,6 @@ struct demo_window_t : public imgui_window_t
         }
     }
 };
-
-
-void check_status()
-{
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-    if (GL_FRAMEBUFFER_COMPLETE == status)
-    {
-        debug_msg("GL_FRAMEBUFFER is COMPLETE.");
-        return;
-    }
-
-    const char * msg;   
-    switch (status)
-    {
-        case GL_FRAMEBUFFER_UNDEFINED:                     msg = "GL_FRAMEBUFFER_UNDEFINED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:         msg = "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: msg = "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER."; break;
-        case GL_FRAMEBUFFER_UNSUPPORTED:                   msg = "GL_FRAMEBUFFER_UNSUPPORTED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:        msg = "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:      msg = "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS."; break;
-      default:
-        msg = "Unknown Framebuffer error.";
-    }
-
-    exit_msg("FBO incomplete : %s", msg);
-}
-
 
 //=======================================================================================================================================================================================================================
 // Setup 1 :: renderbuffer object + one color attachment

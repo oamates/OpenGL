@@ -22,18 +22,51 @@ void check_status();
 //=======================================================================================================================================================================================================================
 // fbo_depth : FBO with a single depth texture attached
 //=======================================================================================================================================================================================================================
+//=======================================================================================================================================================================================================================
+// Setup 5 :: framebuffer with a single depth
+//=======================================================================================================================================================================================================================
 struct fbo_depth_t
 {
+    GLsizei res_x, res_y;
+
     GLuint id;
     GLuint texture_id;
+    
+    fbo_depth_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
+        : res_x(res_x), res_y(res_y)
+    {
+        debug_msg("Creating FBO with one %dx%d depth attachment. Internal format :: %u", res_x, res_y, internal_format);
 
-    fbo_depth_t();
-    fbo_depth_t(GLsizei width, GLsizei height, GLenum internal_format = GL_DEPTH_COMPONENT32);
+        glGenFramebuffers(1, &id);
+        glBindFramebuffer(GL_FRAMEBUFFER, id);
 
-    void bind();
-    void bind_texture(GLenum texture_unit);
+        glActiveTexture(texture_unit);
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_2D, texture_id);
+    
+        glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
 
-    ~fbo_depth_t();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id, 0);
+
+        check_status();
+    }
+    
+    //===================================================================================================================================================================================================================
+    // target should be one of GL_FRAMEBUFFER, GL_DRAW_FRAMEBUFFER, GL_READ_FRAMEBUFFER
+    //===================================================================================================================================================================================================================
+    void bind(GLenum target)
+        { glBindFramebuffer(GL_FRAMEBUFFER, id); }
+    
+    ~fbo_depth_t() 
+    {
+        glDeleteTextures(1, &texture_id);
+        glDeleteFramebuffers(1, &id);
+    }
 };
 
 //=======================================================================================================================================================================================================================

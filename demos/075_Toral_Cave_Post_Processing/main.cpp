@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 	torus_t cave;
     cave.generate_vao_mt<vertex_pn_t>(toral_func, TORUS_U_DIV, TORUS_V_DIV);
 
-	fbo_depth_t zbuffer(window.res_x, window.res_y);
+	fbo_depth_t zbuffer(window.res_x, window.res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE0);
 	fbo_color_t<GL_TEXTURE_2D, 1> ssao_buffer(window.res_x, window.res_y);
 	fbo_color_t<GL_TEXTURE_2D, 1> blur_buffer(window.res_x, window.res_y);
 	color_rbo_t scene_buffer(window.res_x, window.res_y);
@@ -319,7 +319,7 @@ int main(int argc, char *argv[])
     	ssao.enable();
 		ssao_buffer.bind();
 		glClear(GL_COLOR_BUFFER_BIT);
-		zbuffer.bind_texture(GL_TEXTURE0);
+//		zbuffer.bind_texture(GL_TEXTURE0);
 		glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
 
