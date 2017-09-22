@@ -9,6 +9,7 @@ uniform float z_near;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
 uniform vec2 focal_scale;
+uniform float camera_shift;
 
 uniform sampler2D value_tex;
 uniform sampler2D stone_tex;
@@ -79,8 +80,9 @@ vec3 tri(in vec3 x)
 
 float sdf(vec3 p)
 {    
+    const float ground_level = -1.0f;
     vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
-    float ground = p.z + 3.5 + dot(op, vec3(0.067));
+    float ground = p.z - ground_level + dot(op, vec3(0.067));
     p += (op - 0.25) * 0.3;
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
@@ -220,6 +222,20 @@ float trace(vec3 p, vec3 v, float t0)
     return min(t, HORIZON);
 }
 
+float lower_bound(vec2 pq, float lambda)
+{
+    const vec4 offset = vec4(1.0 / 1920.0, 1.0 / 1080.0, -1.0 / 1920.0, -1.0 / 1080.0);
+
+    vec4 d0 = vec4(texture(depth_tex, lambda * pq + offset.xy).x,
+                   texture(depth_tex, lambda * pq + offset.xw).x,
+                   texture(depth_tex, lambda * pq + offset.zy).x,
+                   texture(depth_tex, lambda * pq + offset.zw).x);
+
+    vec4 z_aff = z_near / (1.0 - d0);
+    z_aff.xy = min(z_aff.xy, z_aff.zw);
+    return min(z_aff.x, z_aff.y);
+}
+
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
@@ -229,26 +245,17 @@ void main()
     vec2 ndc = _view_cs.xy / _view_cs.z;
     vec2 _uv = 0.5 - 0.5 * ndc / focal_scale; 
 
+
+    //float mz_aff0 = min(lower_bound(_uv, 1.0), lower_bound(_uv, 2.0));
+    //float mz_aff1 = min(lower_bound(_uv, 3.0), lower_bound(_uv, 4.0));
+    float mz_aff = lower_bound(_uv, 1.0); //min(mz_aff0, mz_aff1);
+
+    mz_aff = max(mz_aff - camera_shift - 0.025, z_near);
     
     //==========================================================================================================================================================
     // read depth value from previous render cycle
     // -z_aff = z_near / (1.0 - gl_FragDepth)
     //==========================================================================================================================================================
-    const vec4 offset = vec4(1.0 / 1920.0, 1.0 / 1080.0, -1.0 / 1920.0, -1.0 / 1080.0);
-
-    float depth00 = texture(depth_tex, _uv + offset.xy).x;
-    float depth01 = texture(depth_tex, _uv + offset.xw).x;
-    float depth10 = texture(depth_tex, _uv + offset.zy).x;
-    float depth11 = texture(depth_tex, _uv + offset.zw).x;
-
-    float mz_aff00 = z_near / (1.0 - depth00);
-    float mz_aff01 = z_near / (1.0 - depth01);
-    float mz_aff10 = z_near / (1.0 - depth10);
-    float mz_aff11 = z_near / (1.0 - depth11);
-
-    float mz_aff = min(min(mz_aff00, mz_aff01), min(mz_aff10, mz_aff11));
-
-    mz_aff = max(mz_aff - 0.05, 0.0);
                              
 
     vec3 v = normalize(view_ws);                                                    // from eye to fragment (in camera-space)
