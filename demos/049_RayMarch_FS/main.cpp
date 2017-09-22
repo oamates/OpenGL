@@ -172,8 +172,13 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("GLFW + OpenGL 3.3 + ImGui Example", 4, 3, 3, res_x, res_y);
+    demo_window_t window("GLFW + OpenGL 3.3 + ImGui Example", 1, 3, 3, res_x, res_y);
 
+
+
+    GLfloat fLargest;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &fLargest);
+    debug_msg("GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT = %f", fLargest);
 
     //===================================================================================================================================================================================================================
     // Shader and uniform variables initialization
@@ -182,6 +187,7 @@ int main(int argc, char *argv[])
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/canyon.fs"));
     ray_marcher.enable();
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
+    uniform_t uni_rm_view_matrix = ray_marcher["view_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
     uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
     uniform_t uni_rm_time = ray_marcher["time"];
@@ -222,9 +228,11 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Texture unit 2 will have depth texture bound with GL_DEPTH_COMPONENT32 internal format
     //===================================================================================================================================================================================================================
-    fbo_depth_t geometry_fbo(res_x, res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE2);
+    fbo_depth_t geometry_fbo(res_x, res_y, GL_TEXTURE2, GL_DEPTH_COMPONENT32, GL_LINEAR, GL_CLAMP_TO_EDGE);
     const float zero = 0.0f;
     glClearTexImage(geometry_fbo.texture_id, 0, GL_DEPTH_COMPONENT, GL_FLOAT, &zero);
+
+    glm::mat3 view_matrix = glm::mat3(window.camera.view_matrix);
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -256,6 +264,7 @@ int main(int argc, char *argv[])
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
 
         uni_rm_time = time;
+        uni_rm_view_matrix = view_matrix;
         uni_rm_camera_matrix = camera_matrix;
         uni_rm_camera_ws = camera_ws;
         uni_rm_light_ws = light_ws;
@@ -269,6 +278,8 @@ int main(int argc, char *argv[])
         geometry_fbo.bind(GL_DRAW_FRAMEBUFFER);
         glBlitFramebuffer(0, 0, res_x, res_y, 0, 0, res_x, res_y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+        view_matrix = glm::mat3(window.camera.view_matrix);
 
         //===============================================================================================================================================================================================================
         // After end_frame call ::

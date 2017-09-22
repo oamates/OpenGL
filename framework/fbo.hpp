@@ -32,7 +32,7 @@ struct fbo_depth_t
     GLuint id;
     GLuint texture_id;
     
-    fbo_depth_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
+    fbo_depth_t(GLsizei res_x, GLsizei res_y, GLenum texture_unit, GLenum internal_format, GLint filtering_mode, GLint wrap_mode)
         : res_x(res_x), res_y(res_y)
     {
         debug_msg("Creating FBO with one %dx%d depth attachment. Internal format :: %u", res_x, res_y, internal_format);
@@ -47,8 +47,8 @@ struct fbo_depth_t
         glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filtering_mode);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filtering_mode);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
         glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_id, 0);
@@ -60,7 +60,7 @@ struct fbo_depth_t
     // target should be one of GL_FRAMEBUFFER, GL_DRAW_FRAMEBUFFER, GL_READ_FRAMEBUFFER
     //===================================================================================================================================================================================================================
     void bind(GLenum target)
-        { glBindFramebuffer(GL_FRAMEBUFFER, id); }
+        { glBindFramebuffer(target, id); }
     
     ~fbo_depth_t() 
     {

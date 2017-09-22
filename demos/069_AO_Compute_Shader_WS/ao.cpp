@@ -26,7 +26,7 @@
 #include "vao.hpp"
 #include "tess.hpp"
 #include "attribute.hpp"
-
+#include "fbo.hpp"
 
 std::default_random_engine generator;
 std::normal_distribution<float> gaussRand(0.0, 1.0);
@@ -150,47 +150,17 @@ struct demo_window_t : public imgui_window_t
     }
 };
 
-
-void check_status()
-{
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-    if (GL_FRAMEBUFFER_COMPLETE == status)
-    {
-        debug_msg("GL_FRAMEBUFFER is COMPLETE.");
-        return;
-    }
-
-    const char * msg;   
-    switch (status)
-    {
-        case GL_FRAMEBUFFER_UNDEFINED:                     msg = "GL_FRAMEBUFFER_UNDEFINED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:         msg = "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: msg = "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER."; break;
-        case GL_FRAMEBUFFER_UNSUPPORTED:                   msg = "GL_FRAMEBUFFER_UNSUPPORTED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:        msg = "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:      msg = "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS."; break;
-      default:
-        msg = "Unknown Framebuffer error.";
-    }
-
-    exit_msg("FBO incomplete : %s", msg);
-}
-
-
 //=======================================================================================================================================================================================================================
 // Setup 1 :: renderbuffer object + one color attachment
 //=======================================================================================================================================================================================================================
 
-struct fbo_rb_color_t
+struct fbo_rb1_color_t
 {
     GLuint fbo_id;
     GLuint rbo_id;
     GLuint texture_id;
     
-    fbo_rb_color_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
+    fbo_rb1_color_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
     {
         debug_msg("Creating color FBO with renderbuffer and one %dx%d color attachment. Internal format :: %u", res_x, res_y, internal_format);
 
@@ -220,52 +190,10 @@ struct fbo_rb_color_t
     void bind()
         { glBindFramebuffer(GL_FRAMEBUFFER, fbo_id); }
     
-    ~fbo_rb_color_t() 
+    ~fbo_rb1_color_t() 
     {
         glDeleteTextures(1, &texture_id);
         glDeleteRenderbuffers(1, &rbo_id);
-        glDeleteFramebuffers(1, &fbo_id);
-    }
-
-};
-
-//=======================================================================================================================================================================================================================
-// Setup 2 :: renderbuffer object + one color attachment
-//=======================================================================================================================================================================================================================
-
-struct fbo_color_t
-{
-    GLuint fbo_id;
-    GLuint texture_id;
-    
-    fbo_color_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode, GLenum texture_unit)
-    {
-        debug_msg("Creating color FBO with one %dx%d color attachment. Internal format :: %u", res_x, res_y, internal_format);
-
-        glGenFramebuffers(1, &fbo_id);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
-        
-        glActiveTexture(texture_unit);
-        glGenTextures(1, &texture_id);
-        glBindTexture(GL_TEXTURE_2D, texture_id);
-        glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
-        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture_id, 0);
-
-        glDrawBuffer(GL_COLOR_ATTACHMENT0);    
-        check_status();
-    }
-    
-    void bind()
-        { glBindFramebuffer(GL_FRAMEBUFFER, fbo_id); }
-    
-    ~fbo_color_t() 
-    {
-        glDeleteTextures(1, &texture_id);
         glDeleteFramebuffers(1, &fbo_id);
     }
 
@@ -405,7 +333,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // framebuffer object and textures for geometry rendering step
     //===================================================================================================================================================================================================================
-    fbo_rb_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
+    fbo_rb1_color_t geometry_fbo(res_x, res_y, GL_RGBA32F, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
 
     GLuint ssao_tex_id;
     glActiveTexture(GL_TEXTURE2);

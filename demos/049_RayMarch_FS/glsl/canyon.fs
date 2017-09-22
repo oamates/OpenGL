@@ -8,10 +8,13 @@ uniform float time;
 uniform float z_near;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
+uniform vec2 focal_scale;
 
 uniform sampler2D value_tex;
 uniform sampler2D stone_tex;
 uniform sampler2D depth_tex;
+
+uniform mat3 view_matrix;
 
 out vec4 FragmentColor;
 
@@ -217,22 +220,36 @@ float trace(vec3 p, vec3 v, float t0)
     return min(t, HORIZON);
 }
 
-
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
 {
+    vec3 _view_cs = view_matrix * view_ws;
+    vec2 ndc = _view_cs.xy / _view_cs.z;
+    vec2 _uv = 0.5 - 0.5 * ndc / focal_scale; 
+
+    
     //==========================================================================================================================================================
     // read depth value from previous render cycle
     // -z_aff = z_near / (1.0 - gl_FragDepth)
     //==========================================================================================================================================================
+    const vec4 offset = vec4(1.0 / 1920.0, 1.0 / 1080.0, -1.0 / 1920.0, -1.0 / 1080.0);
 
-    float depth = texture(depth_tex, uv).x;
-    float mz_aff = z_near / (1.0 - depth);
+    float depth00 = texture(depth_tex, _uv + offset.xy).x;
+    float depth01 = texture(depth_tex, _uv + offset.xw).x;
+    float depth10 = texture(depth_tex, _uv + offset.zy).x;
+    float depth11 = texture(depth_tex, _uv + offset.zw).x;
 
-    mz_aff = max(mz_aff - 0.15, 0.0);
-    
+    float mz_aff00 = z_near / (1.0 - depth00);
+    float mz_aff01 = z_near / (1.0 - depth01);
+    float mz_aff10 = z_near / (1.0 - depth10);
+    float mz_aff11 = z_near / (1.0 - depth11);
+
+    float mz_aff = min(min(mz_aff00, mz_aff01), min(mz_aff10, mz_aff11));
+
+    mz_aff = max(mz_aff - 0.05, 0.0);
+                             
 
     vec3 v = normalize(view_ws);                                                    // from eye to fragment (in camera-space)
     float t = trace(camera_ws, v, mz_aff);                                          // t is the distance from eye to fragment
@@ -269,5 +286,7 @@ void main()
     float z_aff = position_cs.z;
     gl_FragDepth = 1.0 + z_near / z_aff;   
 
+//    FragmentColor = (uv.x < 0.5) ? vec4(diffuse_color * diffuse, 1.0f) :
+//                                   vec4(vec3(mz_aff00), 1.0f);
     FragmentColor = vec4(diffuse_color * diffuse, 1.0f);
 }
