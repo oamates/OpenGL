@@ -236,50 +236,144 @@ float lower_bound(vec2 pq, float lambda)
     return min(z_aff.x, z_aff.y);
 }
 
-//==============================================================================================================================================================
-// shader entry point
-//==============================================================================================================================================================
-void main()
+#define AA
+#define HQ_AA
+
+#ifndef HQ_AA
+    #define AA_SAMPLES 4
+#endif
+
+vec3 shade(vec3 p0, vec3 v, float t)
 {
-    vec3 _view_cs = view_matrix * view_ws;
-    vec2 ndc = _view_cs.xy / _view_cs.z;
-    vec2 _uv = 0.5 - 0.5 * ndc / focal_scale; 
-
-
-    //float mz_aff0 = min(lower_bound(_uv, 1.0), lower_bound(_uv, 2.0));
-    //float mz_aff1 = min(lower_bound(_uv, 3.0), lower_bound(_uv, 4.0));
-    float mz_aff = lower_bound(_uv, 1.0); //min(mz_aff0, mz_aff1);
-
-    mz_aff = max(mz_aff - camera_shift - 0.025, z_near);
-    
-    //==========================================================================================================================================================
-    // read depth value from previous render cycle
-    // -z_aff = z_near / (1.0 - gl_FragDepth)
-    //==========================================================================================================================================================
-                             
-
-    vec3 v = normalize(view_ws);                                                    // from eye to fragment (in camera-space)
-    float t = trace(camera_ws, v, mz_aff);                                          // t is the distance from eye to fragment
-    vec3 p = camera_ws + v * t;                                                     // fragment position in world space
+    vec3 p = p0 + v * t;                                                     // fragment position in world space
     vec3 n = calc_normal(p);                                                        // fragment normal
     vec3 b = bump_normal(p, n, 0.0175);                                             // bumped normal, third parameter is bump factor
     vec3 l = light_ws - p;                                                          // direction from fragment to light source
     float d = length(l);                                                            // distance from fragment to light
     l /= d;                                                                         // normalized light direction
 
-    float sf = soft_shadow_factor(p, b, l, d);                                      // soft shadow factor
+//    float sf = soft_shadow_factor(p, b, l, d);                                      // soft shadow factor
 //    float sf = hard_shadow_factor(p, b, l, d);                                      // hard shadow factor
-    float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
+//    float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
 //    float ao = calc_ao2(p, b);                                                      // ambient occlusion factor : second option
 
-    vec3 color = vec3(0.0);
-
-    float diffuse = max(dot(b, l), 0.0);                                            // diffuse lighting factor
+    float diffuse = 0.5 + 0.5 * max(dot(b, l), 0.0);                                            // diffuse lighting factor
     float specular = pow(max(dot(reflect(-l, b), -v), 0.0), 32.0);                  // specular lighting factor
     float fresnel = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 1.0);                     // fresnel lighting factor for reflective glow
     float attenuation = 1.0 / (1.0 + d * 0.007);                                    // light attenuation, based on the light distance
 
     vec3 diffuse_color = tex3d(p, n);                                               // trilinear blended color from input texture
+
+    vec3 color = diffuse_color * diffuse;
+    return color;
+}
+
+//==============================================================================================================================================================
+// shader entry point
+//==============================================================================================================================================================
+void main()
+{
+    // vec3 _view_cs = view_matrix * view_ws;
+    // vec2 ndc = _view_cs.xy / _view_cs.z;
+    // vec2 _uv = 0.5 - 0.5 * ndc / focal_scale; 
+
+
+    // float mz_aff0 = min(lower_bound(_uv, 1.0), lower_bound(_uv, 2.0));
+    // float mz_aff1 = min(lower_bound(_uv, 3.0), lower_bound(_uv, 4.0));
+    // float mz_aff = lower_bound(_uv, 1.0); //min(mz_aff0, mz_aff1);
+
+    // mz_aff = max(mz_aff - camera_shift - 0.025, z_near);
+
+
+    vec3 v = normalize(view_ws);                                                    // from eye to fragment (in camera-space)
+    vec3 p = camera_ws;
+
+    //==========================================================================================================================================================
+    // main raymarching algorithm
+    //==========================================================================================================================================================
+    float t = z_near;
+
+  #ifdef AA
+  #ifdef HQ_AA
+    vec4 accumulated_color = vec4(0.0);
+  #else
+    vec2 hit[AA_SAMPLES];
+    int hit_idx = 0;
+  #endif
+  #endif
+
+    const int MAX_MARCH_ITERATIONS = 128;
+    const float MAX_MARCH_DISTANCE = 200.0f;
+    const float ALPHA_THRESHOLD = 0.99;
+    const float WORLD_TO_PIXEL_SCALE = 1.0 / 1080.0;
+    const vec3 AMBIENT_COLOR = vec3(0.32, 0.17, 0.07);
+
+    float d = sdf(p + t * v);
+
+    for(int i = 0; i < MAX_MARCH_ITERATIONS; ++i)
+    {
+        float theta1 = WORLD_TO_PIXEL_SCALE * t;
+        if(d < theta1 || t > MAX_MARCH_DISTANCE)
+            break;
+
+      #ifdef AA
+        float theta2 = 2.0f * theta1;
+        if(d < theta2)
+        {
+            float d_min = d;
+            float t_min = t;
+            float t1 = t, d1 = d;
+
+            while(true)
+            {
+                t1 = t1 + d1;
+                d1 = sdf(p + t1 * v);
+                if (d1 < d_min)
+                {
+                    d_min = d1;
+                    t_min = t1;
+                }
+                else
+                    break;
+            }
+            t = t1;
+            d = d1;
+
+            float theta1_min = WORLD_TO_PIXEL_SCALE * t_min;
+            float theta2_min = 2.0 * theta1_min;
+            float coverage = 1.0 - smoothstep(theta1_min, theta2_min, d_min);
+          #ifdef HQ_AA
+            vec3 c = shade(p, v, t_min);
+            accumulated_color += (1.0 - accumulated_color.a) * vec4(c, coverage);
+            if(accumulated_color.a > ALPHA_THRESHOLD) 
+                break;
+          #else
+            if(hit_idx < AA_SAMPLES)
+            {
+                hit[hit_idx] = vec2(t_min, coverage);
+                hit_idx++;
+            }
+          #endif
+        }
+      #endif
+      
+        t += d;
+        d = sdf(p + t * v);
+    }
+
+    vec3 color = (t > MAX_MARCH_DISTANCE) ? AMBIENT_COLOR : shade(p, v, t);
+
+  #ifdef AA
+  #ifdef HQ_AA
+    color = mix(color, accumulated_color.rgb / (0.001 + accumulated_color.a), accumulated_color.a);
+  #else
+    //==========================================================================================================================================================
+    // blend hit points back to front
+    //==========================================================================================================================================================
+    for(int i = hit_idx - 1; i >= 0; --i)
+        color = mix(color, shade(p, v, hit[i].x), hit[i].y);
+  #endif
+  #endif
 
 
     //==========================================================================================================================================================
@@ -295,5 +389,5 @@ void main()
 
 //    FragmentColor = (uv.x < 0.5) ? vec4(diffuse_color * diffuse, 1.0f) :
 //                                   vec4(vec3(mz_aff00), 1.0f);
-    FragmentColor = vec4(diffuse_color * diffuse, 1.0f);
+    FragmentColor = vec4(color, 1.0f);
 }

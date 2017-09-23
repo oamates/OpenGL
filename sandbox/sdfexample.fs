@@ -146,20 +146,17 @@
 
 // Sign function that doesn't return 0
 float sgn(float x) {
-	return (x<0.)?-1.:1.;
+	return (x < 0.0f) ? -1.0f : 1.0f;
 }
 
-float square (float x) {
-	return x*x;
-}
+float square (float x)
+    { return x * x; }
 
-vec2 square (vec2 x) {
-	return x*x;
-}
+vec2 square (vec2 x)
+    { return x * x; }
 
-vec3 square (vec3 x) {
-	return x*x;
-}
+vec3 square (vec3 x)
+    { return x * x; }
 
 float lengthSqr(vec3 x) {
 	return dot(x, x);
@@ -521,29 +518,30 @@ float fTruncatedIcosahedron(vec3 p, float r) {
 // Read like this: R(p.xz, a) rotates "x towards z".
 // This is fast if <a> is a compile-time constant and slower (but still practical) if not.
 void pR(inout vec2 p, float a) {
-	p = cos(a)*p + sin(a)*vec2(p.y, -p.x);
+	p = cos(a) * p + sin(a) * vec2(p.y, -p.x);
 }
 
 // Shortcut for 45-degrees rotation
 void pR45(inout vec2 p) {
-	p = (p + vec2(p.y, -p.x))*sqrt(0.5);
+	p = (p + vec2(p.y, -p.x)) * sqrt(0.5);
 }
 
 // Repeat space along one axis. Use like this to repeat along the x axis:
 // <float cell = pMod1(p.x,5);> - using the return value is optional.
 float pMod1(inout float p, float size) {
-	float halfsize = size*0.5;
-	float c = floor((p + halfsize)/size);
+	float halfsize = size * 0.5;
+	float c = floor((p + halfsize) / size);
 	p = mod(p + halfsize, size) - halfsize;
 	return c;
 }
 
 // Same, but mirror every second cell so they match at the boundaries
-float pModMirror1(inout float p, float size) {
+float pModMirror1(inout float p, float size)
+{
 	float halfsize = size*0.5;
 	float c = floor((p + halfsize)/size);
 	p = mod(p + halfsize,size) - halfsize;
-	p *= mod(c, 2.0)*2. - 1.;
+	p *= mod(c, 2.0) * 2.0 - 1.0;
 	return c;
 }
 
@@ -948,9 +946,6 @@ float snoise(vec3 v)
 
 
 
-// Created by inigo quilez - iq/2014
-// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
 // An edge antialising experiment (not multisampling used)
 //
 // If slow_antialias is disabled, then only the 4 closest hit points are used for antialising,
@@ -959,7 +954,8 @@ float snoise(vec3 v)
 #define ANTIALIASING
 //#define SLOW_ANTIALIAS
 
-vec2 sincos( float x ) { return vec2( sin(x), cos(x) ); }
+vec2 sincos(float x)
+    { return vec2(sin(x), cos(x)); }
 
 vec2 sdSegment( in vec3 p, in vec3 a, in vec3 b )
 {
@@ -999,13 +995,10 @@ float lerp(float a, float b, float w)
   return a + w*(b-a);
 }
 
-float map( vec3 p )
+float map(vec3 p)
 {
     float h;
-
     h = fSphere(p, 0.75);
-
-
     return h;
 }
 
@@ -1062,7 +1055,7 @@ vec3 shade( in float t, in float m, in float v, in vec3 ro, in vec3 rd )
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-	vec2 p = (-iResolution.xy+2.0*fragCoord.xy)/iResolution.y;
+	vec2 p = (-iResolution.xy + 2.0 * fragCoord.xy) / iResolution.y;
 
 
 
@@ -1078,7 +1071,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 vv = normalize( cross(ww,uu) );
     vec3 rd = normalize( p.x*uu + p.y*vv + fl*ww );
 
-    float px = (2.0/iResolution.y)*(1.0/fl);
+    float px = (2.0 / iResolution.y) * (1.0 / fl);
 
     vec3 col = vec3(0.0);
 
@@ -1090,72 +1083,63 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     vec3 res = vec3(-1.0);
     float t = 0.0;
-    #ifdef ANTIALIASING
+  #ifdef ANTIALIASING
     vec3 oh = vec3(0.0);
-    mat4 hit = mat4(-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0,-1.0);
-    #endif
+    mat4 hit = mat4(-1.0,-1.0,-1.0,-1.0,
+                    -1.0,-1.0,-1.0,-1.0,
+                    -1.0,-1.0,-1.0,-1.0,
+                    -1.0,-1.0,-1.0,-1.0);
+  #endif
 
 
-    for( int i=0; i<maxiteration; i++ )
+    for(int i = 0; i < maxiteration; i++ )
     {
-	    vec3 h = vec3(map( ro + t*rd ), 10.7, 10.);
-        float th1 = px*t;
-        res = vec3( t, h.yz );
-        if( h.x<th1 || t>maxdist ) break;
+	    vec3 h = vec3(map(ro + t * rd), 10.7, 10.0);
+        float th1 = px * t;
+        res = vec3(t, h.yz);
+        if(h.x < th1 || t > maxdist) break;
 
-
-        #ifdef ANTIALIASING
-        float th2 = px*t*3.0;
-        if( (h.x<th2) && (h.x>oh.x) )
+      #ifdef ANTIALIASING
+        float th2 = px * t * 3.0;
+        if((h.x < th2) && (h.x > oh.x))
         {
-            float lalp = 1.0 - (h.x-th1)/(th2-th1);
-            #ifdef SLOW_ANTIALIAS
-             vec3  lcol = shade( t, oh.y, oh.z, ro, rd );
-             tmp.xyz += (1.0-tmp.w)*lalp*lcol;
-             tmp.w   += (1.0-tmp.w)*lalp;
-             if( tmp.w>0.99 ) break;
-            #else
-             if( hit[0].x<0.0 )
-             {
-             hit[0] = hit[1]; hit[1] = hit[2]; hit[2] = hit[3]; hit[3] = vec4( t, oh.yz, lalp );
-             }
-            #endif
+            float lalp = 1.0 - (h.x - th1) / (th2 - th1);
+          #ifdef SLOW_ANTIALIAS
+            vec3  lcol = shade( t, oh.y, oh.z, ro, rd );
+            tmp.xyz += (1.0 - tmp.w) * lalp * lcol;
+            tmp.w += (1.0 - tmp.w) * lalp;
+            if(tmp.w > 0.99) break;
+          #else
+            if(hit[0].x < 0.0 )
+            {
+                hit[0] = hit[1];
+                hit[1] = hit[2];
+                hit[2] = hit[3];
+                hit[3] = vec4( t, oh.yz, lalp );
+            }
+          #endif
         }
         oh = h;
-        #endif
+      #endif
 
-        t += min( h.x, 0.5 )*0.5;
+        t += min(h.x, 0.5) * 0.5;
     }
 
-    if( t < maxdist )
-        col = shade( res.x, res.y, res.z, ro, rd );
+    if(t < maxdist)
+        col = shade(res.x, res.y, res.z, ro, rd);
 
-    #ifdef ANTIALIASING
-    #ifdef SLOW_ANTIALIAS
-	col = mix( col, tmp.xyz/(0.001+tmp.w), tmp.w );
-    #else
-    for( int i=0; i<4; i++ ) // blend back to front
-    if( hit[3-i].x>0.0 )
-        col = mix( col, shade( hit[3-i].x, hit[3-i].y, hit[3-i].z, ro, rd ), hit[3-i].w );
-    #endif
-    #endif
+  #ifdef ANTIALIASING
+  #ifdef SLOW_ANTIALIAS
+	col = mix(col, tmp.xyz / (0.001 + tmp.w), tmp.w);
+  #else
+    for(int i = 0; i < 4; i++ ) // blend back to front
+        if(hit[3 - i].x > 0.0)
+            col = mix(col, shade(hit[3 - i].x, hit[3 - i].y, hit[3 - i].z, ro, rd), hit[3 - i].w);
+  #endif
+  #endif
 
     //---------------------------------------------
-
-    col = pow( col, vec3(0.3,0.24,0.1) );
-
-    col = col / 2. + col / 1.3 * vec3(pow(col.r * col.g * col.b * 1.3, 1.5));
-
-
-
-
-    //vec2 q = fragCoord.xy/iResolution.xy;
-    //col /= pow(16.0*q.x*q.y*(1.0-q.x)*(1.0-q.y),0.1);
-
-
-    //col += 0.015;
-    //col *= 1.4;
-    //col = clamp(col, 0., 1.);
-
+    col = pow(col, vec3(0.3, 0.24, 0.1));
+    col = col / 2.0 + col / 1.3 * vec3(pow(col.r * col.g * col.b * 1.3, 1.5));
 	fragColor = vec4( col, 1.0 );
 }

@@ -49,7 +49,7 @@ template<typename sdf_t> float lipshitz_norm(float R, int attempts)
 template<typename sdf_t> glm::vec3 gradient(const glm::vec3& p)
 {
     sdf_t sdf;
-    const float delta = 0.075f;
+    const float delta = 0.0078125f;
     const glm::vec3 dX = glm::vec3(delta, 0.0f, 0.0f);
     const glm::vec3 dY = glm::vec3(0.0f, delta, 0.0f);
     const glm::vec3 dZ = glm::vec3(0.0f, 0.0f, delta);
@@ -61,7 +61,7 @@ template<typename sdf_t> glm::vec3 gradient(const glm::vec3& p)
         sdf(p + dZ) - sdf(p - dZ)
     );
 
-    return glm::normalize(dF);
+    return dF / (2.0f * delta); //glm::normalize(dF);
 }
 
 template<typename sdf_t> glm::vec3 pick_above(float R, float infimum)
@@ -115,7 +115,7 @@ struct cave_sdf
 
 };
 
-const float z_near = 0.5f;
+const float z_near = 0.125f;
 
 struct demo_window_t : public imgui_window_t
 {
@@ -197,9 +197,27 @@ int main(int argc, char *argv[])
 {
     const int res_x = 1920;
     const int res_y = 1080;
-
+/*
     float norm = lipshitz_norm<cave_sdf>(40.0f, 1024 * 1024);
     debug_msg("Lipshitz norm of the cave function = %f", norm);
+
+    cave_sdf sdf;
+    float grad_max = 0.0f, grad_min = 1.0f;
+    for(int i = 0; i < 1024 * 1024; ++i)
+    {
+        glm::vec3 p = glm::ballRand(32.0f);
+        glm::vec3 g = gradient<cave_sdf>(p);
+
+        float l = glm::length(g);
+        if (l < grad_min) grad_min = l;
+        if (l > grad_max) grad_max = l;
+    }
+
+    debug_msg("Minimum gradient norm of the cave function = %f", grad_min);
+    debug_msg("Maximum gradient norm of the cave function = %f", grad_max);
+*/
+    //return 0;
+
 
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
@@ -250,15 +268,17 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // texture unit 2 will have depth texture bound with GL_DEPTH_COMPONENT32 internal format
     //===================================================================================================================================================================================================================
+/*
     fbo_depth_t geometry_fbo(res_x, res_y, GL_TEXTURE2, GL_DEPTH_COMPONENT32, GL_LINEAR, GL_CLAMP_TO_BORDER);
     const float zero = 0.0f;
     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, &zero);
     glClearTexImage(geometry_fbo.texture_id, 0, GL_DEPTH_COMPONENT, GL_FLOAT, &zero);
-
+*/
+    
     glm::vec3 light_ws = pick_above<cave_sdf>(3.0f, z_near);
 
-    glm::mat3 view_matrix = glm::mat3(window.camera.view_matrix);
-    glm::vec3 camera_ws0 = window.camera.position();
+//    glm::mat3 view_matrix = glm::mat3(window.camera.view_matrix);
+//    glm::vec3 camera_ws0 = window.camera.position();
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -285,13 +305,13 @@ int main(int argc, char *argv[])
         glm::mat4 cmatrix4x4 = glm::inverse(window.camera.view_matrix);
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
-        float camera_shift = glm::length(camera_ws0 - camera_ws);
-        camera_ws0 = camera_ws;
+//        float camera_shift = glm::length(camera_ws0 - camera_ws);
+//        camera_ws0 = camera_ws;
 
         uni_rm_time = time;
-        uni_rm_view_matrix = view_matrix;
+//        uni_rm_view_matrix = view_matrix;
         uni_rm_camera_matrix = camera_matrix;
-        uni_rm_camera_shift = camera_shift;
+//        uni_rm_camera_shift = camera_shift;
         uni_rm_camera_ws = camera_ws;
         uni_rm_light_ws = light_ws;
 
@@ -300,13 +320,14 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // copy depth buffer to use on the next rendering pass for lower bound distance to object estimation
         //===============================================================================================================================================================================================================
+/*
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
         geometry_fbo.bind(GL_DRAW_FRAMEBUFFER);
         glBlitFramebuffer(0, 0, res_x, res_y, 0, 0, res_x, res_y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
         view_matrix = glm::mat3(window.camera.view_matrix);
-
+*/
         //===============================================================================================================================================================================================================
         // After end_frame call ::
         //  - GL_DEPTH_TEST is disabled

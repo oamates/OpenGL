@@ -73,5 +73,85 @@ float trace(vec3 p, vec3 v, float t_min)
 
 
 
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    vec2 p = (-iResolution.xy + 2.0 * fragCoord.xy) / iResolution.y;
+
+
+
+    vec3 ro = 0.6 * vec3(2.0,-3.0, 4.0);
+    vec3 ta = 0.5 * vec3(0.0, 4.0,-4.0);
+
+    ro.x -= cos(iGlobalTime / 30.0) * 2.0;
+    ta.y -= sin(iGlobalTime / 10.0) * 2.0;
+
+    float fl = 1.0;
+    vec3 ww = normalize(ta - ro);
+    vec3 uu = normalize(cross(vec3(1.0, 0.0, 0.0), ww));
+    vec3 vv = normalize(cross(ww,uu) );
+    vec3 rd = normalize(p.x * uu + p.y * vv + fl * ww);
+
+    float px = (2.0 / iResolution.y) * (1.0 / fl);
+
+    vec3 col = vec3(0.0);
+
+    //---------------------------------------------
+    // raymach loop
+    //---------------------------------------------
+    const float maxdist = 64.0; // 64.0
+    const int maxiteration = 128; //1024; // 256;
+
+    vec3 res = vec3(-1.0);
+    float t = 0.0;
+  #ifdef ANTIALIASING
+    vec3 oh = vec3(0.0);
+    mat4 hit = mat4(-1.0,-1.0,-1.0,-1.0,
+                    -1.0,-1.0,-1.0,-1.0,
+                    -1.0,-1.0,-1.0,-1.0,
+                    -1.0,-1.0,-1.0,-1.0);
+  #endif
+
+
+    for(int i = 0; i < maxiteration; i++ )
+    {
+        vec3 h = vec3(map(ro + t * rd), 10.7, 10.0);
+        float th1 = px * t;
+        res = vec3(t, h.yz);
+        if(h.x < th1 || t > maxdist) break;
+
+      #ifdef ANTIALIASING
+        float th2 = px * t * 3.0;
+        if((h.x < th2) && (h.x > oh.x))
+        {
+            float lalp = 1.0 - (h.x - th1) / (th2 - th1);
+          #ifdef SLOW_ANTIALIAS
+            vec3  lcol = shade( t, oh.y, oh.z, ro, rd );
+            tmp.xyz += (1.0 - tmp.w) * lalp * lcol;
+            tmp.w += (1.0 - tmp.w) * lalp;
+            if(tmp.w > 0.99) break;
+          #else
+            if(hit[0].x < 0.0 )
+            {
+                hit[0] = hit[1];
+                hit[1] = hit[2];
+                hit[2] = hit[3];
+                hit[3] = vec4( t, oh.yz, lalp );
+            }
+          #endif
+        }
+        oh = h;
+      #endif
+
+        t += min(h.x, 0.5) * 0.5;
+    }
+
+
+    //---------------------------------------------
+    col = pow(col, vec3(0.3, 0.24, 0.1));
+    col = col / 2.0 + col / 1.3 * vec3(pow(col.r * col.g * col.b * 1.3, 1.5));
+    fragColor = vec4( col, 1.0 );
+}
+
+
 
 
