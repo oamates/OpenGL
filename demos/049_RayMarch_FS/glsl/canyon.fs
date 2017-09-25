@@ -86,22 +86,44 @@ float sdf(vec3 p)
     p += (op - 0.25) * 0.3;
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
-    return min(ground, canyon);
+    return 0.461 * min(ground, canyon);
 }
 
 //==============================================================================================================================================================
-// sdf gradient :: tetrahedral evaluation
+// gradient, normal and directional derivative
 //==============================================================================================================================================================
-vec3 calc_normal(in vec3 p)
+const float sigma = 0.015625;                                       // 1 / 64
+//const float sigma = 0.0078125;                                  // 1 / 128
+const vec2 delta = vec2(sigma, -sigma);
+
+const float inv_derivative_factor = 0.5f / sigma;
+const float inv_grad_factor = 0.25f / (sigma * sigma);
+
+vec3 grad(vec3 p)                                                   // tetrahedral evaluation
 {
-    vec2 e = vec2(0.0125, -0.0125);
-    return normalize(e.xyy * sdf(p + e.xyy) + e.yyx * sdf(p + e.yyx) + e.yxy * sdf(p + e.yxy) + e.xxx * sdf(p + e.xxx));
+    return inv_grad_factor * (delta.xyy * sdf(p + delta.xyy) 
+                            + delta.yyx * sdf(p + delta.yyx) 
+                            + delta.yxy * sdf(p + delta.yxy) 
+                            + delta.xxx * sdf(p + delta.xxx));
+}
+
+vec3 calc_normal(vec3 p)                                            // tetrahedral evaluation
+{
+    return normalize(delta.xyy * sdf(p + delta.xyy) 
+                   + delta.yyx * sdf(p + delta.yyx) 
+                   + delta.yxy * sdf(p + delta.yxy) 
+                   + delta.xxx * sdf(p + delta.xxx));
+}
+
+float directional_derivative(vec3 p, vec3 v)                        // symmetric difference
+{
+    return inv_derivative_factor * (sdf(p + sigma * v) - sdf(p - sigma * v));
 }
 
 //==============================================================================================================================================================
 // bumped normal calculation
 //==============================================================================================================================================================
-vec3 bump_normal(in vec3 p, in vec3 n, float bf)
+vec3 bump_normal(vec3 p, vec3 n, float bf)
 {
     const vec2 e = vec2(0.0025, 0);
     mat3 m = mat3(tex3d(p - e.xyy, n),
@@ -236,17 +258,10 @@ float lower_bound(vec2 pq, float lambda)
     return min(z_aff.x, z_aff.y);
 }
 
-#define AA
-#define HQ_AA
 
-#ifndef HQ_AA
-    #define AA_SAMPLES 4
-#endif
-
-vec3 shade(vec3 p0, vec3 v, float t)
+vec3 shade(vec3 p0, vec3 n, vec3 v, float t)
 {
-    vec3 p = p0 + v * t;                                                     // fragment position in world space
-    vec3 n = calc_normal(p);                                                        // fragment normal
+    vec3 p = p0 + v * t;                                                            // fragment position in world space
     vec3 b = bump_normal(p, n, 0.0175);                                             // bumped normal, third parameter is bump factor
     vec3 l = light_ws - p;                                                          // direction from fragment to light source
     float d = length(l);                                                            // distance from fragment to light
@@ -264,116 +279,89 @@ vec3 shade(vec3 p0, vec3 v, float t)
 
     vec3 diffuse_color = tex3d(p, n);                                               // trilinear blended color from input texture
 
-    vec3 color = diffuse_color * diffuse;
+    vec3 color = diffuse_color;
     return color;
 }
+
 
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
 {
-    // vec3 _view_cs = view_matrix * view_ws;
-    // vec2 ndc = _view_cs.xy / _view_cs.z;
-    // vec2 _uv = 0.5 - 0.5 * ndc / focal_scale; 
 
-
-    // float mz_aff0 = min(lower_bound(_uv, 1.0), lower_bound(_uv, 2.0));
-    // float mz_aff1 = min(lower_bound(_uv, 3.0), lower_bound(_uv, 4.0));
-    // float mz_aff = lower_bound(_uv, 1.0); //min(mz_aff0, mz_aff1);
-
-    // mz_aff = max(mz_aff - camera_shift - 0.025, z_near);
-
-
-    vec3 v = normalize(view_ws);                                                    // from eye to fragment (in camera-space)
+    vec3 v = normalize(view_ws);
     vec3 p = camera_ws;
-
-    //==========================================================================================================================================================
-    // main raymarching algorithm
-    //==========================================================================================================================================================
     float t = z_near;
 
-  #ifdef AA
-  #ifdef HQ_AA
-    vec4 accumulated_color = vec4(0.0);
-  #else
-    vec2 hit[AA_SAMPLES];
-    int hit_idx = 0;
-  #endif
-  #endif
-
-    const int MAX_MARCH_ITERATIONS = 128;
+    const int MAX_MARCH_ITERATIONS = 256;
     const float MAX_MARCH_DISTANCE = 200.0f;
-    const float ALPHA_THRESHOLD = 0.99;
-    const float WORLD_TO_PIXEL_SCALE = 1.0 / 1080.0;
+    const float ALPHA_THRESHOLD = 0.00125;
+    const float PIXEL_SIZE_FACTOR = 1.0 / 1080.0;
     const vec3 AMBIENT_COLOR = vec3(0.32, 0.17, 0.07);
 
     float d = sdf(p + t * v);
 
+    vec3 acc_color = vec3(0.0);
+    float acc_alpha = 1.0;
+
     for(int i = 0; i < MAX_MARCH_ITERATIONS; ++i)
     {
-        float theta1 = WORLD_TO_PIXEL_SCALE * t;
-        if(d < theta1 || t > MAX_MARCH_DISTANCE)
-            break;
+        float theta = PIXEL_SIZE_FACTOR * t;
 
-      #ifdef AA
-        float theta2 = 2.0f * theta1;
-        if(d < theta2)
+        if(d < theta)
         {
-            float d_min = d;
-            float t_min = t;
-            float t1 = t, d1 = d;
+            vec3 g = grad(p + t * v);
+            float t_next = t + abs(d / dot(g, v));
+            float d_next = sdf(p + t_next * v);
 
-            while(true)
+            if (d_next < PIXEL_SIZE_FACTOR * t_next)
             {
-                t1 = t1 + d1;
-                d1 = sdf(p + t1 * v);
-                if (d1 < d_min)
-                {
-                    d_min = d1;
-                    t_min = t1;
-                }
-                else
-                    break;
-            }
-            t = t1;
-            d = d1;
-
-            float theta1_min = WORLD_TO_PIXEL_SCALE * t_min;
-            float theta2_min = 2.0 * theta1_min;
-            float coverage = 1.0 - smoothstep(theta1_min, theta2_min, d_min);
-          #ifdef HQ_AA
-            vec3 c = shade(p, v, t_min);
-            accumulated_color += (1.0 - accumulated_color.a) * vec4(c, coverage);
-            if(accumulated_color.a > ALPHA_THRESHOLD) 
+                //==============================================================================================================================================
+                // at the next step we are going to get an invisible surface element
+                // we can stop raymarching at this point
+                //==============================================================================================================================================
                 break;
-          #else
-            if(hit_idx < AA_SAMPLES)
-            {
-                hit[hit_idx] = vec2(t_min, coverage);
-                hit_idx++;
             }
-          #endif
+            else
+            {
+                //==============================================================================================================================================
+                // surface element we just encountered only partially covers pixel area
+                // lets shade it and accumulate its color, but continue marching
+                // Since d_next < PIXEL_SIZE_FACTOR * t_next is not satisfied we can immediately do one more marching step
+                //==============================================================================================================================================
+                vec3 n = normalize(g);
+                float cos_theta = dot(n, v);
+
+                vec3 c = shade(p, n, v, t);
+                float coverage = 1.0 - smoothstep(-theta, theta, d); //cos_theta * cos_theta;
+
+                //FragmentColor = vec4(coverage, 0.0, 0.0, 1.0);
+                //return;
+
+                acc_color = acc_color + acc_alpha * coverage * c;
+                acc_alpha = acc_alpha * (1 - coverage);
+
+                t = t_next + abs(d_next);
+                d = sdf(p + t * v);
+                continue;
+            }
+
+
         }
-      #endif
-      
-        t += d;
+
+        t += abs(d);
+        if (t > MAX_MARCH_DISTANCE)
+            break;
         d = sdf(p + t * v);
+
     }
 
-    vec3 color = (t > MAX_MARCH_DISTANCE) ? AMBIENT_COLOR : shade(p, v, t);
+    vec3 n = calc_normal(p + t * v);
+    vec3 c = shade(p, n, v, t);
 
-  #ifdef AA
-  #ifdef HQ_AA
-    color = mix(color, accumulated_color.rgb / (0.001 + accumulated_color.a), accumulated_color.a);
-  #else
-    //==========================================================================================================================================================
-    // blend hit points back to front
-    //==========================================================================================================================================================
-    for(int i = hit_idx - 1; i >= 0; --i)
-        color = mix(color, shade(p, v, hit[i].x), hit[i].y);
-  #endif
-  #endif
+    vec3 color = acc_color + acc_alpha * c;
+
 
 
     //==========================================================================================================================================================
@@ -387,7 +375,6 @@ void main()
     float z_aff = position_cs.z;
     gl_FragDepth = 1.0 + z_near / z_aff;   
 
-//    FragmentColor = (uv.x < 0.5) ? vec4(diffuse_color * diffuse, 1.0f) :
-//                                   vec4(vec3(mz_aff00), 1.0f);
     FragmentColor = vec4(color, 1.0f);
+
 }

@@ -35,12 +35,17 @@ template<typename sdf_t> float lipshitz_norm(float R, int attempts)
         glm::vec3 p = glm::ballRand(R);
         glm::vec3 q = glm::ballRand(R);
 
+        q = p + (q - p) / (10.0f * R);
+
         float f_p = sdf(p);
         float f_q = sdf(q);
 
         float b = abs(f_p - f_q) / glm::length(p - q);
         if (b > norm)
             norm = b;
+
+        if ((a % (1024 * 1024)) == 0)
+            debug_msg("%u millions iterations made", a / (1024 * 1024));
     }
 
     return norm;
@@ -109,11 +114,11 @@ struct cave_sdf
         float ground = q.z - ground_level + glm::dot(oq, glm::vec3(0.067f));
         q += (oq - glm::vec3(0.25f)) * 0.3f;
         q = glm::cos(0.444f * q + glm::sin(1.112f * glm::vec3(q.z, q.x, q.y)));
-        float canyon = 0.947f * (glm::length(q) - 1.05f);
+        float canyon = 0.95f * (glm::length(q) - 1.05f);
         return glm::min(ground, canyon);
     }
-
 };
+
 
 const float z_near = 0.125f;
 
@@ -197,12 +202,14 @@ int main(int argc, char *argv[])
 {
     const int res_x = 1920;
     const int res_y = 1080;
-/*
-    float norm = lipshitz_norm<cave_sdf>(40.0f, 1024 * 1024);
-    debug_msg("Lipshitz norm of the cave function = %f", norm);
 
+//    float norm = lipshitz_norm<cave_sdf>(32.0f, 1024 * 1024 * 8);
+//    debug_msg("Lipshitz norm of the cave function = %f", norm);
+
+
+/*
     cave_sdf sdf;
-    float grad_max = 0.0f, grad_min = 1.0f;
+    float grad_max = 0.0f, grad_min = 10.0f;
     for(int i = 0; i < 1024 * 1024; ++i)
     {
         glm::vec3 p = glm::ballRand(32.0f);
