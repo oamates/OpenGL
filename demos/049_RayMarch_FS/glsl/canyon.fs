@@ -283,13 +283,20 @@ vec3 shade(vec3 p0, vec3 n, vec3 v, float t)
     return color;
 }
 
+vec3 hsv2rgb(vec3 c)
+{
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
 {
-
+/*
     vec3 v = normalize(view_ws);
     vec3 p = camera_ws;
     float t = z_near;
@@ -297,9 +304,56 @@ void main()
     const int MAX_MARCH_ITERATIONS = 256;
     const float MAX_MARCH_DISTANCE = 200.0f;
     const float ALPHA_THRESHOLD = 0.00125;
-    const float PIXEL_SIZE_FACTOR = 1.0 / 1080.0;
+    const float PIXEL_SIZE = 1.0 / 1080.0;
     const vec3 AMBIENT_COLOR = vec3(0.32, 0.17, 0.07);
+*/
 
+// o, d : ray origin, direction (normalized)
+// t_min, t_max: minimum, maximum t values
+// pixelRadius: radius of a pixel at t = 1
+// forceHit: boolean enforcing to use the
+//           candidate_t value as result
+/*
+    float omega = 1.97;
+    float candidate_error = 100.0;
+    float candidate_t = z_near;
+    float previousRadius = 0.0f;
+    float stepLength = 0.0f;
+
+    for(int i = 0; i < MAX_MARCH_ITERATIONS; ++i)
+    {
+        float signedRadius = sdf(p + t * v);
+        float radius = abs(signedRadius);
+        bool sorFail = omega > 1 && (radius + previousRadius) < stepLength;
+        if (sorFail)
+        {
+            stepLength -= omega * stepLength;
+            omega = 1;
+        }
+        else
+        {
+            stepLength = signedRadius * omega;
+        }
+        previousRadius = radius;
+        float error = radius / t;
+
+        if (!sorFail && error < candidate_error)
+        {
+            candidate_t = t;
+            candidate_error = error;
+        }
+
+        if (!sorFail && error < PIXEL_SIZE || t > MAX_MARCH_DISTANCE)
+            break;
+        t += stepLength;
+    }
+    t = candidate_t;
+
+    vec3 n = calc_normal(p + t * v);
+    vec3 c = shade(p, n, v, t);
+    vec3 color = c;
+*/
+/*
     float d = sdf(p + t * v);
 
     vec3 acc_color = vec3(0.0);
@@ -361,6 +415,85 @@ void main()
     vec3 c = shade(p, n, v, t);
 
     vec3 color = acc_color + acc_alpha * c;
+*/
+
+
+    vec3 v = normalize(view_ws);
+    vec3 p = camera_ws;
+
+    const int MAX_MARCH_ITERATIONS = 128;
+    const float MAX_MARCH_DISTANCE = 200.0f;
+    const float ALPHA_THRESHOLD = 0.00125;
+    const float PIXEL_SIZE = 1.0 / 1080.0;
+    const vec3 AMBIENT_COLOR = vec3(0.32, 0.17, 0.07);
+    float gamma = 1.97;
+
+    //==========================================================================================================================================================
+    // the surface we are rendering is lsdf(x, eye) = sdf(x) - PIXEL_SIZE * dist(x, eye) = 0
+    // the volume elements along the ray are classified as follows:
+    // sdf(x) <= 0 -- the element is inside the surface, the marching loop can be stopped at this point
+    // sdf(x) >= 2 * PIXEL_SIZE * dist(x, eye) -- the element is outside the surface, and its screen projection does not cover any of the pixel area
+    // 0 < sdf(x) < 2 * PIXEL_SIZE * dist(x, eye) -- the element touches the surface and (possibly) partially covers the pixel area
+    //==========================================================================================================================================================
+
+    float t = z_near;
+    float d = sdf(p + t * v);
+    int it = 0;
+
+    do
+    {
+
+        float delta1 = PIXEL_SIZE * t;
+        float delta2 = 2.0f * delta1;
+
+
+
+
+        if (d < delta2)
+        {
+
+            float hue = t / float(MAX_MARCH_DISTANCE);
+            vec3 rgb = hsv2rgb(vec3(hue, 0.875, 0.875));
+            FragmentColor = vec4(rgb, 1.0);
+            return;
+
+            // let us make one more iteration, 
+
+            float coverage = 0.5f - 0.5f * (d - delta1) / delta1; // (1 to 0)
+            // d = 0      : coverage = 1.0f;
+            // d = delta2 : coverage = 0.0f;
+        }
+
+        //======================================================================================================================================================
+        // at this point we have d > delta2, let us try to make big step and if it does not work then
+        //======================================================================================================================================================
+        float dt = gamma * d;
+        float t1 = t + dt;
+        float d1 = sdf(p + t1 * v);
+        while (dt <= d + d1)
+        {
+            d = d1;
+            t = t1;
+            dt = gamma * d;
+            t1 = t + dt;
+            d1 = sdf(p + t1 * v);
+        }
+
+        //======================================================================================================================================================
+        // at this point we know that last step failed, e.g  d + d1 < dt
+        //======================================================================================================================================================
+
+
+
+        t = t + max(d, 0.0025 * t);
+        d = sdf(p + t * v);
+        ++it;
+    }
+    while((d > 0) && (it < MAX_MARCH_ITERATIONS));
+
+    vec3 n = calc_normal(p + t * v);
+    vec3 c = shade(p, n, v, t);
+    vec3 color = c;
 
 
 
