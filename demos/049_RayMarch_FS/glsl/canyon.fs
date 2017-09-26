@@ -4,11 +4,12 @@ in vec2 uv;
 in vec3 view_cs;
 in vec3 view_ws;
 
+uniform mat3 camera_matrix;
+uniform vec2 focal_scale;
 uniform float time;
 uniform float z_near;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
-uniform vec2 focal_scale;
 uniform float camera_shift;
 
 uniform sampler2D value_tex;
@@ -259,9 +260,10 @@ float lower_bound(vec2 pq, float lambda)
 }
 
 
-vec3 shade(vec3 p0, vec3 n, vec3 v, float t)
+vec3 shade(vec3 p0, vec3 v, float t)
 {
     vec3 p = p0 + v * t;                                                            // fragment position in world space
+    vec3 n = calc_normal(p + t * v);
     vec3 b = bump_normal(p, n, 0.0175);                                             // bumped normal, third parameter is bump factor
     vec3 l = light_ws - p;                                                          // direction from fragment to light source
     float d = length(l);                                                            // distance from fragment to light
@@ -296,23 +298,72 @@ vec3 hsv2rgb(vec3 c)
 //==============================================================================================================================================================
 void main()
 {
-/*
+
     vec3 v = normalize(view_ws);
     vec3 p = camera_ws;
-    float t = z_near;
 
     const int MAX_MARCH_ITERATIONS = 256;
     const float MAX_MARCH_DISTANCE = 200.0f;
     const float ALPHA_THRESHOLD = 0.00125;
     const float PIXEL_SIZE = 1.0 / 1080.0;
     const vec3 AMBIENT_COLOR = vec3(0.32, 0.17, 0.07);
-*/
+
+
+    float px = 0.25 / 1080.0;
+    vec3 col = vec3(0.0);
+    vec3 ro = p;
+    vec3 rd = v;
+
+    //---------------------------------------------
+    // raymach loop
+    //---------------------------------------------
+    float t = z_near;
+
+    vec3 acc_color = vec3(0.0f);
+    float acc_alpha = 1.0f;
+
+    for(int i = 0; i < MAX_MARCH_ITERATIONS; i++)
+    {
+        float d = sdf(p + t * v);
+        float th1 = px * t;
+
+        if(d < th1 || t > MAX_MARCH_DISTANCE) break;
+
+        
+        float th3 = 3.0 * px * t;
+        if(d < th3)
+        {
+            float t1 = t + 2.0 * d;
+            float d1 = sdf(p + t1 * v);
+
+            if (d1 < px * t1)
+            {
+                FragmentColor = vec4(1,0,0,1);
+                return;
+            }
+            
+
+            float alpha = 1.0 - (d - th1) / (th3 - th1);
+            acc_color = acc_color + acc_alpha * alpha * shade(p, v, t);
+            acc_alpha = acc_alpha * (1.0 - alpha);
+        }
+        
+        t += d;
+    }
+    
+    if(t < MAX_MARCH_DISTANCE)
+        col = shade(p, v, t);
+
+    col = acc_color + acc_alpha * col;
+    
+
 
 // o, d : ray origin, direction (normalized)
 // t_min, t_max: minimum, maximum t values
 // pixelRadius: radius of a pixel at t = 1
 // forceHit: boolean enforcing to use the
 //           candidate_t value as result
+
 /*
     float omega = 1.97;
     float candidate_error = 100.0;
@@ -353,6 +404,10 @@ void main()
     vec3 c = shade(p, n, v, t);
     vec3 color = c;
 */
+
+
+
+
 /*
     float d = sdf(p + t * v);
 
@@ -416,17 +471,44 @@ void main()
 
     vec3 color = acc_color + acc_alpha * c;
 */
-
-
-    vec3 v = normalize(view_ws);
-    vec3 p = camera_ws;
-
-    const int MAX_MARCH_ITERATIONS = 128;
+/*
+    const int MAX_MARCH_ITERATIONS = 512;
     const float MAX_MARCH_DISTANCE = 200.0f;
     const float ALPHA_THRESHOLD = 0.00125;
-    const float PIXEL_SIZE = 1.0 / 1080.0;
+    const float PIXEL_SIZE = 0.125 / 1080.0;
     const vec3 AMBIENT_COLOR = vec3(0.32, 0.17, 0.07);
     float gamma = 1.97;
+
+
+    const int NUM_SAMPLES = 8;
+    const vec2 samples[NUM_SAMPLES] = vec2[NUM_SAMPLES]
+    (
+        vec2(-3.0 / 4.0, -1.0 / 4.0),
+        vec2(-1.0 / 4.0,  3.0 / 4.0),
+        vec2( 3.0 / 4.0,  1.0 / 4.0),
+        vec2( 1.0 / 4.0, -3.0 / 4.0),
+
+        vec2(-1.0 / 2.0, -1.0 / 2.0),
+        vec2(-1.0 / 2.0,  1.0 / 2.0),
+        vec2( 1.0 / 2.0,  1.0 / 2.0),
+        vec2( 1.0 / 2.0, -2.0 / 2.0)
+    );
+
+    vec3 color;
+
+    vec3 p = camera_ws;
+    float t_min = z_near;
+
+
+for(int s = 0; s < NUM_SAMPLES; ++s)
+{
+
+    vec2 dndc = samples[s] / vec2(1920.0, 1080.0);
+    vec3 view_cs1 = view_cs + vec3(focal_scale * dndc, 0.0);
+    vec3 view_ws1 = camera_matrix * view_cs1;
+
+    vec3 v = normalize(view_ws1);
+
 
     //==========================================================================================================================================================
     // the surface we are rendering is lsdf(x, eye) = sdf(x) - PIXEL_SIZE * dist(x, eye) = 0
@@ -440,13 +522,19 @@ void main()
     float d = sdf(p + t * v);
     int it = 0;
 
+
+
+
     do
     {
 
         float delta1 = PIXEL_SIZE * t;
-        float delta2 = 2.0f * delta1;
+        float delta3 = 3.0f * delta1;
 
-
+        if (d < delta1)
+        {
+            break;
+        }
 
 
         if (d < delta2)
@@ -485,17 +573,19 @@ void main()
 
 
 
-        t = t + max(d, 0.0025 * t);
+        t = t + d;
         d = sdf(p + t * v);
         ++it;
     }
     while((d > 0) && (it < MAX_MARCH_ITERATIONS));
 
+    t_min = min(t_min, t);
     vec3 n = calc_normal(p + t * v);
     vec3 c = shade(p, n, v, t);
-    vec3 color = c;
-
-
+    color += c;
+}
+    color /= float(NUM_SAMPLES);
+*/
 
     //==========================================================================================================================================================
     // view_cs is the view vector in camera space 
@@ -508,6 +598,6 @@ void main()
     float z_aff = position_cs.z;
     gl_FragDepth = 1.0 + z_near / z_aff;   
 
-    FragmentColor = vec4(color, 1.0f);
+    FragmentColor = vec4(col, 1.0f);
 
 }
