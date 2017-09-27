@@ -333,7 +333,7 @@ void main()
         float th3 = 3.0 * px * t;
         if(d < th3)
         {
-            float t1 = t + 2.0 * d;
+            float t1 = t + 3.0 * d;
             float d1 = sdf(p + t1 * v);
 
             if (d1 < px * t1)
@@ -341,7 +341,7 @@ void main()
                 FragmentColor = vec4(1,0,0,1);
                 return;
             }
-            
+
 
             float alpha = 1.0 - (d - th1) / (th3 - th1);
             acc_color = acc_color + acc_alpha * alpha * shade(p, v, t);

@@ -21,7 +21,7 @@ struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
 
-    bool hell = true;
+    bool split_screen = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
@@ -40,8 +40,8 @@ struct demo_window_t : public imgui_window_t
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
-        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
-            hell = !hell;
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+            split_screen = !split_screen;
     }
 
     void on_mouse_move() override
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
     uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
-    uniform_t uni_rm_hell = ray_marcher["hell"];
+    uniform_t uni_rm_split_screen = ray_marcher["split_screen"];
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
         glm::mat4 cmatrix4x4 = window.camera.camera_matrix();
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
-        glm::vec3 light_ws = glm::vec3(75.0f * glm::cos(0.25f * time), 100.0f, 75.0f * glm::sin(0.25f * time));
+        glm::vec3 light_ws = 1.25f * glm::vec3(glm::cos(0.25f * time), glm::sin(0.25f * time), 0.43f);
 
         //===============================================================================================================================================================================================================
         // Render scene
@@ -139,6 +139,7 @@ int main(int argc, char *argv[])
         uni_rm_camera_matrix = camera_matrix;
         uni_rm_camera_ws = camera_ws;
         uni_rm_light_ws = light_ws;
+        uni_rm_split_screen = int (window.split_screen ? 1 : 0);
 
         glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
 
