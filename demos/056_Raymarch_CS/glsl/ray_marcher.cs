@@ -56,7 +56,7 @@ vec3 tex3D(vec3 p, vec3 n)
 
 vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float l, float t)
 {
-    const float tex_scale = 0.25;
+    const float tex_scale = 0.5;
     vec3 q = tex_scale * p;
     n = max(abs(n) - 0.35f, 0.0f);
     n /= dot(n, vec3(1.0));
@@ -91,9 +91,12 @@ vec3 tri(vec3 p)
 //    vec3 y2 = abs(fract(4.32456 * p.zxy + 11.19776) - 0.5);
 //    return 0.6131 * y0 + 0.2712 * y1 + 0.1491 * y2;
 
-    vec3 y = 0.5 * clamp(abs(2.0 * fract(p) - 1.0), 0.025, 0.975);
-    return y;
+//    vec3 y = 0.5 * clamp(abs(2.0 * fract(p) - 1.0), 0.025, 0.975);
+//    return y;
+
+    return abs(fract(p) - 0.5);
 }
+
 
 float sdf(vec3 p)
 {
