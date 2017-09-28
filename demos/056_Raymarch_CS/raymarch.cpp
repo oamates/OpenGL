@@ -17,6 +17,8 @@
 #include "glsl_noise.hpp"
 #include "image.hpp"
 
+const float z_near = 1.0f;
+
 struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
@@ -27,7 +29,7 @@ struct demo_window_t : public imgui_window_t
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), z_near);
     }
 
     //===================================================================================================================================================================================================================
@@ -81,9 +83,19 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glsl_program_t ray_marcher(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/ray_marcher.cs"));
     ray_marcher.enable();
-    ray_marcher["focal_scale"] = glm::vec2(1.0f / window.camera.projection_matrix[0][0], 1.0f / window.camera.projection_matrix[1][1]);
+    ray_marcher["z_near"] = z_near;
+
+    glm::vec2 focal_scale = window.camera.focal_scale();
+    float pixel_size = (2.0f * focal_scale.x) / window.res_x;
+
+    debug_msg("Camera focal scale = %s", glm::to_string(focal_scale).c_str());
+    debug_msg("Pixel size = %f", pixel_size);
+
+    ray_marcher["focal_scale"] = focal_scale;
+    ray_marcher["pixel_size"] = pixel_size;
     ray_marcher["tb_tex"] = 2;
     ray_marcher["noise_tex"] = 3;
+
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
     uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
@@ -106,9 +118,15 @@ int main(int argc, char *argv[])
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, window.res_x, window.res_y);
     glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
-    glActiveTexture(GL_TEXTURE2);
-    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
+
+    glActiveTexture(GL_TEXTURE2);
+    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/marble.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+/*
+    GLfloat max_anisotropy;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
+*/
     glActiveTexture(GL_TEXTURE3);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 

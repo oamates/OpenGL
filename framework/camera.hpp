@@ -25,12 +25,13 @@ struct camera_t
     void straight_left(double dt);
     void rotateXY(const glm::dvec2& direction, double dt);
 
-
     void infinite_perspective(float view_angle, float aspect_ratio, float znear);
 
     glm::mat4 projection_view_matrix();
     glm::mat4 camera_matrix();
     glm::vec3 position();
+    glm::vec2 focal_scale();
+
 };
 
 //=======================================================================================================================================================================================================================

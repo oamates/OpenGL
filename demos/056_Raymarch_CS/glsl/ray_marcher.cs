@@ -14,9 +14,13 @@ layout (rgba8, binding = 0) uniform image2D scene_image;
 
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
-uniform vec2 focal_scale;
-uniform sampler2D tb_tex;
 uniform vec3 light_ws;
+uniform vec2 focal_scale;                                                   // camera focal scale
+uniform float pixel_size;                                                        // NDC / pixel uv - ratio
+uniform float z_near;                                                       // distance to near z-plane
+
+uniform sampler2D tb_tex;
+
 uniform int split_screen;
 
 //==============================================================================================================================================================
@@ -50,13 +54,45 @@ vec3 tex3D(vec3 p, vec3 n)
     return tx * n.x + ty * n.y + tz * n.z;
 }
 
+vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float l, float t)
+{
+    const float tex_scale = 0.25;
+    vec3 q = tex_scale * p;
+    n = max(abs(n) - 0.35f, 0.0f);
+    n /= dot(n, vec3(1.0));
+
+    float der_factor = tex_scale * pixel_size * t / l;
+    float dp = dot(v, n);
+
+    vec3 cX = camera_matrix[0];
+    vec3 cY = camera_matrix[1];
+
+    float qX = dot(cX, n) / dp;
+    float qY = dot(cY, n) / dp;
+
+    vec3 dq_dx = der_factor * (cX - qX * v);
+    vec3 dq_dy = der_factor * (cY - qY * v);
+
+    vec3 tx = textureGrad(tb_tex, q.zy, dq_dx.zy, dq_dx.zy).rgb;
+    vec3 ty = textureGrad(tb_tex, q.xz, dq_dx.xz, dq_dx.xz).rgb;
+    vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dx.xy).rgb;
+
+    vec3 b = tx * n.x + ty * n.y + tz * n.z;
+    return b;
+}
+
 //==============================================================================================================================================================
 // canyon signed distance function
 //==============================================================================================================================================================
-vec3 tri(in vec3 x)
+vec3 tri(vec3 p)
 {
-    vec3 y = clamp(fract(x), 0.005, 0.995);
-    return abs(y - 0.5);
+//    vec3 y0 = abs(fract(p) - 0.5);
+//    vec3 y1 = abs(fract(2.14179 * p.yzx + 14.12495) - 0.5);
+//    vec3 y2 = abs(fract(4.32456 * p.zxy + 11.19776) - 0.5);
+//    return 0.6131 * y0 + 0.2712 * y1 + 0.1491 * y2;
+
+    vec3 y = 0.5 * clamp(abs(2.0 * fract(p) - 1.0), 0.025, 0.975);
+    return y;
 }
 
 float sdf(vec3 p)
@@ -123,7 +159,7 @@ float calc_ao2(in vec3 p, in vec3 n)
 //==============================================================================================================================================================
 // tetrahedral normal and bumped normal
 //==============================================================================================================================================================
-const float DERIVATIVE_SCALE = 0.5 * 0.00390625;
+float DERIVATIVE_SCALE = pixel_size;
 const vec3 RGB_SPECTRAL_POWER = vec3(0.299, 0.587, 0.114);
 
 vec3 normal_AA(vec3 p, float t)
@@ -144,6 +180,18 @@ vec3 bump_normal_AA(vec3 p, vec3 n, float bf, float t)
                   tex3D(p - delta.yyx, n));
     vec3 g = RGB_SPECTRAL_POWER * m;                                    // Converting to greyscale.
     g = (g - dot(tex3D(p, n), RGB_SPECTRAL_POWER)) / delta.x;
+    return normalize(n + g * bf);                                       // Bumped normal. "bf" - bump factor.
+}
+
+
+vec3 bump_normal_AA_AA(vec3 p, vec3 n, vec3 v, float bf, float l, float t)
+{
+    vec2 delta = vec2(DERIVATIVE_SCALE * t, 0.0f);
+    mat3 m = mat3(tex3D_AA(p - delta.xyy, n, v, l, t), 
+                  tex3D_AA(p - delta.yxy, n, v, l, t), 
+                  tex3D_AA(p - delta.yyx, n, v, l, t));
+    vec3 g = RGB_SPECTRAL_POWER * m;                                    // Converting to greyscale.
+    g = (g - dot(tex3D_AA(p, n, v, l, t), RGB_SPECTRAL_POWER)) / delta.x;
     return normalize(n + g * bf);                                       // Bumped normal. "bf" - bump factor.
 }
 
@@ -191,10 +239,15 @@ vec3 envMap(vec3 rd, vec3 n)
 
 void main()
 {
-    vec2 uv = ivec2(gl_GlobalInvocationID.xy) / vec2(1920.0f, 1080.0f);
-    vec3 view = camera_matrix * vec3(focal_scale * (2.0f * uv - 1.0f), -1.0f);
 
-    vec3 v = normalize(view);
+    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + 0.5f) / vec2(1920.0f, 1080.0f);     // pixel half-integral coordinates
+    vec2 ndc = 2.0f * uv - 1.0f;                                                    // normalized device coordinates
+    vec3 z_uv = vec3(focal_scale * ndc, -z_near);
+    float h = length(z_uv);
+    float inv_h = 1.0f / h;
+
+    vec3 view_ws = inv_h * (camera_matrix * z_uv);
+    vec3 v = view_ws;
 
     float t = 0.0;
     for(int i = 0; i < 128; i++)
@@ -206,7 +259,8 @@ void main()
     
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
-    vec3 b = bump_normal_AA(p, n, 0.171f, t);                                       // texture-based bump mapping
+    //vec3 b = bump_normal_AA(p, n, 0.171f, t);                                       // texture-based bump mapping
+    vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
 
     vec3 l = light_ws - p;                                                          // from fragment to light
     float ld = max(length(l), 0.001);                                               // distance to light
@@ -222,7 +276,7 @@ void main()
     float fresnel_factor = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
     float ambient_factor = ao * (0.75 * ao + fresnel_factor * fresnel_factor * 0.15);                     // ambient light factor
 
-    vec3 texCol = tex3D(p, n);                                                     // trilinear blended texture
+    vec3 texCol = tex3D_AA(p, n, v, h, t);                                                     // trilinear blended texture
     vec3 color = texCol * (diffuse_factor + specular_factor + ambient_factor);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 

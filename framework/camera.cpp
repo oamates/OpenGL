@@ -72,6 +72,8 @@ glm::mat4 camera_t::camera_matrix()
 glm::vec3 camera_t::position()
     { return -glm::inverse(glm::mat3(view_matrix)) * glm::vec3(view_matrix[3]); }
 
+glm::vec2 camera_t::focal_scale()
+    { return glm::vec2(1.0f / projection_matrix[0][0], 1.0f / projection_matrix[1][1]); }
 
 //=======================================================================================================================================================================================================================
 // For hyperboloid model of hyperbolic space motions are linear transformations preserving Lorentz metric dx * dx + dy * dy + dz * dz - dw * dw.
