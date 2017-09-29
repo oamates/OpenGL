@@ -84,7 +84,13 @@ vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float l, float t)
 //==============================================================================================================================================================
 // canyon signed distance function
 //==============================================================================================================================================================
-vec3 tri(vec3 p)
+vec3 tri_sharp(vec3 p)
+{
+    vec3 y = abs(fract(p) - 0.5);
+    return y;
+}
+
+vec3 tri_smooth(vec3 p)
 {
     const float k = 0.04;
     vec3 y = abs(fract(p) - 0.5);
@@ -98,7 +104,7 @@ vec3 tri(vec3 p)
 float sdf(vec3 p)
 {
     p *= 0.77;
-    vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
+    vec3 op = tri_smooth(1.1f * p + tri_sharp(1.1f * p.zxy));
     float ground = p.z + 0.5 + dot(op, vec3(0.067));
     p += (op - 0.25) * 0.3;
     p = cos(0.444f * p + sin(1.112f * p.zxy));
@@ -184,12 +190,16 @@ vec3 normal_AA(vec3 p, float t)
 
 vec3 bump_normal_AA(vec3 p, vec3 n, float bf, float t)
 {
-    vec2 delta = vec2(4.0 * DERIVATIVE_SCALE * t, 0.0f);
+    float scale = DERIVATIVE_SCALE * t;
+    vec2 delta = vec2(scale, -scale);
 
-    vec3 g = vec3(dot(tex3D(p - delta.xyy, n), RGB_SPECTRAL_POWER),
-                  dot(tex3D(p - delta.yxy, n), RGB_SPECTRAL_POWER),
-                  dot(tex3D(p - delta.yyx, n), RGB_SPECTRAL_POWER));
-    g = (g - dot(tex3D(p, n), RGB_SPECTRAL_POWER)) / delta.x;
+    vec3 g = vec3(delta.xyy * dot(tex3D(p + delta.xyy, n), RGB_SPECTRAL_POWER) 
+                + delta.yyx * dot(tex3D(p + delta.yyx, n), RGB_SPECTRAL_POWER) 
+                + delta.yxy * dot(tex3D(p + delta.yxy, n), RGB_SPECTRAL_POWER) 
+                + delta.xxx * dot(tex3D(p + delta.xxx, n), RGB_SPECTRAL_POWER));
+
+    float inv_factor = 1.0 / (scale * scale);
+    g = inv_factor * g;
     return normalize(n + bf * g);                                       // Bumped normal. "bf" - bump factor.
 }
 
@@ -275,7 +285,7 @@ void main()
     
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
-    vec3 b = bump_normal_AA(p, n, 0.771f, t);                                       // texture-based bump mapping
+    vec3 b = bump_normal_AA(p, n, 0.0471f, t);                                       // texture-based bump mapping
     //vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
 
     vec3 l = light_ws - p;                                                          // from fragment to light
@@ -292,7 +302,7 @@ void main()
     float fresnel_factor = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
     float ambient_factor = ao * (0.75 * ao + fresnel_factor * fresnel_factor * 0.15);                     // ambient light factor
 
-    vec3 texCol = tex3D_AA(p, n, v, h, t);                                                     // trilinear blended texture
+    vec3 texCol = tex3D(p, n);                                                     // trilinear blended texture
     vec3 color = texCol * (diffuse_factor + specular_factor + ambient_factor);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
