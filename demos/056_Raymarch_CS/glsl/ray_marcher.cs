@@ -43,20 +43,36 @@ float hermite5(float a, float b, float x)
 const float pi = 3.14159265359;
 const float HORIZON = 200.0;
 
+//==============================================================================================================================================================
+// trilinear blend texture
+//==============================================================================================================================================================
+const float tex_scale = 0.5;
+
 vec3 tex3D(vec3 p, vec3 n)
 {
-    p *= 0.25;
+    vec3 q = tex_scale * p;
     n = max(abs(n) - 0.35f, 0.0f);
     n /= dot(n, vec3(1.0));
-    vec3 tx = texture(tb_tex, p.zy).rgb;
-    vec3 ty = texture(tb_tex, p.xz).rgb;
-    vec3 tz = texture(tb_tex, p.xy).rgb;
+    vec3 tx = texture(tb_tex, q.yz).rgb;
+    vec3 ty = texture(tb_tex, q.zx).rgb;
+    vec3 tz = texture(tb_tex, q.xy).rgb;
     return tx * n.x + ty * n.y + tz * n.z;
+}
+
+float luminosity(vec3 p, vec3 n)
+{
+    vec3 q = tex_scale * p;
+    n = max(abs(n) - 0.35f, 0.0f);
+
+    vec3 l = vec3(dot(texture(tb_tex, q.yz).rgb, RGB_SPECTRAL_POWER),
+                  dot(texture(tb_tex, q.zx).rgb, RGB_SPECTRAL_POWER),
+                  dot(texture(tb_tex, q.xy).rgb, RGB_SPECTRAL_POWER));
+
+    return dot(l, n) / dot(n, vec3(1.0));
 }
 
 vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float l, float t)
 {
-    const float tex_scale = 0.5;
     vec3 q = tex_scale * p;
     n = max(abs(n) - 0.35f, 0.0f);
     n /= dot(n, vec3(1.0));
@@ -73,8 +89,8 @@ vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float l, float t)
     vec3 dq_dx = der_factor * (cX - qX * v);
     vec3 dq_dy = der_factor * (cY - qY * v);
 
-    vec3 tx = textureGrad(tb_tex, q.zy, dq_dx.zy, dq_dx.zy).rgb;
-    vec3 ty = textureGrad(tb_tex, q.xz, dq_dx.xz, dq_dx.xz).rgb;
+    vec3 tx = textureGrad(tb_tex, q.yz, dq_dx.yz, dq_dx.yz).rgb;
+    vec3 ty = textureGrad(tb_tex, q.zx, dq_dx.zx, dq_dx.zx).rgb;
     vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dx.xy).rgb;
 
     vec3 b = tx * n.x + ty * n.y + tz * n.z;
