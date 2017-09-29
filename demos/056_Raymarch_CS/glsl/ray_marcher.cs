@@ -86,23 +86,20 @@ vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float l, float t)
 //==============================================================================================================================================================
 vec3 tri(vec3 p)
 {
-//    vec3 y0 = abs(fract(p) - 0.5);
-//    vec3 y1 = abs(fract(2.14179 * p.yzx + 14.12495) - 0.5);
-//    vec3 y2 = abs(fract(4.32456 * p.zxy + 11.19776) - 0.5);
-//    return 0.6131 * y0 + 0.2712 * y1 + 0.1491 * y2;
+    const float k = 0.04;
+    vec3 y = abs(fract(p) - 0.5);
+    vec3 z = clamp(y, k, 0.5 - k);
+    return z;
 
-//    vec3 y = 0.5 * clamp(abs(2.0 * fract(p) - 1.0), 0.025, 0.975);
-//    return y;
-
-    return abs(fract(p) - 0.5);
+//    return abs(fract(p) - 0.5);
 }
 
 
 float sdf(vec3 p)
 {
-    p *= 0.77;    
+    p *= 0.77;
     vec3 op = tri(1.1f * p + tri(1.1f * p.zxy));
-    float ground = p.z + 3.5 + dot(op, vec3(0.067));
+    float ground = p.z + 0.5 + dot(op, vec3(0.067));
     p += (op - 0.25) * 0.3;
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = (length(p) - 1.05) * 0.95;
@@ -162,8 +159,18 @@ float calc_ao2(in vec3 p, in vec3 n)
 //==============================================================================================================================================================
 // tetrahedral normal and bumped normal
 //==============================================================================================================================================================
-float DERIVATIVE_SCALE = pixel_size;
+float DERIVATIVE_SCALE = 0.0093717;
 const vec3 RGB_SPECTRAL_POWER = vec3(0.299, 0.587, 0.114);
+
+vec3 normal(vec3 p)
+{
+    float scale = DERIVATIVE_SCALE;
+    vec2 delta = vec2(scale, -scale); 
+    return normalize(delta.xyy * sdf(p + delta.xyy) 
+                   + delta.yyx * sdf(p + delta.yyx) 
+                   + delta.yxy * sdf(p + delta.yxy) 
+                   + delta.xxx * sdf(p + delta.xxx));
+}
 
 vec3 normal_AA(vec3 p, float t)
 {
@@ -177,13 +184,13 @@ vec3 normal_AA(vec3 p, float t)
 
 vec3 bump_normal_AA(vec3 p, vec3 n, float bf, float t)
 {
-    vec2 delta = vec2(DERIVATIVE_SCALE * t, 0.0f);
-    mat3 m = mat3(tex3D(p - delta.xyy, n), 
-                  tex3D(p - delta.yxy, n), 
-                  tex3D(p - delta.yyx, n));
-    vec3 g = RGB_SPECTRAL_POWER * m;                                    // Converting to greyscale.
+    vec2 delta = vec2(4.0 * DERIVATIVE_SCALE * t, 0.0f);
+
+    vec3 g = vec3(dot(tex3D(p - delta.xyy, n), RGB_SPECTRAL_POWER),
+                  dot(tex3D(p - delta.yxy, n), RGB_SPECTRAL_POWER),
+                  dot(tex3D(p - delta.yyx, n), RGB_SPECTRAL_POWER));
     g = (g - dot(tex3D(p, n), RGB_SPECTRAL_POWER)) / delta.x;
-    return normalize(n + g * bf);                                       // Bumped normal. "bf" - bump factor.
+    return normalize(n + bf * g);                                       // Bumped normal. "bf" - bump factor.
 }
 
 
@@ -202,10 +209,16 @@ vec3 bump_normal_AA_AA(vec3 p, vec3 n, vec3 v, float bf, float l, float t)
 //==============================================================================================================================================================
 // shadows calculation
 //==============================================================================================================================================================
-float smin2(float a, float b, float k)
+float smooth_min(float a, float b, float k)
 {
-    float h = clamp(0.5f + 0.5f * (b - a) / k, 0.0f, 1.0f);
-    return mix(b, a, h) - k * h * (1.0f - h);
+    float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
+}
+
+float smooth_max(float a, float b, float k)
+{
+    float h = clamp(0.5 - 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) + k * h * (1.0 - h);
 }
 
 float hard_shadow_factor(vec3 p, vec3 l, float min_t, float max_t)
@@ -262,8 +275,8 @@ void main()
     
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
-    //vec3 b = bump_normal_AA(p, n, 0.171f, t);                                       // texture-based bump mapping
-    vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
+    vec3 b = bump_normal_AA(p, n, 0.771f, t);                                       // texture-based bump mapping
+    //vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
 
     vec3 l = light_ws - p;                                                          // from fragment to light
     float ld = max(length(l), 0.001);                                               // distance to light
@@ -285,8 +298,8 @@ void main()
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
                         ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(texCol, 1.0f)
                                                       : vec4(ao, ao, ao, 1.0f))
-                                      : ((uv.y < 0.5) ? vec4(sf, sf, sf, 1.0f)
-                                                      : vec4(vec3(fresnel_factor), 1.0f)));
+                                      : ((uv.y < 0.5) ? vec4(abs(n), 1.0f)
+                                                      : vec4(abs(b), 1.0f)));
 
     imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
 }
