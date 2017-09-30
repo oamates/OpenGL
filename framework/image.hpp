@@ -24,8 +24,10 @@ GLuint random_rgba(GLuint size);
 
 //=======================================================================================================================================================================================================================
 // GL_TEXTURE_2D loading function
+//  - texture2d_luma - load RGB texture and fill the alpha channel with luminosity values
 //=======================================================================================================================================================================================================================
 GLuint texture2d(const char* file_name, int* channels = 0, GLint mag_filter = GL_LINEAR, GLint min_filter = GL_LINEAR_MIPMAP_LINEAR, GLint wrap_mode = GL_REPEAT, bool float_texture = false);
+GLuint texture2d_luma(const char* file_name, int* channels = 0, GLint mag_filter = GL_LINEAR, GLint min_filter = GL_LINEAR_MIPMAP_LINEAR, GLint wrap_mode = GL_REPEAT, bool float_texture = false);
 
 //=======================================================================================================================================================================================================================
 // GL_TEXTURE_CUBE_MAP loading function

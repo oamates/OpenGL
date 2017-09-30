@@ -586,6 +586,129 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
 }
 
 //===================================================================================================================================================================================================================
+// loads png file and computes pixel luminosity storing it to alpha channel
+//===================================================================================================================================================================================================================
+GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GLint min_filter, GLint wrap_mode, bool float_texture)
+{
+    debug_msg("Loading PNG texture : %s", file_name);
+
+    //===============================================================================================================================================================================================================
+    // open the file and read its 8-byte header to make sure the format is png
+    //===============================================================================================================================================================================================================
+    png_byte header[8];
+    FILE * file = fopen(file_name, "rb");
+    if ((0 == file) || (8 != fread(header, 1, 8, file)) || png_sig_cmp(header, 0, 8))
+    { 
+        fclose(file);
+        debug_msg("Failed to open %s or invalid png format.", file_name);
+        return 0;
+    }
+
+    //===============================================================================================================================================================================================================
+    // set up reading struct, image info struct and error callback point
+    //===============================================================================================================================================================================================================
+    png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+    if (setjmp(png_jmpbuf(png_ptr))) 
+    {
+        png_destroy_read_struct(&png_ptr, &info_ptr, 0);
+        debug_msg("Error from libpng.");
+        return 0;
+    }
+
+    png_init_io(png_ptr, file);
+    png_set_sig_bytes(png_ptr, 8);
+    png_read_info(png_ptr, info_ptr);
+    int bit_depth, color_type;
+    png_uint_32 width, height;
+    png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);
+
+    if ((color_type == PNG_COLOR_TYPE_PALETTE) || ((color_type == PNG_COLOR_TYPE_GRAY) && (bit_depth < 8)) || png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
+        png_set_expand(png_ptr);
+
+    // Tell libpng to strip 16 bits/color files down to 8 bits/color (png_set_scale_16 uses accurate scaling)
+    if (bit_depth == 16) png_set_scale_16(png_ptr);
+
+    GLint format, internal_format;
+
+    if (color_type != PNG_COLOR_TYPE_RGB)
+        exit_msg("Expecting PNG_COLOR_TYPE_RGB image type.")
+
+    format = GL_RGBA;
+    internal_format = float_texture ? GL_RGBA32F : GL_RGBA;
+    if (channels) 
+        *channels = 3;
+
+    png_read_update_info(png_ptr, info_ptr);
+
+    //===============================================================================================================================================================================================================
+    // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d 
+    //===============================================================================================================================================================================================================
+    int rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;
+    png_byte * image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));
+    png_byte ** row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));
+
+    if ((0 == image_data) || (0 == row_pointers))
+    {
+        free(image_data);
+        free(row_pointers);
+        png_destroy_read_struct(&png_ptr, &info_ptr, 0);
+        fclose(file);
+        debug_msg("Error: could not allocate memory for PNG image data or row pointers\n");
+        return 0;
+    }
+    
+    for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;
+
+    //===============================================================================================================================================================================================================
+    // finally, read the image data, compute pixel luminosity values and store them into the alpha channel
+    //===============================================================================================================================================================================================================
+    png_read_image(png_ptr, row_pointers);
+
+    uint32_t* luma_image_data = (uint32_t*) malloc(width * height * sizeof(uint32_t));
+
+    int idx = 0;
+    for (int j = 0; j < height; ++j)
+        for (int i = 0; i < width; ++i)
+        {
+            png_byte* rgb_pixel = row_pointers[j] + 3 * i;
+            uint32_t r = rgb_pixel[0];
+            uint32_t g = rgb_pixel[1];
+            uint32_t b = rgb_pixel[2];
+
+            double luma = 0.299 * r + 0.587 * g + 0.114 * b;
+            uint32_t l = luma;
+            if (l > 255) l = 255;
+
+            luma_image_data[idx++] = r | (g << 8) | (b << 16) | (l << 24);
+        }
+
+    
+    GLuint texture_id;
+    glGenTextures(1, &texture_id);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width, height, 0, format, GL_UNSIGNED_BYTE, luma_image_data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter); 
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) 
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+    //===============================================================================================================================================================================================================
+    // clean up
+    //===============================================================================================================================================================================================================
+    png_destroy_read_struct(&png_ptr, &info_ptr, 0);
+    free(luma_image_data);
+    free(image_data);
+    free(row_pointers);
+    fclose(file);
+    debug_msg("RGB texture with luminosity successfully loaded : id = %u", texture_id);
+    return texture_id;
+}
+
+//===================================================================================================================================================================================================================
 // stores pixelbuffer into a png file
 //===================================================================================================================================================================================================================
 bool write(const char * file_name, int width, int height, unsigned char* pixelbuffer, int color_type)
