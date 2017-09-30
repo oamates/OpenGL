@@ -40,13 +40,13 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
     glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-    //glGenerateMipmap(GL_TEXTURE_2D);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
-    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) glGenerateMipmap(GL_TEXTURE_2D);
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) 
+        glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(data);
     return texture_id;
@@ -61,6 +61,7 @@ GLuint hdr2d(const char* file_name, int* channels, GLint mag_filter, GLint min_f
     if (!data)
     {
         debug_msg("stbi :: failed to load HDR image : %s", file_name);
+        return 0;
     }
 
     GLint internal_format;
@@ -97,7 +98,8 @@ GLuint hdr2d(const char* file_name, int* channels, GLint mag_filter, GLint min_f
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
 
-    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) glGenerateMipmap(GL_TEXTURE_2D);
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR)
+        glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(data);
     return texture_id;
@@ -150,7 +152,7 @@ GLuint random_rgb(GLuint size)
     glGenerateMipmap(GL_TEXTURE_2D);
     free(random_data);
     return texture_id;
-};
+}
 
 GLuint random_rgba(GLuint size)
 {
@@ -172,7 +174,7 @@ GLuint random_rgba(GLuint size)
     glGenerateMipmap(GL_TEXTURE_2D);
     free(random_data);
     return texture_id;
-};
+}
 
 //===================================================================================================================================================================================================================
 // creates GL_TEXTURE_CUBE_MAP from six png files
@@ -273,7 +275,7 @@ GLuint cubemap(const char* file_names[6])
                 glDeleteTextures(1, &texture_id);
                 debug_msg("Error: could not allocate memory for png image data or row pointers\n");
                 return 0;
-            };
+            }
             for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;                 
         }
         else

@@ -71,7 +71,7 @@ struct mip_t                                    // vglImageMipData
 //=======================================================================================================================================================================================================================
 // The main image data structure. It contains all the parameters needed to place texture data into a texture object using OpenGL.
 //=======================================================================================================================================================================================================================
-struct image_t                                  // vglImageData
+struct image_t
 {
     GLenum target;                              // texture target (1D, 2D, cubemap, array, etc.)
     GLenum internal_format;                     // recommended internal format (GL_RGBA32F, etc).
@@ -85,10 +85,9 @@ struct image_t                                  // vglImageData
     mip_t mips[MAX_TEXTURE_MIPS];               // actual mipmap data
 };
 
-void vglLoadImage(const char* file_name, image_t* image);
-void vglUnloadImage(image_t* image);
-GLuint vglLoadTexture(const char* filename, image_t* image);
-void vglLoadDDS(const char* filename, image_t* image);
+void unload(image_t* image);
+GLuint load_texture(const char* filename, image_t* image);
+void load(const char* filename, image_t* image);
 
 } // namespace dds
 

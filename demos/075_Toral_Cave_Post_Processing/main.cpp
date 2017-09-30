@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 	torus_t cave;
     cave.generate_vao_mt<vertex_pn_t>(toral_func, TORUS_U_DIV, TORUS_V_DIV);
 
-	fbo_depth_t zbuffer(window.res_x, window.res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE0);
+	fbo_depth_t zbuffer(window.res_x, window.res_y, GL_TEXTURE0, GL_DEPTH_COMPONENT32, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	fbo_color_t<GL_TEXTURE_2D, 1> ssao_buffer(window.res_x, window.res_y);
 	fbo_color_t<GL_TEXTURE_2D, 1> blur_buffer(window.res_x, window.res_y);
 	color_rbo_t scene_buffer(window.res_x, window.res_y);
@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
         // geometry rendering pass, just to get the z-texture filled
         //===============================================================================================================================================================================================================
 		geometry.enable();
-		zbuffer.bind();	
+		zbuffer.bind(GL_FRAMEBUFFER);	
 		glClear(GL_DEPTH_BUFFER_BIT);	
 		geometry_projection_view_matrix = projection_view_matrix;
 		cave.render();

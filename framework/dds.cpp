@@ -8,8 +8,6 @@
 #include "image.hpp"
 #include "log.hpp"
 
-#include "log.hpp"
-
 namespace image { 
 namespace dds {
 
@@ -372,21 +370,16 @@ static const DDS_FORMAT_GL_INFO gl_info_table[] =
 
 #define NUM_DDS_FORMATS     (sizeof(gl_info_table) / sizeof(gl_info_table[0]))
 
-void vglLoadImage(const char* filename, image_t* image)
-{
-    vglLoadDDS(filename, image);
-}
-
-void vglUnloadImage(image_t* image)
+void unload(image_t* image)
 {
     free(image->mips[0].data);
 }
 
-GLuint vglLoadTexture(const char* file_name, image_t* image)
+GLuint load_texture(const char* file_name, image_t* image)
 {
     image_t local_image;
     if (!image) image = &local_image;
-    vglLoadDDS(file_name, image);
+    load(file_name, image);
 
     GLuint texture_id;
     glGenTextures(1, &texture_id);
@@ -460,12 +453,13 @@ GLuint vglLoadTexture(const char* file_name, image_t* image)
             break;
     }
     glTexParameteriv(image->target, GL_TEXTURE_SWIZZLE_RGBA, reinterpret_cast<const GLint *>(image->swizzle));
-    if (image == &local_image) vglUnloadImage(image);
+    if (image == &local_image)
+        unload(image);
     return texture_id;
 }
 
 
-static bool vgl_DDSHeaderToImageDataHeader(const DDS_FILE_HEADER& header, image_t* image)
+static bool dds_header_to_image_t_header(const DDS_FILE_HEADER& header, image_t* image)
 {
     if (header.std_header.ddspf.dwFlags == DDS_DDPF_FOURCC && header.std_header.ddspf.dwFourCC == DDS_FOURCC_DX10)
     {
@@ -553,7 +547,7 @@ static bool vgl_DDSHeaderToImageDataHeader(const DDS_FILE_HEADER& header, image_
     return false;
 }
 
-static GLsizei vgl_GetDDSStride(const DDS_FILE_HEADER& header, GLsizei width)
+static GLsizei dds_header_to_stride(const DDS_FILE_HEADER& header, GLsizei width)
 {
     if (header.std_header.ddspf.dwFlags == DDS_DDPF_FOURCC && header.std_header.ddspf.dwFourCC == DDS_FOURCC_DX10)
     {
@@ -578,52 +572,48 @@ static GLsizei vgl_GetDDSStride(const DDS_FILE_HEADER& header, GLsizei width)
     return 0;
 }
 
-static GLenum vgl_GetTargetFromDDSHeader(const DDS_FILE_HEADER& header)
+static GLenum dds_header_to_target(const DDS_FILE_HEADER& header)
 {
-    // If the DX10 header is present it's format should be non-zero (unless it's unknown)
-    if (header.dxt10_header.format != 0)
+    if (header.dxt10_header.format != 0)                                                        // If the DX10 header is present it's format should be non-zero (unless it's unknown)
     {
-        // Check the dimension...
-        switch (header.dxt10_header.dimension)
+        switch (header.dxt10_header.dimension)                                                  // Check the dimension...
         {
-            // Could be a 1D or 1D array texture
-            case DDS_RESOURCE_DIMENSION_TEXTURE1D:
-                if (header.dxt10_header.array_size > 1) return GL_TEXTURE_1D_ARRAY;
+            case DDS_RESOURCE_DIMENSION_TEXTURE1D:                                              // Could be a 1D or 1D array texture
+                if (header.dxt10_header.array_size > 1)
+                    return GL_TEXTURE_1D_ARRAY;
                 return GL_TEXTURE_1D;
-            // 2D means 2D, 2D array, cubemap or cubemap array
-            case DDS_RESOURCE_DIMENSION_TEXTURE2D:
+            
+            case DDS_RESOURCE_DIMENSION_TEXTURE2D:                                              // 2D means 2D, 2D array, cubemap or cubemap array
                 if (header.dxt10_header.misc_flag & DDS_RESOURCE_MISC_TEXTURECUBE)
                 {
-                    if (header.dxt10_header.array_size > 1) return GL_TEXTURE_CUBE_MAP_ARRAY;
+                    if (header.dxt10_header.array_size > 1)
+                        return GL_TEXTURE_CUBE_MAP_ARRAY;
                     return GL_TEXTURE_CUBE_MAP;
                 }
-                if (header.dxt10_header.array_size > 1) return GL_TEXTURE_2D_ARRAY;
+                if (header.dxt10_header.array_size > 1)
+                    return GL_TEXTURE_2D_ARRAY;
                 return GL_TEXTURE_2D;
-            // 3D should always be a volume texture
-            case DDS_RESOURCE_DIMENSION_TEXTURE3D:
+            case DDS_RESOURCE_DIMENSION_TEXTURE3D:                                              // 3D should always be a volume texture
                 return GL_TEXTURE_3D;
         }
         return GL_NONE;
     }
-
-    // No DX10 header. Check volume texture flag
-    if (header.std_header.caps2 & DDSCAPS2_VOLUME) return GL_TEXTURE_3D;
-
-    // Could be a cubemap
-    if (header.std_header.caps2 & DDSCAPS2_CUBEMAP)
+    
+    if (header.std_header.caps2 & DDSCAPS2_VOLUME)                                              // No DX10 header. Check volume texture flag
+        return GL_TEXTURE_3D;        
+    
+    if (header.std_header.caps2 & DDSCAPS2_CUBEMAP)                                             // Could be a cubemap
     {
-        // This shouldn't happen if the DX10 header is present, but what the hey
-        if (header.dxt10_header.array_size > 1)
+        if (header.dxt10_header.array_size > 1)                                                 // This shouldn't happen if the DX10 header is present
             return GL_TEXTURE_CUBE_MAP_ARRAY;
         else
             return GL_TEXTURE_CUBE_MAP;
     }
+    
+    if (header.std_header.height <= 1)                                                          // Alright, if there's no height, guess 1D
+        return GL_TEXTURE_1D;
 
-    // Alright, if there's no height, guess 1D
-    if (header.std_header.height <= 1) return GL_TEXTURE_1D;
-
-    // Last ditch, probably 2D
-    return GL_TEXTURE_2D;
+    return GL_TEXTURE_2D;                                                                       // Last ditch, probably 2D
 }
 
 void dump_dds_file_header_info(const DDS_FILE_HEADER& header)
@@ -656,13 +646,13 @@ void dump_dds_file_header_info(const DDS_FILE_HEADER& header)
     }    
 }
 
-void vglLoadDDS(const char* filename, image_t* image)
+void load(const char* filename, image_t* image)
 {
     memset(image, 0, sizeof(image_t));
 
     FILE* f = fopen(filename, "rb");
-
-    if (!f) return;
+    if (!f)
+        return;
 
     DDS_FILE_HEADER file_header;
     fread(&file_header, sizeof(file_header.magic) + sizeof(file_header.std_header), 1, f);
@@ -678,13 +668,13 @@ void vglLoadDDS(const char* filename, image_t* image)
     else
         memset(&file_header.dxt10_header, 0, sizeof(file_header.dxt10_header));
 
-    if (!vgl_DDSHeaderToImageDataHeader(file_header, image))
+    if (!dds_header_to_image_t_header(file_header, image))
     {
         fclose(f);
         return;
     }
 
-    image->target = vgl_GetTargetFromDDSHeader(file_header);
+    image->target = dds_header_to_target(file_header);
     debug_msg("Target = %u", image->target);
 
     if (image->target == GL_NONE)
@@ -722,7 +712,7 @@ void vglLoadDDS(const char* filename, image_t* image)
         image->mips[level].width = width;
         image->mips[level].height = height;
         image->mips[level].depth = depth;
-        image->mips[level].stride = vgl_GetDDSStride(file_header, width) * height;
+        image->mips[level].stride = dds_header_to_stride(file_header, width) * height;
         image->stride += image->mips[level].stride;
         ptr += image->mips[level].stride;
         width >>= 1;

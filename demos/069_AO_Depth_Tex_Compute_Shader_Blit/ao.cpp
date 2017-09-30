@@ -150,36 +150,6 @@ struct demo_window_t : public imgui_window_t
     }
 };
 
-
-void check_status()
-{
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-
-    if (GL_FRAMEBUFFER_COMPLETE == status)
-    {
-        debug_msg("GL_FRAMEBUFFER is COMPLETE.");
-        return;
-    }
-
-    const char * msg;   
-    switch (status)
-    {
-        case GL_FRAMEBUFFER_UNDEFINED:                     msg = "GL_FRAMEBUFFER_UNDEFINED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:         msg = "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: msg = "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:        msg = "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER."; break;
-        case GL_FRAMEBUFFER_UNSUPPORTED:                   msg = "GL_FRAMEBUFFER_UNSUPPORTED."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:        msg = "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE."; break;
-        case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:      msg = "GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS."; break;
-      default:
-        msg = "Unknown Framebuffer error.";
-    }
-
-    exit_msg("FBO incomplete : %s", msg);
-}
-
-
 /*
 float factor(const glm::vec3& v)
 {
@@ -319,8 +289,7 @@ int main(int argc, char *argv[])
     // Texture unit 3 : horizontally blurred ssao
     // Texture unit 3 : vertically blurred ssao
     //===================================================================================================================================================================================================================
-
-    fbo_depth_t geometry_fbo(res_x, res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
+    fbo_depth_t geometry_fbo(res_x, res_y, GL_TEXTURE1, GL_DEPTH_COMPONENT32, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     GLuint ssao_tex_id;
     glActiveTexture(GL_TEXTURE2);
@@ -428,7 +397,7 @@ int main(int argc, char *argv[])
         cube_vao.render();
         glQueryCounter(window.queryID[1], GL_TIMESTAMP);        
 
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, geometry_fbo.fbo_id);
+        geometry_fbo.bind(GL_DRAW_FRAMEBUFFER);
         glBlitFramebuffer(0, 0, res_x, res_y, 0, 0, res_x, res_y, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 

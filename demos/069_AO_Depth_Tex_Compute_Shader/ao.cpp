@@ -282,7 +282,7 @@ int main(int argc, char *argv[])
     // Texture unit 3 : vertically blurred ssao
     //===================================================================================================================================================================================================================
 
-    fbo_depth_t geometry_fbo(res_x, res_y, GL_DEPTH_COMPONENT32, GL_CLAMP_TO_EDGE, GL_TEXTURE1);
+    fbo_depth_t geometry_fbo(res_x, res_y, GL_TEXTURE0, GL_DEPTH_COMPONENT32, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     GLuint ssao_tex_id;
     glActiveTexture(GL_TEXTURE2);
@@ -367,7 +367,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // 2. Geometry Pass: render scene's geometry / color data into gbuffer
         //===============================================================================================================================================================================================================
-        geometry_fbo.bind();
+        geometry_fbo.bind(GL_FRAMEBUFFER);
         glClear(GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
