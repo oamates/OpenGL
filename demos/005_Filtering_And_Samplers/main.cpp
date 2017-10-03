@@ -256,13 +256,29 @@ int main(int argc, char *argv[])
     filtering.enable();
 
     uniform_t uni_pv_matrix = filtering["projection_view_matrix"];
+    uniform_t uni_frame = filtering["frame"];
+
+    filtering["nearest_mode_tex"] = 0;
+    filtering["linear_mode_tex"] = 1;
+    filtering["mipmap_mode_tex"] = 2;
+    filtering["anisotropic_mode_tex"] = 3;
+
+
+
 
     const char* subroutine_names[] = 
     {
         "nearest_filter_HW",
         "linear_filter_HW",
         "mipmap_filter_HW",
-        "anisotropic_filter_HW"
+        "linear_filter_SW",
+        "bicubic_filter_SW",
+        "mipmap_filter_SW",
+        "anisotropic_filter_SW",
+        "approximate_anisotropic_filter_SW",
+        "lodError_SW",
+        "anisotropyLevel_SW",
+        "mipLevel_SW"
     };
 
     const GLuint SUBROUTINE_COUNT = sizeof(subroutine_names) / sizeof(char*);
@@ -282,7 +298,7 @@ int main(int argc, char *argv[])
     struct hyperbola
     {
         float operator () (float z)
-        {
+        { 
             return 10.0 / z;
         }
     };
@@ -373,6 +389,7 @@ int main(int argc, char *argv[])
         filtering.enable();
 
         uni_pv_matrix = projection_view_matrix;
+        uni_frame = (int) window.frame;
 
         glViewport(0, 0, half_x, y);
         uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[0]);
