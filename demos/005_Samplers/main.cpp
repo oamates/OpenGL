@@ -59,10 +59,11 @@ struct demo_window_t : public imgui_window_t
 
     void set_texture(int texture_index)
     {
+        int tex_id = textures[texture_index];
         for(int i = 0; i < 4; ++i)
         {
             glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textures[texture_index]);
+            glBindTexture(GL_TEXTURE_2D, tex_id);
         }
     }
 
@@ -77,147 +78,11 @@ struct demo_window_t : public imgui_window_t
             set_texture(texture_index);
         }
     }
-    /*
-    switch (key) {
-    case 27:
-        exit(0);
-        break;
-    case '1':
-        printf("hardware texture filtering\n");
-        filtering_mode = 1;
-        break;
-    case '2':
-        printf("high quality elliptical texture filtering\n");
-        filtering_mode = 2;
-        break;
-    case '3':
-        printf("high quality elliptical texture filtering (linear)\n");
-        filtering_mode = 3;
-        break;
-    case '4':
-        printf("high quality elliptical texture filtering (bilinear)\n");
-        filtering_mode = 4;
-        break;
-    case '5':
-        printf("approximated elliptical texture filtering\n");
-        filtering_mode = 5;
-        break;
-    case '6':
-        printf("spatial elliptical texture filtering\n");
-        filtering_mode = 6;
-        break;
-    case '7':
-        printf("temporal elliptical texture filtering\n");
-        filtering_mode = 7;
-        break;
-    case '8':
-        printf("absolute lod error display\n");
-        filtering_mode = 8;
-        num_texels = 1;
-        max_anisotropy = 16; //just to match NVIDIA hardware
-        break;
-    case '9':
-        printf("anisotropy level\n");
-        filtering_mode = 9;
-        break;
-    case '0':
-        printf("MIP-MAP level\n");
-        filtering_mode = 0;
-        break;
-    case 'a':
-    case 'A':
-        toggle(render_scene);
-        if(render_scene==1){
-            filter_width=1.0;
-            filter_sharpness=2.0f;
-            num_probes=6;
-            num_texels = 1;
-            max_anisotropy = 16;
-        }
-        else{
-            filter_width=1.8f;
-            filter_sharpness=5.5;
-            num_probes=10;
-            num_texels = 1;
-            max_anisotropy = 16;
-        }
-        break;
-    case 's':
-    case 'S':
-        printf("toggle split screen\n");
-        toggle(split_screen);
-        break;
-    case '=':
-    case '+':
-        glob_speed+=0.001f;
-        printf("speed: %f\n", glob_speed);
-        break;
-    case '-':
-        glob_speed-=0.001f;
-        printf("speed: %f\n", glob_speed);
-        break;
-    case 'e':
-        num_probes-=2;
-        printf("num_probes: %d\n", num_probes);
-        break;
-    case 'E':
-        num_probes+=2;
-        printf("num_probes: %d\n", num_probes);
-        break;
-    case 'q':
-        filter_width-=0.1f;
-        printf("speed: %f\n", filter_width);
-        break;
-    case 'Q':
-        filter_width+=0.1f;
-        printf("filter_width: %f\n", filter_width);
-        break;
-    case 'r':
-        num_texels-=0.1f;
-        break;
-    case 'R':
-        num_texels+=0.1f;
-        break;
-    case 't':
-        max_anisotropy-=1;
-        break;
-    case 'T':
-        max_anisotropy+=1;
-        break;
-    case 'h':
-    case 'H':
-        toggle(showHelp);
-        break;
-    case 'd':
-    case 'D':
-        toggle(showOSD);
-        break;
-    case 'w':
-        filter_sharpness-=0.1f;
-        break;
-    case 'W':
-        filter_sharpness+=0.1f;
-        break;
-    case 'v':
-    case 'V':
-        printf("toggle vertical sync\n");
-        toggle(vsync);
-        if(vsync==0){
-            wglSwapIntervalEXT(0);
-        }
-        else{
-            wglSwapIntervalEXT(1);
-        }
-        break;
-    }
 
-    }
-*/
-    /*
     void on_mouse_move() override
     {
     }
-    */
+
 
     void update_ui() override
     {
@@ -225,66 +90,57 @@ struct demo_window_t : public imgui_window_t
         // show a simple fps window.
         //===============================================================================================================================================================================================================
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::Text("HW nearest filtering mode");
+        ImGui::Text("HW linear filtering mode");
+        ImGui::Text("HW mipmap filtering mode");
+        ImGui::Text("HW anisotropic filtering mode");
+        ImGui::Text("HW anisotropic filtering mode");
+        ImGui::Text("HW anisotropic filtering mode");
 
-/*
-        if(showOSD)
-        {
-            overlay->Begin();
+        ImGui::Text("SW elliptical filtering mode");   // filtering_mode = 2
+        ImGui::Text("SW elliptical linear filtering mode");   // filtering_mode = 3
+        ImGui::Text("SW elliptical bilinear filtering mode");   // filtering_mode = 4
+        ImGui::Text("SW approximate elliptical filtering mode");   // filtering_mode = 5
+        ImGui::Text("SW spatial elliptical filtering mode");   // filtering_mode = 6
+        ImGui::Text("SW temporal elliptical filtering mode");   // filtering_mode = 7
 
-            DisplayFilterType();
-
-            
-            if(frameCounter==timingNumFrames){
-                int timeInterval=glutGet(GLUT_ELAPSED_TIME)-timeCounter;
-                fps = float(timingNumFrames)*1000.0f/float(timeInterval);
-                timeCounter=glutGet(GLUT_ELAPSED_TIME);
-                frameCounter=0;
-                
-            }   
-
-            static char tmpString[128];
-            sprintf(tmpString,"fps: %.1f",fps);
-            overlay->Print(RESX-130,10,1,tmpString);
-
-            if(filtering_mode<9)
-                DisplayFilterInfo();
-
-            if(showHelp)
-                DisplayHelp();
-        }
-*/
-
+        ImGui::Text("Mip-map selection absolute deviation x2 (black = zero error)");   // filtering_mode = 8
+        ImGui::Text("Anisotropy level (pure red > 16)");   // filtering_mode = 9
+        ImGui::Text("Mip-Map level visualization");   // filtering_mode = 9
     }
-
 };
 
-
-
-//write a ppm file to disk
-/*
-void writeppm(char* file_name, int resx, int resy, char* raster)
+void writeppm(char* file_name, int res_x, int res_y, char* rgb_data)
 {
+    FILE* f = fopen(file_name, "wb");
+    fprintf(f, "P6 %d %d 255\n", res_y, res_x);
 
-    FILE * out = fopen(file_name, "wb");
-    fprintf(out, "P6 %d %d 255\n", resy, resx);
-
-    for(int i=0; i<resy; i++)
-        for(int j=0; j<resx; j++)
+    for(int i = 0; i < res_y; i++)
+        for(int j = 0; j < res_x; j++)
         {
-            putc(raster[3 * (i * resx + j) + 0], out);
-            putc(raster[3 * (i * resx + j) + 1], out);
-            putc(raster[3 * (i * resx + j) + 2], out);
+            putc(rgb_data[3 * (i * res_x + j) + 0], f);
+            putc(rgb_data[3 * (i * res_x + j) + 1], f);
+            putc(rgb_data[3 * (i * res_x + j) + 2], f);
         }
 
-    fclose(out);
+    fclose(f);
 }
-*/
 
-//    glFinish();
-//    glReadBuffer( GL_BACK );
-//    glReadPixels( 0, 0, RESX, RESY, GL_RGB, GL_UNSIGNED_BYTE, fb_mem);
-//    sprintf(file_name,"capture%05d.ppm", frameCounter);
-//    writeppm(file_name, RESX, RESY, fb_mem);
+void screenshot(int frame, int res_x, int res_y)
+{
+    int size = 3 * res_x * res_y;
+    char* rgb_data = (char*) malloc(size);
+
+    glFinish();
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, res_x, res_y, GL_RGB, GL_UNSIGNED_BYTE, rgb_data);
+    char file_name[128];
+
+    sprintf(file_name,"shot%u.ppm", frame);
+    writeppm(file_name, res_x, res_y, rgb_data);    
+}
+
+
     // Shader dynamic macro setting
 /*
     resetShadersGlobalMacros();
@@ -298,43 +154,6 @@ void writeppm(char* file_name, int resx, int resy, char* raster)
     setShadersGlobalMacro("FILTER_SHARPNESS", filter_sharpness);
     setShadersGlobalMacro("TEXELS_PER_PIXEL", num_texels);
     setShadersGlobalMacro("MAX_ECCENTRICITY", max_anisotropy);
-*/
-/*
-    switch (filtering_mode){
-    case 1:
-        sprintf(tmpString,"Hardware Filtering");
-        break;
-    case 2:
-        sprintf(tmpString,"Elliptical Filtering");
-        break;
-    case 3:
-        sprintf(tmpString,"Elliptical Filtering (2-tex)");
-        break;
-    case 4:
-        sprintf(tmpString,"Elliptical Filtering (4-tex)");
-        break;
-    case 5:
-        sprintf(tmpString,"Approximated Elliptical Filter");
-        break;
-    case 6:
-        sprintf(tmpString,"Spatial Elliptical Filtering");
-        break;
-    case 7:
-        sprintf(tmpString,"Temporal Elliptical Filtering");
-        break;
-    case 8:
-        if(supports_gl4)
-            sprintf(tmpString,"Mip-map selection absolute deviation x2 (black = zero error)");
-        else
-            sprintf(tmpString,"Error: Requires an OpenGL 4 context");
-        break;
-    case 9:
-        sprintf(tmpString,"Anisotropy level (pure red > 16)");
-        break;
-    case 0:
-        sprintf(tmpString,"Mip-Map level visualization");
-        break;
-    };
 */
 
 template<typename axial_func> vao_t surface_of_revolution(float z0, float z1, int m, int n)
