@@ -1,20 +1,139 @@
-#version 330 core
+#version 400 core
+
+#extension GL_ARB_texture_query_lod : enable
+#extension GL_EXT_gpu_shader4 : enable
+
+in vec3 position_ws;
+in vec3 normal_ws;
+in vec2 uv;
+
+uniform sampler2D nearest_mode_tex;
+uniform sampler2D linear_mode_tex;
+uniform sampler2D mipmap_mode_tex;
+uniform sampler2D anisotropic_mode_tex;
+
+uniform vec2 texture_dim = vec2(1920.0, 1080.0);
+
+out vec4 FragmentColor;
+
+const float pi = 3.14159265359f;
+
+//==============================================================================================================================================================
+// FILTER FUNCTIONS
+//==============================================================================================================================================================
+//#define FILTER_SHARPNESS 2.0
+uniform float sharpness;
+
+float box_filter(float r2)
+{
+    return 1.0f;
+}
+
+float gauss_filter(float r2)
+{
+    float alpha = sharpness;
+    return exp(-alpha * r2);
+}
+
+float tri_filter(float r2)
+{
+    float alpha = sharpness;
+    float r = sqrt(r2);
+    return max(0.0f, 1.0f - r / alpha);
+}
+
+float sinc(float x)
+{
+    float y = pi * x;
+    return sin(y) / y;
+}
+
+float lanczos_filter(float r2)
+{
+    if (r2 == 0.0f) return 1;
+    float r = sqrt(r2);
+    return sinc(r) * sinc(r / 1.3);
+}
+
+float cr_filter(float r2)                   // catmull-rom filter
+{
+    float r = sqrt(r2);
+    return (r >= 2.0f) ? 0.0f : 
+           (r  < 1.0f) ? (3.0f * r * r2 - 5.0f * r2 + 2.0f) 
+                       : (-r * r2 + 5.0f * r2 - 8.0f * r + 4.0f);
+}
+
+float quadratic_filter(float r2)
+{
+    float a = sharpness;
+    return 1.0f - r2 / (a * a);
+}
+
+float cubic_filter(float r2)
+{
+    float a = sharpness;
+    float r = sqrt(r2);
+    return 1.0f - 3.0f * r2 / (a * a) + 2.0f * r * r2 / (a * a * a);
+}
+
+
+//==============================================================================================================================================================
+// texture filtering subroutines
+//==============================================================================================================================================================
+
+subroutine vec3 texture_filter_func(vec2 uv);
+subroutine uniform texture_filter_func texture_filter;
+
+subroutine(texture_filter_func) vec3 nearest_filter_HW(vec2 uv)
+{
+    return texture(nearest_mode_tex, uv).rgb;
+}
+
+subroutine(texture_filter_func) vec3 linear_filter_HW(vec2 uv)
+{
+    return texture(linear_mode_tex, uv).rgb;
+}
+
+subroutine(texture_filter_func) vec3 mipmap_filter_HW(vec2 uv)
+{
+    return texture(mipmap_mode_tex, uv).rgb;
+}
+
+subroutine(texture_filter_func) vec3 anisotropic_filter_HW(vec2 uv)
+{
+    return texture(anisotropic_mode_tex, uv).rgb;
+}
+
+
+
+
+
+
+//========= PARAMETERS FOR THE RENDERING OF THE TUNNEL/PLANE ==========
+#define SPEED 0.00
+#define ZOOM 0.07
+//=====================================================================
+
+uniform int frame;
+uniform float time;
+uniform sampler2D tex0;
+
+
 
 //========= TEXTURE FILTERING (EWA) PARAMETERS =========
 #define MAX_ECCENTRICITY 16
 #define NUM_PROBES 6
 #define FILTER_WIDTH 1.0
-#define FILTER_SHARPNESS 2.0
 #define TEXELS_PER_PIXEL 1.0
 #define USE_GL4 1
 #define RENDER_SCENE 1
 #define SPLIT_SCREEN 1
 #define USE_HARDWARE_LOD 1
 #define TEXEL_LIMIT 128
-#define FILTER_FUNC gaussFilter
+//#define FILTER_FUNC gaussFilter
 
 //choose a filtering mode. For the highest clarity choose one of the (2-3-4)  
-#define FILTERING_MODE 2
+//#define FILTERING_MODE 2
 
 /**
 * FILTERING MODES:
@@ -31,82 +150,9 @@
 //=====================================================================
 
 
-//========= PARAMETERS FOR THE RENDERING OF THE TUNNEL/PLANE ==========
-const vec2 resolution = vec2(1920.0, 1080.0);
-#define SPEED 0.00
-#define ZOOM 0.07
-//=====================================================================
-
-uniform int frame;
-uniform float time;
-uniform sampler2D tex0;
-
-#extension GL_ARB_texture_query_lod : enable
-#extension GL_EXT_gpu_shader4 : enable
-
-#define M_PI 3.14159265358979323846
-
-
-//========================= FILTER FUNCTIONS =======================
-// We only use the Gaussian filter function. The other filters give 
-// very similar results.
-
-float boxFilter(float r2)
-{
-	return 1.0f;
-}
-
-float gaussFilter(float r2)
-{
-	float alpha = FILTER_SHARPNESS;
-	return exp(-alpha * r2);
-}
-
-float triFilter(float r2)
-{
-	float alpha = FILTER_SHARPNESS;
-	float r= sqrt(r2);
-	return max(0.0f, 1.0f - r / alpha);
-}
-
-float sinc(float x)
-{
-	return sin(M_PI * x) / (M_PI * x);
-}
-
-float lanczosFilter(float r2)
-{
-	if (r2 == 0)
-		return 1;
-	float r = sqrt(r2);
-	return sinc(r) * sinc(r / 1.3);
-}
-
-//catmull-rom filter
-float crFilter(float r2)
-{
-	float r = sqrt(r2);
-	return (r >= 2.0) ? 0.0 : 
-           (r  < 1.0) ? (3.0 * r * r2 - 5.0f * r2 + 2.0f) 
-                      : (-r * r2 + 5.0f * r2 - 8.0f * r + 4.0f);
-}
-
-float quadraticFilter(float r2)
-{
-	float a = FILTER_SHARPNESS;
-	return 1.0 - r2 / (a * a);
-}
-
-float cubicFilter(float r2)
-{
-	float a = FILTER_SHARPNESS;
-	float r = sqrt(r2);
-	return 1.0f - 3.0f * r2 / (a * a) + 2.0f * r * r2 / (a * a * a);
-}
-
 //==================== EWA ( reference / 2-tex / 4-tex) ====================
 // EWA filter :: Adapted from an ANSI C implementation from Matt Pharr
-
+/*
 vec4 ewaFilter(sampler2D tex0, vec2 p0, vec2 du, vec2 dv, float lod, int psize)
 {
 	int scale = psize >> int(lod);
@@ -381,18 +427,18 @@ vec4 anisoLevel(sampler2D sampler, vec2 coords){
 }
 
 //visualizes the mip-map level of each rendered pixel
-vec4 mipLevel(sampler2D sampler, vec2 coords){
-
+vec4 mipLevel(sampler2D sampler, vec2 uv)
+{
 #if 0
 	float lod = textureQueryLOD(sampler, coords).x;
 #else
-	vec2 du = dFdx(coords);
-	vec2 dv = dFdy(coords);
+	vec2 du = dFdx(uv);
+	vec2 dv = dFdy(uv);
 	
 	int psize = textureSize(sampler, 0).x;
 	float lod = textureQueryLODEWA(sampler, du, dv, psize).x;
 #endif
-	return mix(map_B(lod), texture2D(sampler, coords), 0.45);
+	return mix(map_B(lod), texture2D(sampler, uv), 0.45);
 
 }
 
@@ -448,11 +494,11 @@ vec4 texture2DApprox(sampler2D sampler, vec2 coords){
 	#endif
 
 	float lineLength = 2*(majorRadius-8*minorRadius);
-	if(lineLength<0) lineLength = 0;
+	if(lineLength < 0) lineLength = 0;
 	//lineLength *=2.0;
 
 	float theta= atan(B,A-C);
-	if (A>C) theta = theta + M_PI/2;
+	if (A>C) theta = theta + 0.5f * pi;
 
 	float dpu = cos(theta)*lineLength/(iProbes-1);
 	float dpv = sin(theta)*lineLength/(iProbes-1);
@@ -524,6 +570,7 @@ vec4 texture2DApprox(sampler2D sampler, vec2 coords){
 */
 
 //drop-in replacement for glsl texture2D function
+/*
 vec4 superTexture2D(sampler2D tex0, vec2 uv)
 {
     vec4 color =  texture2D(tex0,uv);
@@ -571,11 +618,12 @@ vec4 superTexture2D(sampler2D tex0, vec2 uv)
 	return color2;
 
 }
-
+*/
 //==================== MAIN ==================
 
 void main()
 {
+/*
     vec2 p = -1.0 + 2.0 * gl_FragCoord.xy / vec2(RESX, RESY);
 
 	float time2 = 0.3 * SPEED * time;
@@ -596,6 +644,8 @@ void main()
     uv.x = .25*x/abs(y);
     uv.y = .20*time2 + .825/abs(y);
 #endif
-	gl_FragColor = superTexture2D(tex0,uv);
+*/
+    FragmentColor = vec4(anisotropic_filter_HW(uv), 1.0f);
 
+    // gl_FragColor = superTexture2D(tex0,uv);
 }

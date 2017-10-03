@@ -86,6 +86,7 @@ template<typename index_t> void surface_t::generate_IBO(int size_x, int size_y)
         indices[index++] = -1;
     }
     vao.ibo.init(GL_TRIANGLE_STRIP, indices, index_count);
+    free(indices);
 }
 
 template void surface_t::generate_IBO<GLuint>  (int, int);

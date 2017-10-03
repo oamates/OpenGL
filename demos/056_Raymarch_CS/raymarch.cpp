@@ -122,13 +122,22 @@ int main(int argc, char *argv[])
 
     glActiveTexture(GL_TEXTURE2);
 //    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/1.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
 
-/*
     GLfloat max_anisotropy;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
-*/
+//    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
+
+
+    GLuint sampler_id;
+    glGenSamplers(1, &sampler_id);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glSamplerParameterf(sampler_id, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
+    glBindSampler(2, sampler_id);
+
     glActiveTexture(GL_TEXTURE3);
     GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 
