@@ -51,6 +51,10 @@ struct demo_window_t : public imgui_window_t
     unsigned int texture_index;
     GLuint* textures;
 
+    unsigned int FILTER_MODE_COUNT;
+    unsigned int left_filter_mode_index = 0;
+    unsigned int right_filter_mode_index = 0;
+
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
@@ -72,10 +76,28 @@ struct demo_window_t : public imgui_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+        if (action != GLFW_RELEASE)
+            return;
+        if (key == GLFW_KEY_SPACE)
         {
             texture_index = (texture_index + 1) % TEXTURE_COUNT;
             set_texture(texture_index);
+        }
+        else if (key == GLFW_KEY_KP_1)
+        {
+            left_filter_mode_index = (left_filter_mode_index + FILTER_MODE_COUNT - 1) % FILTER_MODE_COUNT;
+        }
+        else if (key == GLFW_KEY_KP_7)
+        {
+            left_filter_mode_index = (left_filter_mode_index + 1) % FILTER_MODE_COUNT;
+        }
+        else if (key == GLFW_KEY_KP_3)
+        {
+            right_filter_mode_index = (right_filter_mode_index + FILTER_MODE_COUNT - 1) % FILTER_MODE_COUNT;
+        }
+        else if (key == GLFW_KEY_KP_9)
+        {
+            right_filter_mode_index = (right_filter_mode_index + 1) % FILTER_MODE_COUNT;
         }
     }
 
@@ -286,6 +308,8 @@ int main(int argc, char *argv[])
     for (int i = 0; i < SUBROUTINE_COUNT; ++i)
         subroutine_index[i] = filtering.subroutine_index(GL_FRAGMENT_SHADER, subroutine_names[i]);
 
+    window.FILTER_MODE_COUNT = SUBROUTINE_COUNT;
+
     //===================================================================================================================================================================================================================
     // create models for texture filtering tests :
     //  1. rotating cube
@@ -392,12 +416,12 @@ int main(int argc, char *argv[])
         uni_frame = (int) window.frame;
 
         glViewport(0, 0, half_x, y);
-        uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[0]);
+        uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[window.left_filter_mode_index]);
         cube.render();
 
  
         glViewport(half_x, 0, half_x, y);
-        uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[2]);
+        uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[window.right_filter_mode_index]);
         cube.render();
 
 
