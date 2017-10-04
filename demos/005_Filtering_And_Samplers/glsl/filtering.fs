@@ -549,9 +549,63 @@ subroutine(texture_filter_func) vec4 bicubic_filter_SW(vec2 uv)
     return mix(mix(sample11, sample01, s.x), mix(sample10, sample00, s.x), s.y);
 }
 
+#define USE_LINEAR_MODE_TEXTURE
+
 subroutine(texture_filter_func) vec4 mipmap_filter_SW(vec2 uv)
 {
-    return texture(mipmap_mode_tex, uv);
+    vec2 size = textureSize(linear_mode_tex, 0);
+    vec2 texel_size = 1.0f / size;
+
+    //vec2 duv_dx = dFdx(uv);
+    //vec2 duv_dy = dFdy(uv);
+    mat2 jacobian = mat2(dFdx(uv), dFdy(uv));
+    float area = det(jacobian);         // in normalized texel area units, the area of the whole texture is 1
+
+    float level = log2(abs(area));
+
+    float mip_l = max(0.0f, floor(level));
+    float mip_h = mip_l + 1.0f;
+
+    float f = level - mip_l;
+
+
+  #ifdef USE_LINEAR_MODE_TEXTURE
+    vec4 texel_l = textureLod(linear_mode_tex, uv, mip_l);
+    vec4 texel_h = textureLod(linear_mode_tex, uv, mip_h);
+  #else
+    vec2 P = size * uv - 0.5f;
+    vec2 Pf = fract(P);
+    vec2 Pi = P - Pf;
+
+    vec4 offset = vec4(0.5f, 0.5f, 1.5f, 1.5f) * texel_size.xyxy;
+    vec2 base = texel_size * Pi;
+
+    vec4 texel00 = textureLod(nearest_mode_tex, base + offset.xy, mip_l);
+    vec4 texel10 = textureLod(nearest_mode_tex, base + offset.zy, mip_l);
+    vec4 texel01 = textureLod(nearest_mode_tex, base + offset.xw, mip_l);
+    vec4 texel11 = textureLod(nearest_mode_tex, base + offset.zw, mip_l);
+
+    vec4 texel_y0 = mix(texel00, texel10, Pf.x);
+    vec4 texel_y1 = mix(texel01, texel11, Pf.x);
+
+    vec4 texel_l = mix(texel_y0, texel_y1, Pf.y);
+
+    offset = offset + offset;
+    base = texel_size * Pi;
+
+    texel00 = textureLod(nearest_mode_tex, base + offset.xy, mip_h);
+    texel10 = textureLod(nearest_mode_tex, base + offset.zy, mip_h);
+    texel01 = textureLod(nearest_mode_tex, base + offset.xw, mip_h);
+    texel11 = textureLod(nearest_mode_tex, base + offset.zw, mip_h);
+
+    texel_y0 = mix(texel00, texel10, Pf.x);
+    texel_y1 = mix(texel01, texel11, Pf.x);
+
+    vec4 texel_h = mix(texel_y0, texel_y1, Pf.y);
+
+
+  #endif  
+    return mix(texel_l, texel_h, f);
 }
 
 #define USE_HARDWARE_LOD
