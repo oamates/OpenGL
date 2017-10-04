@@ -24,29 +24,25 @@
 #include "plato.hpp"
 #include "image.hpp"
 
-/*
-int filtering_mode = 2;
-int render_scene = 1;
-int split_screen = 1;
-int num_probes = 6;
-float num_texels = 1.0;
-float glob_speed = 0.001;
-float filter_width = 1.0;
-float filter_sharpness = 2.0;
-int vsync = 1;
-int showHelp = 0;
-int showOSD = 1;
-int supports_gl4 = 0;
-int max_anisotropy = 16;
-int uniform_frame = 0;
-int uniform_time = 0;
-float fps = 60;
-float global_time = 0;
-
-*/
+const char* subroutine_names[] = 
+{
+    "nearest_filter_HW",
+    "linear_filter_HW",
+    "mipmap_filter_HW",
+    "linear_filter_SW",
+    "bicubic_filter_SW",
+    "mipmap_filter_SW",
+    "anisotropic_filter_SW",
+    "approximate_anisotropic_filter_SW",
+    "lodError_SW",
+    "anisotropyLevel_SW",
+    "mipLevel_SW"
+};
 
 struct demo_window_t : public imgui_window_t
 {
+    bool pause = false;
+
     unsigned int TEXTURE_COUNT;
     unsigned int texture_index;
     GLuint* textures;
@@ -78,7 +74,12 @@ struct demo_window_t : public imgui_window_t
     {
         if (action != GLFW_RELEASE)
             return;
-        if (key == GLFW_KEY_SPACE)
+
+        if (key == GLFW_KEY_ENTER)
+        {
+            pause = !pause;
+        }
+        else if (key == GLFW_KEY_SPACE)
         {
             texture_index = (texture_index + 1) % TEXTURE_COUNT;
             set_texture(texture_index);
@@ -112,7 +113,10 @@ struct demo_window_t : public imgui_window_t
         // show a simple fps window.
         //===============================================================================================================================================================================================================
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::Text("HW nearest filtering mode");
+        ImGui::Text("Left  :: %s", subroutine_names[left_filter_mode_index]);
+        ImGui::Text("Right :: %s", subroutine_names[right_filter_mode_index]);
+
+/*
         ImGui::Text("HW linear filtering mode");
         ImGui::Text("HW mipmap filtering mode");
         ImGui::Text("HW anisotropic filtering mode");
@@ -129,6 +133,7 @@ struct demo_window_t : public imgui_window_t
         ImGui::Text("Mip-map selection absolute deviation x2 (black = zero error)");   // filtering_mode = 8
         ImGui::Text("Anisotropy level (pure red > 16)");   // filtering_mode = 9
         ImGui::Text("Mip-Map level visualization");   // filtering_mode = 9
+*/
     }
 };
 
@@ -161,22 +166,6 @@ void screenshot(int frame, int res_x, int res_y)
     sprintf(file_name,"shot%u.ppm", frame);
     writeppm(file_name, res_x, res_y, rgb_data);    
 }
-
-
-    // Shader dynamic macro setting
-/*
-    resetShadersGlobalMacros();
-    setShadersGlobalMacro("RENDER_SCENE", render_scene);
-    setShadersGlobalMacro("FILTERING_MODE", filtering_mode);
-    setShadersGlobalMacro("SPLIT_SCREEN", split_screen);
-    setShadersGlobalMacro("USE_GL4", supports_gl4);
-    setShadersGlobalMacro("SPEED", glob_speed);
-    setShadersGlobalMacro("FILTER_WIDTH", filter_width);
-    setShadersGlobalMacro("NUM_PROBES", num_probes);
-    setShadersGlobalMacro("FILTER_SHARPNESS", filter_sharpness);
-    setShadersGlobalMacro("TEXELS_PER_PIXEL", num_texels);
-    setShadersGlobalMacro("MAX_ECCENTRICITY", max_anisotropy);
-*/
 
 template<typename axial_func> vao_t surface_of_revolution(float z0, float z1, int m, int n)
 {
@@ -285,24 +274,6 @@ int main(int argc, char *argv[])
     filtering["mipmap_mode_tex"] = 2;
     filtering["anisotropic_mode_tex"] = 3;
 
-
-
-
-    const char* subroutine_names[] = 
-    {
-        "nearest_filter_HW",
-        "linear_filter_HW",
-        "mipmap_filter_HW",
-        "linear_filter_SW",
-        "bicubic_filter_SW",
-        "mipmap_filter_SW",
-        "anisotropic_filter_SW",
-        "approximate_anisotropic_filter_SW",
-        "lodError_SW",
-        "anisotropyLevel_SW",
-        "mipLevel_SW"
-    };
-
     const GLuint SUBROUTINE_COUNT = sizeof(subroutine_names) / sizeof(char*);
     GLuint subroutine_index[SUBROUTINE_COUNT];
     for (int i = 0; i < SUBROUTINE_COUNT; ++i)
@@ -317,7 +288,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     const float cube_size = 2.0;
     polyhedron cube;
-    cube.regular_pnt2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
+    cube.regular_pnt2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, false);
 
     struct hyperbola
     {
@@ -370,13 +341,8 @@ int main(int argc, char *argv[])
     anisotropy_sampler.set_max_af_level(max_af_level);
     anisotropy_sampler.bind(3);
 
-    //===================================================================================================================================================================================================================
-    // GL_FRAGMENT_SHADER subroutines
-    //===================================================================================================================================================================================================================
-
-
-    //glEnable(GL_CULL_FACE);
     glm::mat4 projection_matrix = glm::infinitePerspective (constants::two_pi / 6.0f, (float) (0.5 * window.aspect()), 0.5f);
+    float t = 0;
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -399,13 +365,13 @@ int main(int argc, char *argv[])
         int half_x = x / 2;
         int y = window.res_y;
 
+        if (!window.pause)
+            t += window.frame_dt;
 
-        float cs0 = glm::cos(0.517f * time);
-        float sn0 = glm::sin(0.517f * time);
-        float cs1 = glm::cos(0.211f * time);
-        float sn1 = glm::sin(0.211f * time);
+        glm::vec2 r0 = glm::vec2(glm::cos(0.517f * t), glm::sin(0.517f * t));
+        glm::vec2 r1 = glm::vec2(glm::cos(0.211f * t), glm::sin(0.211f * t));
 
-        glm::vec3 eye = 7.0f * glm::vec3(cs0 * cs1, cs0 * sn1, sn0);
+        glm::vec3 eye = 7.0f * glm::vec3(r0.x * r1.x, r0.x * r1.y, r0.y);
 
         glm::mat4 view_matrix = glm::lookAt(eye, glm::vec3(0.0), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
@@ -437,7 +403,7 @@ int main(int argc, char *argv[])
         window.end_frame();
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_BLEND);
-        //glEnable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
     }
