@@ -29,11 +29,16 @@ const char* subroutine_names[] =
     "nearest_filter_HW",
     "linear_filter_HW",
     "mipmap_filter_HW",
+    "anisotropic_filter_HW",
     "linear_filter_SW",
     "bicubic_filter_SW",
     "mipmap_filter_SW",
-    "anisotropic_filter_SW",
-    "approximate_anisotropic_filter_SW",
+    "ewa_SW",
+    "ewa2tex_SW",
+    "ewa4tex_SW",
+    "approximate_ewa_SW",
+    "approximate_ewa_spatial_SW",
+    "approximate_ewa_temporal_SW",
     "lodError_SW",
     "anisotropyLevel_SW",
     "mipLevel_SW"
@@ -42,6 +47,7 @@ const char* subroutine_names[] =
 struct demo_window_t : public imgui_window_t
 {
     bool pause = false;
+    const unsigned int SAMPLER_MODE_COUNT = 4;
 
     unsigned int TEXTURE_COUNT;
     unsigned int texture_index;
@@ -60,7 +66,7 @@ struct demo_window_t : public imgui_window_t
     void set_texture(int texture_index)
     {
         int tex_id = textures[texture_index];
-        for(int i = 0; i < 4; ++i)
+        for(unsigned int i = 0; i < SAMPLER_MODE_COUNT; ++i)
         {
             glActiveTexture(GL_TEXTURE0 + i);
             glBindTexture(GL_TEXTURE_2D, tex_id);
@@ -171,7 +177,8 @@ template<typename axial_func> vao_t surface_of_revolution(float z0, float z1, in
 {
     axial_func func;
 
-    GLuint V = (2 * m + 1) * (n + 1);
+    int m2 = m + m;
+    GLuint V = m2 * (n + 1);
     vertex_pnt2_t* vertices = (vertex_pnt2_t*) malloc(V * sizeof(vertex_pnt2_t));
 
     float z = z0;
@@ -186,11 +193,11 @@ template<typename axial_func> vao_t surface_of_revolution(float z0, float z1, in
     {
         float R = func(z);
         float dRdz = inv_delta * (func(z + delta) - func(z - delta));
-        float inv_norm = 1.0f / glm::sqrt(dRdz * dRdz);
+        float inv_norm = 1.0f / glm::sqrt(1.0f + dRdz * dRdz);
 
-        for (int u = 0; u <= 2 * m; ++u)
+        for (int u = 0; u < m2; ++u)
         {
-            int q = (u <= m) ? u : 2 * m - u;
+            int q = (u <= m) ? u : m2 - u;
 
             float theta = constants::pi * u / m;
             float cs = glm::cos(theta);
@@ -202,6 +209,7 @@ template<typename axial_func> vao_t surface_of_revolution(float z0, float z1, in
             vertices[index].uv = glm::vec2(z, float(q) / m);
             ++index;
         }
+        z += delta_z;
     }
     
     //===================================================================================================================================================================================================================
@@ -220,16 +228,18 @@ template<typename axial_func> vao_t surface_of_revolution(float z0, float z1, in
     index = 0;
     GLuint index_count = n * (4 * m + 3);
     GLuint* indices = (GLuint*) malloc (index_count * sizeof(GLuint));
-    GLuint q = 2 * m;
     GLuint p = 0;
+    GLuint q = m2;
     for (int u = 0; u < n; ++u)
     {
-        for (int v = 0; v <= 2 * m; ++v)
+        for (int v = 0; v < m2; ++v)
         {
             indices[index++] = q;
             indices[index++] = p;
             ++p; ++q;
         }
+        indices[index++] = q - m2;
+        indices[index++] = p - m2;
         indices[index++] = -1;
     }
     vao.ibo.init(GL_TRIANGLE_STRIP, indices, index_count);
@@ -335,15 +345,19 @@ int main(int argc, char *argv[])
     sampler_t mipmap_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT);
     mipmap_sampler.bind(2);
 
-    sampler_t anisotropy_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT);
     GLfloat max_af_level;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_af_level);
+    debug_msg("Maximal HW supported anisotropy level is %.1f", max_af_level);
+
+    sampler_t anisotropy_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT);
     anisotropy_sampler.set_max_af_level(max_af_level);
     anisotropy_sampler.bind(3);
 
-    glm::mat4 projection_matrix = glm::infinitePerspective (constants::two_pi / 6.0f, (float) (0.5 * window.aspect()), 0.5f);
+    glm::mat4 projection_matrix = glm::infinitePerspective(constants::two_pi / 6.0f, (float) (0.5 * window.aspect()), 0.5f);
     float t = 0;
 
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(-1);
     //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
@@ -360,7 +374,6 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // render scene on two halfs of the screen
         //===============================================================================================================================================================================================================
-        float time = window.frame_ts;
         int x = window.res_x;
         int half_x = x / 2;
         int y = window.res_y;
@@ -371,7 +384,10 @@ int main(int argc, char *argv[])
         glm::vec2 r0 = glm::vec2(glm::cos(0.517f * t), glm::sin(0.517f * t));
         glm::vec2 r1 = glm::vec2(glm::cos(0.211f * t), glm::sin(0.211f * t));
 
+    #if 0
         glm::vec3 eye = 7.0f * glm::vec3(r0.x * r1.x, r0.x * r1.y, r0.y);
+    #endif
+        glm::vec3 eye = 3.5f * glm::vec3(r0.x * r1.x, r0.x * r1.y, -2.0f + r0.y);
 
         glm::mat4 view_matrix = glm::lookAt(eye, glm::vec3(0.0), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
@@ -383,12 +399,13 @@ int main(int argc, char *argv[])
 
         glViewport(0, 0, half_x, y);
         uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[window.left_filter_mode_index]);
-        cube.render();
-
+//        cube.render();
+        hyperboloid.render();
  
         glViewport(half_x, 0, half_x, y);
         uniform_t::subroutine(GL_FRAGMENT_SHADER, &subroutine_index[window.right_filter_mode_index]);
-        cube.render();
+//        cube.render();
+        hyperboloid.render();
 
 
         // saveFrameBuffer();
@@ -403,7 +420,7 @@ int main(int argc, char *argv[])
         window.end_frame();
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_BLEND);
-        glEnable(GL_CULL_FACE);
+        //glEnable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
 
     }
