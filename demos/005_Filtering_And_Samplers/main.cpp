@@ -26,6 +26,7 @@
 
 const char* subroutine_names[] = 
 {
+    "area_distortion_HW",
     "nearest_filter_HW",
     "linear_filter_HW",
     "mipmap_filter_HW",
@@ -304,11 +305,11 @@ int main(int argc, char *argv[])
     {
         float operator () (float z)
         { 
-            return 10.0 / z;
+            return 5.0 / z;
         }
     };
 
-    vao_t hyperboloid = surface_of_revolution<hyperbola>(0.5, 20.0, 64, 64);
+    vao_t hyperboloid = surface_of_revolution<hyperbola>(1.0, 20.0, 64, 64);
 
     //===================================================================================================================================================================================================================
     // load test textures
@@ -387,7 +388,7 @@ int main(int argc, char *argv[])
     #if 0
         glm::vec3 eye = 7.0f * glm::vec3(r0.x * r1.x, r0.x * r1.y, r0.y);
     #endif
-        glm::vec3 eye = 3.5f * glm::vec3(r0.x * r1.x, r0.x * r1.y, -2.0f + r0.y);
+        glm::vec3 eye = 3.5f * glm::vec3(r0.x * r1.x, r0.x * r1.y, -2.5f + r0.y);
 
         glm::mat4 view_matrix = glm::lookAt(eye, glm::vec3(0.0), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection_view_matrix = projection_matrix * view_matrix;

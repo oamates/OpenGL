@@ -685,6 +685,75 @@ vec4 approximate_ewa_temporal(sampler2D sampler, vec2 uv)
 subroutine vec4 texture_filter_func(vec2 uv);
 subroutine uniform texture_filter_func texture_filter;
 
+float ewa_lod2(vec2 duv_dx, vec2 duv_dy)
+{
+    vec2 size = textureSize(mipmap_mode_tex, 0);
+    float max_level = log2(max(size.x, size.y));
+
+    float ux = duv_dx.s;
+    float vx = duv_dx.t;
+
+    float uy = duv_dy.s;
+    float vy = duv_dy.t;
+
+    //==========================================================================================================================================================
+    // compute ellipse coefficients Axx + 2Bxy + Cyy = F
+    //==========================================================================================================================================================
+    float A = vx * vx + vy * vy;
+    float B = -(ux * vx + uy * vy);
+    float C = ux * ux + uy * uy;
+    float F = A * C - B * B;
+    float inv_F = 1.0f / F;
+        
+    A *= inv_F;
+    B *= inv_F;
+    C *= inv_F;
+    
+    float root = sqrt((A - C) * (A - C) + 4.0f * B * B);
+    float majorRadius = sqrt(2.0f / (A + C - root));
+    float minorRadius = sqrt(2.0f / (A + C + root));
+
+    float majorLength = majorRadius;
+    float minorLength = minorRadius;
+
+    float lod = log2(majorLength);  
+    lod = clamp(lod, 0.0f, max_level);
+    return lod;
+}
+
+subroutine(texture_filter_func) vec4 area_distortion_HW(vec2 uv)
+{
+    vec2 size = textureSize(mipmap_mode_tex, 0);
+    float max_level = log2(max(size.x, size.y));
+
+    vec2 unorm_uv = size * uv;
+    vec2 duv_dx = dFdx(unorm_uv);
+    vec2 duv_dy = dFdy(unorm_uv);
+
+
+    float rho_sqr = max(dot(duv_dx, duv_dx), dot(duv_dy, duv_dy));
+    float lambda = 0.5 * log2(rho_sqr);
+//    float rho_sqr = max(length(duv_dx), length(duv_dy));
+//    float lambda = log2(rho_sqr);
+    float sw_lod = clamp(lambda, 0.0f, max_level);
+
+    float rho_sqr2 = max(abs(duv_dx.x) + abs(duv_dx.y), abs(duv_dy.x) + abs(duv_dy.y));
+    float lambda2 = log2(rho_sqr2);
+    float sw_lod2 = clamp(lambda2, 0.0f, max_level);
+
+    mat2 jacobian = mat2(duv_dx, duv_dy);
+    float area = determinant(jacobian);
+    float rho3 = log2(abs(area));
+    float sw_lod3 = clamp(rho3, 0.0f, max_level);
+
+
+    float hw_lod = textureQueryLOD(mipmap_mode_tex, uv).x;
+
+    float diff = 5.0 * abs(hw_lod -ewa_lod2(duv_dx, duv_dy));
+
+    return vec4(vec3(diff), 1.0f);
+}
+
 subroutine(texture_filter_func) vec4 nearest_filter_HW(vec2 uv)
 {
     return texture(nearest_mode_tex, uv);
