@@ -26,6 +26,7 @@
 
 const char* subroutine_names[] = 
 {
+    "mipmap_filter_SW",
     "area_distortion_HW",
     "nearest_filter_HW",
     "linear_filter_HW",
@@ -33,7 +34,6 @@ const char* subroutine_names[] =
     "anisotropic_filter_HW",
     "linear_filter_SW",
     "bicubic_filter_SW",
-    "mipmap_filter_SW",
     "ewa_SW",
     "ewa2tex_SW",
     "ewa4tex_SW",

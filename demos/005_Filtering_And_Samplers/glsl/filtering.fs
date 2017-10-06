@@ -80,6 +80,30 @@ float filter_func(float q)
 }
 
 //==============================================================================================================================================================
+// function that selects mipmap level based on the length of major ellipse axis
+// this matches exactly to how Radeon performs mipmap level selection for GL_LINEAR_MIPMAP_LINEAR filtering (no anisotropy enabled)
+//==============================================================================================================================================================
+float mip_level_major_axis(vec2 duv_dx, vec2 duv_dy)
+{
+    vec2 size = textureSize(mipmap_mode_tex, 0);
+    float max_level = log2(max(size.x, size.y));
+
+    mat2 jacobian = mat2(duv_dx, duv_dy);
+    mat2 qform = jacobian * transpose(jacobian);
+
+    float A = qform[0][0];
+    float B = qform[0][1];
+    float C = qform[1][1];
+    float Q = C - A;
+    float sp = C + A;
+    float R = sqrt(Q * Q + 4.0f * B * B);
+    float major_axis_sqr = 0.5f * (sp + R);
+    //float minor_axis_sqr = sp - major_axis_sqr;
+
+    return clamp(0.5 * log2(major_axis_sqr), 0.0f, max_level);
+}
+
+//==============================================================================================================================================================
 // EWA filter parameters
 //==============================================================================================================================================================
 const int NUM_PROBES = 6;
@@ -685,41 +709,6 @@ vec4 approximate_ewa_temporal(sampler2D sampler, vec2 uv)
 subroutine vec4 texture_filter_func(vec2 uv);
 subroutine uniform texture_filter_func texture_filter;
 
-float ewa_lod2(vec2 duv_dx, vec2 duv_dy)
-{
-    vec2 size = textureSize(mipmap_mode_tex, 0);
-    float max_level = log2(max(size.x, size.y));
-
-    float ux = duv_dx.s;
-    float vx = duv_dx.t;
-
-    float uy = duv_dy.s;
-    float vy = duv_dy.t;
-
-    //==========================================================================================================================================================
-    // compute ellipse coefficients Axx + 2Bxy + Cyy = F
-    //==========================================================================================================================================================
-    float A = vx * vx + vy * vy;
-    float B = -(ux * vx + uy * vy);
-    float C = ux * ux + uy * uy;
-    float F = A * C - B * B;
-    float inv_F = 1.0f / F;
-        
-    A *= inv_F;
-    B *= inv_F;
-    C *= inv_F;
-    
-    float root = sqrt((A - C) * (A - C) + 4.0f * B * B);
-    float majorRadius = sqrt(2.0f / (A + C - root));
-    float minorRadius = sqrt(2.0f / (A + C + root));
-
-    float majorLength = majorRadius;
-    float minorLength = minorRadius;
-
-    float lod = log2(majorLength);  
-    lod = clamp(lod, 0.0f, max_level);
-    return lod;
-}
 
 subroutine(texture_filter_func) vec4 area_distortion_HW(vec2 uv)
 {
@@ -749,7 +738,7 @@ subroutine(texture_filter_func) vec4 area_distortion_HW(vec2 uv)
 
     float hw_lod = textureQueryLOD(mipmap_mode_tex, uv).x;
 
-    float diff = 5.0 * abs(hw_lod -ewa_lod2(duv_dx, duv_dy));
+    float diff = abs(-hw_lod + mip_level_major_axis(duv_dx, duv_dy));
 
     return vec4(vec3(diff), 1.0f);
 }
@@ -839,32 +828,63 @@ subroutine(texture_filter_func) vec4 bicubic_filter_SW(vec2 uv)
     return mix(mix(sample11, sample01, s.x), mix(sample10, sample00, s.x), s.y);
 }
 
-#define USE_LINEAR_MODE_TEXTURE
+//#define MIPMAP_SW_FILTER_USE_MIPMAP_SAMPLING
+//#define MIPMAP_SW_FILTER_USE_LINEAR_SAMPLING
+#define MIPMAP_SW_FILTER_USE_NEAREST_SAMPLING
+#define MIPMAP_SW_FILTER_USE_HW_LOD
 
 subroutine(texture_filter_func) vec4 mipmap_filter_SW(vec2 uv)
 {
-    vec2 size = textureSize(linear_mode_tex, 0);
-    vec2 texel_size = 1.0f / size;
+    vec2 size;
+    float lod;
+
+#ifdef MIPMAP_SW_FILTER_USE_HW_LOD
+
+    lod = textureQueryLOD(mipmap_mode_tex, uv).x;
+
+#else       /* COMPUTE LOD AS A MAJOR ELLIPTIC FOOTPRINT AXIS */ 
+
+    size = textureSize(mipmap_mode_tex, 0);
+    float max_lod = log2(max(size.x, size.y));
 
     vec2 unorm_uv = size * uv;
-    vec2 duv_dx = dFdx(uv);
-    vec2 duv_dy = dFdy(uv);
-    float rho = max(dot(duv_dx, duv_dx), dot(duv_dy, duv_dy));
-    float level = max(0.0f, 0.5f * log2(rho));
+    vec2 duv_dx = dFdx(unorm_uv);
+    vec2 duv_dy = dFdy(unorm_uv);
 
-//    vec2 unorm_uv = size * uv;
-//    mat2 jacobian = mat2(dFdx(unorm_uv), dFdy(unorm_uv));
-//    float area = det(jacobian);
-//    float level = log2(abs(area));
+    mat2 jacobian = mat2(duv_dx, duv_dy);
+    mat2 qform = jacobian * transpose(jacobian);
 
-    float mip_l = floor(level);
+    float A = qform[0][0];
+    float B = qform[0][1];
+    float C = qform[1][1];
+    float Q = C - A;
+    float sp = C + A;
+    float R = sqrt(Q * Q + 4.0f * B * B);
+    float major_axis_sqr = 0.5f * (sp + R);
+    lod = clamp(0.5 * log2(major_axis_sqr), 0.0f, max_lod);
+
+#endif
+
+#ifdef MIPMAP_SW_FILTER_USE_MIPMAP_SAMPLING
+
+    return textureLod(mipmap_mode_tex, uv, lod);
+
+#else
+
+    float mip_l = floor(lod);
     float mip_h = mip_l + 1.0f;
-    float f = level - mip_l;
+    float f = lod - mip_l;
 
-  #ifdef USE_LINEAR_MODE_TEXTURE
-    vec4 texel_l = textureLod(linear_mode_tex, uv, mip_l);
-    vec4 texel_h = textureLod(linear_mode_tex, uv, mip_h);
-  #else
+  #ifdef MIPMAP_SW_FILTER_USE_LINEAR_SAMPLING
+
+    vec4 texel_l = textureLod(mipmap_mode_tex, uv, mip_l);
+    vec4 texel_h = textureLod(mipmap_mode_tex, uv, mip_h);
+    return mix(texel_l, texel_h, f);
+
+  #else     /* NEAREST SAMPLING */
+
+    size = textureSize(mipmap_mode_tex, int(mip_l));
+    vec2 texel_size = 1.0f / size;
     vec2 P = size * uv - 0.5f;
     vec2 Pf = fract(P);
     vec2 Pi = P - Pf;
@@ -872,32 +892,39 @@ subroutine(texture_filter_func) vec4 mipmap_filter_SW(vec2 uv)
     vec4 offset = vec4(0.5f, 0.5f, 1.5f, 1.5f) * texel_size.xyxy;
     vec2 base = texel_size * Pi;
 
-    vec4 texel00 = textureLod(nearest_mode_tex, base + offset.xy, mip_l);
-    vec4 texel10 = textureLod(nearest_mode_tex, base + offset.zy, mip_l);
-    vec4 texel01 = textureLod(nearest_mode_tex, base + offset.xw, mip_l);
-    vec4 texel11 = textureLod(nearest_mode_tex, base + offset.zw, mip_l);
+    vec4 texel00 = textureLod(mipmap_mode_tex, base + offset.xy, mip_l);
+    vec4 texel10 = textureLod(mipmap_mode_tex, base + offset.zy, mip_l);
+    vec4 texel01 = textureLod(mipmap_mode_tex, base + offset.xw, mip_l);
+    vec4 texel11 = textureLod(mipmap_mode_tex, base + offset.zw, mip_l);
 
     vec4 texel_y0 = mix(texel00, texel10, Pf.x);
     vec4 texel_y1 = mix(texel01, texel11, Pf.x);
 
     vec4 texel_l = mix(texel_y0, texel_y1, Pf.y);
 
-    offset = offset + offset;
+    size = textureSize(mipmap_mode_tex, int(mip_h));
+    texel_size = 1.0f / size;
+    P = size * uv - 0.5f;
+    Pf = fract(P);
+    Pi = P - Pf;
+
+    offset = vec4(0.5f, 0.5f, 1.5f, 1.5f) * texel_size.xyxy;
     base = texel_size * Pi;
 
-    texel00 = textureLod(nearest_mode_tex, base + offset.xy, mip_h);
-    texel10 = textureLod(nearest_mode_tex, base + offset.zy, mip_h);
-    texel01 = textureLod(nearest_mode_tex, base + offset.xw, mip_h);
-    texel11 = textureLod(nearest_mode_tex, base + offset.zw, mip_h);
+    texel00 = textureLod(mipmap_mode_tex, base + offset.xy, mip_h);
+    texel10 = textureLod(mipmap_mode_tex, base + offset.zy, mip_h);
+    texel01 = textureLod(mipmap_mode_tex, base + offset.xw, mip_h);
+    texel11 = textureLod(mipmap_mode_tex, base + offset.zw, mip_h);
 
     texel_y0 = mix(texel00, texel10, Pf.x);
     texel_y1 = mix(texel01, texel11, Pf.x);
 
     vec4 texel_h = mix(texel_y0, texel_y1, Pf.y);
+    return mix(texel_l, texel_h, f);    
 
+  #endif
 
-  #endif  
-    return mix(texel_l, texel_h, f);
+#endif 
 }
 
 //#define USE_HARDWARE_LOD
