@@ -116,6 +116,51 @@ const float TEXELS_PER_PIXEL = 1.0f;
 //==============================================================================================================================================================
 // EWA filter : reference implementation
 //==============================================================================================================================================================
+/*
+vec4 ewa(vec2 uv)
+{
+    vec2 size = textureSize(mipmap_mode_tex, 0);
+    float max_level = log2(max(size.x, size.y));
+
+    vec2 unorm_uv = size * uv;
+    vec2 duv_dx = dFdx(unorm_uv);
+    vec2 duv_dy = dFdy(unorm_uv);
+
+    mat2 jacobian = mat2(duv_dx, duv_dy);
+    mat2 qform = jacobian * transpose(jacobian);
+
+    float A = qform[0][0];
+    float B = qform[0][1];
+    float C = qform[1][1];
+    float Q = C - A;
+    float sp = C + A;
+    float R = sqrt(Q * Q + 4.0f * B * B);
+    float major_axis_sqr = 0.5f * (sp + R);
+    float minor_axis_sqr = sp - major_axis_sqr;
+
+    float lod = clamp(0.5 * log2(major_axis_sqr), 0.0f, max_level);
+
+    ivec2 iscale = textureSize(mipmap_mode_tex, lod);
+
+    if (iscale.x * iscale.y <= 2)
+        return textureLod(mipmap_mode_tex, uv, lod);
+
+    vec2 scale = vec2(iscale);
+
+    vec2 inv_scale = 1.0f / scale;
+
+    vec2 p = scale * uv - vec2(0.5f);
+
+    float S = FILTER_WIDTH * scale;
+    float ux = S * duv_dx.s;
+    float vx = S * duv_dx.t;
+
+    float uy = S * duv_dy.s;
+    float vy = S * duv_dy.t;
+
+}
+*/
+
 vec4 ewa(sampler2D sampler, vec2 uv, vec2 duv_dx, vec2 duv_dy, float lod, int psize)
 {
     int scale = psize >> int(lod);
@@ -196,6 +241,7 @@ vec4 ewa(sampler2D sampler, vec2 uv, vec2 duv_dx, vec2 duv_dy, float lod, int ps
     vec4 color = num * (1.0f / total_weight);
     return color;
 }
+
 
 //==============================================================================================================================================================
 // EWA filter : 2-tex implementation
@@ -709,6 +755,11 @@ vec4 approximate_ewa_temporal(sampler2D sampler, vec2 uv)
 subroutine vec4 texture_filter_func(vec2 uv);
 subroutine uniform texture_filter_func texture_filter;
 
+subroutine(texture_filter_func) vec4 textureGrad_HW(vec2 uv)
+{
+    //return textureGrad(anisotropic_mode_tex, uv, dFdx(uv), dFdy(uv));
+    return textureGrad(mipmap_mode_tex, uv, dFdx(uv), dFdy(uv));
+}
 
 subroutine(texture_filter_func) vec4 area_distortion_HW(vec2 uv)
 {
