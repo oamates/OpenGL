@@ -116,8 +116,8 @@ const float TEXELS_PER_PIXEL = 1.0f;
 //==============================================================================================================================================================
 // EWA filter : reference implementation
 //==============================================================================================================================================================
-/*
-vec4 ewa(vec2 uv)
+
+vec4 ewa00(vec2 uv)
 {
     vec2 size = textureSize(mipmap_mode_tex, 0);
     float max_level = log2(max(size.x, size.y));
@@ -129,37 +129,106 @@ vec4 ewa(vec2 uv)
     mat2 jacobian = mat2(duv_dx, duv_dy);
     mat2 qform = jacobian * transpose(jacobian);
 
-    float A = qform[0][0];
+    float A = qform[1][1];
     float B = qform[0][1];
-    float C = qform[1][1];
+    float C = qform[0][0];
     float Q = C - A;
     float sp = C + A;
     float R = sqrt(Q * Q + 4.0f * B * B);
     float major_axis_sqr = 0.5f * (sp + R);
-    float minor_axis_sqr = sp - major_axis_sqr;
+    float minor_axis_sqr = max(sp - major_axis_sqr, 0.5);
 
-    float lod = clamp(0.5 * log2(major_axis_sqr), 0.0f, max_level);
+    float majorLength = sqrt(major_axis_sqr);
+    float minorLength = sqrt(minor_axis_sqr);
 
-    ivec2 iscale = textureSize(mipmap_mode_tex, lod);
+    const float maxEccentricity = MAX_ECCENTRICITY;
+
+    float e = majorLength / minorLength;
+    minorLength *= max(e / maxEccentricity, 1.0f);
+    
+    float lod = log2(minorLength);  
+    lod = clamp(lod, 0.0, max_level);
+
+
+//    float lod = clamp(0.5 * log2(major_axis_sqr), 0.0f, max_level);
+
+    ivec2 iscale = textureSize(mipmap_mode_tex, int(floor(lod)));
+    vec2 scale = vec2(iscale);
+    unorm_uv = scale * uv;
+    vec2 p = unorm_uv - vec2(0.5f);
+    duv_dx = dFdx(unorm_uv);
+    duv_dy = dFdy(unorm_uv);
 
     if (iscale.x * iscale.y <= 2)
         return textureLod(mipmap_mode_tex, uv, lod);
 
-    vec2 scale = vec2(iscale);
 
     vec2 inv_scale = 1.0f / scale;
 
-    vec2 p = scale * uv - vec2(0.5f);
 
-    float S = FILTER_WIDTH * scale;
-    float ux = S * duv_dx.s;
-    float vx = S * duv_dx.t;
+    jacobian = mat2(duv_dx, duv_dy);
+    qform = jacobian * transpose(jacobian);
 
-    float uy = S * duv_dy.s;
-    float vy = S * duv_dy.t;
+    //==========================================================================================================================================================
+    // compute ellipse coefficients Axx + 2Bxy + Cyy = F
+    //==========================================================================================================================================================
+    A =  qform[1][1] + 1.0f;
+    B = -qform[0][1];
+    C =  qform[0][0] + 1.0f;
+    float F = determinant(qform);
+
+    //==========================================================================================================================================================
+    // Compute the ellipse's (u,v) bounding box in texture space
+    //==========================================================================================================================================================
+    vec2 ebbox_d = sqrt(vec2(C, A)); 
+
+    //==========================================================================================================================================================
+    // compute the symmetric bounding box, clamp it so that it includes at most TEXEL_LIMIT texels
+    // then compute u, v bounds to loop over
+    //==========================================================================================================================================================
+    float ebbox_area = ebbox_d.s * ebbox_d.t;
+    ebbox_d *= min(sqrt(TEXEL_LIMIT / ebbox_area), 1.0f);
+
+    vec2 ebbox_min = floor(p - ebbox_d);
+    vec2 ebbox_max = ceil (p + ebbox_d);
+
+    //==========================================================================================================================================================
+    // Heckbert MS thesis, p. 59: scan over the bounding box of the ellipse and incrementally update the value of Axx + Bxy + Cyy; when this
+    // value, q, is less than F, we're inside the ellipse so add weighted texel to the total sum
+    //==========================================================================================================================================================
+    vec4 num = vec4(0.0f);
+    float total_weight = 0.0f;
+    float ddq = 2.0f * A;
+    float U = ebbox_min.s - p.s;
+
+    float v = ebbox_min.t;
+    while (v <= ebbox_max.t)
+    {
+        float V = v - p.t;
+        float dq = A + 2.0f * (A * U + B * V);
+        float q = (C * V + 2.0f * B * U) * V + A * U * U;
+
+        float u = ebbox_min.s;
+        while (u <= ebbox_max.s)
+        {
+            if (q < F) 
+            {
+                float r2 = q / F;
+                float weight = filter_func(r2);
+                num += weight * textureLod(mipmap_mode_tex, inv_scale * vec2(u + 0.5f, v + 0.5f), lod);
+                total_weight += weight;
+            }
+            q += dq;
+            dq += ddq;
+            u += 1.0f;
+        }
+        v += 1.0f;
+    }
+
+    vec4 color = num * (1.0f / total_weight);
+    return color;
 
 }
-*/
 
 vec4 ewa(sampler2D sampler, vec2 uv, vec2 duv_dx, vec2 duv_dy, float lod, int psize)
 {
@@ -757,8 +826,7 @@ subroutine uniform texture_filter_func texture_filter;
 
 subroutine(texture_filter_func) vec4 textureGrad_HW(vec2 uv)
 {
-    //return textureGrad(anisotropic_mode_tex, uv, dFdx(uv), dFdy(uv));
-    return textureGrad(mipmap_mode_tex, uv, dFdx(uv), dFdy(uv));
+    return textureGrad(anisotropic_mode_tex, uv, dFdx(uv), dFdy(uv));
 }
 
 subroutine(texture_filter_func) vec4 area_distortion_HW(vec2 uv)
@@ -981,7 +1049,7 @@ subroutine(texture_filter_func) vec4 mipmap_filter_SW(vec2 uv)
 //#define USE_HARDWARE_LOD
 
 subroutine(texture_filter_func) vec4 ewa_SW(vec2 uv)
-{
+{/*
     vec2 duv_dx = dFdx(uv);
     vec2 duv_dy = dFdy(uv);
     
@@ -992,7 +1060,10 @@ subroutine(texture_filter_func) vec4 ewa_SW(vec2 uv)
   #else
     lod = textureQueryLOD_EWA(mipmap_mode_tex, duv_dx, duv_dy, size).x;
   #endif
+
     return ewa(mipmap_mode_tex, uv, duv_dx, duv_dy, lod, size);
+*/
+    return ewa00(uv);
 }
 
 subroutine(texture_filter_func) vec4 ewa2tex_SW(vec2 uv)
