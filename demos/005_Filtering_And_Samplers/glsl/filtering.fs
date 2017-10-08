@@ -82,12 +82,14 @@ float filter_func(float q)
 // function that selects mipmap level based on the length of major ellipse axis
 // this matches exactly to how Radeon performs mipmap level selection for GL_LINEAR_MIPMAP_LINEAR filtering (no anisotropy enabled)
 //==============================================================================================================================================================
-float mip_level_major_axis(vec2 duv_dx, vec2 duv_dy)
+float mip_level_major_axis(vec2 uv)
 {
-    vec2 size = textureSize(mipmap_mode_tex, 0);
-    float max_level = log2(max(size.x, size.y));
+    vec2 duv_dx = dFdx(uv);
+    vec2 duv_dy = dFdy(uv);
 
-    mat2 jacobian = mat2(duv_dx, duv_dy);
+    vec2 tex_size = textureSize(mipmap_mode_tex, 0);
+
+    mat2 jacobian = mat2(tex_size * duv_dx, tex_size * duv_dy);
     mat2 qform = jacobian * transpose(jacobian);
 
     float A = qform[0][0];
@@ -96,10 +98,42 @@ float mip_level_major_axis(vec2 duv_dx, vec2 duv_dy)
     float Q = C - A;
     float sp = C + A;
     float R = sqrt(Q * Q + 4.0f * B * B);
-    float major_axis_sqr = 0.5f * (sp + R);
-    //float minor_axis_sqr = sp - major_axis_sqr;
+    float major_axis = sqrt(0.5f * (sp + R));
 
-    return clamp(0.5 * log2(major_axis_sqr), 0.0f, max_level);
+    return log2(clamp(major_axis, 1.0f, max(tex_size.x, tex_size.y)));
+}
+
+//==============================================================================================================================================================
+// function that selects mipmap level based on the length of minor ellipse axis
+// the function is supposed to be used for selecting base mipmap level for anisotropic filtration
+//==============================================================================================================================================================
+const float MAX_ECCENTRICITY = 16.0f;
+const float MINOR_AXIS_INFIMUM_VALUE = 0.01;
+
+vec2 mip_level_minor_axis(vec2 uv)
+{
+    vec2 duv_dx = dFdx(uv);
+    vec2 duv_dy = dFdy(uv);
+    
+    vec2 tex_size = textureSize(mipmap_mode_tex, 0);
+
+    mat2 jacobian = mat2(tex_size * duv_dx, tex_size * duv_dy);
+    mat2 qform = jacobian * transpose(jacobian);
+
+    float A = qform[1][1];
+    float B = qform[0][1];
+    float C = qform[0][0];
+    float Q = C - A;
+    float sp = A + C;
+    float R = sqrt(Q * Q + 4.0f * B * B);
+    float major_axis = sqrt(0.5f * (sp + R));
+    float minor_axis = max(sqrt(0.5f * (sp - R)), MINOR_AXIS_INFIMUM_VALUE);
+
+    float eccentricity = major_axis / minor_axis;
+    minor_axis *= max(eccentricity / MAX_ECCENTRICITY, 1.0f);
+    
+    float lod = log2(clamp(minor_axis, 1.0, max(tex_size.x, tex_size.y)));
+    return vec2(lod, eccentricity);
 }
 
 //==============================================================================================================================================================
@@ -108,55 +142,8 @@ float mip_level_major_axis(vec2 duv_dx, vec2 duv_dy)
 const int NUM_PROBES = 6;
 const int TEXEL_LIMIT = 128;
 
-const float MAX_ECCENTRICITY = 16.0f;
 const float FILTER_WIDTH = 1.0f;
 const float TEXELS_PER_PIXEL = 1.0f;
-
-//==============================================================================================================================================================
-// mip-map level selection routine
-//==============================================================================================================================================================
-vec2 textureQueryLOD_EWA(sampler2D sampler, vec2 duv_dx, vec2 duv_dy, int size)
-{
-    int scale = size;
-
-    float ux = duv_dx.s * scale;
-    float vx = duv_dx.t * scale;
-
-    float uy = duv_dy.s * scale;
-    float vy = duv_dy.t * scale;
-
-    //==========================================================================================================================================================
-    // compute ellipse coefficients Axx + 2Bxy + Cyy = F
-    //==========================================================================================================================================================
-    float A = vx * vx + vy * vy + 1.0f;
-    float B = -(ux * vx + uy * vy);
-    float C = ux * ux + uy * uy + 1.0f;
-    float F = A * C - B * B;
-    float inv_F = 1.0f / F;
-        
-    A *= inv_F;
-    B *= inv_F;
-    C *= inv_F;
-    
-    float root = sqrt((A - C) * (A - C) + 4.0f * B * B);
-    float majorRadius = sqrt(2.0f / (A + C - root));
-    float minorRadius = sqrt(2.0f / (A + C + root));
-
-    float majorLength = majorRadius;
-    float minorLength = max(minorRadius, 0.01);
-
-    const float maxEccentricity = MAX_ECCENTRICITY;
-
-    float e = majorLength / minorLength;
-
-    if (e > maxEccentricity)
-        minorLength *= (e / maxEccentricity);
-    
-    float lod = log2(minorLength / TEXELS_PER_PIXEL);  
-    lod = clamp(lod, 0.0, log2(size));
-
-    return vec2(lod, e);
-}
 
 //==============================================================================================================================================================
 // Elliptic Weighted Average filter : reference implementation
@@ -183,15 +170,11 @@ vec4 ewa(vec2 uv)
     float major_axis = sqrt(0.5f * (sp + q));
     float minor_axis = max(sqrt(0.5f * (sp - q)), 0.01);
 
-    float e = major_axis / minor_axis;
-
-    minor_axis *= max(e / MAX_ECCENTRICITY, 1.0f);
+    float eccentricity = major_axis / minor_axis;
+    minor_axis *= max(eccentricity / MAX_ECCENTRICITY, 1.0f);
     
     float lod = log2(clamp(minor_axis, 1.0, max(tex_size.x, tex_size.y)));
 
-    //return vec4(exp2(-lod) * vec3(1.0, 1.0, 0.0), 1.0);
-
-        
     //==========================================================================================================================================================
     // use regular filtering if the scale is very small
     //==========================================================================================================================================================
@@ -448,74 +431,6 @@ vec4 ewa4tex(sampler2D sampler, vec2 p0, vec2 du, vec2 dv, float lod, int psize)
 }
 
 //==============================================================================================================================================================
-// helper : visualize the absolute deviation between hardware and software lod selection
-//==============================================================================================================================================================
-vec4 lodError(sampler2D sampler, vec2 uv)
-{
-    vec2 duv_dx = dFdx(uv);
-    vec2 duv_dy = dFdy(uv);
-    
-    int size = textureSize(sampler, 0).x;
-
-    float lod1 = textureQueryLOD(sampler, uv).x;
-    float lod2 = textureQueryLOD_EWA(sampler, duv_dx, duv_dy, size).x;
-
-    return vec4(vec3(2.0f * abs(lod2 - lod1)), 1.0f);
-}
-
-vec4 map_A(float h)
-{
-    vec4 colors[3];
-    colors[0] = vec4(0.0f, 0.0f, 1.0f, 1.0f);
-    colors[1] = vec4(1.0f, 1.0f, 0.0f, 1.0f);
-    colors[2] = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-
-    h = clamp(h, 0 ,16);
-    if(h > 8)
-        return mix(colors[1], colors[2], (h - 8) / 8);
-    else
-        return mix(colors[0], colors[1], h / 8);
-}
-
-vec4 map_B(float h)
-{
-    vec4 colors[3];
-    colors[0] = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    colors[1] = vec4(0.0f, 1.0f, 0.0f, 1.0f);
-    colors[2] = vec4(0.0f, 0.0f, 1.0f, 1.0f);
-
-    h = mod(h, 3);
-    if(h > 1)
-        return mix(colors[1], colors[2], h - 1);
-    else
-        return mix(colors[0], colors[1], h);
-}
-
-//==============================================================================================================================================================
-// helper : visualize the anisotropy level
-//==============================================================================================================================================================
-vec4 anisotropyLevel(sampler2D sampler, vec2 uv)
-{
-    vec2 duv_dx = dFdx(uv);
-    vec2 duv_dy = dFdy(uv);
-    int psize = textureSize(sampler, 0).x;
-    float aniso = textureQueryLOD_EWA(sampler, duv_dx, duv_dy, psize).y;
-    return mix(map_A(aniso), texture(sampler, uv), 0.4);
-}
-
-//==============================================================================================================================================================
-// helper : visualize the mip-map level
-//==============================================================================================================================================================
-vec4 mipLevel(sampler2D sampler, vec2 uv)
-{
-    vec2 duv_dx = dFdx(uv);
-    vec2 duv_dy = dFdy(uv);
-    int psize = textureSize(sampler, 0).x;
-    float lod = textureQueryLOD_EWA(sampler, duv_dx, duv_dy, psize).x;
-    return mix(map_B(lod), texture(sampler, uv), 0.45);
-}
-
-//==============================================================================================================================================================
 // approximate EWA
 //==============================================================================================================================================================
 vec4 approximate_ewa(sampler2D sampler, vec2 uv)
@@ -591,7 +506,7 @@ vec4 approximate_ewa_spatial(sampler2D sampler, vec2 uv)
     
     int psize = textureSize(sampler, 0).x;
 
-    float vlod = textureQueryLOD_EWA(sampler, du, dv, psize).y;
+    float vlod = mip_level_minor_axis(uv).y;
 
     vec4 hcolor = texture(sampler, uv);
     if(vlod < 12)
@@ -726,65 +641,38 @@ vec4 approximate_ewa_temporal(sampler2D sampler, vec2 uv)
 subroutine vec4 texture_filter_func(vec2 uv);
 subroutine uniform texture_filter_func texture_filter;
 
-subroutine(texture_filter_func) vec4 textureGrad_HW(vec2 uv)
+subroutine(texture_filter_func) vec4 textureGrad_hw(vec2 uv)
 {
     return textureGrad(anisotropic_mode_tex, uv, dFdx(uv), dFdy(uv));
 }
 
-subroutine(texture_filter_func) vec4 area_distortion_HW(vec2 uv)
+subroutine(texture_filter_func) vec4 textureLod_hw(vec2 uv)
 {
-    vec2 size = textureSize(mipmap_mode_tex, 0);
-    float max_level = log2(max(size.x, size.y));
-
-    vec2 unorm_uv = size * uv;
-    vec2 duv_dx = dFdx(unorm_uv);
-    vec2 duv_dy = dFdy(unorm_uv);
-
-
-    float rho_sqr = max(dot(duv_dx, duv_dx), dot(duv_dy, duv_dy));
-    float lambda = 0.5 * log2(rho_sqr);
-//    float rho_sqr = max(length(duv_dx), length(duv_dy));
-//    float lambda = log2(rho_sqr);
-    float sw_lod = clamp(lambda, 0.0f, max_level);
-
-    float rho_sqr2 = max(abs(duv_dx.x) + abs(duv_dx.y), abs(duv_dy.x) + abs(duv_dy.y));
-    float lambda2 = log2(rho_sqr2);
-    float sw_lod2 = clamp(lambda2, 0.0f, max_level);
-
-    mat2 jacobian = mat2(duv_dx, duv_dy);
-    float area = determinant(jacobian);
-    float rho3 = log2(abs(area));
-    float sw_lod3 = clamp(rho3, 0.0f, max_level);
-
-
-    float hw_lod = textureQueryLOD(mipmap_mode_tex, uv).x;
-
-    float diff = abs(-hw_lod + mip_level_major_axis(duv_dx, duv_dy));
-
-    return vec4(vec3(diff), 1.0f);
+    float lod = textureQueryLOD(mipmap_mode_tex, uv).x;
+    return textureLod(mipmap_mode_tex, uv, lod);
 }
 
-subroutine(texture_filter_func) vec4 nearest_filter_HW(vec2 uv)
+subroutine(texture_filter_func) vec4 nearest_filter_hw(vec2 uv)
 {
     return texture(nearest_mode_tex, uv);
 }
 
-subroutine(texture_filter_func) vec4 linear_filter_HW(vec2 uv)
+subroutine(texture_filter_func) vec4 linear_filter_hw(vec2 uv)
 {
     return texture(linear_mode_tex, uv);
 }
 
-subroutine(texture_filter_func) vec4 mipmap_filter_HW(vec2 uv)
+subroutine(texture_filter_func) vec4 mipmap_filter_hw(vec2 uv)
 {
     return texture(mipmap_mode_tex, uv);
 }
 
-subroutine(texture_filter_func) vec4 anisotropic_filter_HW(vec2 uv)
+subroutine(texture_filter_func) vec4 anisotropic_filter_hw(vec2 uv)
 {
     return texture(anisotropic_mode_tex, uv);
 }
 
-subroutine(texture_filter_func) vec4 linear_filter_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 linear_filter_sw(vec2 uv)
 {
     vec2 size = textureSize(nearest_mode_tex, 0);
 
@@ -819,7 +707,7 @@ vec4 cubic(float v)
     return vec4(x, y, z, w) * (1.0/6.0);
 }
 
-subroutine(texture_filter_func) vec4 bicubic_filter_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 bicubic_filter_sw(vec2 uv)
 {
     vec2 size = textureSize(linear_mode_tex, 0);
     vec2 texel_size = 1.0f / size;
@@ -854,7 +742,7 @@ subroutine(texture_filter_func) vec4 bicubic_filter_SW(vec2 uv)
 #define MIPMAP_SW_FILTER_USE_NEAREST_SAMPLING
 #define MIPMAP_SW_FILTER_USE_HW_LOD
 
-subroutine(texture_filter_func) vec4 mipmap_filter_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 mipmap_filter_sw(vec2 uv)
 {
     vec2 size;
     float lod;
@@ -950,12 +838,12 @@ subroutine(texture_filter_func) vec4 mipmap_filter_SW(vec2 uv)
 
 //#define USE_HARDWARE_LOD
 
-subroutine(texture_filter_func) vec4 ewa_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 ewa_sw(vec2 uv)
 {
     return ewa(uv);
 }
 
-subroutine(texture_filter_func) vec4 ewa2tex_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 ewa2tex_sw(vec2 uv)
 {
     vec2 duv_dx = dFdx(uv);
     vec2 duv_dy = dFdy(uv);
@@ -965,12 +853,12 @@ subroutine(texture_filter_func) vec4 ewa2tex_SW(vec2 uv)
   #ifdef USE_HARDWARE_LOD
     lod = textureQueryLOD(mipmap_mode_tex, uv).x;
   #else
-    lod = textureQueryLOD_EWA(mipmap_mode_tex, duv_dx, duv_dy, size).x;
+    lod = mip_level_minor_axis(uv).x;
   #endif
     return ewa2tex(mipmap_mode_tex, uv, duv_dx, duv_dy, lod, size);
 }
 
-subroutine(texture_filter_func) vec4 ewa4tex_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 ewa4tex_sw(vec2 uv)
 {
     vec2 duv_dx = dFdx(uv);
     vec2 duv_dy = dFdy(uv);
@@ -980,22 +868,22 @@ subroutine(texture_filter_func) vec4 ewa4tex_SW(vec2 uv)
   #ifdef USE_HARDWARE_LOD
     lod = textureQueryLOD(mipmap_mode_tex, uv).x;
   #else
-    lod = textureQueryLOD_EWA(mipmap_mode_tex, duv_dx, duv_dy, size).x;
+    lod = mip_level_minor_axis(uv).x;
   #endif
     return ewa4tex(mipmap_mode_tex, uv, duv_dx, duv_dy, lod, size);
 }
 
-subroutine(texture_filter_func) vec4 approximate_ewa_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 approximate_ewa_sw(vec2 uv)
 {
     return approximate_ewa(mipmap_mode_tex, uv);
 }
 
-subroutine(texture_filter_func) vec4 approximate_ewa_spatial_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 approximate_ewa_spatial_sw(vec2 uv)
 {
     return approximate_ewa_spatial(mipmap_mode_tex, uv);
 }
 
-subroutine(texture_filter_func) vec4 approximate_ewa_temporal_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 approximate_ewa_temporal_sw(vec2 uv)
 {
     return approximate_ewa_temporal(mipmap_mode_tex, uv);
 }
@@ -1003,21 +891,59 @@ subroutine(texture_filter_func) vec4 approximate_ewa_temporal_SW(vec2 uv)
 //==============================================================================================================================================================
 // helper / debugging filtering subroutines
 //==============================================================================================================================================================
-subroutine(texture_filter_func) vec4 lodError_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 mipmap_lod_hw(vec2 uv)
 {
-    return lodError(mipmap_mode_tex, uv);
+    float lod_hw = textureQueryLOD(mipmap_mode_tex, uv).x;
+    return vec4(vec3(exp(-lod_hw)), 1.0f);
 }
 
-subroutine(texture_filter_func) vec4 anisotropyLevel_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 mipmap_lod_sw(vec2 uv)
 {
-    return anisotropyLevel(mipmap_mode_tex, uv);
+    float lod_sw = mip_level_major_axis(uv);
+    return vec4(vec3(exp(-lod_sw)), 1.0f);
 }
 
-subroutine(texture_filter_func) vec4 mipLevel_SW(vec2 uv)
+subroutine(texture_filter_func) vec4 anisotropic_lod_hw(vec2 uv)
 {
-    return mipLevel(mipmap_mode_tex, uv);
+    float lod_hw = textureQueryLOD(anisotropic_mode_tex, uv).x;
+    return vec4(vec3(exp(-lod_hw)), 1.0f);    
 }
 
+subroutine(texture_filter_func) vec4 anisotropic_lod_sw(vec2 uv)
+{
+    float lod_hw = mip_level_minor_axis(uv).x;
+    return vec4(vec3(exp(-lod_hw)), 1.0f);    
+}
+
+subroutine(texture_filter_func) vec4 eccentricity_sw(vec2 uv)
+{
+    float e = mip_level_minor_axis(uv).y;
+    return vec4(vec3(exp(-e)), 1.0f);    
+}
+
+subroutine(texture_filter_func) vec4 mipmap_lod_error(vec2 uv)
+{
+    float lod_hw = textureQueryLOD(mipmap_mode_tex, uv).x;
+    float lod_sw = mip_level_major_axis(uv);
+    return vec4(vec3(2.0f * abs(lod_hw - lod_sw)), 1.0f);
+}
+
+subroutine(texture_filter_func) vec4 anisotropic_lod_error(vec2 uv)
+{
+    float lod_hw = textureQueryLOD(anisotropic_mode_tex, uv).x;
+    float lod_sw = mip_level_minor_axis(uv).x;
+    return vec4(vec3(2.0f * abs(lod_hw - lod_sw)), 1.0f);
+}
+
+subroutine(texture_filter_func) vec4 test_func(vec2 uv)
+{
+    vec4 q = 10.0 * abs(textureLod_hw(uv) - mipmap_filter_hw(uv));
+    return vec4(q.rgb, 1.0f);
+}
+
+//==============================================================================================================================================================
+// shader entry point
+//==============================================================================================================================================================
 void main()
 {
     FragmentColor = texture_filter(uv);

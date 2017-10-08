@@ -26,24 +26,29 @@
 
 const char* subroutine_names[] = 
 {
-    "ewa_SW",
-    "mipmap_filter_SW",
-    "textureGrad_HW",
-    "area_distortion_HW",
-    "nearest_filter_HW",
-    "linear_filter_HW",
-    "mipmap_filter_HW",
-    "anisotropic_filter_HW",
-    "linear_filter_SW",
-    "bicubic_filter_SW",
-    "ewa2tex_SW",
-    "ewa4tex_SW",
-    "approximate_ewa_SW",
-    "approximate_ewa_spatial_SW",
-    "approximate_ewa_temporal_SW",
-    "lodError_SW",
-    "anisotropyLevel_SW",
-    "mipLevel_SW"
+    "textureGrad_hw",
+    "textureLod_hw",
+    "nearest_filter_hw",
+    "linear_filter_hw",
+    "mipmap_filter_hw",
+    "anisotropic_filter_hw",
+    "linear_filter_sw",
+    "bicubic_filter_sw",
+    "mipmap_filter_sw",
+    "ewa_sw",
+    "ewa2tex_sw",
+    "ewa4tex_sw",
+    "approximate_ewa_sw",
+    "approximate_ewa_spatial_sw",
+    "approximate_ewa_temporal_sw",
+    "mipmap_lod_hw",
+    "mipmap_lod_sw",
+    "anisotropic_lod_hw",
+    "anisotropic_lod_sw",
+    "eccentricity_sw",
+    "mipmap_lod_error",
+    "anisotropic_lod_error",
+    "test_func"
 };
 
 struct demo_window_t : public imgui_window_t
