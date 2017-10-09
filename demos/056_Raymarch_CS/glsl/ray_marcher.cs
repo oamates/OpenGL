@@ -16,7 +16,7 @@ uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
 uniform vec2 focal_scale;                                                   // camera focal scale
-uniform float pixel_size;                                                        // NDC / pixel uv - ratio
+uniform float pixel_size;                                                   // NDC / pixel uv - ratio
 uniform float z_near;                                                       // distance to near z-plane
 
 uniform sampler2D tb_tex;
@@ -84,21 +84,22 @@ vec3 tex3D(vec3 p, vec3 n)
 
 vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float t)
 {
+    float inv_dp = 1.0f / (-0.05 + dot(v, n));
+
     vec3 q = TEX_SCALE * p;
     n = max(abs(n) - NORMAL_CLAMP, 0.0f);
     n /= dot(n, vec3(1.0));
 
-    float der_factor = TEX_SCALE * pixel_size * t;
-    float dp = dot(v, n);
-    if(abs(dp) < 0.25) dp = 0.25 * sign(dp);
+    float der_factor = pixel_size * TEX_SCALE * (1.0 + t);
 
     vec3 cX = camera_matrix[0];
     vec3 cY = camera_matrix[1];
 
-    vec3 dq_dx = der_factor * (dp * cX - dot(cX, n) * v);
-    vec3 dq_dy = der_factor * (dp * cY - dot(cY, n) * v);
+    vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
+    vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
 
     vec3 tx = textureGrad(tb_tex, q.yz, dq_dx.yz, dq_dx.yz).rgb;
+    return tx;
     vec3 ty = textureGrad(tb_tex, q.zx, dq_dx.zx, dq_dx.zx).rgb;
     vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dx.xy).rgb;
 
@@ -359,10 +360,10 @@ void main()
     vec3 v = view_ws;
 
     float t = 0.0;
-    for(int i = 0; i < 128; i++)
+    for(int i = 0; i < 512; i++)
     {    
         float h = sdf(camera_ws + v * t);
-        if(abs(h) < 0.00005 * (t * 0.25 + 1.0) || t > HORIZON) break;
+        if(abs(h) < 0.00001 * (t * 0.25 + 1.0) || t > HORIZON) break;
         t += h;
     }
     
@@ -386,9 +387,12 @@ void main()
     float ambient_factor = ao * (0.75 * ao + fresnel_factor * fresnel_factor * 0.15);                     // ambient light factor
 
 //    vec3 texCol = tex3D(p, n);                                                     // trilinear blended texture
-//    vec3 texCol = tex3D_AA(p, n, v, t);                                                     // trilinear blended texture
+    vec3 texCol = tex3D_AA(p, n, v, t);                                                     // trilinear blended texture
+
+
+
 //    vec3 texCol = tex3D_AA2(p, n, v, t);                                                     // trilinear blended texture
-    vec3 texCol = tex3D_AA3(p, n, v, t);                                                     // trilinear blended texture
+//    vec3 texCol = tex3D_AA3(p, n, v, t);                                                     // trilinear blended texture
     vec3 color = texCol * (diffuse_factor + specular_factor + ambient_factor);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
