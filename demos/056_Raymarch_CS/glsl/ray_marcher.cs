@@ -111,16 +111,17 @@ vec3 tri_smooth(vec3 p)
 
 float sdf(vec3 p)
 {
+    const float SDF_SCALE = 5.0;
+    const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
+    p *= INV_SDF_SCALE;
     const float G2 = 0.211324865f;
     p.xy += dot(p.xy, vec2(G2));
     vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
-//    float ground = p.z + 0.5 + 0.24 * length(cos(op));
+    float ground = 0.77 * p.z + 0.5 + 0.77 * dot(op, vec3(0.067));
     p += 0.45 * (op - 0.25);
     p = cos(0.444f * p + sin(1.112f * p.zxy));
-    float canyon = (length(p) - 1.05) * 0.95;
-
-    return 0.367 * canyon;
-//    return min(ground, canyon);
+    float canyon = 0.367 * (length(p) - 1.05) * 0.95;
+    return SDF_SCALE * min(ground, canyon);
 }
 
 //==============================================================================================================================================================
@@ -241,21 +242,21 @@ vec3 luminosity_gradient(vec3 p, vec3 n, vec3 v, float t)
 
     vec3 q = TEX_SCALE * p;
 
-    vec3 l_100 = vec3(texture(tb_tex, q.yz + delta.yy, bias).a,
-                      texture(tb_tex, q.zx + delta.yx, bias).a,
-                      texture(tb_tex, q.xy + delta.xy, bias).a);
+    vec3 l_100 = vec3(textureLod(tb_tex, q.yz + delta.yy, bias).a,
+                      textureLod(tb_tex, q.zx + delta.yx, bias).a,
+                      textureLod(tb_tex, q.xy + delta.xy, bias).a);
 
-    vec3 l_001 = vec3(texture(tb_tex, q.yz + delta.yx, bias).a,
-                      texture(tb_tex, q.zx + delta.xy, bias).a,
-                      texture(tb_tex, q.xy + delta.yy, bias).a);
+    vec3 l_001 = vec3(textureLod(tb_tex, q.yz + delta.yx, bias).a,
+                      textureLod(tb_tex, q.zx + delta.xy, bias).a,
+                      textureLod(tb_tex, q.xy + delta.yy, bias).a);
 
-    vec3 l_010 = vec3(texture(tb_tex, q.yz + delta.xy, bias).a,
-                      texture(tb_tex, q.zx + delta.yy, bias).a,
-                      texture(tb_tex, q.xy + delta.yx, bias).a);
+    vec3 l_010 = vec3(textureLod(tb_tex, q.yz + delta.xy, bias).a,
+                      textureLod(tb_tex, q.zx + delta.yy, bias).a,
+                      textureLod(tb_tex, q.xy + delta.yx, bias).a);
 
-    vec3 l_111 = vec3(texture(tb_tex, q.yz + delta.xx, bias).a,
-                      texture(tb_tex, q.zx + delta.xx, bias).a,
-                      texture(tb_tex, q.xy + delta.xx, bias).a);
+    vec3 l_111 = vec3(textureLod(tb_tex, q.yz + delta.xx, bias).a,
+                      textureLod(tb_tex, q.zx + delta.xx, bias).a,
+                      textureLod(tb_tex, q.xy + delta.xx, bias).a);
 
     vec3 g = vec3(delta.xyy * dot(l_100, w) 
                 + delta.yyx * dot(l_001, w) 
@@ -375,43 +376,63 @@ void main()
     float delta1;
 
 
-    float sd1 = sdf(camera_ws + 10.0 * v);
-    float sd2 = sdf(camera_ws + (10.0 + t0) * v);
+    float sd1 = ground_sdf(camera_ws + 10.0 * v);
+    float sd2 = ground_sdf(camera_ws + (10.0 + t0) * v);
 
     float qq = abs(sd2 - sd1) / t0;
     if (qq > 1.0f)
     {
         imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
         return;
+    }
+    else {
+//        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 1.0, 0.0, 1.0));
+//        return;
 
     }
 
 
 
+    int p_c = 0, q_c = 0;
+    bool exit_by_break = false;
+
     while (it < MAX_ITER)
     {
-        float s = sqrt(delta0);
-        t1 = t0 + max(s, delta0);
+        float s = 0.01725 + 1.75 * delta0;
+        float d = s; //max(s, delta0);
+        t1 = t0 + d;
         delta1 = sdf(camera_ws + t1 * v);
 
         if (delta1 <= 0.0) break;
 
-        float q = s - delta0;
-        float t2 = t0 + 0.5 * (s + delta0);
-        float delta2 = sdf(camera_ws + t2 * v);
-        if (delta2 > q)
+        if (delta1 + delta0 > d)
         {
-            t0 = t2;
-            delta0 = delta2;
+            t0 = t1;
+            delta0 = delta1;
+            ++p_c;
         }
         else
         {
-            t0 = t0 + delta0;
-            delta0 = sdf(camera_ws + t0 * v);
+            t1 = t0 + delta0 + 0.040725;
+            delta1 = sdf(camera_ws + t0 * v);
+            if (delta1 < 0.0)
+            {
+                exit_by_break = true;
+                break;
+            }
+            t0 = t1;
+            delta0 = delta1;
+            ++q_c;
         }
         ++it;
     }
-
+/*
+    if (exit_by_break)
+    {
+        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
+        return;        
+    }
+*/
     if(delta1 >= 0.0)
     {
         imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 0.0, 1.0, 1.0));
@@ -433,8 +454,10 @@ void main()
             delta0 = delta2;
         }
     }
+    float s_c = float(p_c) / float(p_c + q_c);
 
     float t = (delta1 * t0 - delta0 * t1) / (delta1 - delta0);
+
     float delta = 1000.0 * sdf(camera_ws + t * v);
 
 
@@ -443,17 +466,16 @@ void main()
 
     vec4 FragmentColor = (uv.x < 0.5) ? (uv.y < 0.5) ? vec4(m, 1.0f)
                                                      : vec4(vec3(it / float(MAX_ITER)), 1.0f)
-                                      : (uv.y < 0.5) ? vec4(vec3(delta), 1.0f)
+                                      : (uv.y < 0.5) ? vec4(vec3(s_c), 1.0f)
                                                      : vec4(vec3(1.0 / (1.0 + 0.05 * t)), 1.0f);
 
     imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
-
 //    imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
 
-    /*
+/*  
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
-    vec3 b = n; //bump_normal_AA(p, n, v, t);                                       // texture-based bump mapping
+    vec3 b = bump_normal_AA(p, n, v, t);                                       // texture-based bump mapping
     //vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
 
     vec3 l = light_ws - p;                                                          // from fragment to light
