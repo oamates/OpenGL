@@ -20,6 +20,7 @@ uniform float pixel_size;                                                   // N
 uniform float z_near;                                                       // distance to near z-plane
 
 uniform sampler2D tb_tex;
+uniform sampler2D bump_tb_tex;
 uniform sampler2D value_tex;
 
 uniform int split_screen;
@@ -52,7 +53,7 @@ const vec3 RGB_SPECTRAL_POWER = vec3(0.299, 0.587, 0.114);
 // trilinear blend texture
 //==============================================================================================================================================================
 const float NORMAL_CLAMP = 0.37f;
-const float TEX_SCALE = 0.0625;
+const float TEX_SCALE = 0.25;
 
 vec3 tex3D(vec3 p, vec3 n)
 {
@@ -78,7 +79,7 @@ float luminosity(vec3 p, vec3 n)
 
 vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float t)
 {
-    float inv_dp = -pow(abs(dot(v, n)), -1.44);
+    float inv_dp = -pow(abs(dot(v, n)), -1.02);
     vec3 cX = camera_matrix[0];
     vec3 cY = camera_matrix[1];
 
@@ -96,6 +97,30 @@ vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float t)
     vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dx.xy).rgb;
 
     return tx * tx * w.x + ty * ty * w.y + tz * tz * w.z;
+}
+
+vec3 bump3D_AA(vec3 p, vec3 n, vec3 v, float t)
+{
+    float inv_dp = -pow(abs(dot(v, n)), -1.44);
+    vec3 cX = camera_matrix[0];
+    vec3 cY = camera_matrix[1];
+
+    float der_factor = pixel_size * TEX_SCALE * pow(t, 1.222);
+    vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
+    vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
+
+    vec3 w = pow(abs(n), vec3(6.0));
+    w /= (w.x + w.y + w.z);
+
+    vec3 q = TEX_SCALE * p;
+
+    vec3 tx = textureGrad(bump_tb_tex, q.yz, dq_dx.yz, dq_dx.yz).zxy;
+    vec3 ty = textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dx.zx).yzx;
+    vec3 tz = textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dx.xy).xyz;
+
+    vec3 b = tx * w.x + ty * w.y + tz * w.z - vec3(0.5, 0.5, 0.5);
+    b = normalize(b);
+    return b;
 }
 
 //==============================================================================================================================================================
@@ -447,7 +472,9 @@ void main()
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
 
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
-    vec3 b = bump_normal_AA(p, n, v, t);                                       // texture-based bump mapping
+    //vec3 b = bump_normal_AA(p, n, v, t);                                       // texture-based bump mapping
+
+    vec3 b = bump3D_AA(p, n, v, t);
     //vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
 
     vec3 l = light_ws - p;                                                          // from fragment to light
@@ -460,14 +487,14 @@ void main()
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
     float attenuation_factor = 1.0 / (1.0 + ld * 0.007);                            // attenuation w.r.t light proximity
-    float diffuse_factor = max(dot(b, l), 0.0);                                     // diffuse component factor
-    float specular_factor = 0.25 * pow(max(dot(reflect(-l, n), -v), 0.0), 40.0);           // specular light factor
-    float fresnel_factor = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
-    float ambient_factor = ao * (0.75 * ao + fresnel_factor * fresnel_factor * 0.15);                     // ambient light factor
+    float diffuse_factor = 0.5 + 0.5 * dot(b, l);                                     // diffuse component factor
+    float specular_factor = 0.0; //0.25 * pow(max(dot(reflect(-l, n), -v), 0.0), 40.0);           // specular light factor
+    float fresnel_factor = 0.0;//pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
+    float ambient_factor = sqrt(ao);                     // ambient light factor
 
     vec3 texCol = tex3D_AA(p, normal(p), v, t);                                                     // trilinear blended texture
 
-    vec3 color = texCol * (diffuse_factor + specular_factor + ambient_factor);
+    vec3 color = texCol * (diffuse_factor + 0.25 * ambient_factor);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
                         ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(texCol, 1.0f)

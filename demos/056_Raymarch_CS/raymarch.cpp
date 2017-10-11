@@ -94,7 +94,8 @@ int main(int argc, char *argv[])
     ray_marcher["focal_scale"] = focal_scale;
     ray_marcher["pixel_size"] = pixel_size;
     ray_marcher["tb_tex"] = 2;
-    ray_marcher["value_tex"] = 3;
+    ray_marcher["bump_tb_tex"] = 3;
+
 
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
@@ -121,11 +122,13 @@ int main(int argc, char *argv[])
 
 
     glActiveTexture(GL_TEXTURE2);
-//    GLuint tb_tex_id = image::png::texture2d("../../../resources/tex2d/clay.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/8.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-
+    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/1.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     GLfloat max_anisotropy;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
+
+    glActiveTexture(GL_TEXTURE3);
+    GLuint bump_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/bump1.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
 
 
@@ -138,8 +141,8 @@ int main(int argc, char *argv[])
     glSamplerParameterf(sampler_id, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
     glBindSampler(2, sampler_id);
 
-    glActiveTexture(GL_TEXTURE3);
-    GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
+    //glActiveTexture(GL_TEXTURE3);
+    //GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup
