@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
     ray_marcher["focal_scale"] = focal_scale;
     ray_marcher["pixel_size"] = pixel_size;
     ray_marcher["tb_tex"] = 2;
-    ray_marcher["noise_tex"] = 3;
+    ray_marcher["value_tex"] = 3;
 
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];

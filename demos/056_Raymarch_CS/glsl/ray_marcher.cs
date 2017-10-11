@@ -20,22 +20,28 @@ uniform float pixel_size;                                                   // N
 uniform float z_near;                                                       // distance to near z-plane
 
 uniform sampler2D tb_tex;
+uniform sampler2D value_tex;
 
 uniform int split_screen;
 
 //==============================================================================================================================================================
-// smoothing hermite interpolation polynomial
+// 3D Value noise function
 //==============================================================================================================================================================
-float hermite5(float x)
-    { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
+
+#define VALUE_NOISE_TEXEL_SIZE 1.0 / 256.0
+#define VALUE_NOISE_HALF_TEXEL 1.0 / 512.0
 
 vec3 hermite5(vec3 x)
     { return x * x * x * (10.0 + x * (6.0 * x - 15.0)); }
 
-float hermite5(float a, float b, float x)
+float vnoise(vec3 x)
 {
-    float y = clamp((x - a) / (b - a), 0.0, 1.0);
-    return y * y * y * (10.0 + y * (6.0 * y - 15.0));
+    vec3 p = floor(x);
+    vec3 f = x - p;
+    f = hermite5(f);
+    vec2 uv = (p.xy + vec2(37.0, 17.0) * p.z) + f.xy;
+    vec2 rg = texture(value_tex, VALUE_NOISE_TEXEL_SIZE * uv + VALUE_NOISE_HALF_TEXEL).rg;
+    return mix(rg.g, rg.r, f.z);
 }
 
 const float pi = 3.14159265359;
@@ -46,7 +52,7 @@ const vec3 RGB_SPECTRAL_POWER = vec3(0.299, 0.587, 0.114);
 // trilinear blend texture
 //==============================================================================================================================================================
 const float NORMAL_CLAMP = 0.37f;
-const float TEX_SCALE = 0.125;
+const float TEX_SCALE = 0.0625;
 
 vec3 tex3D(vec3 p, vec3 n)
 {
@@ -72,11 +78,11 @@ float luminosity(vec3 p, vec3 n)
 
 vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float t)
 {
-    float inv_dp = 1.0f / (-0.15 + dot(v, n));
+    float inv_dp = -pow(abs(dot(v, n)), -1.44);
     vec3 cX = camera_matrix[0];
     vec3 cY = camera_matrix[1];
 
-    float der_factor = pixel_size * TEX_SCALE * t;
+    float der_factor = pixel_size * TEX_SCALE * pow(t, 1.222);
     vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
     vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
 
@@ -111,6 +117,19 @@ vec3 tri_smooth(vec3 p)
 
 float sdf(vec3 p)
 {
+    const float SDF_SCALE = 1.0;
+    const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
+    p *= INV_SDF_SCALE;
+    vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
+    p += 0.317 * (op - 0.25);
+    p = cos(0.444f * p + sin(1.112f * p.zxy));
+    float canyon = 0.941 * (length(p) - 1.05);
+    return SDF_SCALE * canyon;
+}
+
+/*
+float sdf(vec3 p)
+{
     const float SDF_SCALE = 5.0;
     const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
     p *= INV_SDF_SCALE;
@@ -120,9 +139,10 @@ float sdf(vec3 p)
     float ground = 0.77 * p.z + 0.5 + 0.77 * dot(op, vec3(0.067));
     p += 0.45 * (op - 0.25);
     p = cos(0.444f * p + sin(1.112f * p.zxy));
-    float canyon = 0.367 * (length(p) - 1.05) * 0.95;
+    float canyon = 0.34865 * (length(p) - 1.05);
     return SDF_SCALE * min(ground, canyon);
 }
+*/
 
 //==============================================================================================================================================================
 // ambient occlusion, ver 1
@@ -355,6 +375,8 @@ vec3 envMap(vec3 rd, vec3 n)
 
 void main()
 {
+    const float CONE_SIZE = 0.001;
+
     vec2 uv = (vec2(gl_GlobalInvocationID.xy) + 0.5f) / vec2(1920.0f, 1080.0f);     // pixel half-integral coordinates
     vec2 ndc = 2.0f * uv - 1.0f;                                                    // normalized device coordinates
     vec3 z_uv = vec3(focal_scale * ndc, -z_near);
@@ -364,116 +386,66 @@ void main()
     vec3 view_ws = inv_h * (camera_matrix * z_uv);
     vec3 v = view_ws;
 
-    int it = 0;
-    const int MAX_ITER = 256;
-
-    const float MIN_DELTA = 0.03125f;
-    const float alpha = 2.5f;
-
-    float t0 = 0.05 * fract(dot(cos(gl_GlobalInvocationID.xy), vec2(-117.4361, 9.15217)));
-    float delta0 = sdf(camera_ws + t0 * v);
-    float t1;
-    float delta1;
-
-
-    float sd1 = ground_sdf(camera_ws + 10.0 * v);
-    float sd2 = ground_sdf(camera_ws + (10.0 + t0) * v);
-
-    float qq = abs(sd2 - sd1) / t0;
-    if (qq > 1.0f)
-    {
-        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
-        return;
-    }
-    else {
-//        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 1.0, 0.0, 1.0));
-//        return;
-
-    }
-
-
-
-    int p_c = 0, q_c = 0;
-    bool exit_by_break = false;
-
-    while (it < MAX_ITER)
-    {
-        float s = 0.01725 + 1.75 * delta0;
-        float d = s; //max(s, delta0);
-        t1 = t0 + d;
-        delta1 = sdf(camera_ws + t1 * v);
-
-        if (delta1 <= 0.0) break;
-
-        if (delta1 + delta0 > d)
-        {
-            t0 = t1;
-            delta0 = delta1;
-            ++p_c;
-        }
-        else
-        {
-            t1 = t0 + delta0 + 0.040725;
-            delta1 = sdf(camera_ws + t0 * v);
-            if (delta1 < 0.0)
-            {
-                exit_by_break = true;
-                break;
-            }
-            t0 = t1;
-            delta0 = delta1;
-            ++q_c;
-        }
-        ++it;
-    }
 /*
-    if (exit_by_break)
+    float hash = 0.125 * fract(dot(cos(gl_GlobalInvocationID.xy), vec2(-117.4361, 9.15217)));
+
+    float sd0 = sdf(camera_ws + (13.0 - 0.5 * hash) * v); 
+    float sd1 = sdf(camera_ws + (13.0 + 0.5 * hash) * v); 
+
+    float qqq = abs(sd1 - sd0) / hash;
+    if (qqq > 1.0)
     {
-        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
+        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 0.0, 1.0, 1.0));
         return;        
     }
 */
-    if(delta1 >= 0.0)
+
+
+    float t0 = 0.0;
+    float d0 = sdf(camera_ws + t0 * v);
+    float t1;
+    float d1;
+
+    int it = 0;
+    while (it < 128)
     {
-        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 0.0, 1.0, 1.0));
+        t1 = t0 + 0.0009765625 + 1.75 * d0;
+        d1 = sdf(camera_ws + t1 * v); 
+        if(d1 < 0.0) break;
+        t0 = t1;
+        d0 = d1;
+        ++it;
+    }
+
+    if (d1 < 0.0)
+    {
+        for(int i = 0; i < 8; ++i)
+        {
+            float t2 = (d0 * t1 - d1 * t0) / (d0 - d1);
+            float d2 = sdf(camera_ws + t2 * v);
+            if (d2 < 0.0)
+            {
+                t1 = t2;
+                d1 = d2;
+            }
+            else
+            {
+                t0 = t2;
+                d0 = d2;
+            }
+        }
+    }
+    else
+    {
+        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
         return;
     }
 
-    for(int i = 0; i < 16; ++i)
-    {
-        float t2 = (delta1 * t0 - delta0 * t1) / (delta1 - delta0);
-        float delta2 = sdf(camera_ws + t2 * v);
-        if (delta2 < 0.0)
-        {
-            t1 = t2;
-            delta1 = delta2;
-        }
-        else
-        {
-            t0 = t2;
-            delta0 = delta2;
-        }
-    }
-    float s_c = float(p_c) / float(p_c + q_c);
+    float t = (d0 * t1 - d1 * t0) / (d0 - d1);
+    float d = sdf(camera_ws + t * v);
 
-    float t = (delta1 * t0 - delta0 * t1) / (delta1 - delta0);
-
-    float delta = 1000.0 * sdf(camera_ws + t * v);
-
-
-    vec3 m = (it == MAX_ITER) ? vec3(1.0, 1.0, 0.0) : vec3(0.4, 0.4, 0.0);
-
-
-    vec4 FragmentColor = (uv.x < 0.5) ? (uv.y < 0.5) ? vec4(m, 1.0f)
-                                                     : vec4(vec3(it / float(MAX_ITER)), 1.0f)
-                                      : (uv.y < 0.5) ? vec4(vec3(s_c), 1.0f)
-                                                     : vec4(vec3(1.0 / (1.0 + 0.05 * t)), 1.0f);
-
-    imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
-//    imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
-
-/*  
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
+
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
     vec3 b = bump_normal_AA(p, n, v, t);                                       // texture-based bump mapping
     //vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
@@ -483,6 +455,7 @@ void main()
     l /= ld;                                                                        // unit light direction
 
     float sf = hard_shadow_factor(p, l, 0.0, ld);                                    // calculate shadow factor
+
 //    float ssf = soft_shadow_factor(p, l, 0.0, ld, 8.0);                                    // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
@@ -492,21 +465,15 @@ void main()
     float fresnel_factor = pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
     float ambient_factor = ao * (0.75 * ao + fresnel_factor * fresnel_factor * 0.15);                     // ambient light factor
 
-//    vec3 texCol = tex3D(p, n);                                                     // trilinear blended texture
-    vec3 texCol = tex3D_AA(p, n, v, t);                                                     // trilinear blended texture
+    vec3 texCol = tex3D_AA(p, normal(p), v, t);                                                     // trilinear blended texture
 
-
-
-//    vec3 texCol = tex3D_AA2(p, n, v, t);                                                     // trilinear blended texture
-//    vec3 texCol = tex3D_AA3(p, n, v, t);                                                     // trilinear blended texture
     vec3 color = texCol * (diffuse_factor + specular_factor + ambient_factor);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
                         ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(texCol, 1.0f)
-                                                      : vec4(ao, ao, ao, 1.0f))
+                                                      : vec4(vec3(ao), 1.0f))
                                       : ((uv.y < 0.5) ? vec4(abs(n), 1.0f)
                                                       : vec4(abs(b), 1.0f)));
-
     imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
-*/
+
 }
