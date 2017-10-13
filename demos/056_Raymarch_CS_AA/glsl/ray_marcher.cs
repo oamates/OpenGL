@@ -46,14 +46,13 @@ float vnoise(vec3 x)
 }
 
 const float pi = 3.14159265359;
-const float HORIZON = 200.0;
 const vec3 RGB_SPECTRAL_POWER = vec3(0.299, 0.587, 0.114);
 
 //==============================================================================================================================================================
 // trilinear blend texture
 //==============================================================================================================================================================
 const float NORMAL_CLAMP = 0.37f;
-const float TEX_SCALE = 0.25;
+const float TEX_SCALE = 0.15;
 
 vec3 tex3D(vec3 p, vec3 n)
 {
@@ -83,11 +82,11 @@ vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float t)
     vec3 cX = camera_matrix[0];
     vec3 cY = camera_matrix[1];
 
-    float der_factor = pixel_size * TEX_SCALE * pow(t, 1.222);
+    float der_factor = pixel_size * TEX_SCALE * t; /*pow(t, 1.222) */
     vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
     vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
 
-    vec3 w = pow(abs(n), vec3(6.0));
+    vec3 w = pow(abs(n), vec3(2.8));
     w /= (w.x + w.y + w.z);
 
     vec3 q = TEX_SCALE * p;
@@ -109,8 +108,7 @@ vec3 bump3D_AA(vec3 p, vec3 n, vec3 v, float t)
     vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
     vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
 
-    vec3 w = pow(abs(n), vec3(6.0));
-    w /= (w.x + w.y + w.z);
+    vec3 w = n;
 
     vec3 q = TEX_SCALE * p;
 
@@ -118,7 +116,7 @@ vec3 bump3D_AA(vec3 p, vec3 n, vec3 v, float t)
     vec3 ty = textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dx.zx).yzx;
     vec3 tz = textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dx.xy).xyz;
 
-    vec3 b = tx * w.x + ty * w.y + tz * w.z - vec3(0.5, 0.5, 0.5);
+    vec3 b = tx * w.x + ty * w.y + tz * w.z/* - vec3(0.5, 0.5, 0.5)*/;
     b = normalize(b);
     return b;
 }
@@ -432,7 +430,7 @@ void main()
     float d1;
 
     int it = 0;
-    while (it < 128)
+    while (it < 512)
     {
         t1 = t0 + 0.0009765625 + 1.75 * d0;
         d1 = sdf(camera_ws + t1 * v); 
@@ -442,6 +440,7 @@ void main()
         ++it;
     }
 
+    float t;
     if (d1 < 0.0)
     {
         for(int i = 0; i < 8; ++i)
@@ -459,15 +458,16 @@ void main()
                 d0 = d2;
             }
         }
+        t = (d0 * t1 - d1 * t0) / (d0 - d1);
     }
     else
     {
-        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
-        return;
+        t = d0;
+//        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
+//        return;
     }
 
-    float t = (d0 * t1 - d1 * t0) / (d0 - d1);
-    float d = sdf(camera_ws + t * v);
+//    float d = sdf(camera_ws + t * v);
 
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
 
@@ -487,14 +487,14 @@ void main()
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
     float attenuation_factor = 1.0 / (1.0 + ld * 0.007);                            // attenuation w.r.t light proximity
-    float diffuse_factor = 0.5 + 0.5 * dot(b, l);                                     // diffuse component factor
+    float diffuse_factor = clamp(0.3 + 0.7 * dot(b, l), 0.0, 1.0);                                     // diffuse component factor
     float specular_factor = 0.0; //0.25 * pow(max(dot(reflect(-l, n), -v), 0.0), 40.0);           // specular light factor
     float fresnel_factor = 0.0;//pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
     float ambient_factor = sqrt(ao);                     // ambient light factor
 
     vec3 texCol = tex3D_AA(p, normal(p), v, t);                                                     // trilinear blended texture
 
-    vec3 color = texCol * (diffuse_factor + 0.25 * ambient_factor);
+    vec3 color = texCol * diffuse_factor + 0.25 * ambient_factor * pow(texCol, vec3(2.2));
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
                         ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(texCol, 1.0f)

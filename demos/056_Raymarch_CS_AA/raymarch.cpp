@@ -24,6 +24,7 @@ struct demo_window_t : public imgui_window_t
     camera_t camera;
 
     bool split_screen = false;
+    int aa_mode = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
@@ -44,6 +45,9 @@ struct demo_window_t : public imgui_window_t
 
         if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
             split_screen = !split_screen;
+
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            aa_mode = (aa_mode + 1) % 3;
     }
 
     void on_mouse_move() override
@@ -109,6 +113,7 @@ int main(int argc, char *argv[])
     quad_renderer["focal_scale"] = focal_scale;
     quad_renderer["pixel_size"] = glm::vec2(1.0f / window.res_x, 1.0f / window.res_y);
     quad_renderer["z_near"] = z_near;
+    uniform_t uni_aa_mode = quad_renderer["aa_mode"];
 
     //===================================================================================================================================================================================================================
     // create output textures, load texture for trilinear blend shading and generate noise texture
@@ -117,8 +122,8 @@ int main(int argc, char *argv[])
     GLuint output_image;
     glGenTextures(1, &output_image);
     glBindTexture(GL_TEXTURE_2D, output_image);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, window.res_x, window.res_y);
     glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
@@ -184,6 +189,7 @@ int main(int argc, char *argv[])
         glDepthFunc(GL_ALWAYS);
 
         quad_renderer.enable();
+        uni_aa_mode = window.aa_mode;
         glBindVertexArray(vao_id);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
