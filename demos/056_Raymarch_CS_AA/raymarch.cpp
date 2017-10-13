@@ -131,13 +131,13 @@ int main(int argc, char *argv[])
 
 
     glActiveTexture(GL_TEXTURE2);
-    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/E.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     GLfloat max_anisotropy;
     glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
 
     glActiveTexture(GL_TEXTURE3);
-    GLuint bump_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/bump6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+    GLuint bump_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/bumpE.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
 
 
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
         glm::mat4 cmatrix4x4 = window.camera.camera_matrix();
         glm::mat3 camera_matrix = glm::mat3(cmatrix4x4);
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
-        glm::vec3 light_ws = 2.15f * glm::vec3(glm::cos(0.61f * time), glm::sin(0.61f * time), 1.13f);
+        glm::vec3 light_ws = 1.45f * glm::vec3(glm::cos(0.61f * time), glm::sin(0.61f * time), 1.13f);
 
         //===============================================================================================================================================================================================================
         // Render scene

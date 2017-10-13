@@ -7,7 +7,6 @@ uniform sampler2D raymarch_tex;
 out vec4 FragmentColor;
 
 uniform vec2 focal_scale;
-uniform vec2 pixel_size;
 uniform float z_near;  
 uniform int aa_mode;
 
@@ -18,7 +17,7 @@ float weight_func(float z, float w)
     float d = z - w;
     float d2 = d * d;
 
-    return 0.197 * d2 / (d2 + 0.00625);
+    return 0.197 * d2 / (d2 + 0.00925);
 }
 
 void main()

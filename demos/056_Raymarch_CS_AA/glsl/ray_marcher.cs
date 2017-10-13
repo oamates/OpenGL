@@ -213,7 +213,7 @@ float hard_shadow_factor(vec3 p, vec3 l, float min_t, float max_t)
 float soft_shadow_factor(vec3 p, vec3 l, float min_t, float max_t, float k)
 {
     float res = 1.0;
-    float t = min_t;
+    float t = mix(min_t, max_t, 0.05);
     while(t < max_t)
     {
         float h = sdf(p + t * l);
@@ -309,7 +309,7 @@ void main()
     l /= ld;                                                                        // unit light direction
 
 //    float sf = hard_shadow_factor(p, l, 0.0, ld);                                    // calculate shadow factor
-    float ssf = soft_shadow_factor(p, l, 0.0, ld, 8.0);                             // calculate shadow factor
+    float ssf = soft_shadow_factor(p, l, 0.0, ld, 4.0);                             // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
     float ambient_factor = 0.1251 * ao;                                               // ambient light factor
@@ -321,7 +321,7 @@ void main()
     vec3 h = normalize(l - v);
     float cos_alpha = max(dot(h, b), 0.0f);
     float specular_factor = 0.75 * pow(cos_alpha, 40.0);
-    float attenuation_factor = 1.0 / (0.91 + 0.0949 * ld * ld);
+    float attenuation_factor = ssf / (0.91 + 0.0949 * ld * ld);
 
     vec3 color = ambient_color + attenuation_factor * (diffuse_factor * diffuse_color + specular_factor * specular_color);
 
