@@ -18,7 +18,7 @@ float weight_func(float z, float w)
     float d = z - w;
     float d2 = d * d;
 
-    return 0.317 * d2 / (d2 + 0.000625);
+    return 0.197 * d2 / (d2 + 0.00625);
 }
 
 void main()

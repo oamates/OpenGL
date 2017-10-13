@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
     debug_msg("Camera focal scale = %s", glm::to_string(focal_scale).c_str());
     debug_msg("Pixel size = %f", pixel_size);
 
+    ray_marcher["inv_res"] = glm::vec2(1.0f / window.res_x, 1.0f / window.res_y);
     ray_marcher["focal_scale"] = focal_scale;
     ray_marcher["pixel_size"] = pixel_size;
     ray_marcher["tb_tex"] = 2;
