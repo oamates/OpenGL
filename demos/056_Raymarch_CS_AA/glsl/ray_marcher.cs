@@ -68,7 +68,7 @@ vec3 tex3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
 
 vec3 bump3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
 {
-    vec3 w = n;
+    vec3 w = n * n * n;
     vec3 tx = textureGrad(bump_tb_tex, q.yz, dq_dx.yz, dq_dy.yz).zxy;
     vec3 ty = textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dy.zx).yzx;
     vec3 tz = textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dy.xy).xyz;
@@ -100,28 +100,12 @@ float sdf(vec3 p)
     const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
     p *= INV_SDF_SCALE;
     vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
+    float ground = p.z + 0.5 + dot(op, vec3(0.067));
     p += 0.317 * (op - 0.25);
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = 0.941 * (length(p) - 1.05);
-    return SDF_SCALE * canyon;
+    return SDF_SCALE * min(canyon, ground);
 }
-
-/*
-float sdf(vec3 p)
-{
-    const float SDF_SCALE = 5.0;
-    const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
-    p *= INV_SDF_SCALE;
-    const float G2 = 0.211324865f;
-    p.xy += dot(p.xy, vec2(G2));
-    vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
-    float ground = 0.77 * p.z + 0.5 + 0.77 * dot(op, vec3(0.067));
-    p += 0.45 * (op - 0.25);
-    p = cos(0.444f * p + sin(1.112f * p.zxy));
-    float canyon = 0.34865 * (length(p) - 1.05);
-    return SDF_SCALE * min(ground, canyon);
-}
-*/
 
 //==============================================================================================================================================================
 // ambient occlusion, ver 1
@@ -331,20 +315,21 @@ void main()
     float ambient_factor = 0.25 * ao;                                               // ambient light factor
     vec3 ambient_color = ambient_factor * diffuse_color;                            // ambient color
 
-    float diffuse_factor = max(dot(b, l), 0.0);                                     // diffuse component factor
+    float diffuse_factor = sqrt(ao) * (0.5 + 0.5 * dot(b, l));                                     // diffuse component factor
 
     vec3 specular_color = vec3(1.0);
     vec3 h = normalize(l - v);
     float cos_alpha = max(dot(h, b), 0.0f);
-    float specular_factor = 0.75 * pow(cos_alpha, 20.0);
+    float specular_factor = 0.45 * pow(cos_alpha, 40.0);
+    float attenuation_factor = 1.0 / (1.0 + 0.0349 * ld);
 
-    vec3 color = ambient_color + diffuse_factor * diffuse_color + specular_factor * specular_color;
+    vec3 color = ambient_color + attenuation_factor * (diffuse_factor * diffuse_color + specular_factor * specular_color);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), t) : 
                         ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(diffuse_color, t)
                                                       : vec4(vec3(ao), t))
-                                      : ((uv.y < 0.5) ? vec4(abs(n), t)
-                                                      : vec4(abs(b), t)));
+                                      : ((uv.y < 0.5) ? vec4(abs(b), t)
+                                                      : vec4(vec3(dot(b, n)), t)));
 
     imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
 }
