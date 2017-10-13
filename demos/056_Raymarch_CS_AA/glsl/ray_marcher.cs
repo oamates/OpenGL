@@ -63,7 +63,7 @@ vec3 tex3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
     vec3 tx = textureGrad(tb_tex, q.yz, dq_dx.yz, dq_dy.yz).rgb;
     vec3 ty = textureGrad(tb_tex, q.zx, dq_dx.zx, dq_dy.zx).rgb;
     vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dy.xy).rgb;
-    return tx * tx * w.x + ty * ty * w.y + tz * tz * w.z;
+    return sqrt(tx * tx * w.x + ty * ty * w.y + tz * tz * w.z);
 }
 
 vec3 bump3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
@@ -159,7 +159,7 @@ float calc_ao2(in vec3 p, in vec3 n)
 //==============================================================================================================================================================
 // tetrahedral normal and bumped normal
 //==============================================================================================================================================================
-const float NORMAL_DERIVATIVE_SCALE = 0.014117;
+const float NORMAL_DERIVATIVE_SCALE = 0.0247;
 const float BUMP_DERIVATIVE_SCALE = 0.002;
 const float BUMP_FACTOR = 0.00625771f;
 
@@ -256,7 +256,7 @@ void main()
     int it = 0;
     while (it < 256)
     {
-        t1 = t0 + 0.0009765625 + 1.75 * d0;
+        t1 = t0 + 0.0009765625 + 1.7 * d0;
         d1 = sdf(camera_ws + t1 * v); 
         if(d1 < 0.0) break;
         t0 = t1;
@@ -285,7 +285,7 @@ void main()
         t = (d0 * t1 - d1 * t0) / (d0 - d1);
     }
     else
-        t = d0;
+        t = t0;
 
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
@@ -312,7 +312,7 @@ void main()
     float ssf = soft_shadow_factor(p, l, 0.0, ld, 8.0);                             // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
-    float ambient_factor = 0.25 * ao;                                               // ambient light factor
+    float ambient_factor = 0.1251 * ao;                                               // ambient light factor
     vec3 ambient_color = ambient_factor * diffuse_color;                            // ambient color
 
     float diffuse_factor = sqrt(ao) * (0.5 + 0.5 * dot(b, l));                                     // diffuse component factor
@@ -320,8 +320,8 @@ void main()
     vec3 specular_color = vec3(1.0);
     vec3 h = normalize(l - v);
     float cos_alpha = max(dot(h, b), 0.0f);
-    float specular_factor = 0.45 * pow(cos_alpha, 40.0);
-    float attenuation_factor = 1.0 / (1.0 + 0.0349 * ld);
+    float specular_factor = 0.75 * pow(cos_alpha, 40.0);
+    float attenuation_factor = 1.0 / (0.91 + 0.0949 * ld * ld);
 
     vec3 color = ambient_color + attenuation_factor * (diffuse_factor * diffuse_color + specular_factor * specular_color);
 

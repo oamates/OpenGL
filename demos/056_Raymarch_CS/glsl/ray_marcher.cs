@@ -10,8 +10,9 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 //  in uvec3 gl_GlobalInvocationID    ----- unique identifier of this invocation of the compute shader among all invocations of this compute dispatch call
 //==============================================================================================================================================================
 
-layout (rgba8, binding = 0) uniform image2D scene_image;
+layout (rgba32f, binding = 0) uniform image2D scene_image;
 
+uniform vec2 inv_res;
 uniform mat3 camera_matrix;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
@@ -46,79 +47,32 @@ float vnoise(vec3 x)
 }
 
 const float pi = 3.14159265359;
-const float HORIZON = 200.0;
 const vec3 RGB_SPECTRAL_POWER = vec3(0.299, 0.587, 0.114);
 
 //==============================================================================================================================================================
 // trilinear blend texture
 //==============================================================================================================================================================
 const float NORMAL_CLAMP = 0.37f;
-const float TEX_SCALE = 0.25;
+const float TEX_SCALE = 0.15;
 
-vec3 tex3D(vec3 p, vec3 n)
+vec3 tex3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
 {
-    vec3 w = pow(abs(n), vec3(6.0));
+    vec3 w = pow(abs(n), vec3(4.8));
     w /= (w.x + w.y + w.z);
-    vec3 q = TEX_SCALE * p;
-    vec3 tx = texture(tb_tex, q.yz).rgb;
-    vec3 ty = texture(tb_tex, q.zx).rgb;
-    vec3 tz = texture(tb_tex, q.xy).rgb;
-    return tx * tx * w.x + ty * ty * w.y + tz * tz * w.z;
+
+    vec3 tx = textureGrad(tb_tex, q.yz, dq_dx.yz, dq_dy.yz).rgb;
+    vec3 ty = textureGrad(tb_tex, q.zx, dq_dx.zx, dq_dy.zx).rgb;
+    vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dy.xy).rgb;
+    return sqrt(tx * tx * w.x + ty * ty * w.y + tz * tz * w.z);
 }
 
-float luminosity(vec3 p, vec3 n)
+vec3 bump3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
 {
-    vec3 w = pow(abs(n), vec3(6.0));
-    w /= (w.x + w.y + w.z);
-    vec3 q = TEX_SCALE * p;
-    vec3 l = vec3(texture(tb_tex, q.yz).a,
-                  texture(tb_tex, q.zx).a,
-                  texture(tb_tex, q.xy).a);
-    return dot(l, w);
-}
-
-vec3 tex3D_AA(vec3 p, vec3 n, vec3 v, float t)
-{
-    float inv_dp = -pow(abs(dot(v, n)), -1.02);
-    vec3 cX = camera_matrix[0];
-    vec3 cY = camera_matrix[1];
-
-    float der_factor = pixel_size * TEX_SCALE * pow(t, 1.222);
-    vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
-    vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
-
-    vec3 w = pow(abs(n), vec3(6.0));
-    w /= (w.x + w.y + w.z);
-
-    vec3 q = TEX_SCALE * p;
-
-    vec3 tx = textureGrad(tb_tex, q.yz, dq_dx.yz, dq_dx.yz).rgb;
-    vec3 ty = textureGrad(tb_tex, q.zx, dq_dx.zx, dq_dx.zx).rgb;
-    vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dx.xy).rgb;
-
-    return tx * tx * w.x + ty * ty * w.y + tz * tz * w.z;
-}
-
-vec3 bump3D_AA(vec3 p, vec3 n, vec3 v, float t)
-{
-    float inv_dp = -pow(abs(dot(v, n)), -1.44);
-    vec3 cX = camera_matrix[0];
-    vec3 cY = camera_matrix[1];
-
-    float der_factor = pixel_size * TEX_SCALE * pow(t, 1.222);
-    vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
-    vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
-
-    vec3 w = pow(abs(n), vec3(6.0));
-    w /= (w.x + w.y + w.z);
-
-    vec3 q = TEX_SCALE * p;
-
-    vec3 tx = textureGrad(bump_tb_tex, q.yz, dq_dx.yz, dq_dx.yz).zxy;
-    vec3 ty = textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dx.zx).yzx;
-    vec3 tz = textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dx.xy).xyz;
-
-    vec3 b = tx * w.x + ty * w.y + tz * w.z - vec3(0.5, 0.5, 0.5);
+    vec3 w = n * n * n;
+    vec3 tx = textureGrad(bump_tb_tex, q.yz, dq_dx.yz, dq_dy.yz).zxy;
+    vec3 ty = textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dy.zx).yzx;
+    vec3 tz = textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dy.xy).xyz;
+    vec3 b = tx * w.x + ty * w.y + tz * w.z;
     b = normalize(b);
     return b;
 }
@@ -142,32 +96,16 @@ vec3 tri_smooth(vec3 p)
 
 float sdf(vec3 p)
 {
-    const float SDF_SCALE = 1.0;
+    const float SDF_SCALE = 3.0;
     const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
     p *= INV_SDF_SCALE;
     vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
+    float ground = p.z + 0.5 + dot(op, vec3(0.067));
     p += 0.317 * (op - 0.25);
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = 0.941 * (length(p) - 1.05);
-    return SDF_SCALE * canyon;
+    return SDF_SCALE * min(canyon, ground);
 }
-
-/*
-float sdf(vec3 p)
-{
-    const float SDF_SCALE = 5.0;
-    const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
-    p *= INV_SDF_SCALE;
-    const float G2 = 0.211324865f;
-    p.xy += dot(p.xy, vec2(G2));
-    vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
-    float ground = 0.77 * p.z + 0.5 + 0.77 * dot(op, vec3(0.067));
-    p += 0.45 * (op - 0.25);
-    p = cos(0.444f * p + sin(1.112f * p.zxy));
-    float canyon = 0.34865 * (length(p) - 1.05);
-    return SDF_SCALE * min(ground, canyon);
-}
-*/
 
 //==============================================================================================================================================================
 // ambient occlusion, ver 1
@@ -224,92 +162,6 @@ float calc_ao2(in vec3 p, in vec3 n)
 const float NORMAL_DERIVATIVE_SCALE = 0.014117;
 const float BUMP_DERIVATIVE_SCALE = 0.002;
 const float BUMP_FACTOR = 0.00625771f;
-/*
-vec3 luminosity_gradient(vec3 p, vec3 n, vec3 v, float t)
-{
-    float scale = TEX_SCALE * BUMP_DERIVATIVE_SCALE * t;
-    vec2 delta = vec2(scale, -scale); 
-
-    float inv_dp = 1.0f / dot(v, n);
-    vec3 cX = camera_matrix[0];
-    vec3 cY = camera_matrix[1];
-
-    float der_factor = pixel_size * TEX_SCALE * t;
-    vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
-    vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
-
-    vec3 w = pow(abs(n), vec3(6.0));
-    w /= (w.x + w.y + w.z);
-
-    vec3 q = TEX_SCALE * p;
-
-    vec3 l_100 = vec3(textureGrad(tb_tex, q.yz + delta.yy, dq_dx.yz, dq_dx.yz).a,
-                      textureGrad(tb_tex, q.zx + delta.yx, dq_dx.zx, dq_dx.zx).a,
-                      textureGrad(tb_tex, q.xy + delta.xy, dq_dx.xy, dq_dx.xy).a);
-
-    vec3 l_001 = vec3(textureGrad(tb_tex, q.yz + delta.yx, dq_dx.yz, dq_dx.yz).a,
-                      textureGrad(tb_tex, q.zx + delta.xy, dq_dx.zx, dq_dx.zx).a,
-                      textureGrad(tb_tex, q.xy + delta.yy, dq_dx.xy, dq_dx.xy).a);
-
-    vec3 l_010 = vec3(textureGrad(tb_tex, q.yz + delta.xy, dq_dx.yz, dq_dx.yz).a,
-                      textureGrad(tb_tex, q.zx + delta.yy, dq_dx.zx, dq_dx.zx).a,
-                      textureGrad(tb_tex, q.xy + delta.yx, dq_dx.xy, dq_dx.xy).a);
-
-    vec3 l_111 = vec3(textureGrad(tb_tex, q.yz + delta.xx, dq_dx.yz, dq_dx.yz).a,
-                      textureGrad(tb_tex, q.zx + delta.xx, dq_dx.zx, dq_dx.zx).a,
-                      textureGrad(tb_tex, q.xy + delta.xx, dq_dx.xy, dq_dx.xy).a);
-
-    vec3 g = vec3(delta.xyy * dot(l_100, w) 
-                + delta.yyx * dot(l_001, w) 
-                + delta.yxy * dot(l_010, w) 
-                + delta.xxx * dot(l_111, w));
-
-    return g / (4.0 * scale * scale);
-}
-*/
-vec3 luminosity_gradient(vec3 p, vec3 n, vec3 v, float t)
-{
-    float scale = TEX_SCALE * BUMP_DERIVATIVE_SCALE * t;
-    vec2 delta = vec2(scale, -scale); 
-
-    float inv_dp = 1.0f / dot(v, n);
-    vec3 cX = camera_matrix[0];
-    vec3 cY = camera_matrix[1];
-
-    float der_factor = pixel_size * TEX_SCALE * t;
-    vec3 dq_dx = der_factor * (cX - inv_dp * dot(cX, n) * v);
-    vec3 dq_dy = der_factor * (cY - inv_dp * dot(cY, n) * v);
-
-    float bias = log2(t + dot(dq_dx, dq_dx) + dot(dq_dy, dq_dy));
-
-    vec3 w = pow(abs(n), vec3(6.0));
-    w /= (w.x + w.y + w.z);
-
-    vec3 q = TEX_SCALE * p;
-
-    vec3 l_100 = vec3(textureLod(tb_tex, q.yz + delta.yy, bias).a,
-                      textureLod(tb_tex, q.zx + delta.yx, bias).a,
-                      textureLod(tb_tex, q.xy + delta.xy, bias).a);
-
-    vec3 l_001 = vec3(textureLod(tb_tex, q.yz + delta.yx, bias).a,
-                      textureLod(tb_tex, q.zx + delta.xy, bias).a,
-                      textureLod(tb_tex, q.xy + delta.yy, bias).a);
-
-    vec3 l_010 = vec3(textureLod(tb_tex, q.yz + delta.xy, bias).a,
-                      textureLod(tb_tex, q.zx + delta.yy, bias).a,
-                      textureLod(tb_tex, q.xy + delta.yx, bias).a);
-
-    vec3 l_111 = vec3(textureLod(tb_tex, q.yz + delta.xx, bias).a,
-                      textureLod(tb_tex, q.zx + delta.xx, bias).a,
-                      textureLod(tb_tex, q.xy + delta.xx, bias).a);
-
-    vec3 g = vec3(delta.xyy * dot(l_100, w) 
-                + delta.yyx * dot(l_001, w) 
-                + delta.yxy * dot(l_010, w) 
-                + delta.xxx * dot(l_111, w));
-
-    return g / (4.0 * scale * scale);
-}
 
 vec3 normal(vec3 p)
 {
@@ -330,26 +182,6 @@ vec3 normal_AA(vec3 p, float t)
                    + delta.yxy * sdf(p + delta.yxy) 
                    + delta.xxx * sdf(p + delta.xxx));
 }
-
-vec3 bump_normal_AA(vec3 p, vec3 n, vec3 v, float t)
-{
-    vec3 g = luminosity_gradient(p, n, v, t);
-    g = g - dot(g, n) * n;
-    return normalize(n - BUMP_FACTOR * g);                                       // Bumped normal. "bf" - bump factor.
-}
-
-/*
-vec3 bump_normal_AA_AA(vec3 p, vec3 n, vec3 v, float bf)
-{
-    vec2 delta = vec2(DERIVATIVE_SCALE, 0.0f);
-    mat3 m = mat3(tex3D_AA(p - delta.xyy, n, v), 
-                  tex3D_AA(p - delta.yxy, n, v), 
-                  tex3D_AA(p - delta.yyx, n, v));
-    vec3 g = RGB_SPECTRAL_POWER * m;                                    // Converting to greyscale.
-    g = (g - dot(tex3D_AA(p, n, v), RGB_SPECTRAL_POWER)) / delta.x;
-    return normalize(n - g * bf);                                       // Bumped normal. "bf" - bump factor.
-}
-*/
 
 //==============================================================================================================================================================
 // shadows calculation
@@ -393,38 +225,28 @@ float soft_shadow_factor(vec3 p, vec3 l, float min_t, float max_t, float k)
     return res;
 }
 
-vec3 envMap(vec3 rd, vec3 n)
-{    
-    return tex3D(rd, n);
+bool lipshitz_test(vec3 p, vec3 v, float t, float s)
+{
+    float h = 0.125 * fract(dot(cos(gl_GlobalInvocationID.xy), vec2(-117.4361, 9.15217)));
+    float sd0 = sdf(p + (t - 0.5 * h) * v); 
+    float sd1 = sdf(p + (t + 0.5 * h) * v); 
+
+    float l = abs(sd1 - sd0) / h;
+
+    if (l <= 1.0)
+        return true;
+    imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 0.0, 1.0, 1.0));
+    return false;
 }
 
 void main()
 {
-    const float CONE_SIZE = 0.001;
-
-    vec2 uv = (vec2(gl_GlobalInvocationID.xy) + 0.5f) / vec2(1920.0f, 1080.0f);     // pixel half-integral coordinates
-    vec2 ndc = 2.0f * uv - 1.0f;                                                    // normalized device coordinates
+    vec2 uv = inv_res * (vec2(gl_GlobalInvocationID.xy) + 0.5f);        // pixel half-integral coordinates
+    vec2 ndc = 2.0f * uv - 1.0f;                                        // normalized device coordinates
     vec3 z_uv = vec3(focal_scale * ndc, -z_near);
-    float h = length(z_uv);
-    float inv_h = 1.0f / h;
+    vec3 v = normalize(camera_matrix * z_uv);
 
-    vec3 view_ws = inv_h * (camera_matrix * z_uv);
-    vec3 v = view_ws;
-
-/*
-    float hash = 0.125 * fract(dot(cos(gl_GlobalInvocationID.xy), vec2(-117.4361, 9.15217)));
-
-    float sd0 = sdf(camera_ws + (13.0 - 0.5 * hash) * v); 
-    float sd1 = sdf(camera_ws + (13.0 + 0.5 * hash) * v); 
-
-    float qqq = abs(sd1 - sd0) / hash;
-    if (qqq > 1.0)
-    {
-        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(0.0, 0.0, 1.0, 1.0));
-        return;        
-    }
-*/
-
+//  if (!lipshitz_test(camera_ws, v, 13.0f, 0.125f)) return;
 
     float t0 = 0.0;
     float d0 = sdf(camera_ws + t0 * v);
@@ -432,7 +254,7 @@ void main()
     float d1;
 
     int it = 0;
-    while (it < 128)
+    while (it < 256)
     {
         t1 = t0 + 0.0009765625 + 1.75 * d0;
         d1 = sdf(camera_ws + t1 * v); 
@@ -442,6 +264,7 @@ void main()
         ++it;
     }
 
+    float t;
     if (d1 < 0.0)
     {
         for(int i = 0; i < 8; ++i)
@@ -459,48 +282,54 @@ void main()
                 d0 = d2;
             }
         }
+        t = (d0 * t1 - d1 * t0) / (d0 - d1);
     }
     else
-    {
-        imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), vec4(1.0, 0.0, 0.0, 1.0));
-        return;
-    }
-
-    float t = (d0 * t1 - d1 * t0) / (d0 - d1);
-    float d = sdf(camera_ws + t * v);
+        t = d0;
 
     vec3 p = camera_ws + v * t;                                                     // fragment world-space position
-
     vec3 n = normal_AA(p, t);                                                       // antialiased fragment normal
-    //vec3 b = bump_normal_AA(p, n, v, t);                                       // texture-based bump mapping
 
-    vec3 b = bump3D_AA(p, n, v, t);
-    //vec3 b = bump_normal_AA_AA(p, n, v, 0.111f, h, t);                                       // texture-based bump mapping
+    vec3 cX = camera_matrix[0];                                                     // projections of neighbor fragment displacement onto tangent plane
+    vec3 cY = camera_matrix[1];
+    float der_factor = pixel_size * TEX_SCALE * t;
+    float dp_v = dot(v, n);
+    float dp_cX = dot(cX, n);
+    float dp_cY = dot(cY, n);
 
-    vec3 l = light_ws - p;                                                          // from fragment to light
-    float ld = max(length(l), 0.001);                                               // distance to light
+    vec3 q = TEX_SCALE * p;
+    vec3 dq_dx = der_factor * (dp_v * cX - dp_cX * v) / (dp_v + pixel_size * dp_cX);
+    vec3 dq_dy = der_factor * (dp_v * cY - dp_cY * v) / (dp_v + pixel_size * dp_cY);
+
+    vec3 diffuse_color = tex3D_AA(q, dq_dx, dq_dy, n);                              // trilinear blended diffuse color texture
+    vec3 b = bump3D_AA(q, dq_dx, dq_dy, n);                                         // trilinear blended bumped normal
+
+    vec3 l = light_ws - p;                                                          // vector from fragment to light
+    float ld = length(l);                                                           // distance to light
     l /= ld;                                                                        // unit light direction
 
-    float sf = hard_shadow_factor(p, l, 0.0, ld);                                    // calculate shadow factor
-
-//    float ssf = soft_shadow_factor(p, l, 0.0, ld, 8.0);                                    // calculate shadow factor
+//    float sf = hard_shadow_factor(p, l, 0.0, ld);                                    // calculate shadow factor
+    float ssf = soft_shadow_factor(p, l, 0.0, ld, 8.0);                             // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
-    float attenuation_factor = 1.0 / (1.0 + ld * 0.007);                            // attenuation w.r.t light proximity
-    float diffuse_factor = 0.5 + 0.5 * dot(b, l);                                     // diffuse component factor
-    float specular_factor = 0.0; //0.25 * pow(max(dot(reflect(-l, n), -v), 0.0), 40.0);           // specular light factor
-    float fresnel_factor = 0.0;//pow(clamp(dot(b, v) + 1.0, 0.0, 1.0), 5.0);              // fresnel term, for reflective glow
-    float ambient_factor = sqrt(ao);                     // ambient light factor
+    float ambient_factor = 0.25 * ao;                                               // ambient light factor
+    vec3 ambient_color = ambient_factor * diffuse_color;                            // ambient color
 
-    vec3 texCol = tex3D_AA(p, normal(p), v, t);                                                     // trilinear blended texture
+    float diffuse_factor = sqrt(ao) * (0.5 + 0.5 * dot(b, l));                                     // diffuse component factor
 
-    vec3 color = texCol * (diffuse_factor + 0.25 * ambient_factor);
+    vec3 specular_color = vec3(1.0);
+    vec3 h = normalize(l - v);
+    float cos_alpha = max(dot(h, b), 0.0f);
+    float specular_factor = 0.45 * pow(cos_alpha, 40.0);
+    float attenuation_factor = 1.0 / (1.0 + 0.349 * ld);
 
-    vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), 1.0f) : 
-                        ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(texCol, 1.0f)
-                                                      : vec4(vec3(ao), 1.0f))
-                                      : ((uv.y < 0.5) ? vec4(abs(n), 1.0f)
-                                                      : vec4(abs(b), 1.0f)));
+    vec3 color = ambient_color + attenuation_factor * (diffuse_factor * diffuse_color + specular_factor * specular_color);
+
+    vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), t) : 
+                        ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(diffuse_color, t)
+                                                      : vec4(vec3(ao), t))
+                                      : ((uv.y < 0.5) ? vec4(abs(b), t)
+                                                      : vec4(vec3(dot(b, n)), t)));
+
     imageStore(scene_image, ivec2(gl_GlobalInvocationID.xy), FragmentColor);
-
 }
