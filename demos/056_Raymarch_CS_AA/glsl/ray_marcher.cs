@@ -57,23 +57,36 @@ const float TEX_SCALE = 0.15;
 
 vec3 tex3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
 {
+//    vec3 w = max(abs(n) - NORMAL_CLAMP, 0.0);
     vec3 w = pow(abs(n), vec3(4.8));
     w /= (w.x + w.y + w.z);
 
     vec3 tx = textureGrad(tb_tex, q.yz, dq_dx.yz, dq_dy.yz).rgb;
     vec3 ty = textureGrad(tb_tex, q.zx, dq_dx.zx, dq_dy.zx).rgb;
     vec3 tz = textureGrad(tb_tex, q.xy, dq_dx.xy, dq_dy.xy).rgb;
-    return sqrt(tx * tx * w.x + ty * ty * w.y + tz * tz * w.z);
+    return tx * w.x + ty * w.y + tz * w.z;
 }
 
 vec3 bump3D_AA(vec3 q, vec3 dq_dx, vec3 dq_dy, vec3 n)
 {
-    vec3 w = n * n * n;
-    vec3 tx = textureGrad(bump_tb_tex, q.yz, dq_dx.yz, dq_dy.yz).zxy;
-    vec3 ty = textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dy.zx).yzx;
-    vec3 tz = textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dy.xy).xyz;
-    vec3 b = tx * w.x + ty * w.y + tz * w.z;
-    b = normalize(b);
+//    vec3 w = max(abs(n) - NORMAL_CLAMP, 0.0);
+    vec3 w = pow(abs(n), vec3(4.8));
+    w /= (w.x + w.y + w.z);
+
+    vec2 l_xy = 2.0 * textureGrad(bump_tb_tex, q.xy, dq_dx.xy, dq_dy.xy).rg - vec2(1.0);
+    vec2 l_yz = 2.0 * textureGrad(bump_tb_tex, q.yz, dq_dx.yz, dq_dy.yz).rg - vec2(1.0);
+    vec2 l_zx = 2.0 * textureGrad(bump_tb_tex, q.zx, dq_dx.zx, dq_dy.zx).rg - vec2(1.0);
+
+    l_xy *= inversesqrt(1.0f - dot(l_xy, l_xy));
+    l_yz *= inversesqrt(1.0f - dot(l_yz, l_yz));
+    l_zx *= inversesqrt(1.0f - dot(l_zx, l_zx));
+
+    vec3 g = vec3(w.z * l_xy.x + w.y * l_zx.y,
+                  w.x * l_yz.x + w.z * l_xy.y,
+                  w.y * l_zx.x + w.x * l_yz.y);
+
+    vec3 b = g - dot(g, n) * n;
+    b = normalize(n + b);
     return b;
 }
 
@@ -99,8 +112,9 @@ float sdf(vec3 p)
     const float SDF_SCALE = 3.0;
     const float INV_SDF_SCALE = 1.0 / SDF_SCALE;
     p *= INV_SDF_SCALE;
-    vec3 op = tri_smooth(1.1f * p + tri_smooth(1.1f * p.zxy));
-    float ground = p.z + 0.5 + dot(op, vec3(0.067));
+    vec3 s = tri_smooth(1.1f * p.zxy);
+    vec3 op = tri_smooth(1.1f * p + s);
+    float ground = p.z + 0.5 + dot(op, vec3(0.067)) + dot(s, vec3(0.031));
     p += 0.317 * (op - 0.25);
     p = cos(0.444f * p + sin(1.112f * p.zxy));
     float canyon = 0.941 * (length(p) - 1.05);
@@ -210,16 +224,18 @@ float hard_shadow_factor(vec3 p, vec3 l, float min_t, float max_t)
     return 1.0f;
 }
 
-float soft_shadow_factor(vec3 p, vec3 l, float min_t, float max_t, float k)
+float soft_shadow_factor(vec3 p, vec3 l, float min_t, float max_t)
 {
+    const float k = 8.0;
+    const float h_min = 0.001;
     float res = 1.0;
-    float t = mix(min_t, max_t, 0.05);
+    float t = 0.0f;
     while(t < max_t)
     {
         float h = sdf(p + t * l);
-        if(h < 0.001)
+        if(h < h_min)
             return 0.0;
-        res = min(res, k * h / t);
+        res = min(res, k * (h - h_min) / t);
         t += h;
     }
     return res;
@@ -301,7 +317,11 @@ void main()
     vec3 dq_dx = der_factor * (dp_v * cX - dp_cX * v) / (dp_v + pixel_size * dp_cX);
     vec3 dq_dy = der_factor * (dp_v * cY - dp_cY * v) / (dp_v + pixel_size * dp_cY);
 
-    vec3 diffuse_color = tex3D_AA(q, dq_dx, dq_dy, n);                              // trilinear blended diffuse color texture
+    vec3 tex_col = tex3D_AA(q, dq_dx, dq_dy, n);                              // trilinear blended diffuse color texture
+    vec3 diffuse_color = tex_col.rgb;                              // trilinear blended diffuse color texture
+    diffuse_color = sqrt(diffuse_color);
+
+    float spec = 1.44 * pow(clamp(dot(diffuse_color, RGB_SPECTRAL_POWER), 0.0, 1.0), 8.0);
     vec3 b = bump3D_AA(q, dq_dx, dq_dy, n);                                         // trilinear blended bumped normal
 
     vec3 l = light_ws - p;                                                          // vector from fragment to light
@@ -309,7 +329,7 @@ void main()
     l /= ld;                                                                        // unit light direction
 
 //    float sf = hard_shadow_factor(p, l, 0.0, ld);                                    // calculate shadow factor
-    float ssf = soft_shadow_factor(p, l, 0.0, ld, 4.0);                             // calculate shadow factor
+    float sf = soft_shadow_factor(p + 0.025 * b, l, 0.0, ld);                             // calculate shadow factor
 
     float ao = calc_ao1(p, b);                                                      // ambient occlusion factor
     float ambient_factor = 0.1251 * ao;                                               // ambient light factor
@@ -320,14 +340,14 @@ void main()
     vec3 specular_color = vec3(1.0);
     vec3 h = normalize(l - v);
     float cos_alpha = max(dot(h, b), 0.0f);
-    float specular_factor = 0.75 * pow(cos_alpha, 40.0);
-    float attenuation_factor = ssf / (0.91 + 0.0949 * ld * ld);
+    float specular_factor = spec * pow(cos_alpha, 40.0);
+    float attenuation_factor = sf / (0.91 + 0.0949 * ld * ld);
 
     vec3 color = ambient_color + attenuation_factor * (diffuse_factor * diffuse_color + specular_factor * specular_color);
 
     vec4 FragmentColor = (split_screen != 0) ? vec4(clamp(color, 0.0f, 1.0f), t) : 
                         ((uv.x < 0.5) ? ((uv.y < 0.5) ? vec4(diffuse_color, t)
-                                                      : vec4(vec3(ao), t))
+                                                      : vec4(vec3(spec), t))
                                       : ((uv.y < 0.5) ? vec4(abs(b), t)
                                                       : vec4(vec3(dot(b, n)), t)));
 

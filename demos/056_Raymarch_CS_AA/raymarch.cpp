@@ -16,6 +16,7 @@
 #include "camera.hpp"
 #include "glsl_noise.hpp"
 #include "image.hpp"
+#include "sampler.hpp"
 
 const float z_near = 1.0f;
 
@@ -25,6 +26,10 @@ struct demo_window_t : public imgui_window_t
 
     bool split_screen = false;
     int aa_mode = 0;
+    int texture_index = 0;
+
+    GLuint tb_tex_id = 0,
+           bump_tex_id = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
@@ -38,16 +43,32 @@ struct demo_window_t : public imgui_window_t
     //===================================================================================================================================================================================================================
     void on_key(int key, int scancode, int action, int mods) override
     {
-        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(frame_dt);
-        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
-        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
-        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+        float speed = (mods & GLFW_MOD_SHIFT) ? 8.0 * frame_dt : frame_dt;
 
-        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+        if      ((key == GLFW_KEY_UP)    || (key == GLFW_KEY_W)) camera.move_forward(speed);
+        else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(speed);
+        else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(speed);
+        else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(speed);
+
+        if (action != GLFW_RELEASE) return;
+
+        if (key == GLFW_KEY_SPACE)
             split_screen = !split_screen;
 
-        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+        if (key == GLFW_KEY_ENTER)
             aa_mode = (aa_mode + 1) % 3;
+
+        if (key == GLFW_KEY_KP_ADD)
+        {
+            texture_index = (texture_index + 1) & 0x0F;
+            texture_load();
+        }
+
+        if (key == GLFW_KEY_KP_SUBTRACT)
+        {
+            texture_index = (texture_index - 1) & 0x0F;
+            texture_load();
+        }
     }
 
     void on_mouse_move() override
@@ -63,6 +84,26 @@ struct demo_window_t : public imgui_window_t
         // show a simple fps window.
         //===============================================================================================================================================================================================================
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::Text("SPACE : show debug split screen");
+        ImGui::Text("ENTER : change antialiasing mode (no AA, show AA regions, AA)");
+        ImGui::Text("+ / - : next / previous texture");
+    }
+
+    void texture_load()
+    {
+        char c = (texture_index < 0x0A) ? '0' + texture_index : 'A' + texture_index - 0x0A;
+        char tex_name[128];
+        sprintf(tex_name, "../../../resources/tex2d/nature/rocks/%c.png", c);
+        glActiveTexture(GL_TEXTURE2);
+        if (tb_tex_id)
+            glDeleteTextures(1, &tb_tex_id);
+        tb_tex_id = image::png::texture2d(tex_name, 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
+
+        sprintf(tex_name, "../../../resources/tex2d/nature/rocks/bump%c.png", c);
+        glActiveTexture(GL_TEXTURE3);
+        if (bump_tex_id)
+            glDeleteTextures(1, &bump_tex_id);
+        bump_tex_id = image::png::texture2d("../../../resources/tex2d/nature/rocks/bump0.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
     }
 };
 
@@ -101,7 +142,6 @@ int main(int argc, char *argv[])
     ray_marcher["tb_tex"] = 2;
     ray_marcher["bump_tb_tex"] = 3;
 
-
     uniform_t uni_rm_camera_matrix = ray_marcher["camera_matrix"];
     uniform_t uni_rm_camera_ws = ray_marcher["camera_ws"];
     uniform_t uni_rm_light_ws = ray_marcher["light_ws"];
@@ -128,27 +168,15 @@ int main(int argc, char *argv[])
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, window.res_x, window.res_y);
     glBindImageTexture(0, output_image, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
+    GLfloat max_af_level;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_af_level);
+    debug_msg("Maximal HW supported anisotropy level is %.1f", max_af_level);
+    window.texture_load();
 
+    sampler_t anisotropy_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    anisotropy_sampler.bind(2);
+    anisotropy_sampler.bind(3);
 
-    glActiveTexture(GL_TEXTURE2);
-    GLuint tb_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/E.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-    GLfloat max_anisotropy;
-    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
-
-    glActiveTexture(GL_TEXTURE3);
-    GLuint bump_tex_id = image::png::texture2d_luma("../../../resources/tex2d/nature/rocks/bumpE.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT, false);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
-
-
-    GLuint sampler_id;
-    glGenSamplers(1, &sampler_id);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(sampler_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glSamplerParameterf(sampler_id, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_anisotropy);
-    glBindSampler(2, sampler_id);
 
     //glActiveTexture(GL_TEXTURE3);
     //GLuint noise_tex = glsl_noise::randomRGBA_shift_tex256x256(glm::ivec2(37, 17));
