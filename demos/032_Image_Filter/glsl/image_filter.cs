@@ -91,6 +91,7 @@ vec3 hash3(vec2 p)
     return fract(cos(h) * 43134.717f);
 }
 
+/*
 //==============================================================================================================================================================
 // Probabilistic dithering algorithm in all components :: 256 colors :: only 8x8x4 rgb values are available
 //==============================================================================================================================================================
@@ -228,6 +229,7 @@ subroutine(image_filter4x4) void scharr_edge_detector_luminosity()
         rgb_out[x][y] = vec4(vec3(l), 1.0f);
     }
 }    
+*/
 
 //==============================================================================================================================================================
 const float gaussian5x5_filter[5][5] = 
@@ -248,12 +250,18 @@ subroutine(image_filter4x4) void gaussian_blur5x5_rgb()
 {
     for (int x = 0; x < 4; ++x) for (int y = 0; y < 4; ++y)
     {
-        vec3 rgb_gb = vec3(0.0);
-        for(int p = -2; p <= 2; ++p)
-            for(int q = -2; q <= 2; ++q)
-                rgb_gb += gaussian5x5_filter[p + 2][q + 2] * rgba[iX + x + p][iY + y + q].rgb;
-        rgb_gb *= weight_normalizer;
-        rgb_out[x][y] = vec4(rgb_gb, 1.0f);        
+        int idx_x = iX + x - 2;
+        int idx_y = iY + y - 2;
+
+        vec3 q = vec3(0.0f);
+
+        for(int u = 0; u < 5; ++u)
+        {
+            for(int v = 0; v < 5; ++v)
+                q += gaussian5x5_filter[u][v] * rgba[idx_x + u][idx_y + v].rgb;
+        }
+
+        rgb_out[x][y] = vec4(weight_normalizer * q, 1.0f);
     }
 }
 
