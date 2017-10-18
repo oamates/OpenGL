@@ -25,12 +25,13 @@
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
+    bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
-          camera(5.0, 0.5)
+          camera(2.5, 0.5)
     {
-        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
+        camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.0625f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
@@ -43,6 +44,9 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+            pause = !pause;
     }
 
     void on_mouse_move() override
@@ -71,7 +75,7 @@ void fill_shift_rotor_data(motion3d_t* data, const glm::vec3& group_shift, float
     for (int i = 0; i < N; ++i) for (int j = 0; j < N; ++j) for (int k = 0; k < N; ++k)
     {
         data[index].shift = group_shift + cell_size * glm::vec3(float(i) - middle, float(j) - middle, float(k) - middle);
-        data[index].hue = glm::gaussRand(0.0f, 1.0f);
+        data[index].hue = glm::linearRand(0.0f, 1.0f);
         data[index].axis = glm::sphericalRand(1.0f);
         data[index].angular_velocity = glm::gaussRand(0.0f, 1.0f);
         index++;
@@ -167,6 +171,7 @@ int main(int argc, char *argv[])
     glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, ssbo_id, 0, sizeof(data));
 
+    float time = 0.0f;
 
     //===================================================================================================================================================================================================================
     // main program loop : just clear the buffer in a loop
@@ -176,10 +181,14 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        float time = 0.41f * window.frame_ts;
+        if (!window.pause)
+            time += window.frame_dt;
+
+        float t0 = 0.5f * window.frame_ts;
+
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
-        glm::vec3 light_ws = 1.25f * origin_distance * glm::vec3(glm::cos(time), glm::sin(time), 0.0f);
+        glm::vec3 light_ws = 1.25f * origin_distance * glm::vec3(glm::cos(t0), glm::sin(t0), 0.0f);
 
         framed_lighting.enable();
         uni_fl_pv_matrix = projection_view_matrix;

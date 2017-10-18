@@ -42,20 +42,19 @@ vec3 bump_normal(vec3 n, vec2 uv)
 
     float B = texture(heightmap_tex, uv).r - 0.5f;
 
-    vec2 UVx = 0.125 * dFdx(uv);
-    vec2 UVy = 0.125 * dFdy(uv);
+    vec2 UVx = dFdx(uv);
+    vec2 UVy = dFdy(uv);
 
     float Bx = texture(heightmap_tex, uv + 0.5f * UVx).r - texture(heightmap_tex, uv - 0.5f * UVx).r;
     float By = texture(heightmap_tex, uv + 0.5f * UVy).r - texture(heightmap_tex, uv - 0.5f * UVy).r;
 
-    const float bm = 0.03125f;
+    const float bm = 3.87f;
 
-    vec3 P_x = tangent_x + bm * (Bx * n + B * Nx);
-    vec3 P_y = tangent_y + bm * (By * n + B * Ny);
+    vec3 P_x = tangent_x - bm * (Bx * n + B * Nx);
+    vec3 P_y = tangent_y - bm * (By * n + B * Ny);
 
     vec3 b = normalize(cross(P_x, P_y));
     return b;
-
 }
 
 
@@ -69,10 +68,11 @@ void main()
     
     vec3 rgb = texture(diffuse_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);
-    hsv.x = 0.75f + 0.15f * hue;
+    hsv.x = 0.75f + 0.25f * hue;
     vec3 diffuse_color = hsv2rgb(hsv);
     vec3 ambient_color = 0.25f * diffuse_color;
-    vec3 specular_color = hsv2rgb(vec3(0.0f, hsv.yz));
+    vec3 specular_color = hsv2rgb(vec3(hsv.x, pow(hsv.yz, vec2(0.25))));
+
 
     float cos_theta = dot(n, l);
 
@@ -82,19 +82,15 @@ void main()
     {
         color += cos_theta * diffuse_color;
 
-        // Phong lighting
-//        vec3 r = reflect(-l, n);
-//        float cos_alpha = max(dot(v, r), 0.0f);
-//        float exponent = 0.25f * specular_exponent();
-        
-        // Blinn - Phong lighting
         vec3 h = normalize(l + v);
         float cos_alpha = max(dot(h, n), 0.0f);
 
-        color += pow(cos_alpha, Ns) * specular_color;
+        const float Ns = 80.0f;
+        color += 2.75 * pow(cos_alpha, Ns) * specular_color;
+
     }
 
-    FragmentColor = vec4(color, 1.0f);                 
+    FragmentColor = vec4(/*color*/ vec3(0), 1.0f);                 
 }
 
 
