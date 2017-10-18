@@ -1,7 +1,7 @@
 #version 430 core
 
-uniform sampler2D diffuse_texture;
-uniform sampler2D bump_texture; 
+uniform sampler2D diffuse_tex;
+uniform sampler2D heightmap_tex; 
 
 in vec3 position_ws;
 in vec3 view;
@@ -33,33 +33,42 @@ vec3 hsv2rgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+vec3 bump_normal(vec3 n, vec2 uv)
+{
+    vec3 Px = dFdx(position_ws);
+    vec3 Py = dFdy(position_ws);
+
+    vec3 Nx = dFdx(n);
+    vec3 Ny = dFdy(n);
+
+    float B = texture(heightmap_tex, uv).r - 0.5f;
+
+    vec2 UVx = 0.125 * dFdx(uv);
+    vec2 UVy = 0.125 * dFdy(uv);
+
+    float Bx = texture(heightmap_tex, uv + 0.5f * UVx).r - texture(heightmap_tex, uv - 0.5f * UVx).r;
+    float By = texture(heightmap_tex, uv + 0.5f * UVy).r - texture(heightmap_tex, uv - 0.5f * UVy).r;
+
+    const float bm = 0.03125f;
+
+    vec3 P_x = Px + bm * (Bx * n + B * Nx);
+    vec3 P_y = Py + bm * (By * n + B * Ny);
+
+    vec3 b = normalize(cross(P_x, P_y));
+    return b;
+}
+
 void main()
 {    
     vec3 l = normalize(light);
 
-    vec3 Px = dFdx(position_ws);
-    vec3 Py = dFdy(position_ws);
-
-    vec3 Nx = dFdx(normal_ws);
-    vec3 Ny = dFdy(normal_ws);
-
-    float B = texture(bump_texture, uv).r;
-
-    float Bx = dFdx(B);
-    float By = dFdy(B);
-
-    const float bm = 0.03125f;
-
-    vec3 P_x = Px + bm * (Bx * normal_ws + (B - 0.5f) * Nx);
-    vec3 P_y = Py + bm * (By * normal_ws + (B - 0.5f) * Ny);
-
-    vec3 n = normalize(cross(P_x, P_y));
     vec3 v = normalize(view);                                                         
-    
 
-    vec3 rgb = texture(diffuse_texture, uv).rgb;
+    vec3 n = bump_normal(normal_ws, uv);    
+
+    vec3 rgb = texture(diffuse_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);
-    hsv.x = hue;
+    hsv.x = 0.25f + 0.15f * hue;
     hsv.y = pow(hsv.y, 0.25);
     vec3 diffuse_color = hsv2rgb(hsv);
     vec3 ambient_color = 0.25f * diffuse_color;

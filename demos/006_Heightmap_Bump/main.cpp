@@ -27,7 +27,8 @@ struct demo_window_t : public glfw_window_t
     camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
+          camera(5.0, 0.5)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -107,8 +108,8 @@ int main(int argc, char *argv[])
     uniform_t uni_fl_time        = framed_lighting["time"];
     uniform_t uni_fl_base        = framed_lighting["buffer_base"];
 
-    framed_lighting["diffuse_texture"] = 0;
-    framed_lighting["bump_texture"] = 1;
+    framed_lighting["diffuse_tex"] = 0;
+    framed_lighting["heightmap_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // blinn-phong lighting model with bump texturing using normals and partial derivatives
@@ -152,7 +153,7 @@ int main(int argc, char *argv[])
 
     const int N = 5;
     const int group_size = N * N * N;
-    const float cell_size = 0.75f;
+    const float cell_size = 0.5f;
     const float origin_distance = 0.75f * cell_size * N;
 
     motion3d_t data[2 * group_size];
@@ -175,16 +176,16 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        float time = window.frame_ts;
+        float time = 0.41f * window.frame_ts;
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 camera_ws = window.camera.position();
-        glm::vec3 light_ws = glm::vec3(200.0f * glm::cos(time), 200.0f * glm::sin(time), 0.0f);
+        glm::vec3 light_ws = 1.25f * origin_distance * glm::vec3(glm::cos(time), glm::sin(time), 0.0f);
 
         framed_lighting.enable();
         uni_fl_pv_matrix = projection_view_matrix;
         uni_fl_light_ws = light_ws;
         uni_fl_camera_ws = camera_ws;
-        uni_fl_solid_scale = 2.0f * cell_size / N;
+        uni_fl_solid_scale = 0.5f * cell_size;
         uni_fl_time = time;
         uni_fl_base = 0;
         framed_cube.instanced_render(group_size);
@@ -194,7 +195,7 @@ int main(int argc, char *argv[])
         uni_nl_pv_matrix = projection_view_matrix;
         uni_nl_light_ws = light_ws;
         uni_nl_camera_ws = camera_ws;
-        uni_nl_solid_scale = 2.0f * cell_size / N;
+        uni_nl_solid_scale = 0.5f * cell_size;
         uni_nl_time = time;
         uni_nl_base = group_size;
         normal_cube.instanced_render(group_size);

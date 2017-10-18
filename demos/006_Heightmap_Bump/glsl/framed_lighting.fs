@@ -1,7 +1,7 @@
 #version 430 core
 
-uniform sampler2D diffuse_texture;
-uniform sampler2D bump_texture; 
+uniform sampler2D diffuse_tex;
+uniform sampler2D heightmap_tex; 
 
 in vec3 position_ws;
 in vec3 normal_ws;
@@ -35,25 +35,41 @@ vec3 hsv2rgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
+vec3 bump_normal(vec3 n, vec2 uv)
+{
+    vec3 Nx = dFdx(n);
+    vec3 Ny = dFdy(n);
+
+    float B = texture(heightmap_tex, uv).r - 0.5f;
+
+    vec2 UVx = 0.125 * dFdx(uv);
+    vec2 UVy = 0.125 * dFdy(uv);
+
+    float Bx = texture(heightmap_tex, uv + 0.5f * UVx).r - texture(heightmap_tex, uv - 0.5f * UVx).r;
+    float By = texture(heightmap_tex, uv + 0.5f * UVy).r - texture(heightmap_tex, uv - 0.5f * UVy).r;
+
+    const float bm = 0.03125f;
+
+    vec3 P_x = tangent_x + bm * (Bx * n + B * Nx);
+    vec3 P_y = tangent_y + bm * (By * n + B * Ny);
+
+    vec3 b = normalize(cross(P_x, P_y));
+    return b;
+
+}
+
+
 void main()
 {    
     vec3 l = normalize(light);
 
-    vec2 UVx = dFdx(uv);
-    vec2 UVy = dFdy(uv);
-    float Bx = texture(bump_texture, uv + 0.5f * UVx).r - texture(bump_texture, uv - 0.5f * UVx).r;
-    float By = texture(bump_texture, uv + 0.5f * UVy).r - texture(bump_texture, uv - 0.5f * UVy).r;
 
-    const float bm = 0.5f;
-    vec3 surface_gradient = 0.5f * bm * (Bx * tangent_x + By * tangent_y);
-
-    vec3 n = normalize(normal_ws - surface_gradient);
+    vec3 n = bump_normal(normal_ws, uv);
     vec3 v = normalize(view);                                                         
     
-    vec3 rgb = texture(diffuse_texture, uv).rgb;
+    vec3 rgb = texture(diffuse_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);
-    hsv.x = hue;
-    hsv.y = pow(hsv.y, 0.25);
+    hsv.x = 0.75f + 0.15f * hue;
     vec3 diffuse_color = hsv2rgb(hsv);
     vec3 ambient_color = 0.25f * diffuse_color;
     vec3 specular_color = hsv2rgb(vec3(0.0f, hsv.yz));
