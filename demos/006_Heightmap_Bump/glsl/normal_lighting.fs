@@ -62,11 +62,62 @@ vec3 bump_normal(vec3 p, vec3 n, vec2 uv)
     return b;
 }
 
+
+mat3 cotangent_frame(vec3 p, vec3 n, vec2 uv)
+{
+    // get edge vectors of the pixel triangle
+    vec3 Px = dFdx(p);
+    vec3 Py = dFdy(p);
+    vec2 UVx = dFdx(uv);
+    vec2 UVy = dFdy(uv);
+ 
+    // solve the linear system
+    vec3 Py_perp = cross(Py, n);
+    vec3 Px_perp = cross(n, Px);
+    vec3 T = Py_perp * UVx.x + Px_perp * UVy.x;
+    vec3 B = Py_perp * UVx.y + Px_perp * UVy.y;
+ 
+    // construct a scale-invariant frame 
+    float inv_max = inversesqrt(max(dot(T, T), dot(B, B)));
+    return mat3(inv_max * T, inv_max * B, n);
+}
+/*
+vec3 perturb_normal(vec3 p, vec3 n, vec2 uv)
+{
+    vec3 map = texture(mapBump, uv).xyz;
+    mat3 TBN = cotangent_frame(p, n, uv);
+    return normalize(TBN * map);
+}
+*/
+vec3 perturb_normal(vec3 p, vec3 n, vec2 uv)
+{
+    vec3 Px = dFdx(p);
+    vec3 Py = dFdy(p);
+    vec2 UVx = dFdx(uv);
+    vec2 UVy = dFdy(uv);
+ 
+    vec3 Py_perp = cross(Py, n);
+    vec3 Px_perp = cross(n, Px);
+    vec3 T = Py_perp * UVx.x + Px_perp * UVy.x;
+    vec3 B = Py_perp * UVx.y + Px_perp * UVy.y;
+ 
+    float inv_max = inversesqrt(max(dot(T, T), dot(B, B)));
+    float lod = textureQueryLod(heightmap_tex, uv).x;
+    float q = 0.5f;
+
+    float Bx = textureLod(heightmap_tex, uv + q * UVx, lod).r - textureLod(heightmap_tex, uv - q * UVx, lod).r;
+    float By = textureLod(heightmap_tex, uv + q * UVy, lod).r - textureLod(heightmap_tex, uv - q * UVy, lod).r;
+
+    const float bf = 1.75;
+    vec3 b = n + bf * inv_max * (Bx * T + By * B);  
+    return normalize(b);
+}
+
 void main()
 {    
     vec3 l = normalize(light);
     vec3 v = normalize(view);
-    vec3 n = bump_normal(position_ws, normal_ws, uv);
+    vec3 n = perturb_normal(position_ws, normal_ws, uv);
 
     vec3 rgb = texture(diffuse_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);
