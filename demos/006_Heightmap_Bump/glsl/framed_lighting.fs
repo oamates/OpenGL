@@ -86,11 +86,12 @@ void main()
         float cos_alpha = max(dot(h, n), 0.0f);
 
         const float Ns = 80.0f;
-        color += 2.75 * pow(cos_alpha, Ns) * specular_color;
+        color += 1.75 * pow(cos_alpha, Ns) * specular_color;
 
     }
 
-    FragmentColor = vec4(/*color*/ vec3(0), 1.0f);                 
+    FragmentColor = vec4(color, 1.0f);                 
+    //FragmentColor = vec4(/*color*/ vec3(0), 1.0f);                 
 }
 
 

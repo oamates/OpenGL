@@ -29,7 +29,7 @@ struct demo_window_t : public glfw_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
-          camera(2.5, 0.5)
+          camera(12.5, 0.5)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.0625f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -137,9 +137,9 @@ int main(int argc, char *argv[])
     // load textures
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_texture_id = image::png::texture2d("../../../resources/tex2d/rock.png");
+    GLuint diffuse_texture_id = image::png::texture2d("../../../resources/tex2d/metal.png");
     glActiveTexture(GL_TEXTURE1);
-    GLuint bump_texture_id    = image::png::texture2d("../../../resources/tex2d/rock_heightmap.png");
+    GLuint bump_texture_id    = image::png::texture2d("../../../resources/tex2d/metal_heightmap.png");
 
     //===================================================================================================================================================================================================================
     // create two buffers

@@ -89,6 +89,7 @@ vec3 perturb_normal(vec3 p, vec3 n, vec2 uv)
     return normalize(TBN * map);
 }
 */
+
 vec3 perturb_normal(vec3 p, vec3 n, vec2 uv)
 {
     vec3 Px = dFdx(p);
@@ -108,8 +109,22 @@ vec3 perturb_normal(vec3 p, vec3 n, vec2 uv)
     float Bx = textureLod(heightmap_tex, uv + q * UVx, lod).r - textureLod(heightmap_tex, uv - q * UVx, lod).r;
     float By = textureLod(heightmap_tex, uv + q * UVy, lod).r - textureLod(heightmap_tex, uv - q * UVy, lod).r;
 
-    const float bf = 1.75;
+    const float bf = 1.25;
     vec3 b = n + bf * inv_max * (Bx * T + By * B);  
+    return normalize(b);
+}
+
+vec3 perturb_normal_2(vec3 p, vec3 n, vec2 uv)
+{
+    const float bf = 1.25;
+
+    vec2 size = textureSize(heightmap_tex, 0);
+    float scale = bf * inversesqrt(dot(size, size));
+
+    vec3 Q = p + scale * texture(heightmap_tex, uv).r * n;
+    vec3 Qx = dFdx(Q);
+    vec3 Qy = dFdy(Q);
+    vec3 b = cross(Qx, Qy);
     return normalize(b);
 }
 
@@ -117,7 +132,7 @@ void main()
 {    
     vec3 l = normalize(light);
     vec3 v = normalize(view);
-    vec3 n = perturb_normal(position_ws, normal_ws, uv);
+    vec3 n = perturb_normal_2(position_ws, normal_ws, uv);
 
     vec3 rgb = texture(diffuse_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);
@@ -139,7 +154,7 @@ void main()
         float cos_alpha = max(dot(h, n), 0.0f);
 
         const float Ns = 80.0f;
-        color += 2.75 * pow(cos_alpha, Ns) * specular_color;
+        color += 1.75 * pow(cos_alpha, Ns) * specular_color;
     }
 
     FragmentColor = vec4(color, 1.0f);                 
