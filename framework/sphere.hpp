@@ -31,9 +31,15 @@ struct sphere_t
     template<typename vertex_t> void generate_vao(typename maps<vertex_t>::spheric_func func, int level);
 
     //===============================================================================================================================================================================================================
-    // Multithreaded subdivision of sphere : provided function computes position-normal-texture coordinate vertex attributes
+    // Multithreaded subdivision of sphere : function creates triangle strip indexed sphere subdivision buffers
     //===============================================================================================================================================================================================================
     template<typename vertex_t, int threads = 8> void generate_vao_mt(typename maps<vertex_t>::spheric_func func, int level);
+
+    //===============================================================================================================================================================================================================
+    // Multithreaded subdivision of sphere : function creates quad list subdivision buffers
+    // to be used with tesselation and rendered with primitive type = GL_PATCHES
+    //===============================================================================================================================================================================================================
+    template<typename vertex_t, int threads = 8> void generate_quads_mt(typename maps<vertex_t>::spheric_func func, int level);
 
 
     //===============================================================================================================================================================================================================
@@ -74,6 +80,11 @@ struct sphere_t
     // Auxiliary function that populates its own chunk of vertex and index buffers
     //===============================================================================================================================================================================================================
     template<typename vertex_t> static void fill_vao_chunk(typename maps<vertex_t>::spheric_func func, const compute_data<vertex_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
+
+    //===============================================================================================================================================================================================================
+    // Auxiliary function that populates its own chunk of vertex and index buffers for quad patches of sphere
+    //===============================================================================================================================================================================================================
+    template<typename vertex_t> static void fill_quad_chunk(typename maps<vertex_t>::spheric_func func, const compute_data<vertex_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
 
 };
 

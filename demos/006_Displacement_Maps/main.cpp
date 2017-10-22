@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     // Creating spherical mesh
     //===================================================================================================================================================================================================================
     sphere_t sphere;
-    sphere.generate_vao_mt<vertex_t3_t>(sphere_func, 32);
+    sphere.generate_quads_mt<vertex_t3_t>(sphere_func, 32);
     debug_msg("Sphere generated");
 
     //===================================================================================================================================================================================================================
@@ -103,9 +103,7 @@ int main(int argc, char *argv[])
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
 
-    glEnable(GL_PRIMITIVE_RESTART);
-    glPrimitiveRestartIndex(-1);
-    glPatchParameteri(GL_PATCH_VERTICES, 3);
+    glPatchParameteri(GL_PATCH_VERTICES, 4);
 
     const float light_radius = 4.5f;  
 
@@ -134,7 +132,7 @@ int main(int argc, char *argv[])
         uniform_camera_ws = camera_ws;
         uniform_light_ws = light_ws;
 
-        sphere.render(GL_PATCHES);
+        sphere.render();
         window.end_frame();
     }
     

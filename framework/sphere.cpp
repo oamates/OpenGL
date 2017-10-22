@@ -288,7 +288,106 @@ template<typename vertex_t, int threads> void sphere_t::generate_vao_mt(typename
 }
 
 template void sphere_t::generate_vao_mt<vertex_pnt3_t>(typename maps<vertex_pnt3_t>::spheric_func func, int level);
-template void sphere_t::generate_vao_mt<vertex_t3_t>(typename maps<vertex_t3_t>::spheric_func func, int level);
+
+//=======================================================================================================================================================================================================================
+// Multithreaded subdivision of sphere : function creates quad list subdivision buffers
+// to be used with tesselation and rendered with primitive type = GL_PATCHES
+//=======================================================================================================================================================================================================================
+template<typename vertex_t, int threads> void sphere_t::generate_quads_mt(typename maps<vertex_t>::spheric_func func, int level)
+{
+    //===================================================================================================================================================================================================================
+    // prepare data to be read by all threads
+    //===================================================================================================================================================================================================================
+    compute_data<vertex_t> data;
+    data.level = level;
+
+    //===================================================================================================================================================================================================================
+    // icosahedron has similar structures defined and can be used instead of cube
+    //===================================================================================================================================================================================================================
+  #ifndef ICOSAHEDRAL_SUBDIVISION
+    data.V = plato::cube::V;                                                                        
+    data.E = plato::cube::E;
+    data.Q = plato::cube::Q;
+    data.edges = plato::cube::edges;
+    data.edge_indices = plato::cube::edge_indices;
+    data.quads = plato::cube::quads;
+    const glm::vec3* initial_vertices = plato::cube::vertices;
+  #else
+    data.V = plato::icosahedron::V;                                                                        
+    data.E = plato::icosahedron::E;
+    data.Q = plato::icosahedron::Q;
+    data.edges = plato::icosahedron::edges;
+    data.edge_indices = plato::icosahedron::edge_indices;
+    data.quads = plato::icosahedron::quads;
+    const glm::vec3* initial_vertices = plato::icosahedron::vertices;
+  #endif 
+
+    //===================================================================================================================================================================================================================
+    // compute this elementary combinatorial part here to avoid recalculating the same stuff by all threads
+    //===================================================================================================================================================================================================================
+    data.vertices_per_quad = (level - 1) * (level - 1);
+    data.indices_per_quad = 4 * level * level;
+    data.quad_vertices_base_index = data.V + (level - 1) * data.E;
+    int V = data.V + (level - 1) * data.E + data.vertices_per_quad * data.Q;
+    GLuint index_count = data.indices_per_quad * data.Q;
+
+    debug_msg("Multi-threaded quad subdivision generation of sphere : V = %d. E = %d. Q = %d. index_count = %u. total_V = %d.", data.V, data.E, data.Q, index_count, V);
+
+    //===================================================================================================================================================================================================================
+    // vertex and index buffer allocation
+    //===================================================================================================================================================================================================================
+    vertex_t* vertices = (vertex_t*) malloc(V * sizeof(vertex_t));
+    GLuint* indices = (GLuint*) malloc(index_count * sizeof(GLuint));
+    data.vertices = &vertices[0];
+    data.indices  = &indices[0];
+
+    for(GLuint v = 0; v < data.V; ++v) data.vertices[v] = func(initial_vertices[v]);
+
+    //===================================================================================================================================================================================================================
+    // run threads that compute their own chunks of vertices on edges and faces
+    // in case the number of edges/faces is not divisible by the number of threads, threads that are launched first will compute a bit more
+    //===================================================================================================================================================================================================================
+    std::thread computation_thread[threads - 1];
+
+    int edges_per_thread = data.E / threads;
+    int extra_edges = data.E % threads;
+    int quads_per_thread = data.Q / threads;
+    int extra_quads = data.Q % threads;
+    int edge_start = 0;
+    int quad_start = 0;
+
+    for (unsigned int thread_id = 0; thread_id < threads - 1; ++thread_id)
+    {
+        GLuint edge_end = edge_start + edges_per_thread + GLint(thread_id < extra_edges);
+        GLuint quad_end = quad_start + quads_per_thread + GLint(thread_id < extra_quads);
+        debug_msg("Launching thread #%u. Edges to compute : [%u, %u]. Faces to compute : [%u, %u]", thread_id, edge_start, edge_end - 1, quad_start, quad_end - 1);
+        computation_thread[thread_id] = std::thread(sphere_t::fill_quad_chunk<vertex_t>, func, data, edge_start, edge_end, quad_start, quad_end);
+        edge_start = edge_end;
+        quad_start = quad_end;
+    }
+
+    //===================================================================================================================================================================================================================
+    // this thread will do the last task and will wait for others to finish
+    //===================================================================================================================================================================================================================
+    debug_msg("Main thread #%u. Edges to compute : [%u, %u]. Faces to compute : [%u, %u]", threads - 1, edge_start, edge_start + edges_per_thread - 1, quad_start, quad_start + quads_per_thread - 1);
+    fill_quad_chunk<vertex_t>(func, data, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);           
+
+    for (int thread_id = 0; thread_id < threads - 1; ++thread_id)
+    {
+        computation_thread[thread_id].join();
+        debug_msg("Thread #%u joined the main thread.", thread_id);
+    }
+
+    //===================================================================================================================================================================================================================
+    // create VAO
+    //===================================================================================================================================================================================================================
+    vao.init(GL_PATCHES, vertices, V, indices, index_count);
+
+    free(vertices);
+    free(indices);
+}
+
+template void sphere_t::generate_quads_mt<vertex_t3_t>(typename maps<vertex_t3_t>::spheric_func func, int level);
 
 //=======================================================================================================================================================================================================================
 // Rendering functions
@@ -306,7 +405,7 @@ void sphere_t::instanced_render(GLsizei primcount)
     { vao.instanced_render(primcount); }
 
 //=======================================================================================================================================================================================================================
-// Auxiliary function that populates its own chunk of vertex and index buffers
+// Auxiliary function that populates its own chunk of vertex and index buffers for triangle strip primitive type
 //=======================================================================================================================================================================================================================
 template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t>::spheric_func func, const compute_data<vertex_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end)
 {
@@ -418,7 +517,131 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
 }
 
 template void sphere_t::fill_vao_chunk(typename maps<vertex_pnt3_t>::spheric_func func, const compute_data<vertex_pnt3_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
-template void sphere_t::fill_vao_chunk(typename maps<vertex_t3_t>::spheric_func func, const compute_data<vertex_t3_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
+
+//=======================================================================================================================================================================================================================
+// Auxiliary function that populates its own chunk of vertex and index buffers for triangle strip primitive type
+//=======================================================================================================================================================================================================================
+template<typename vertex_t> void sphere_t::fill_quad_chunk(typename maps<vertex_t>::spheric_func func, const compute_data<vertex_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end)
+{
+    //===================================================================================================================================================================================================================
+    // Compute new vertices on edges
+    //===================================================================================================================================================================================================================
+    for (GLuint e = edge_start; e < edge_end; ++e)
+    {
+        GLuint A = data.edges[e].x;
+        GLuint B = data.edges[e].y;
+    
+        glm::vec3 direction = data.vertices[A].uvw;
+        glm::vec3 delta = (data.vertices[B].uvw - data.vertices[A].uvw) / data.level;
+
+        GLuint vbo_index = data.V + (data.level - 1) * data.edge_indices[A * data.V + B];
+        for(GLint p = 1; p < data.level; ++p)
+        {
+            direction += delta;
+            data.vertices[vbo_index++] = func(direction);
+        }
+    }
+
+    //===================================================================================================================================================================================================================
+    // Compute new vertices inside quads : every quad (ABCD) is split into two triangles by the internal edge AC
+    //===================================================================================================================================================================================================================
+    GLuint vbo_index = data.quad_vertices_base_index + quad_start * data.vertices_per_quad;
+    GLuint ibo_index = data.indices_per_quad * quad_start;
+
+    for (GLuint q = quad_start; q < quad_end; ++q)
+    {
+        GLint A = data.quads[q].x;  
+        GLint B = data.quads[q].y;  
+        GLint C = data.quads[q].z;  
+        GLint D = data.quads[q].w;  
+
+        glm::vec3 vertexA = data.vertices[A].uvw;
+        glm::vec3 vertexB = data.vertices[B].uvw;
+        glm::vec3 vertexC = data.vertices[C].uvw;
+        glm::vec3 vertexD = data.vertices[D].uvw;
+
+        GLuint edge_indexAB = data.V + (data.level - 1) * data.edge_indices[A * data.V + B];
+        GLuint edge_indexBC = data.V + (data.level - 1) * data.edge_indices[B * data.V + C];
+        GLuint edge_indexCD = data.V + (data.level - 1) * data.edge_indices[C * data.V + D];
+        GLuint edge_indexDA = data.V + (data.level - 1) * data.edge_indices[D * data.V + A];
+
+        for (GLint v = 1; v <= data.level - 1; ++v)
+        {
+            for (GLint u = 1; u <= data.level - 1; ++u)
+            {
+                glm::vec3 direction = (v >= u) ? (u * vertexC + (data.level - v) * vertexA + (v - u) * vertexD): // the point is inside ACD or on the diagonal AC
+                                                 (v * vertexC + (data.level - u) * vertexA + (u - v) * vertexB); // the point is inside ABC
+                data.vertices[vbo_index++] = func(direction);
+            }
+        }
+
+        vbo_index -= data.vertices_per_quad;
+
+        //===============================================================================================================================================================================================================
+        // triangle strip near the edge AB 
+        //===============================================================================================================================================================================================================
+        data.indices[ibo_index++] = (A < D) ? edge_indexDA : edge_indexDA + data.level - 2;
+        data.indices[ibo_index++] = A;
+
+        for (GLint p = 1; p < data.level; ++p)
+        {
+            GLuint T = vbo_index + p - 1;
+            GLuint S = (A < B) ? edge_indexAB + p - 1: edge_indexAB + data.level - p - 1;
+            data.indices[ibo_index++] = S;
+            data.indices[ibo_index++] = T;
+            data.indices[ibo_index++] = T;
+            data.indices[ibo_index++] = S;
+        }      
+
+        data.indices[ibo_index++] = B;
+        data.indices[ibo_index++] = (B < C) ? edge_indexBC : edge_indexBC + data.level - 2;
+
+        //===============================================================================================================================================================================================================
+        // triangle strips inside the quad
+        //===============================================================================================================================================================================================================
+        for (GLint p = 1; p < data.level - 1; ++p)
+        {
+            data.indices[ibo_index++] = (A < D) ? edge_indexDA + p : edge_indexDA + data.level - 2 - p;
+            data.indices[ibo_index++] = (A < D) ? edge_indexDA + p - 1 : edge_indexDA + data.level - p - 1;
+
+            for (GLint r = 1; r < data.level; ++r)
+            {
+                GLuint T = vbo_index + data.level - 1;
+                GLuint S = vbo_index++;
+
+                data.indices[ibo_index++] = S;
+                data.indices[ibo_index++] = T;
+                data.indices[ibo_index++] = T;
+                data.indices[ibo_index++] = S;
+            }
+
+            data.indices[ibo_index++] = (B < C) ? edge_indexBC + p - 1 : edge_indexBC + data.level - p - 1;
+            data.indices[ibo_index++] = (B < C) ? edge_indexBC + p : edge_indexBC + data.level - 2 - p;
+        }      
+
+        //===============================================================================================================================================================================================================
+        // triangle strip near the edge CD 
+        //===============================================================================================================================================================================================================
+        data.indices[ibo_index++] = D;
+        data.indices[ibo_index++] = (A < D) ? edge_indexDA + data.level - 2 : edge_indexDA;
+
+        for (GLint p = 1; p < data.level; ++p)
+        {
+            GLuint T = (C < D) ? edge_indexCD + data.level - p - 1 : edge_indexCD + p - 1;
+            GLuint S = vbo_index++;
+            data.indices[ibo_index++] = S;
+            data.indices[ibo_index++] = T;
+            data.indices[ibo_index++] = T;
+            data.indices[ibo_index++] = S;
+        }
+
+        data.indices[ibo_index++] = (B < C) ? edge_indexBC + data.level - 2 : edge_indexBC;
+        data.indices[ibo_index++] = C;
+    }
+}
+
+template void sphere_t::fill_quad_chunk(typename maps<vertex_t3_t>::spheric_func func, const compute_data<vertex_t3_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
+
 
 //=======================================================================================================================================================================================================================
 // Sphere is iteratively subdivided beginning from one of the regular plato solids, e.g. icosahedron.
