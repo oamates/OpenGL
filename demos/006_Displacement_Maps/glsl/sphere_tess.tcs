@@ -21,12 +21,12 @@ void main()
         float dp2 = dot(delta2, delta2); 
         float dp3 = dot(delta3, delta3); 
 
-        const float lambda = 3.11;
+        const float lambda = 7.171;
         
-        float level0 = 300.0f / (1.0f + lambda * dp0);
-        float level1 = 300.0f / (1.0f + lambda * dp1);
-        float level2 = 300.0f / (1.0f + lambda * dp2);
-        float level3 = 300.0f / (1.0f + lambda * dp3);
+        float level0 = 40.0f / (1.0f + lambda * dp0);
+        float level1 = 40.0f / (1.0f + lambda * dp1);
+        float level2 = 40.0f / (1.0f + lambda * dp2);
+        float level3 = 40.0f / (1.0f + lambda * dp3);
 
         gl_TessLevelOuter[0] = 0.5f * (level3 + level0);
         gl_TessLevelOuter[1] = 0.5f * (level0 + level1);

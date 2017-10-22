@@ -6,11 +6,9 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/constants.hpp>
-#include <glm/gtc/random.hpp>
 #include <glm/gtx/norm.hpp>
-#include <glm/gtc/noise.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -24,9 +22,11 @@
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
+    bool pause = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
+          camera(10.0f, 0.5f, glm::lookAt(glm::vec3(0.0f, 0.0f, 2.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -41,6 +41,15 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+
+        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+        if ((key == GLFW_KEY_KP_SUBTRACT) && (action == GLFW_RELEASE))
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            pause = !pause;
     }
 
     void on_mouse_move() override
@@ -87,6 +96,7 @@ int main(int argc, char *argv[])
     uniform_t uniform_light_ws               = sphere_tess["light_ws"];
     uniform_t uniform_camera_ws              = sphere_tess["camera_ws"];
     sphere_tess["disp_tex"] = 0;
+    sphere_tess["bump_tex"] = 1;
 
     //===================================================================================================================================================================================================================
     // Creating spherical mesh
@@ -95,38 +105,47 @@ int main(int argc, char *argv[])
     sphere.generate_quads_mt<vertex_t3_t>(sphere_func, 32);
     debug_msg("Sphere generated");
 
+    glActiveTexture(GL_TEXTURE0);                                                           
+    GLuint disp_tex_id = image::png::texture2d("../../../resources/tex2d/moon_disp_8192x4096.png");
+    //GLuint disp_tex_id = image::png::texture2d("../../../resources/tex2d/moon_disp_2048x1024.png");
+
+    glActiveTexture(GL_TEXTURE1);
+    GLuint bump_tex_id = image::png::texture2d("../../../resources/tex2d/moon_normal_8192x4096.png");
+    //GLuint bump_tex_id = image::png::texture2d("../../../resources/tex2d/moon_normal_2048x1024.png");
+
     //===================================================================================================================================================================================================================
     // Global OpenGL settings
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
-
+    glCullFace(GL_BACK);
     glPatchParameteri(GL_PATCH_VERTICES, 4);
-
-    const float light_radius = 4.5f;  
-
-    glActiveTexture(GL_TEXTURE0);
-    GLuint pentagon_texture_id = image::png::texture2d("../../../resources/tex2d/moon_disp_8192x4096.png");
-    glBindTexture(GL_TEXTURE_2D, pentagon_texture_id);
-
+    float t = 0.0f;
 
     //===================================================================================================================================================================================================================
-    // The main loop
+    // main rendering loop
     //===================================================================================================================================================================================================================
-
     while(!window.should_close())
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
+    
+        const float light_radius = 2.17f;  
 
-        float time = glfw::time();
+        if (!window.pause)
+            t += window.frame_dt;
+
+        float t0 = 0.427f * t;
+        float t1 = 0.219f * t;
+        float cs0 = glm::cos(t0);
+        float sn0 = glm::sin(t0);
+        float cs1 = glm::cos(t1);
+        float sn1 = glm::sin(t1);
 
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
-
-        glm::vec3 camera_ws = glm::vec4(window.camera.position(), 1.0f);
-        glm::vec3 light_ws = glm::vec4(light_radius * cos(0.5f * time), light_radius * sin(0.5f * time), -0.66f * light_radius, 1.0f);
+        glm::vec3 camera_ws = window.camera.position();
+        glm::vec3 light_ws = light_radius * glm::vec3(cs0 * cs1, cs0 * sn1, sn0);
 
         uniform_projection_view_matrix = projection_view_matrix;
         uniform_camera_ws = camera_ws;

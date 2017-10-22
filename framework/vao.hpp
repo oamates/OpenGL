@@ -65,10 +65,7 @@ struct ibo_t
 
 
     void render()
-        { debug_msg("Calling glDrawElements(%u, %u, %u, 0). GL_PATCHES = %u. GL_UNSIGNED_INT = %u.", mode, size, type, GL_PATCHES, GL_UNSIGNED_INT);
-            glDrawElements(mode, size, type, 0); 
-             
-        }
+        { glDrawElements(mode, size, type, 0); }
 
     // to be able to render the same data as GL_POINTS or GL_PATCHES
     void render(GLenum override_mode)

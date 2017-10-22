@@ -3,29 +3,36 @@
 layout(quads, equal_spacing, ccw) in;
 
 uniform sampler2D disp_tex;
+uniform sampler2D bump_tex;
+
 uniform mat4 projection_view_matrix;
 
 in vec3 position_ws[];
 
 out vec3 position;
 out vec3 normal;
+out float height;
 
 const float inv_pi = 0.31830988618379067;
-const vec2 inv_factor = vec2(0.5f * inv_pi, inv_pi); 
  
 void main()
 {
 	vec3 AB = mix(position_ws[0], position_ws[1], gl_TessCoord.x);
 	vec3 CD = mix(position_ws[3], position_ws[2], gl_TessCoord.x);
-	vec3 uvw = mix(AB, CD, gl_TessCoord.y);
-    uvw = normalize(uvw);
+	vec3 ABCD = mix(AB, CD, gl_TessCoord.y);
+    vec3 uvw = normalize(ABCD);
 
-    vec2 uv = 0.5f + inv_factor * vec2(atan(uvw.x, uvw.y), atan(uvw.z));
+    vec2 uv = 0.5f + 0.5f * vec2(inv_pi * atan(uvw.y, uvw.x), uvw.z);
 
-    float d = texture(disp_tex, uv).x;
+    height = texture(disp_tex, uv).x - 0.5;
 
-    normal = uvw;
-    position = (1.0 + 0.0625 * d) * uvw;
+    vec3 n = texture(bump_tex, uv).rgb - vec3(0.5, 0.5, 0.0);
+
+    vec3 Tx = vec3(normalize(vec2(-uvw.y, uvw.x)), 0.0);
+    vec3 Ty = cross(uvw, Tx);
+
+    normal = n.x * Tx + n.y * Ty + n.z * uvw;
+    position = (1.0 + 0.03125 * height) * uvw;
 
     gl_Position = projection_view_matrix * vec4(position, 1.0);
 }
