@@ -5,8 +5,7 @@
 #include "log.hpp"
 #include "plato.hpp"
 
-//#define ICOSAHEDRAL_SUBDIVISION 
-
+#define ICOSAHEDRAL_SUBDIVISION
 
 //=======================================================================================================================================================================================================================
 // Iterative spherical topology surface generation procedure :
@@ -289,12 +288,16 @@ template<typename vertex_t, int threads> void sphere_t::generate_vao_mt(typename
 }
 
 template void sphere_t::generate_vao_mt<vertex_pnt3_t>(typename maps<vertex_pnt3_t>::spheric_func func, int level);
+template void sphere_t::generate_vao_mt<vertex_t3_t>(typename maps<vertex_t3_t>::spheric_func func, int level);
 
 //=======================================================================================================================================================================================================================
 // Rendering functions
 //=======================================================================================================================================================================================================================
 void sphere_t::render()
     { vao.render(); }
+
+void sphere_t::render(GLenum override_mode)
+    { vao.render(override_mode); }
 
 void sphere_t::render(GLsizei count, const GLvoid* offset)
     { vao.render(count, offset); }
@@ -415,8 +418,7 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
 }
 
 template void sphere_t::fill_vao_chunk(typename maps<vertex_pnt3_t>::spheric_func func, const compute_data<vertex_pnt3_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
-
-
+template void sphere_t::fill_vao_chunk(typename maps<vertex_t3_t>::spheric_func func, const compute_data<vertex_t3_t>& data, GLuint edge_start, GLuint edge_end, GLuint quad_start, GLuint quad_end);
 
 //=======================================================================================================================================================================================================================
 // Sphere is iteratively subdivided beginning from one of the regular plato solids, e.g. icosahedron.

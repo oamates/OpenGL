@@ -1,0 +1,30 @@
+#version 400 core
+
+layout(triangles, equal_spacing, ccw) in;
+
+uniform sampler2D disp_tex;
+uniform mat4 projection_view_matrix;
+
+in vec3 position_ws[];
+
+out vec3 position;
+out vec3 normal;
+
+const float inv_pi = 0.31830988618379067;
+const vec2 inv_factor = vec2(0.5f * inv_pi, inv_pi); 
+ 
+void main()
+{  
+    vec3 uvw = normalize(position_ws[0] * gl_TessCoord.x + 
+                         position_ws[1] * gl_TessCoord.y + 
+                         position_ws[2] * gl_TessCoord.z);
+
+    vec2 uv = 0.5f + inv_factor * vec2(atan(uvw.x, uvw.y), atan(uvw.z));
+
+    float d = 0.0f; //texture(disp_tex, uv).x;
+
+    normal = uvw;
+    position = (1.0 + 0.0625 * d) * uvw;
+
+    gl_Position = projection_view_matrix * vec4(position, 1.0);
+}

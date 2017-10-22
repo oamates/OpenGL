@@ -19,11 +19,5 @@ void main()
         gl_TessLevelOuter[0] = 2;
         gl_TessLevelOuter[1] = 2;
         gl_TessLevelOuter[2] = 2;
-    };
+    }
 }
-
-
-
-
-
-

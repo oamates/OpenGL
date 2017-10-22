@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
     glEnable(GL_PRIMITIVE_RESTART);
     glPrimitiveRestartIndex(-1);
 
-    uniform_model_matrix = glm::scale(glm::vec3(70.0f, 70.0f, 70.0f));;
+    uniform_model_matrix = glm::scale(glm::vec3(70.0f, 70.0f, 70.0f));
     const float light_radius = 100.0f;  
 
     //===================================================================================================================================================================================================================

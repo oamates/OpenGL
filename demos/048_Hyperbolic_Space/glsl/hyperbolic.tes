@@ -24,10 +24,3 @@ void main()
     position = hyperbolic_normalize(position_ws1[0] * gl_TessCoord.x + position_ws1[1] * gl_TessCoord.y + position_ws1[2] * gl_TessCoord.z);    
     barycentric_coordinates = gl_TessCoord;
 }
-
-
-
-
-
-
-
