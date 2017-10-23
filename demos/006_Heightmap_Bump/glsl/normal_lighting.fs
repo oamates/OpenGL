@@ -132,7 +132,7 @@ void main()
 {    
     vec3 l = normalize(light);
     vec3 v = normalize(view);
-    vec3 n = perturb_normal_2(position_ws, normal_ws, uv);
+    vec3 n = perturb_normal(position_ws, normal_ws, uv);
 
     vec3 rgb = texture(diffuse_tex, uv).rgb;
     vec3 hsv = rgb2hsv(rgb);

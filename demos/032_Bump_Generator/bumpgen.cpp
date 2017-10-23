@@ -58,6 +58,84 @@ GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum intern
     return tex_id;
 }
 
+const char* internal_format_name(GLint format)
+{
+    switch (format)
+    {
+        /* Base Internal Formats */
+        case GL_DEPTH_COMPONENT : return "GL_DEPTH_COMPONENT";
+        case GL_DEPTH_STENCIL :   return "GL_DEPTH_STENCIL";
+        case GL_RED :             return "GL_RED";
+        case GL_RG :              return "GL_RG";
+        case GL_RGB :             return "GL_RGB";
+        case GL_RGBA :            return "GL_RGBA";
+
+        /* Sized Internal Formats */
+        case GL_R8 :              return "GL_R8";
+        case GL_R8_SNORM :        return "GL_R8_SNORM";
+        case GL_R16 :             return "GL_R16";
+        case GL_R16_SNORM :       return "GL_R16_SNORM";
+        case GL_RG8 :             return "GL_RG8";
+        case GL_RG8_SNORM :       return "GL_RG8_SNORM";
+        case GL_RG16 :            return "GL_RG16";
+        case GL_RG16_SNORM :      return "GL_RG16_SNORM";
+        case GL_R3_G3_B2 :        return "GL_R3_G3_B2";
+        case GL_RGB4 :            return "GL_RGB4";
+        case GL_RGB5 :            return "GL_RGB5";
+        case GL_RGB8 :            return "GL_RGB8";
+        case GL_RGB8_SNORM :      return "GL_RGB8_SNORM";
+        case GL_RGB10 :           return "GL_RGB10";
+        case GL_RGB12 :           return "GL_RGB12";
+        case GL_RGB16_SNORM :     return "GL_RGB16_SNORM";
+        case GL_RGBA2 :           return "GL_RGBA2";
+        case GL_RGBA4 :           return "GL_RGBA4";
+        case GL_RGB5_A1 :         return "GL_RGB5_A1";
+        case GL_RGBA8 :           return "GL_RGBA8";
+        case GL_RGBA8_SNORM :     return "GL_RGBA8_SNORM";
+        case GL_RGB10_A2 :        return "GL_RGB10_A2";
+        case GL_RGB10_A2UI :      return "GL_RGB10_A2UI";
+        case GL_RGBA12 :          return "GL_RGBA12";
+        case GL_RGBA16 :          return "GL_RGBA16";
+        case GL_SRGB8 :           return "GL_SRGB8";
+        case GL_SRGB8_ALPHA8 :    return "GL_SRGB8_ALPHA8";
+        case GL_R16F :            return "GL_R16F";
+        case GL_RG16F :           return "GL_RG16F";
+        case GL_RGB16F :          return "GL_RGB16F";
+        case GL_RGBA16F :         return "GL_RGBA16F";
+        case GL_R32F :            return "GL_R32F";
+        case GL_RG32F :           return "GL_RG32F";
+        case GL_RGB32F :          return "GL_RGB32F";
+        case GL_RGBA32F :         return "GL_RGBA32F";
+        case GL_R11F_G11F_B10F :  return "GL_R11F_G11F_B10F";
+        case GL_RGB9_E5 :         return "GL_RGB9_E5";
+        case GL_R8I :             return "GL_R8I";
+        case GL_R8UI :            return "GL_R8UI";
+        case GL_R16I :            return "GL_R16I";
+        case GL_R16UI :           return "GL_R16UI";
+        case GL_R32I :            return "GL_R32I";
+        case GL_R32UI :           return "GL_R32UI";
+        case GL_RG8I :            return "GL_RG8I";
+        case GL_RG8UI :           return "GL_RG8UI";
+        case GL_RG16I :           return "GL_RG16I";
+        case GL_RG16UI :          return "GL_RG16UI";
+        case GL_RG32I :           return "GL_RG32I";
+        case GL_RG32UI :          return "GL_RG32UI";
+        case GL_RGB8I :           return "GL_RGB8I";
+        case GL_RGB8UI :          return "GL_RGB8UI";
+        case GL_RGB16I :          return "GL_RGB16I";
+        case GL_RGB16UI :         return "GL_RGB16UI";
+        case GL_RGB32I :          return "GL_RGB32I";
+        case GL_RGB32UI :         return "GL_RGB32UI";
+        case GL_RGBA8I :          return "GL_RGBA8I";
+        case GL_RGBA8UI :         return "GL_RGBA8UI";
+        case GL_RGBA16I :         return "GL_RGBA16I";
+        case GL_RGBA16UI :        return "GL_RGBA16UI";
+        case GL_RGBA32I :         return "GL_RGBA32I";
+        case GL_RGBA32UI :        return "GL_RGBA32UI";
+    }
+    return "Unknown";
+}
+
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
@@ -79,11 +157,15 @@ int main(int argc, char *argv[])
     // Unit 5 : shininess texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT, true);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR, GL_REPEAT, true);
 
     GLint texres_x, texres_y;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &texres_x);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texres_y);
+
+    GLint internal_format;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
+    debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
 
     GLuint luminosity_tex_id   = generate_texture(GL_TEXTURE1, texres_x, texres_y, GL_R32F);
     GLuint normal_tex_id       = generate_texture(GL_TEXTURE2, texres_x, texres_y, GL_RGBA32F);
@@ -130,7 +212,13 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
+    /* compute luminosity from rgb */
     luminosity_filter.enable();
+    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute normal map from luminosity by using Sobel/Scharr derivative filters */
+    normal_filter.enable();
     glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 

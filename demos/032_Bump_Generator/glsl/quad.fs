@@ -8,6 +8,8 @@ uniform sampler2D teximage;
 
 void main(void)
 {
-    FragmentColor = texture(teximage, uv);
+    vec4 c = texture(teximage, uv);
+    if (length(c.gb) == 0.0f) c.gb = c.rr;
+    FragmentColor = c;
 }
 
