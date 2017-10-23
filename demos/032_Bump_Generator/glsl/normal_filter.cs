@@ -49,5 +49,5 @@ void main()
     dL_dy *= 0.0625;
 
     vec3 n = normalize(vec3(amplitude * vec2(dL_dx, dL_dy), 1.0));
-    imageStore(normal_image, P, vec4(n, 1.0));
+    imageStore(normal_image, P, vec4(0.5 + 0.5 * n, 1.0));
 }

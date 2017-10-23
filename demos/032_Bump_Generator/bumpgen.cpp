@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Bump Generator", 4, 4, 3, 1920, 1080, true);
+    demo_window_t window("Bump Generator", 4, 4, 4, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // Texture units and that will be used for bump generation
@@ -167,11 +167,13 @@ int main(int argc, char *argv[])
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
 
+
     GLuint luminosity_tex_id   = generate_texture(GL_TEXTURE1, texres_x, texres_y, GL_R32F);
     GLuint normal_tex_id       = generate_texture(GL_TEXTURE2, texres_x, texres_y, GL_RGBA32F);
     GLuint displacement_tex_id = generate_texture(GL_TEXTURE3, texres_x, texres_y, GL_R32F);
     GLuint roughness_tex_id    = generate_texture(GL_TEXTURE4, texres_x, texres_y, GL_R32F);
     GLuint shininess_tex_id    = generate_texture(GL_TEXTURE5, texres_x, texres_y, GL_R32F);
+    GLuint aux_tex_id          = generate_texture(GL_TEXTURE6, texres_x, texres_y, GL_R32F);
 
     glBindImageTexture(0, diffuse_tex_id,      0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA32F);
     glBindImageTexture(1, luminosity_tex_id,   0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
@@ -179,6 +181,7 @@ int main(int argc, char *argv[])
     glBindImageTexture(3, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
     glBindImageTexture(4, roughness_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
     glBindImageTexture(5, shininess_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(6, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
     //===================================================================================================================================================================================================================
     // compute shader compilation and subroutine indices querying
@@ -221,6 +224,33 @@ int main(int argc, char *argv[])
     normal_filter.enable();
     glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute displacement map from normal map */
+    displacement_filter.enable();
+    uniform_t uni_df_n = displacement_filter["n"];
+
+    const float zero = 0.0f;
+    glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
+    int n = 32;
+
+    for(int i = 0; i < 6; ++i)
+    {
+        uni_df_n = n;
+        for(int j = 0; j < 15; ++j)
+        {
+            glBindImageTexture(3, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+            glBindImageTexture(6, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+            glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            glBindImageTexture(3, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+            glBindImageTexture(6, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+            glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+        n >>= 1;
+    }
+
 
 
     //===================================================================================================================================================================================================================
