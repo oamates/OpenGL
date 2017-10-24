@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("Bump Generator", 4, 4, 4, 1920, 1080, true);
+    demo_window_t window("Bump Generator", 4, 4, 0, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // Texture units and that will be used for bump generation
@@ -155,6 +155,7 @@ int main(int argc, char *argv[])
     // Unit 3 : displacement texture, GL_R32F
     // Unit 4 : roughness texture, GL_R32F
     // Unit 5 : shininess texture, GL_R32F
+    // Unit 6 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
     GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR, GL_REPEAT, true);
@@ -215,7 +216,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-    /* compute luminosity from rgb */
+    /* compute luminosity from diffuse map */
     luminosity_filter.enable();
     glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -227,7 +228,7 @@ int main(int argc, char *argv[])
 
     /* compute displacement map from normal map */
     displacement_filter.enable();
-    uniform_t uni_df_n = displacement_filter["n"];
+    uniform_t uni_df_n = displacement_filter["n"];    
 
     const float zero = 0.0f;
     glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
@@ -236,7 +237,7 @@ int main(int argc, char *argv[])
     for(int i = 0; i < 6; ++i)
     {
         uni_df_n = n;
-        for(int j = 0; j < 15; ++j)
+        for(int j = 0; j < 2; ++j)
         {
             glBindImageTexture(3, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
             glBindImageTexture(6, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
@@ -250,6 +251,17 @@ int main(int argc, char *argv[])
         }
         n >>= 1;
     }
+
+    /* compute roughness map from diffuse map */
+    roughness_filter.enable();
+    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute shininess map from diffuse map */
+    shininess_filter.enable();
+    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
 
 
 
@@ -298,6 +310,7 @@ int main(int argc, char *argv[])
     glDeleteTextures(1, &displacement_tex_id);
     glDeleteTextures(1, &roughness_tex_id);
     glDeleteTextures(1, &shininess_tex_id);
+    glDeleteTextures(1, &aux_tex_id);
     glDeleteVertexArrays(1, &vao_id);    
 
     //===================================================================================================================================================================================================================
