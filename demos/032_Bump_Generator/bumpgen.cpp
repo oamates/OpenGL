@@ -136,6 +136,86 @@ const char* internal_format_name(GLint format)
     return "Unknown";
 }
 
+struct gauss_kernel_t
+{
+    const double sigma = 4.0;
+    const double gamma = 0.5 / (sigma * sigma);
+
+    double operator () (int l)
+        { return exp(-gamma * l * l); }
+};
+
+struct separable_filter_t
+{
+    static const int MAX_KERNEL_SIZE = 16;
+    int kernel_size;
+    glsl_program_t conv1d;
+
+    uniform_t uni_kernel_size;
+    uniform_t uni_radius;
+    uniform_t uni_weight;
+    uniform_t uni_texel_size;
+    uniform_t uni_conv_axis;
+
+    uniform_t uni_input_image;
+    uniform_t uni_conv_image;
+
+    separable_filter_t(const char* cs_file_name)
+        : conv1d(glsl_shader_t(GL_COMPUTE_SHADER, cs_file_name))
+    {
+        uni_kernel_size = conv1d["kernel_size"];
+        uni_radius      = conv1d["radius"];
+        uni_weight      = conv1d["weight"];
+        uni_texel_size  = conv1d["texel_size"];
+        uni_conv_axis   = conv1d["axis"];
+        uni_input_image = conv1d["input_tex"];
+        uni_conv_image  = conv1d["conv_image"];
+    }
+
+    void enable()
+        { conv1d.enable(); };
+
+    template<typename kernel_t> void set_kernel(int kernel_size)
+    {
+        separable_filter_t::kernel_size = kernel_size;
+        enable();
+
+        kernel_t kernel;
+        double weight_d[MAX_KERNEL_SIZE];
+        double total_weight = 0.0;
+        float weight_f[MAX_KERNEL_SIZE];
+        float radius_f[MAX_KERNEL_SIZE];
+
+        for(int p = 0; p < kernel_size; ++p)
+        {
+            int p2 = p + p;
+            double w0 = kernel(p2);
+            if (p == 0) w0 *= 0.5;
+            double w1 = kernel(p2 + 1);
+            double w = w0 + w1;
+            total_weight += w;
+            weight_d[p] = w;
+            radius_f[p] = p2 + w0 / w; 
+        }
+
+        double inv_factor = 0.5 / total_weight;
+
+        for(int p = 0; p < kernel_size; ++p)
+            weight_f[p] = inv_factor * weight_d[p];
+
+        uni_kernel_size = kernel_size;
+        glUniform1fv(uni_radius.location, kernel_size, radius_f);
+        glUniform1fv(uni_weight.location, kernel_size, weight_f);
+    }
+
+    void set_output_image()
+    {
+
+    }
+
+};
+
+
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
@@ -150,6 +230,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Texture units and that will be used for bump generation
     // Unit 0 : input diffuse texture GL_RGB8UI
+    // Unit 1 : input diffuse texture GL_RGB8UI
+    // Unit 2 : input diffuse texture GL_RGB8UI
     // Unit 1 : luminosity texture GL_R32F
     // Unit 2 : normal texture, GL_RGBA32F
     // Unit 3 : displacement texture, GL_R32F
@@ -168,6 +250,8 @@ int main(int argc, char *argv[])
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
 
+    separable_filter_t gauss_filter("glsl/conv1d_filter.cs");
+    gauss_filter.set_kernel<gauss_kernel_t>(8);
 
     GLuint luminosity_tex_id   = generate_texture(GL_TEXTURE1, texres_x, texres_y, GL_R32F);
     GLuint normal_tex_id       = generate_texture(GL_TEXTURE2, texres_x, texres_y, GL_RGBA32F);
