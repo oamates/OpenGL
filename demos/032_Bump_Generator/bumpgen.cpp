@@ -43,7 +43,6 @@ struct demo_window_t : public imgui_window_t
     void update_ui()
     {
     }
-
 };
 
 GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
@@ -55,6 +54,9 @@ GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum intern
     glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R,  GL_MIRRORED_REPEAT);
     return tex_id;
 }
 
@@ -242,7 +244,7 @@ int main(int argc, char *argv[])
     // Unit 9 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR, GL_REPEAT, true);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint tex_res_x, tex_res_y;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);
@@ -289,7 +291,7 @@ int main(int argc, char *argv[])
 
     separable_filter_t gauss_filter("glsl/conv1d_filter.cs");
     gauss_filter.enable();
-    gauss_filter.set_kernel<gauss_kernel_t>(8);
+    gauss_filter.set_kernel<gauss_kernel_t>(2);
     gauss_filter.uni_texel_size = texel_size;
     
     gauss_filter.uni_conv_axis = glm::vec2(texel_size_x, 0.0f);

@@ -11,6 +11,8 @@ layout (r32f) uniform image2D roughness_image;
 
 uniform vec2 texel_size;
 
+const float inv_root2 = 0.70710678118;
+
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
@@ -31,11 +33,11 @@ void main(void)
     vec3 tc = texture(diffuse_tex, vec2(uv0.x, uvp.y)).rgb;             // top center
     vec3 tr = texture(diffuse_tex, vec2(uvp.x, uvp.y)).rgb;             // top right
 
+    vec3 s1 = abs(cc - bc) + abs(cc - cl) + abs(cc - cr) + abs(cc - tc);
+    vec3 s2 = abs(cc - bl) + abs(cc - br) + abs(cc - tl) + abs(cc - tr);
 
-    vec3 r = 0.125f * (bl + bc + br + cl + cr + tl + tc + tr) - cc;
-
-    float q = 17.71 * dot(r, r);
-    q = clamp(q, 0.0f, 1.0f);
+    float w = dot(s1 + inv_root2 * s2, vec3(1.0f));
+    float q = clamp(0.25 * w, 0.0, 1.0);
 
     imageStore(roughness_image, P, vec4(q, 0.0, 0.0, 0.0));
 }

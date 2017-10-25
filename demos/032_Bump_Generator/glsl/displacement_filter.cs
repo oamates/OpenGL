@@ -38,7 +38,7 @@ void main()
     float H_ym = texture(disp_tex, ym).r;
     float n_ym = texture(normal_tex, ym).g;
 
-    float h = 0.25f * (H_xp + H_xm + H_yp + H_ym) + 
+    float h = 0.25f * (H_xp + H_xm + H_yp + H_ym) -
               0.25f * (n_xp - n_xm + n_yp - n_ym);
 
     imageStore(output_image, P, vec4(h, 0.0, 0.0, 0.0));
