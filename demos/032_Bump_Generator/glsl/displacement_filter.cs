@@ -9,6 +9,7 @@ uniform sampler2D normal_tex;
 uniform sampler2D disp_tex;
 layout (r32f) uniform image2D output_image;
 
+uniform vec2 texel_size;
 uniform vec2 delta;
 
 //==============================================================================================================================================================
@@ -21,19 +22,19 @@ void main()
     vec2 uvp = uv0 + delta;
     vec2 uvm = uv0 - delta;
 
-    vec2 xp = vec2(uv.x + delta.x, uv.y);
+    vec2 xp = vec2(uvp.x, uv0.y);
     float H_xp = texture(disp_tex, xp).r;
     float n_xp = texture(normal_tex, xp).r;
 
-    vec2 xm = vec2(uv.x - delta.x, uv.y);
+    vec2 xm = vec2(uvm.x, uv0.y);
     float H_xm = texture(disp_tex, xm).r;
     float n_xm = texture(normal_tex, xm).r;
 
-    vec2 yp = vec2(uv.x, uv.y + delta.y);
+    vec2 yp = vec2(uv0.x, uvp.y);
     float H_yp = texture(disp_tex, yp).r;
     float n_yp = texture(normal_tex, yp).g;
 
-    vec2 ym = vec2(uv.x, uv.y - delta.y);
+    vec2 ym = vec2(uv0.x, uvm.y);
     float H_ym = texture(disp_tex, ym).r;
     float n_ym = texture(normal_tex, ym).g;
 

@@ -6,7 +6,7 @@
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 uniform sampler2D luma_tex;
-layout (rgba32f, binding = 4) uniform image2D normal_image;
+layout (rgba32f) uniform image2D normal_image;
 
 uniform float amplitude;
 uniform vec2 texel_size;
@@ -21,14 +21,14 @@ void main()
     vec2 uvp = uv0 + texel_size;
     vec2 uvm = uv0 - texel_size;
 
-    float bl = texture(luma_tex, vec2(uvm.x, uvm.y));             // bottom left
-    float bc = texture(luma_tex, vec2(uv0.x, uvm.y));             // bottom center
-    float br = texture(luma_tex, vec2(uvp.x, uvm.y));             // bottom right
-    float cl = texture(luma_tex, vec2(uvm.x, uv0.y));             // center left
-    float cr = texture(luma_tex, vec2(uvp.x, uv0.y));             // center right
-    float tl = texture(luma_tex, vec2(uvm.x, uvp.y));             // top left
-    float tc = texture(luma_tex, vec2(uv0.x, uvp.y));             // top center
-    float tr = texture(luma_tex, vec2(uvp.x, uvp.y));             // top right
+    float bl = texture(luma_tex, vec2(uvm.x, uvm.y)).r;             // bottom left
+    float bc = texture(luma_tex, vec2(uv0.x, uvm.y)).r;             // bottom center
+    float br = texture(luma_tex, vec2(uvp.x, uvm.y)).r;             // bottom right
+    float cl = texture(luma_tex, vec2(uvm.x, uv0.y)).r;             // center left
+    float cr = texture(luma_tex, vec2(uvp.x, uv0.y)).r;             // center right
+    float tl = texture(luma_tex, vec2(uvm.x, uvp.y)).r;             // top left
+    float tc = texture(luma_tex, vec2(uv0.x, uvp.y)).r;             // top center
+    float tr = texture(luma_tex, vec2(uvp.x, uvp.y)).r;             // top right
 
     /* Sobel filter */
     /*

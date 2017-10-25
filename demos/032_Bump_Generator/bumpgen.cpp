@@ -20,7 +20,7 @@
 
 struct demo_window_t : public imgui_window_t
 {
-    int texture = 1;
+    int texture = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
@@ -36,7 +36,7 @@ struct demo_window_t : public imgui_window_t
         if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
         {
             texture++;
-            if (texture > 5) texture = 1;
+            if (texture > 7) texture = 0;
         }
     }
 
@@ -230,15 +230,16 @@ int main(int argc, char *argv[])
 
     //===================================================================================================================================================================================================================
     // Texture units and that will be used for bump generation
-    // Unit 0 : input diffuse texture GL_RGBA32F
-    // Unit 1 : luminosity texture GL_R32F
-    // Unit 2 : normal texture, GL_RGBA32F
-    // Unit 3 : displacement texture, GL_R32F
-    // Unit 4 : roughness texture, GL_R32F
-    // Unit 5 : shininess texture, GL_R32F
-    // Unit 6 : auxiliary texture, GL_R32F
-    // Unit 7 : auxinput diffuse texture GL_RGB8UI
-    // Unit 2 : input diffuse texture GL_RGB8UI
+    // Unit 0 : input diffuse texture, GL_RGBA32F
+    // Unit 1 : blurred diffuse texture, GL_RGBA32F
+    // Unit 2 : luminosity texture, GL_R32F
+    // Unit 3 : blurred luminosity texture, GL_R32F
+    // Unit 4 : normal texture, GL_RGBA32F
+    // Unit 5 : displacement texture, GL_R32F
+    // Unit 6 : roughness texture, GL_R32F
+    // Unit 7 : shininess texture, GL_R32F
+    // Unit 8 : auxiliary texture, GL_RGBA32F
+    // Unit 9 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
     GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR, GL_REPEAT, true);
@@ -268,9 +269,9 @@ int main(int argc, char *argv[])
     glBindImageTexture(4, normal_tex_id,       0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     glBindImageTexture(5, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
     glBindImageTexture(6, roughness_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(7, shininess_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(8, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(9, aux_r_tex_id,        0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+//    glBindImageTexture(7, shininess_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+//    glBindImageTexture(8, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+//    glBindImageTexture(9, aux_r_tex_id,        0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
     //===================================================================================================================================================================================================================
     // compute shader compilation and subroutine indices querying
@@ -281,15 +282,6 @@ int main(int argc, char *argv[])
     glsl_program_t roughness_filter   (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/roughness_filter.cs"));
     glsl_program_t shininess_filter   (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/shininess_filter.cs"));
 
-    /* compute luminosity from diffuse map */
-    luminosity_filter.enable();
-    uniform_t uni_lf_diffuse_image = luminosity_filter["diffuse_image"];
-    uniform_t uni_lf_luminosity_image = luminosity_filter["luminosity_image"];
-    uni_lf_diffuse_image = 0;
-    uni_lf_luminosity_image = 2;
-    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
     /* compute blurred diffuse map */
     float texel_size_x = 1.0f / tex_res_x;
     float texel_size_y = 1.0f / tex_res_y;
@@ -299,16 +291,29 @@ int main(int argc, char *argv[])
     gauss_filter.enable();
     gauss_filter.set_kernel<gauss_kernel_t>(8);
     gauss_filter.uni_texel_size = texel_size;
+    
     gauss_filter.uni_conv_axis = glm::vec2(texel_size_x, 0.0f);
-    gauss_filter.convolve(0, 8, tex_res_x, tex_res_y);                                     // TEXTURE UNIT0 --> image unit 
+    glBindImageTexture(7, aux_rgba_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    gauss_filter.convolve(0, 7, tex_res_x, tex_res_y);
 
     gauss_filter.uni_conv_axis = glm::vec2(0.0f, texel_size_y);
     gauss_filter.convolve(8, 1, tex_res_x, tex_res_y);
 
-    /* compute blurred luminosity map */
+    /* compute luminosity from diffuse map */
     luminosity_filter.enable();
-    uni_lf_diffuse_image = 1;
-    uni_lf_luminosity_image = 3;
+    uniform_t uni_lf_diffuse_tex = luminosity_filter["diffuse_tex"];
+    uniform_t uni_lf_luma_image = luminosity_filter["luma_image"];
+    uniform_t uni_lf_texel_size = luminosity_filter["texel_size"];
+
+    uni_lf_diffuse_tex = 0;
+    uni_lf_luma_image = 2;
+    uni_lf_texel_size = texel_size;
+    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute blurred luminosity map from blurred diffuse map */
+    uni_lf_diffuse_tex = 1;
+    uni_lf_luma_image = 3;
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -317,7 +322,9 @@ int main(int argc, char *argv[])
     uniform_t uni_nf_luma_tex = normal_filter["luma_tex"];
     uniform_t uni_nf_amplitude = normal_filter["amplitude"];
     uniform_t uni_nf_texel_size = normal_filter["texel_size"];
-    uni_nf_luma_tex = 2;
+    uniform_t uni_nf_normal_image = normal_filter["normal_image"];
+    uni_nf_luma_tex = 3;
+    uni_nf_normal_image = 4;
     uni_nf_amplitude = 4.0f;
     uni_nf_texel_size = texel_size;
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
@@ -327,13 +334,18 @@ int main(int argc, char *argv[])
     displacement_filter.enable();
     uniform_t uni_df_normal_tex = displacement_filter["normal_tex"];
     uniform_t uni_df_disp_tex = displacement_filter["disp_tex"];
-    uniform_t uni_df_delta = displacement_filter["delta"];
     uniform_t uni_df_output_image = displacement_filter["output_image"];
 
+    uniform_t uni_df_texel_size = displacement_filter["texel_size"];
+    uniform_t uni_df_delta = displacement_filter["delta"];
 
+    uni_df_normal_tex = 4;
+    uni_df_texel_size = texel_size;
     const float zero = 0.0f;
     glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
     float dx = 32.0f;
+
+    glBindImageTexture(7, aux_r_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
     for(int i = 0; i < 6; ++i)
     {
@@ -341,7 +353,7 @@ int main(int argc, char *argv[])
         for(int j = 0; j < 2; ++j)
         {
             uni_df_disp_tex = 5;
-            uni_df_output_image = 9;
+            uni_df_output_image = 7;
             glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -355,17 +367,30 @@ int main(int argc, char *argv[])
 
     /* compute roughness map from diffuse map */
     roughness_filter.enable();
+    uniform_t uni_rf_diffuse_tex = roughness_filter["diffuse_tex"];
+    uniform_t uni_rf_roughness_image = roughness_filter["roughness_image"];
+    uniform_t uni_rf_texel_size = roughness_filter["texel_size"];
+
+    uni_rf_diffuse_tex = 0;
+    uni_rf_roughness_image = 6;
+    uni_rf_texel_size = texel_size;
+
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     /* compute shininess map from diffuse map */
     shininess_filter.enable();
+    uniform_t uni_sf_diffuse_tex = shininess_filter["diffuse_tex"];
+    uniform_t uni_sf_shininess_image = shininess_filter["shininess_image"];
+    uniform_t uni_sf_texel_size = shininess_filter["texel_size"];
+
+    uni_sf_diffuse_tex = 1;
+    uni_sf_shininess_image = 7;
+    uni_sf_texel_size = texel_size;
+
+    glBindImageTexture(7, shininess_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-
-
-
 
     //===================================================================================================================================================================================================================
     // quad rendering shader and fake VAO for rendering quads
@@ -386,11 +411,6 @@ int main(int argc, char *argv[])
     // DEPTH not needed, hence disabled
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-
-
-
-
-
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -428,7 +448,6 @@ int main(int argc, char *argv[])
         window.end_frame();
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_BLEND);
-
     }
 
     GLuint textures[] = {diffuse_tex_id, blurred_tex_id, luma_tex_id, luma_blurred_tex_id, normal_tex_id, 
