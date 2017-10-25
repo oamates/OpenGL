@@ -5,8 +5,8 @@
 //==============================================================================================================================================================
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout (rgba32f, binding = 0) uniform image2D diffuse_image;
-layout (r32f, binding = 1) uniform image2D luminosity_image;
+layout (rgba32f) uniform image2D diffuse_image;
+layout (r32f) uniform image2D luminosity_image;
 
 const vec3 rgb_power_bt709 = vec3(0.2126f, 0.7152f, 0.0722f);
 

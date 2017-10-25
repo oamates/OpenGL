@@ -5,57 +5,40 @@
 //==============================================================================================================================================================
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout (rgba32f, binding = 2) uniform image2D normal_image;
-layout (r32f, binding = 3) uniform image2D displacement_image;
-layout (r32f, binding = 6) uniform image2D aux_image;
+uniform sampler2D normal_tex;
+uniform sampler2D disp_tex;
+layout (r32f) uniform image2D output_image;
 
-uniform int n;
-
-float normal_x(ivec2 P)
-{
-    return imageLoad(normal_image, P).r;
-}
-
-float normal_y(ivec2 P)
-{
-    return imageLoad(normal_image, P).g;
-}
-
-float H(ivec2 P)
-{
-    return imageLoad(displacement_image, P).r;
-}
+uniform vec2 delta;
 
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
 {
-
-    ivec2 B = ivec2(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy);
     ivec2 P = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 Pmin = max(P - n, n - P - 1);
-    ivec2 Pmax = min(P + n, 2 * B - P - n - 1);
+    vec2 uv0 = texel_size * (vec2(P) + 0.5);
+    vec2 uvp = uv0 + delta;
+    vec2 uvm = uv0 - delta;
 
-    ivec2 xp = ivec2(Pmax.x, P.y);
-    float H_xp = H(xp);
-    float n_xp = normal_x(xp);
+    vec2 xp = vec2(uv.x + delta.x, uv.y);
+    float H_xp = texture(disp_tex, xp).r;
+    float n_xp = texture(normal_tex, xp).r;
 
-    ivec2 xm = ivec2(Pmin.x, P.y);
-    float H_xm = H(xm);
-    float n_xm = normal_x(xm);
+    vec2 xm = vec2(uv.x - delta.x, uv.y);
+    float H_xm = texture(disp_tex, xm).r;
+    float n_xm = texture(normal_tex, xm).r;
 
-    ivec2 yp = ivec2(P.x, Pmax.y);
-    float H_yp = H(yp);
-    float n_yp = normal_y(yp);
+    vec2 yp = vec2(uv.x, uv.y + delta.y);
+    float H_yp = texture(disp_tex, yp).r;
+    float n_yp = texture(normal_tex, yp).g;
 
-    ivec2 ym = ivec2(P.x, Pmin.y);
-    float H_ym = H(ym);
-    float n_ym = normal_y(ym);
+    vec2 ym = vec2(uv.x, uv.y - delta.y);
+    float H_ym = texture(disp_tex, ym).r;
+    float n_ym = texture(normal_tex, ym).g;
 
     float h = 0.25f * (H_xp + H_xm + H_yp + H_ym) + 
               0.25f * (n_xp - n_xm + n_yp - n_ym);
 
-    imageStore(aux_image, P, vec4(h, 0.0, 0.0, 0.0));
-
+    imageStore(output_image, P, vec4(h, 0.0, 0.0, 0.0));
 }

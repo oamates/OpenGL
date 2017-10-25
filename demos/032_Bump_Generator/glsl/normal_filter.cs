@@ -5,34 +5,30 @@
 //==============================================================================================================================================================
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout (r32f, binding = 1) uniform image2D luminosity_image;
-layout (rgba32f, binding = 2) uniform image2D normal_image;
+uniform sampler2D luma_tex;
+layout (rgba32f, binding = 4) uniform image2D normal_image;
 
-const float amplitude = 4.0f;
-
-float luma(ivec2 P)
-{
-    return imageLoad(luminosity_image, P).r;
-}
+uniform float amplitude;
+uniform vec2 texel_size;
 
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
 {
-    ivec2 B = ivec2(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy);
     ivec2 P = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 Pmin = max(P - 1, -P);
-    ivec2 Pmax = min(P + 1, 2 * B - P - 2);
+    vec2 uv0 = texel_size * (vec2(P) + 0.5);
+    vec2 uvp = uv0 + texel_size;
+    vec2 uvm = uv0 - texel_size;
 
-    float bl = luma(ivec2(Pmin.x, Pmin.y));             // bottom left
-    float bc = luma(ivec2(P.x,    Pmin.y));             // bottom center
-    float br = luma(ivec2(Pmax.x, Pmin.y));             // bottom right
-    float cl = luma(ivec2(Pmin.x, P.y   ));             // center left
-    float cr = luma(ivec2(Pmax.x, P.y   ));             // center right
-    float tl = luma(ivec2(Pmin.x, Pmax.y));             // top left
-    float tc = luma(ivec2(P.x,    Pmax.y));             // top center
-    float tr = luma(ivec2(Pmax.x, Pmax.y));             // top right
+    float bl = texture(luma_tex, vec2(uvm.x, uvm.y));             // bottom left
+    float bc = texture(luma_tex, vec2(uv0.x, uvm.y));             // bottom center
+    float br = texture(luma_tex, vec2(uvp.x, uvm.y));             // bottom right
+    float cl = texture(luma_tex, vec2(uvm.x, uv0.y));             // center left
+    float cr = texture(luma_tex, vec2(uvp.x, uv0.y));             // center right
+    float tl = texture(luma_tex, vec2(uvm.x, uvp.y));             // top left
+    float tc = texture(luma_tex, vec2(uv0.x, uvp.y));             // top center
+    float tr = texture(luma_tex, vec2(uvp.x, uvp.y));             // top right
 
     /* Sobel filter */
     /*

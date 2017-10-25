@@ -157,7 +157,7 @@ struct separable_filter_t
     uniform_t uni_texel_size;
     uniform_t uni_conv_axis;
 
-    uniform_t uni_input_image;
+    uniform_t uni_input_tex;
     uniform_t uni_conv_image;
 
     separable_filter_t(const char* cs_file_name)
@@ -168,7 +168,7 @@ struct separable_filter_t
         uni_weight      = conv1d["weight"];
         uni_texel_size  = conv1d["texel_size"];
         uni_conv_axis   = conv1d["axis"];
-        uni_input_image = conv1d["input_tex"];
+        uni_input_tex   = conv1d["input_tex"];
         uni_conv_image  = conv1d["conv_image"];
     }
 
@@ -178,7 +178,6 @@ struct separable_filter_t
     template<typename kernel_t> void set_kernel(int kernel_size)
     {
         separable_filter_t::kernel_size = kernel_size;
-        enable();
 
         kernel_t kernel;
         double weight_d[MAX_KERNEL_SIZE];
@@ -208,11 +207,13 @@ struct separable_filter_t
         glUniform1fv(uni_weight.location, kernel_size, weight_f);
     }
 
-    void set_output_image()
+    void convolve(int input_tex, int output_image, int res_x, int res_y)
     {
-
+        uni_input_tex = input_tex;
+        uni_conv_image = output_image;
+        glDispatchCompute(res_x >> 3, res_y >> 3, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
-
 };
 
 
@@ -229,44 +230,47 @@ int main(int argc, char *argv[])
 
     //===================================================================================================================================================================================================================
     // Texture units and that will be used for bump generation
-    // Unit 0 : input diffuse texture GL_RGB8UI
-    // Unit 1 : input diffuse texture GL_RGB8UI
-    // Unit 2 : input diffuse texture GL_RGB8UI
+    // Unit 0 : input diffuse texture GL_RGBA32F
     // Unit 1 : luminosity texture GL_R32F
     // Unit 2 : normal texture, GL_RGBA32F
     // Unit 3 : displacement texture, GL_R32F
     // Unit 4 : roughness texture, GL_R32F
     // Unit 5 : shininess texture, GL_R32F
     // Unit 6 : auxiliary texture, GL_R32F
+    // Unit 7 : auxinput diffuse texture GL_RGB8UI
+    // Unit 2 : input diffuse texture GL_RGB8UI
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
     GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR, GL_REPEAT, true);
 
-    GLint texres_x, texres_y;
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &texres_x);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &texres_y);
+    GLint tex_res_x, tex_res_y;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_res_y);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
 
-    separable_filter_t gauss_filter("glsl/conv1d_filter.cs");
-    gauss_filter.set_kernel<gauss_kernel_t>(8);
-
-    GLuint luminosity_tex_id   = generate_texture(GL_TEXTURE1, texres_x, texres_y, GL_R32F);
-    GLuint normal_tex_id       = generate_texture(GL_TEXTURE2, texres_x, texres_y, GL_RGBA32F);
-    GLuint displacement_tex_id = generate_texture(GL_TEXTURE3, texres_x, texres_y, GL_R32F);
-    GLuint roughness_tex_id    = generate_texture(GL_TEXTURE4, texres_x, texres_y, GL_R32F);
-    GLuint shininess_tex_id    = generate_texture(GL_TEXTURE5, texres_x, texres_y, GL_R32F);
-    GLuint aux_tex_id          = generate_texture(GL_TEXTURE6, texres_x, texres_y, GL_R32F);
+    GLuint blurred_tex_id      = generate_texture(GL_TEXTURE1, tex_res_x, tex_res_y, GL_RGBA32F);
+    GLuint luma_tex_id         = generate_texture(GL_TEXTURE2, tex_res_x, tex_res_y, GL_R32F);
+    GLuint luma_blurred_tex_id = generate_texture(GL_TEXTURE3, tex_res_x, tex_res_y, GL_R32F);
+    GLuint normal_tex_id       = generate_texture(GL_TEXTURE4, tex_res_x, tex_res_y, GL_RGBA32F);
+    GLuint displacement_tex_id = generate_texture(GL_TEXTURE5, tex_res_x, tex_res_y, GL_R32F);
+    GLuint roughness_tex_id    = generate_texture(GL_TEXTURE6, tex_res_x, tex_res_y, GL_R32F);
+    GLuint shininess_tex_id    = generate_texture(GL_TEXTURE7, tex_res_x, tex_res_y, GL_R32F);
+    GLuint aux_rgba_tex_id     = generate_texture(GL_TEXTURE8, tex_res_x, tex_res_y, GL_RGBA32F);
+    GLuint aux_r_tex_id        = generate_texture(GL_TEXTURE9, tex_res_x, tex_res_y, GL_R32F);
 
     glBindImageTexture(0, diffuse_tex_id,      0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA32F);
-    glBindImageTexture(1, luminosity_tex_id,   0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(2, normal_tex_id,       0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(3, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(4, roughness_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(5, shininess_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(6, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(1, blurred_tex_id,      0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(2, luma_tex_id,         0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(3, luma_blurred_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(4, normal_tex_id,       0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(5, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(6, roughness_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(7, shininess_tex_id,    0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(8, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(9, aux_r_tex_id,        0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
     //===================================================================================================================================================================================================================
     // compute shader compilation and subroutine indices querying
@@ -277,8 +281,94 @@ int main(int argc, char *argv[])
     glsl_program_t roughness_filter   (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/roughness_filter.cs"));
     glsl_program_t shininess_filter   (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/shininess_filter.cs"));
 
+    /* compute luminosity from diffuse map */
+    luminosity_filter.enable();
+    uniform_t uni_lf_diffuse_image = luminosity_filter["diffuse_image"];
+    uniform_t uni_lf_luminosity_image = luminosity_filter["luminosity_image"];
+    uni_lf_diffuse_image = 0;
+    uni_lf_luminosity_image = 2;
+    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute blurred diffuse map */
+    float texel_size_x = 1.0f / tex_res_x;
+    float texel_size_y = 1.0f / tex_res_y;
+    glm::vec2 texel_size = glm::vec2(texel_size_x, texel_size_y);
+
+    separable_filter_t gauss_filter("glsl/conv1d_filter.cs");
+    gauss_filter.enable();
+    gauss_filter.set_kernel<gauss_kernel_t>(8);
+    gauss_filter.uni_texel_size = texel_size;
+    gauss_filter.uni_conv_axis = glm::vec2(texel_size_x, 0.0f);
+    gauss_filter.convolve(0, 8, tex_res_x, tex_res_y);                                     // TEXTURE UNIT0 --> image unit 
+
+    gauss_filter.uni_conv_axis = glm::vec2(0.0f, texel_size_y);
+    gauss_filter.convolve(8, 1, tex_res_x, tex_res_y);
+
+    /* compute blurred luminosity map */
+    luminosity_filter.enable();
+    uni_lf_diffuse_image = 1;
+    uni_lf_luminosity_image = 3;
+    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute normal map from luminosity by using Sobel/Scharr derivative filters */
+    normal_filter.enable();
+    uniform_t uni_nf_luma_tex = normal_filter["luma_tex"];
+    uniform_t uni_nf_amplitude = normal_filter["amplitude"];
+    uniform_t uni_nf_texel_size = normal_filter["texel_size"];
+    uni_nf_luma_tex = 2;
+    uni_nf_amplitude = 4.0f;
+    uni_nf_texel_size = texel_size;
+    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute displacement map from normal map */
+    displacement_filter.enable();
+    uniform_t uni_df_normal_tex = displacement_filter["normal_tex"];
+    uniform_t uni_df_disp_tex = displacement_filter["disp_tex"];
+    uniform_t uni_df_delta = displacement_filter["delta"];
+    uniform_t uni_df_output_image = displacement_filter["output_image"];
+
+
+    const float zero = 0.0f;
+    glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
+    float dx = 32.0f;
+
+    for(int i = 0; i < 6; ++i)
+    {
+        uni_df_delta = glm::vec2(dx / tex_res_x, dx / tex_res_y);
+        for(int j = 0; j < 2; ++j)
+        {
+            uni_df_disp_tex = 5;
+            uni_df_output_image = 9;
+            glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            uni_df_disp_tex = 9;
+            uni_df_output_image = 5;
+            glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+        dx *= 0.5;
+    }
+
+    /* compute roughness map from diffuse map */
+    roughness_filter.enable();
+    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    /* compute shininess map from diffuse map */
+    shininess_filter.enable();
+    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+
+
+
+
     //===================================================================================================================================================================================================================
-    // quad rendering shader
+    // quad rendering shader and fake VAO for rendering quads
     //===================================================================================================================================================================================================================
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
@@ -287,9 +377,6 @@ int main(int argc, char *argv[])
     uniform_t uniform_quad = quad_renderer["quad"];
     uniform_t uniform_teximage = quad_renderer["teximage"];
 
-    //===================================================================================================================================================================================================================
-    // create fake VAO for rendering quads
-    //===================================================================================================================================================================================================================
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
@@ -300,51 +387,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-    /* compute luminosity from diffuse map */
-    luminosity_filter.enable();
-    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    /* compute normal map from luminosity by using Sobel/Scharr derivative filters */
-    normal_filter.enable();
-    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    /* compute displacement map from normal map */
-    displacement_filter.enable();
-    uniform_t uni_df_n = displacement_filter["n"];    
-
-    const float zero = 0.0f;
-    glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
-    int n = 32;
-
-    for(int i = 0; i < 6; ++i)
-    {
-        uni_df_n = n;
-        for(int j = 0; j < 2; ++j)
-        {
-            glBindImageTexture(3, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-            glBindImageTexture(6, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-            glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-            glBindImageTexture(3, aux_tex_id,          0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-            glBindImageTexture(6, displacement_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-            glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        }
-        n >>= 1;
-    }
-
-    /* compute roughness map from diffuse map */
-    roughness_filter.enable();
-    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    /* compute shininess map from diffuse map */
-    shininess_filter.enable();
-    glDispatchCompute(texres_x >> 3, texres_y >> 3, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 
 
@@ -388,14 +431,10 @@ int main(int argc, char *argv[])
 
     }
 
-    glDeleteTextures(1, &diffuse_tex_id);
-    glDeleteTextures(1, &luminosity_tex_id);
-    glDeleteTextures(1, &normal_tex_id);
-    glDeleteTextures(1, &displacement_tex_id);
-    glDeleteTextures(1, &roughness_tex_id);
-    glDeleteTextures(1, &shininess_tex_id);
-    glDeleteTextures(1, &aux_tex_id);
-    glDeleteVertexArrays(1, &vao_id);    
+    GLuint textures[] = {diffuse_tex_id, blurred_tex_id, luma_tex_id, luma_blurred_tex_id, normal_tex_id, 
+                         displacement_tex_id, roughness_tex_id, shininess_tex_id, aux_rgba_tex_id, aux_r_tex_id};
+
+    glDeleteTextures(sizeof(textures) / sizeof(GLuint), textures);
 
     //===================================================================================================================================================================================================================
     // terminate the program and exit
