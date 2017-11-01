@@ -219,6 +219,120 @@ struct separable_filter_t
 };
 
 
+void generate_heightmap(unsigned char* rgb_data, int w, int h)
+{
+    unsigned int num_pixels = w * h;
+
+    float* s = (float*)malloc(num_pixels * 3 * sizeof(float));
+    float* r = (float*)malloc(num_pixels * 4 * sizeof(float));
+
+    const float contrast = 0.05f;
+    const float inv_factor = 1.0f / 127.5f;
+
+    for(unsigned int i = 0; i < num_pixels; ++i)
+    {
+        s[3 * i + 0] = inv_factor * float(rgb_data[3 * i + 0]) - 1.0f;
+        s[3 * i + 1] = inv_factor * float(rgb_data[3 * i + 1]) - 1.0f;
+        s[3 * i + 2] = inv_factor * float(rgb_data[3 * i + 2]) - 1.0f;
+    }
+
+    memset(r, 0, num_pixels * 4 * sizeof(float));
+
+#define S(x, y, n) s[(y) * (w * 3) + ((x) * 3) + (n)]
+#define R(x, y, n) r[(y) * (w * 4) + ((x) * 4) + (n)]
+
+    int x, y;
+
+    /* top-left to bottom-right */
+    for(x = 1; x < w; ++x)
+        R(x, 0, 0) = R(x - 1, 0, 0) + S(x - 1, 0, 0);
+    for(y = 1; y < h; ++y)
+        R(0, y, 0) = R(0, y - 1, 0) + S(0, y - 1, 1);
+    for(y = 1; y < h; ++y)
+    {
+        for(x = 1; x < w; ++x)
+        {
+            R(x, y, 0) = (R(x, y - 1, 0) + R(x - 1, y, 0) + S(x - 1, y, 0) + S(x, y - 1, 1)) * 0.5f;
+        }
+    }
+
+    /* top-right to bottom-left */
+    for(x = w - 2; x >= 0; --x)
+        R(x, 0, 1) = R(x + 1, 0, 1) - S(x + 1, 0, 0);
+    for(y = 1; y < h; ++y)
+        R(0, y, 1) = R(0, y - 1, 1) + S(0, y - 1, 1);
+    for(y = 1; y < h; ++y)
+    {
+        for(x = w - 2; x >= 0; --x)
+        {
+            R(x, y, 1) = (R(x, y - 1, 1) + R(x + 1, y, 1) - S(x + 1, y, 0) + S(x, y - 1, 1)) * 0.5f;
+        }
+    }
+
+    /* bottom-left to top-right */
+    for(x = 1; x < w; ++x)
+        R(x, 0, 2) = R(x - 1, 0, 2) + S(x - 1, 0, 0);
+    for(y = h - 2; y >= 0; --y)
+        R(0, y, 2) = R(0, y + 1, 2) - S(0, y + 1, 1);
+    for(y = h - 2; y >= 0; --y)
+    {
+        for(x = 1; x < w; ++x)
+        {
+            R(x, y, 2) = (R(x, y + 1, 2) + R(x - 1, y, 2) + S(x - 1, y, 0) - S(x, y + 1, 1)) * 0.5f;
+        }
+    }
+
+    /* bottom-right to top-left */
+    for(x = w - 2; x >= 0; --x)
+        R(x, 0, 3) = R(x + 1, 0, 3) - S(x + 1, 0, 0);
+    for(y = h - 2; y >= 0; --y)
+        R(0, y, 3) = R(0, y + 1, 3) - S(0, y + 1, 1);
+    for(y = h - 2; y >= 0; --y)
+    {
+        for(x = w - 2; x >= 0; --x)
+        {
+            R(x, y, 3) = (R(x, y + 1, 3) + R(x + 1, y, 3) - S(x + 1, y, 0) - S(x, y + 1, 1)) * 0.5f;
+        }
+    }
+
+#undef S
+#undef R
+
+   /* accumulate, find min/max */
+    float hmin =  1e10f;
+    float hmax = -1e10f;
+    for(unsigned int i = 0; i < num_pixels; ++i)
+    {
+        r[4 * i] += r[4 * i + 1] + r[4 * i + 2] + r[4 * i + 3];
+        if(r[4 * i] < hmin) hmin = r[4 * i];
+        if(r[4 * i] > hmax) hmax = r[4 * i];
+    }
+
+    /* scale into 0 - 1 range */
+    for(unsigned int i = 0; i < num_pixels; ++i)
+    {
+        float v = (r[4 * i] - hmin) / (hmax - hmin);
+        /* adjust contrast */
+        v = (v - 0.5f) * contrast + v;
+        if(v < 0.0f) v = 0.0f;
+        if(v > 1.0f) v = 1.0f;
+        r[4 * i] = v;
+    }
+
+    /* write out results */
+    for(unsigned int i = 0; i < num_pixels; ++i)
+    {
+        float v = 255.0f * r[4 * i];
+        rgb_data[3 * i + 0] = (unsigned char) v;
+        rgb_data[3 * i + 1] = (unsigned char) v;
+        rgb_data[3 * i + 2] = (unsigned char) v;
+    }
+
+    free(s);
+    free(r);
+}
+
+
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
@@ -244,11 +358,17 @@ int main(int argc, char *argv[])
     // Unit 9 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/crystalline.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint tex_res_x, tex_res_y;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_res_y);
+
+    uint8_t* rgb_data = (uint8_t*) malloc(3 * tex_res_x * tex_res_y);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb_data);
+    generate_heightmap(rgb_data, tex_res_x, tex_res_y);
+    image::png::write("heightmap.png", tex_res_x, tex_res_y, rgb_data, PNG_COLOR_TYPE_RGB);
+    free(rgb_data);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
@@ -275,6 +395,9 @@ int main(int argc, char *argv[])
 //    glBindImageTexture(8, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
 //    glBindImageTexture(9, aux_r_tex_id,        0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
+
+
+
     //===================================================================================================================================================================================================================
     // compute shader compilation and subroutine indices querying
     //===================================================================================================================================================================================================================
@@ -283,6 +406,7 @@ int main(int argc, char *argv[])
     glsl_program_t displacement_filter(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/displacement_filter.cs"));
     glsl_program_t roughness_filter   (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/roughness_filter.cs"));
     glsl_program_t shininess_filter   (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/shininess_filter.cs"));
+    glsl_program_t laplace_filter     (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/laplace_filter.cs"));
 
     /* compute blurred diffuse map */
     float texel_size_x = 1.0f / tex_res_x;

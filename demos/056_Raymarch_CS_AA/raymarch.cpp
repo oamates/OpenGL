@@ -211,7 +211,6 @@ int main(int argc, char *argv[])
         uni_rm_split_screen = int (window.split_screen ? 1 : 0);
 
         glDispatchCompute(window.res_x / 8, window.res_y / 8, 1);
-
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         glEnable(GL_DEPTH_TEST);
