@@ -364,12 +364,6 @@ int main(int argc, char *argv[])
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_res_y);
 
-    uint8_t* rgb_data = (uint8_t*) malloc(3 * tex_res_x * tex_res_y);
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb_data);
-    generate_heightmap(rgb_data, tex_res_x, tex_res_y);
-    image::png::write("heightmap.png", tex_res_x, tex_res_y, rgb_data, PNG_COLOR_TYPE_RGB);
-    free(rgb_data);
-
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
@@ -455,6 +449,16 @@ int main(int argc, char *argv[])
     uni_nf_texel_size = texel_size;
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+
+    glActiveTexture(GL_TEXTURE4);
+    uint8_t* rgb_data = (uint8_t*) malloc(3 * tex_res_x * tex_res_y);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb_data);
+    generate_heightmap(rgb_data, tex_res_x, tex_res_y);
+    image::png::write("heightmap.png", tex_res_x, tex_res_y, rgb_data, PNG_COLOR_TYPE_RGB);
+    free(rgb_data);
+
+
 
     /* compute displacement map from normal map */
     displacement_filter.enable();
