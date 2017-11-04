@@ -203,13 +203,20 @@ static kernel_element_t FILTER_3x3_KERNEL_DV[] =
 //=======================================================================================================================================================================================================================
 // 5x5 partial derivative kernel
 //=======================================================================================================================================================================================================================
-static const float filter_3x3_weight = 1.0f / 6.0f;
+static const float filter_5x5_weight = 1.0f / 6.0f;
 static const int FILTER_3x3_KERNEL_SIZE = 6;
 static kernel_element_t FILTER_3x3_KERNEL_DU[] = 
 {
+    {-2, -2, -filter_5x5_weight},
+    {-2, -1, -filter_5x5_weight},
+    {-2,  0, -filter_5x5_weight},
+    {-2,  1, -filter_5x5_weight},
+    {-2,  2, -filter_5x5_weight},
+
     {-1,  1, -filter_3x3_weight},
     {-1,  0, -filter_3x3_weight},
     {-1, -1, -filter_3x3_weight},
+
     { 1,  1,  filter_3x3_weight},
     { 1,  0,  filter_3x3_weight},
     { 1, -1,  filter_3x3_weight}
