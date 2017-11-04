@@ -15,9 +15,7 @@ normalmap_params_t normalmap_params = {
    .dudv = DUDV_NONE,
    .xinvert = 0,
    .yinvert = 0,
-   .swapRGB = 0,
-   .contrast = 0.0,
-   .alphamap_id = 0
+   .contrast = 0.0
 };
 
 int main(int argc, char** argv)

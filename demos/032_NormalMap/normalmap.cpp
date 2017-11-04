@@ -6,150 +6,6 @@
 
 #include <glm/glm.hpp>
 
-static int sample_alpha_map(unsigned char *pixels, int x, int y, int w, int h, int sw, int sh);
-
-static inline int icerp(int a, int b, int c, int d, int x)
-{
-   int p = (d - c) - (a - b);
-   int q = (a - b) - p;
-   int r = c - a;
-   return((x * (x * (x * p + (q << 7)) + (r << 14)) + (b << 21)) >> 21);
-}
-
-void scale_pixels(unsigned char* dst, int dw, int dh, unsigned char* src, int sw, int sh, int bpp)
-{
-    int x, y, n, ix, iy, wx, wy, v;
-    int a, b, c, d;
-    int dstride = dw * bpp;
-    unsigned char *s;
-   
-    for(y = 0; y < dh; ++y)
-    {
-        if(dh > 1)
-        {
-            iy = (((sh - 1) * y) << 7) / (dh - 1);
-            if(y == dh - 1) --iy;
-            wy = iy & 0x7f;
-            iy >>= 7;
-        }
-        else
-            iy = wy = 0;
-      
-        for(x = 0; x < dw; ++x)
-        {
-            if(dw > 1)
-            {
-                ix = (((sw - 1) * x) << 7) / (dw - 1);
-                if(x == dw - 1) --ix;
-                wx = ix & 0x7f;
-                ix >>= 7;
-            }
-            else
-                ix = wx = 0;
-         
-            s = src + ((iy - 1) * sw + (ix - 1)) * bpp;
-         
-            for(n = 0; n < bpp; ++n)
-            {
-                b = icerp(s[(sw + 0) * bpp], s[(sw + 1) * bpp], s[(sw + 2) * bpp], s[(sw + 3) * bpp], wx);
-                a = (iy > 0) ? icerp(s[0], s[bpp], s[2 * bpp], s[3 * bpp], wx) : b;
-            
-                c = icerp(s[(2 * sw + 0) * bpp], s[(2 * sw + 1) * bpp], s[(2 * sw + 2) * bpp], s[(2 * sw + 3) * bpp], wx);
-                d = (iy < dh - 1) ? icerp(s[(3 * sw + 0) * bpp], s[(3 * sw + 1) * bpp], s[(3 * sw + 2) * bpp], s[(3 * sw + 3) * bpp], wx) : c;
-            
-                v = icerp(a, b, c, d, wy);
-                if(v < 0) v = 0;
-                if(v > 255) v = 255;
-                dst[(y * dstride) + (x * bpp) + n] = v;
-                ++s;
-            }
-        }
-    }
-}
-
-static const float oneover255 = 1.0f / 255.0f;
-
-static inline void NORMALIZE(float* v)
-{
-    float l = glm::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-   
-    if(l > 1e-04f)
-    {
-        l = 1.0f / l;
-        v[0] *= l;
-        v[1] *= l;
-        v[2] *= l;
-    }
-    else
-        v[0] = v[1] = v[2] = 0.0f;
-}
-
-static void make_kernel(kernel_element_t* k, float* weights, int size)
-{
-    int half_size = size / 2;
-    for(int y = 0; y < size; ++y)
-        for(int x = 0; x < size; ++x)
-        {
-            int idx = x + y * size;
-            k[idx] = {x - half_size, half_size - y, weights[idx]};
-        }
-}
-
-static void rotate_array(float *dst, float *src, int size)
-{
-    for(int y = 0; y < size; ++y)
-    {
-        for(int x = 0; x < size; ++x)
-        {
-            int newy = size - x - 1;
-            int newx = y;
-            dst[newx + newy * size] = src[x + y * size];
-        }
-    }
-}
-
-int sample_alpha_map(unsigned char *pixels, int x, int y, int w, int h, int sw, int sh)
-{
-    int ix, iy, wx, wy, v;
-    int a, b, c, d;
-    unsigned char *s;
-   
-    if(sh > 1)
-    {
-        iy = (((h - 1) * y) << 7) / (sh - 1);
-        if(y == sh - 1) --iy;
-        wy = iy & 0x7f;
-        iy >>= 7;
-    }
-    else
-        iy = wy = 0;
-   
-    if(sw > 1)
-    {
-        ix = (((w - 1) * x) << 7) / (sw - 1);
-        if(x == sw - 1) --ix;
-        wx = ix & 0x7f;
-        ix >>= 7;
-    }
-    else
-        ix = wx = 0;
-   
-    s = pixels + ((iy - 1) * w + (ix - 1));
-   
-    b = icerp(s[w + 0], s[w + 1], s[w + 2], s[w + 3], wx);
-    a = (iy > 0) ? icerp(s[0], s[1], s[2], s[3], wx) : b;
-   
-    c = icerp(s[2 * w + 0], s[2 * w + 1], s[2 * w + 2], s[2 * w + 3], wx);
-    d = (iy < sh - 1) ? icerp(s[3 * w + 0], s[3 * w + 1], s[3 * w + 2], s[3 * w + 3], wx) : c;
-   
-    v = icerp(a, b, c, d, wy);
-            
-    if(v <   0) v = 0;
-    if(v > 255) v = 255;
-   
-    return (unsigned char) v;
-}
-
 static void make_heightmap(unsigned char* image, int w, int h, int bpp, const normalmap_params_t& normalmap_params)
 {
     unsigned int i, num_pixels = w * h;
@@ -243,298 +99,199 @@ static void make_heightmap(unsigned char* image, int w, int h, int bpp, const no
     free(r);
 }
 
-void normalmap(unsigned char* rgba_src, unsigned char* rgba_dst, int width, int height, const normalmap_params_t& normalmap_params)
+template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char* rgba_dst, int width, int height, const normalmap_params_t& normalmap_params)
 {
-    int bpp = 4;
-    int x, y;
-    int pw, ph, amap_w = 0, amap_h = 0;
-    unsigned char *d, *s, *tmp, *amap = 0;
-    float val, du, dv, n[3], weight;
-    float rgb_bias[3];
-    int i;
+    const real_t one = 1.0;
+    const real_t inv_255 = 1.0 / 255.0;
+    const real_t inv_127_5 = 2.0 / 255.0;
+    const real_t inv_32767_5 = 2.0 / 65535.0;
+    const real_t scale = (real_t) normalmap_params.scale;
+    const glm::tvec3<real_t> rgb_power = glm::tvec3<real_t>(0.299, 0.587, 0.114);
+    const real_t max_byte = 255.0;
 
+    int bpp = 4;
+    int area = width * height;
     int rowbytes = width * bpp;
 
-    float* heights = (float*) calloc(width * height, sizeof(float));
-
     int kernel_size;
-    kernel_element_t *kernel_du, *kernel_dv;
+    kernel_element_t* kernel;
+    real_t normalization_factor;
+
+    real_t* heights = (real_t*) calloc(width * height, sizeof(real_t));
    
     switch(normalmap_params.filter)
     {
         case FILTER_SOBEL_3x3:
             kernel_size = FILTER_SOBEL_3x3_KERNEL_SIZE;
-            kernel_du = FILTER_SOBEL_3x3_KERNEL_DU;
-            kernel_dv = FILTER_SOBEL_3x3_KERNEL_DV;
+            kernel = FILTER_SOBEL_3x3_KERNEL;
+            normalization_factor = FILTER_SOBEL_3x3_NORMALIZATION_FACTOR;
             break;
         case FILTER_SOBEL_5x5:
             kernel_size = FILTER_SOBEL_5x5_KERNEL_SIZE;
-            kernel_du = FILTER_SOBEL_5x5_KERNEL_DU;
-            kernel_dv = FILTER_SOBEL_5x5_KERNEL_DV;
+            kernel = FILTER_SOBEL_5x5_KERNEL;
+            normalization_factor = FILTER_SOBEL_5x5_NORMALIZATION_FACTOR;
             break;
         case FILTER_PREWITT_3x3:
             kernel_size = FILTER_PREWITT_3x3_KERNEL_SIZE;
-            kernel_du = FILTER_PREWITT_3x3_KERNEL_DU;
-            kernel_dv = FILTER_PREWITT_3x3_KERNEL_DV;
+            kernel = FILTER_PREWITT_3x3_KERNEL;
+            normalization_factor = FILTER_PREWITT_5x5_NORMALIZATION_FACTOR;
             break;      
         case FILTER_PREWITT_5x5:
             kernel_size = FILTER_PREWITT_5x5_KERNEL_SIZE;
-            kernel_du = FILTER_PREWITT_5x5_KERNEL_DU;
-            kernel_dv = FILTER_PREWITT_5x5_KERNEL_DU;
+            kernel = FILTER_PREWITT_5x5_KERNEL;
+            normalization_factor = FILTER_PREWITT_5x5_NORMALIZATION_FACTOR;
             break;
         case FILTER_3x3:
             kernel_size = FILTER_3x3_KERNEL_SIZE;
-            kernel_du = FILTER_3x3_KERNEL_DU;
-            kernel_dv = FILTER_3x3_KERNEL_DV;
+            kernel = FILTER_3x3_KERNEL;
+            normalization_factor = FILTER_3x3_NORMALIZATION_FACTOR;
             break;
         case FILTER_5x5:
-        {
-            int n;
-            float usum = 0, vsum = 0;
-            float wt22 = 1.0f / 16.0f;
-            float wt12 = 1.0f / 10.0f;
-            float wt02 = 1.0f / 8.0f;
-            float wt11 = 1.0f / 2.8f;
-            kernel_size = 20;
-            kernel_du = (kernel_element_t*)malloc(20 * sizeof(kernel_element_t));
-            kernel_dv = (kernel_element_t*)malloc(20 * sizeof(kernel_element_t));
-         
-            kernel_du[0 ] = {-2,  2, -wt22};
-            kernel_du[1 ] = {-1,  2, -wt12};
-            kernel_du[2 ] = { 1,  2,  wt12};
-            kernel_du[3 ] = { 2,  2,  wt22};
-            kernel_du[4 ] = {-2,  1, -wt12};
-            kernel_du[5 ] = {-1,  1, -wt11};
-            kernel_du[6 ] = { 1,  1,  wt11};
-            kernel_du[7 ] = { 2,  1,  wt12};
-            kernel_du[8 ] = {-2,  0, -wt02};
-            kernel_du[9 ] = {-1,  0, -0.5f};
-            kernel_du[10] = { 1,  0,  0.5f};
-            kernel_du[11] = { 2,  0,  wt02};
-            kernel_du[12] = {-2, -1, -wt12};
-            kernel_du[13] = {-1, -1, -wt11};
-            kernel_du[14] = { 1, -1,  wt11};
-            kernel_du[15] = { 2, -1,  wt12};
-            kernel_du[16] = {-2, -2, -wt22};
-            kernel_du[17] = {-1, -2, -wt12};
-            kernel_du[18] = { 1, -2,  wt12};
-            kernel_du[19] = { 2, -2,  wt22};
-         
-            kernel_dv[0 ] = {-2,  2,  wt22};
-            kernel_dv[1 ] = {-1,  2,  wt12};
-            kernel_dv[2 ] = { 0,  2, 0.25f};
-            kernel_dv[3 ] = { 1,  2,  wt12};
-            kernel_dv[4 ] = { 2,  2,  wt22};
-            kernel_dv[5 ] = {-2,  1,  wt12};
-            kernel_dv[6 ] = {-1,  1,  wt11};
-            kernel_dv[7 ] = { 0,  1,  0.5f};
-            kernel_dv[8 ] = { 1,  1,  wt11};
-            kernel_dv[9 ] = { 2,  1,  wt22};
-            kernel_dv[10] = {-2, -1, -wt22};
-            kernel_dv[11] = {-1, -1, -wt11};
-            kernel_dv[12] = { 0, -1, -0.5f};
-            kernel_dv[13] = { 1, -1, -wt11};
-            kernel_dv[14] = { 2, -1, -wt12};
-            kernel_dv[15] = {-2, -2, -wt22};
-            kernel_dv[16] = {-1, -2, -wt12};
-            kernel_dv[17] = { 0, -2,-0.25f};
-            kernel_dv[18] = { 1, -2, -wt12};
-            kernel_dv[19] = { 2, -2, -wt22};
-
-            for(n = 0; n < 20; ++n)
-            {
-               usum += fabsf(kernel_du[n].w);
-               vsum += fabsf(kernel_dv[n].w);
-            }
-            for(n = 0; n < 20; ++n)
-            {
-               kernel_du[n].w /= usum;
-               kernel_dv[n].w /= vsum;
-            }
-         
+            kernel_size = FILTER_5x5_KERNEL_SIZE;
+            kernel = FILTER_5x5_KERNEL;
+            normalization_factor = FILTER_5x5_NORMALIZATION_FACTOR;
             break;
-        }
         case FILTER_7x7:
             kernel_size = FILTER_7x7_KERNEL_SIZE;
-            kernel_du = FILTER_7x7_KERNEL_DU;
-            kernel_dv = FILTER_7x7_KERNEL_DV;
+            kernel = FILTER_7x7_KERNEL;
+            normalization_factor = FILTER_7x7_NORMALIZATION_FACTOR;
             break;
         case FILTER_9x9:
             kernel_size = FILTER_9x9_KERNEL_SIZE;
-            kernel_du = FILTER_9x9_KERNEL_DU;
-            kernel_dv = FILTER_9x9_KERNEL_DV;
+            kernel = FILTER_9x9_KERNEL;
+            normalization_factor = FILTER_9x9_NORMALIZATION_FACTOR;
             break;
         default:                                            // default is FILTER_SYM_DIFF
             kernel_size = FILTER_SYM_DIFF_KERNEL_SIZE;
-            kernel_du = FILTER_SYM_DIFF_KERNEL_DU;
-            kernel_dv = FILTER_SYM_DIFF_KERNEL_DV;
+            kernel = FILTER_SYM_DIFF_KERNEL;
+            normalization_factor = FILTER_SYM_DIFF_NORMALIZATION_FACTOR;
     }
 
-    if(normalmap_params.conversion == CONVERT_BIASED_RGB)
+
+    glm::tvec3<real_t> rgb_bias = glm::tvec3<real_t>(real_t(0.0));
+    if(normalmap_params.conversion == CONVERT_BIASED_RGB)   // compute average color of the image and use it as bias
     {
-        // approximated average color of the image: scale to 16x16, accumulate the pixels and average
-        unsigned int sum[3];
-
-        tmp = (unsigned char*) malloc(16 * 16 * bpp);
-        scale_pixels(tmp, 16, 16, rgba_src, width, height, bpp);
-
-        sum[0] = sum[1] = sum[2] = 0;
-      
-        s = rgba_src;
-        for(y = 0; y < 16; ++y)
+        unsigned char* s = rgba_src;
+        glm::tvec3<real_t> average = glm::tvec3<real_t>(real_t(0.0));
+        for(int i = 0; i < area; ++i)
         {
-            for(x = 0; x < 16; ++x)
-            {
-                sum[0] += *s++;
-                sum[1] += *s++;
-                sum[2] += *s++;
-                if (bpp == 4) s++;
-            }
+            glm::tvec3<real_t> rgb = glm::tvec3<real_t>(*(s + 0), *(s + 1), *(s + 2));
+            rgb_bias += rgb; 
+            s += bpp;
         }
-         
-        rgb_bias[0] = (float)sum[0] / 256.0f;
-        rgb_bias[1] = (float)sum[1] / 256.0f;
-        rgb_bias[2] = (float)sum[2] / 256.0f;
-      
-        free(tmp);
-    }
-    else
-    {
-        rgb_bias[0] = 0;
-        rgb_bias[1] = 0;
-        rgb_bias[2] = 0;
+        real_t inv_area = 1.0 / area;
+        rgb_bias *= inv_area;
     }
 
-    if(normalmap_params.conversion != CONVERT_NORMALIZE_ONLY && normalmap_params.conversion != CONVERT_DUDV_TO_NORMAL && normalmap_params.conversion != CONVERT_HEIGHTMAP)
+    if(normalmap_params.conversion != CONVERT_NORMALIZE_ONLY && 
+       normalmap_params.conversion != CONVERT_DUDV_TO_NORMAL && 
+       normalmap_params.conversion != CONVERT_HEIGHTMAP)
     {
-        s = rgba_src;
-        for(y = 0; y < height; ++y)
+        unsigned char* s = rgba_src;
+        for(int i = 0; i < area; ++i)
         {
-            for(x = 0; x < width; ++x)
+            real_t val;
+            if(!normalmap_params.height_source)
             {
-                if(!normalmap_params.height_source)
+                glm::tvec3<real_t> rgb = inv_255 * glm::tvec3<real_t>(s[0], s[1], s[2]);
+                switch(normalmap_params.conversion)
                 {
-                    switch(normalmap_params.conversion)
-                    {
-                        case CONVERT_NONE:
-                            val = (float)s[0] * 0.3f + (float)s[1] * 0.59f + (float)s[2] * 0.11f;
-                            break;
-                        case CONVERT_BIASED_RGB:
-                            val = (((float)glm::max(0.0f, s[0] - rgb_bias[0])) * 0.3f) + (((float)glm::max(0.0f, s[1] - rgb_bias[1])) * 0.59f) + (((float)glm::max(0.0f, s[2] - rgb_bias[2])) * 0.11f);
-                            break;
-                        case CONVERT_RED:
-                            val = (float)s[0];
-                            break;
-                        case CONVERT_GREEN:
-                            val = (float)s[1];
-                            break;
-                        case CONVERT_BLUE:
-                            val = (float)s[2];
-                            break;
-                        case CONVERT_MAX_RGB:
-                            val = (float)glm::max(s[0], glm::max(s[1], s[2]));
-                            break;
-                        case CONVERT_MIN_RGB:
-                            val = (float)glm::min(s[0], glm::min(s[1], s[2]));
-                            break;
-                        case CONVERT_COLORSPACE:
-                            val = (1.0f - ((1.0f - ((float)s[0] / 255.0f)) * (1.0f - ((float)s[1] / 255.0f)) * (1.0f - ((float)s[2] / 255.0f)))) * 255.0f;
-                            break;
-                        default:
-                            val = 255.0f;
-                            break;
-                    }
+                    case CONVERT_NONE:       val = glm::dot(rgb_power, rgb); break;
+                    case CONVERT_BIASED_RGB: val = glm::dot(rgb_power, glm::max(glm::tvec3<real_t>(0.0), rgb - rgb_bias)); break;
+                    case CONVERT_RED:        val = rgb.r; break;
+                    case CONVERT_GREEN:      val = rgb.g; break;
+                    case CONVERT_BLUE:       val = rgb.b; break;
+                    case CONVERT_MAX_RGB:    val = glm::max(rgb.r, glm::max(rgb.g, rgb.b)); break;
+                    case CONVERT_MIN_RGB:    val = glm::min(rgb.r, glm::min(rgb.g, rgb.b)); break;
+                    case CONVERT_COLORSPACE: val = one - (one - rgb.r) * (one - rgb.g) * (one - rgb.b); break;
+                    default: val = one;
                 }
-                else
-                    val = (float)s[3];
-         
-                heights[x + y * width] = val * oneover255;
-         
-                s += bpp;
             }
+            else
+                val = inv_255 * s[3];
+         
+            heights[i] = val;
+            s += bpp;
         }
     }
 
 #define HEIGHT(x,y) (heights[(glm::max(0, glm::min(width - 1, (x)))) + (glm::max(0, glm::min(height - 1, (y)))) * width])
 #define HEIGHT_WRAP(x,y) (heights[((x) < 0 ? (width + (x)) : ((x) >= width ? ((x) - width) : (x))) + (((y) < 0 ? (height + (y)) : ((y) >= height ? ((y) - height) : (y))) * width)])
 
-    for(y = 0; y < height; ++y)
+    for(int y = 0; y < height; ++y)
     {
-        for(x = 0; x < width; ++x)
+        for(int x = 0; x < width; ++x)
         {
-            d = rgba_dst + ((y * rowbytes) + (x * bpp));
-            s = rgba_src + ((y * rowbytes) + (x * bpp));
+            unsigned char* d = rgba_dst + ((y * rowbytes) + (x * bpp));
+            unsigned char* s = rgba_src + ((y * rowbytes) + (x * bpp));
 
+            glm::tvec3<real_t> n;
             if(normalmap_params.conversion == CONVERT_NORMALIZE_ONLY || normalmap_params.conversion == CONVERT_HEIGHTMAP)
             {
-                n[0] = (((float)s[0] * oneover255) - 0.5f) * 2.0f;
-                n[1] = (((float)s[1] * oneover255) - 0.5f) * 2.0f;
-                n[2] = (((float)s[2] * oneover255) - 0.5f) * 2.0f;
-                n[0] *= normalmap_params.scale;
-                n[1] *= normalmap_params.scale;
+                n = glm::tvec3<real_t>(inv_127_5 * s[0] - one, inv_127_5 * s[1] - one, inv_127_5 * s[2] - one);
+                n.x *= scale;
+                n.y *= scale;
             }
             else if(normalmap_params.conversion == CONVERT_DUDV_TO_NORMAL)
             {
-                n[0] = (((float)s[0] * oneover255) - 0.5f) * 2.0f;
-                n[1] = (((float)s[1] * oneover255) - 0.5f) * 2.0f;
-                n[2] = sqrtf(1.0f - (n[0] * n[0] - n[1] * n[1]));
-                n[0] *= normalmap_params.scale;
-                n[1] *= normalmap_params.scale;
+                n.x = inv_127_5 * s[0] - one;
+                n.y = inv_127_5 * s[1] - one;
+                n.z = glm::sqrt(one - (n.x * n.x + n.y * n.y));
+                n.x *= scale;
+                n.y *= scale;
             }
             else
             {
-                du = 0; dv = 0;
+                real_t du = 0.0; 
+                real_t dv = 0.0;
                 if(!normalmap_params.wrap)
                 {
-                    for(i = 0; i < num_elements; ++i)
-                        du += HEIGHT(x + kernel_du[i].x, y + kernel_du[i].y) * kernel_du[i].w;
-                    for(i = 0; i < num_elements; ++i)
-                        dv += HEIGHT(x + kernel_dv[i].x, y + kernel_dv[i].y) * kernel_dv[i].w;
+                    for(int i = 0; i < kernel_size; ++i)
+                    {
+                        real_t w = real_t(kernel[i].w);
+                        du += HEIGHT(x + kernel[i].x, y + kernel[i].y) * w;
+                        dv += HEIGHT(x + kernel[i].y, y + kernel[i].x) * w;
+                    }
                 }
                 else
                 {
-                    for(i = 0; i < num_elements; ++i) du += HEIGHT_WRAP(x + kernel_du[i].x, y + kernel_du[i].y) * kernel_du[i].w;
-                    for(i = 0; i < num_elements; ++i) dv += HEIGHT_WRAP(x + kernel_dv[i].x, y + kernel_dv[i].y) * kernel_dv[i].w;
+                    for(int i = 0; i < kernel_size; ++i)
+                    {
+                        real_t w = real_t(kernel[i].w);
+                        du += HEIGHT_WRAP(x + kernel[i].x, y + kernel[i].y) * w;
+                        dv += HEIGHT_WRAP(x + kernel[i].y, y + kernel[i].x) * w;
+                    }
                 }
             
-                n[0] = -du * normalmap_params.scale;
-                n[1] = -dv * normalmap_params.scale;
-                n[2] = 1.0f;
+                n = glm::vec3(-du * scale * normalization_factor,
+                              -dv * scale * normalization_factor, one);
             }
 
-            NORMALIZE(n);
+            n = glm::normalize(n);
          
-            if(n[2] < normalmap_params.minz)
+            if(n.z < normalmap_params.minz)
             {
-                n[2] = normalmap_params.minz;
-                NORMALIZE(n);
+                n.z = normalmap_params.minz;
+                n = glm::normalize(n);
             }
 
-
-            if(normalmap_params.xinvert) n[0] = -n[0];
-            if(normalmap_params.yinvert) n[1] = -n[1];
-            if(normalmap_params.swapRGB)
-            {
-                val = n[0];
-                n[0] = n[2];
-                n[2] = val;
-            }            
+            if(normalmap_params.xinvert) n.x = -n.x;
+            if(normalmap_params.yinvert) n.y = -n.y;          
          
             if(!normalmap_params.dudv)
             {
-                *d++ = (unsigned char)((n[0] + 1.0f) * 127.5f);
-                *d++ = (unsigned char)((n[1] + 1.0f) * 127.5f);
-                *d++ = (unsigned char)((n[2] + 1.0f) * 127.5f);
+                *d++ = inv_127_5 * (n.x + one);
+                *d++ = inv_127_5 * (n.y + one);
+                *d++ = inv_127_5 * (n.z + one);
          
                 switch(normalmap_params.alpha)
                 {
-                    case ALPHA_NONE:           *d++ = s[3]; break;
-                    case ALPHA_HEIGHT:         *d++ = (unsigned char)(heights[x + y * width] * 255.0f); break;
-                    case ALPHA_INVERSE_HEIGHT: *d++ = 255 - (unsigned char)(heights[x + y * width] * 255.0f); break;
+                    case ALPHA_HEIGHT:         *d++ = (unsigned char)(heights[x + y * width] * max_byte); break;
+                    case ALPHA_INVERSE_HEIGHT: *d++ = 255 - (unsigned char)(heights[x + y * width] * max_byte); break;
                     case ALPHA_ZERO:           *d++ = 0; break;
                     case ALPHA_ONE:            *d++ = 255; break;
                     case ALPHA_INVERT:         *d++ = 255 - s[3]; break;
-                    default:                   *d++ = s[3]; break;
+                    default:                   *d++ = s[3];
                 }
             }
             else
@@ -543,23 +300,23 @@ void normalmap(unsigned char* rgba_src, unsigned char* rgba_dst, int width, int 
                 {
                     if(normalmap_params.dudv == DUDV_8BIT_UNSIGNED)
                     {
-                        n[0] += 1.0f;
-                        n[1] += 1.0f;
+                        n.x += one;
+                        n.y += one;
                     }
-                    *d++ = (unsigned char)(n[0] * 127.5f);
-                    *d++ = (unsigned char)(n[1] * 127.5f);
+                    *d++ = inv_127_5 * n.x;
+                    *d++ = inv_127_5 * n.y;
                     *d++ = 0;
                 }
                 else if(normalmap_params.dudv == DUDV_16BIT_SIGNED || normalmap_params.dudv == DUDV_16BIT_UNSIGNED)
                 {
-                    unsigned short *d16 = (unsigned short*)d;
+                    unsigned short* d16 = (unsigned short*) d;
                     if(normalmap_params.dudv == DUDV_16BIT_UNSIGNED)
                     {
-                        n[0] += 1.0f;
-                        n[1] += 1.0f;
+                        n.x += one;
+                        n.y += one;
                     }
-                    *d16++ = (unsigned short)(n[0] * 32767.5f);
-                    *d16++ = (unsigned short)(n[1] * 32767.5f);
+                    *d16++ = inv_32767_5 * n.x;
+                    *d16++ = inv_32767_5 * n.y;
                 }
             }
         }

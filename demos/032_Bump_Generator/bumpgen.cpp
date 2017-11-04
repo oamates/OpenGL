@@ -358,7 +358,7 @@ int main(int argc, char *argv[])
     // Unit 9 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/gold_tile.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint tex_res_x, tex_res_y;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);

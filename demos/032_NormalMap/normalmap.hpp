@@ -58,9 +58,7 @@ struct normalmap_params_t
     int dudv;
     int xinvert;
     int yinvert;
-    int swapRGB;
     double contrast;
-    int32_t alphamap_id;
 };
 
 void normalmap(unsigned char* rgba_src, unsigned char* rgba_dst, int width, int height, const normalmap_params_t& normalmap_params);
