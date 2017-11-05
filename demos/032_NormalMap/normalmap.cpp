@@ -99,7 +99,7 @@ static void make_heightmap(unsigned char* image, int w, int h, int bpp, const no
     free(r);
 }
 
-template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char* rgba_dst, int width, int height, const normalmap_params_t& normalmap_params)
+template<typename real_t> void normalmap(unsigned char* src, unsigned char* dst, int width, int height, int bpp, const normalmap_params_t& normalmap_params)
 {
     const real_t one = 1.0;
     const real_t inv_255 = 1.0 / 255.0;
@@ -109,7 +109,6 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
     const glm::tvec3<real_t> rgb_power = glm::tvec3<real_t>(0.299, 0.587, 0.114);
     const real_t max_byte = 255.0;
 
-    int bpp = 4;
     int area = width * height;
     int rowbytes = width * bpp;
 
@@ -135,7 +134,7 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
             kernel_size = FILTER_PREWITT_3x3_KERNEL_SIZE;
             kernel = FILTER_PREWITT_3x3_KERNEL;
             normalization_factor = FILTER_PREWITT_5x5_NORMALIZATION_FACTOR;
-            break;      
+            break;
         case FILTER_PREWITT_5x5:
             kernel_size = FILTER_PREWITT_5x5_KERNEL_SIZE;
             kernel = FILTER_PREWITT_5x5_KERNEL;
@@ -167,16 +166,14 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
             normalization_factor = FILTER_SYM_DIFF_NORMALIZATION_FACTOR;
     }
 
-
     glm::tvec3<real_t> rgb_bias = glm::tvec3<real_t>(real_t(0.0));
     if(normalmap_params.conversion == CONVERT_BIASED_RGB)   // compute average color of the image and use it as bias
     {
-        unsigned char* s = rgba_src;
-        glm::tvec3<real_t> average = glm::tvec3<real_t>(real_t(0.0));
+        unsigned char* s = src;
         for(int i = 0; i < area; ++i)
         {
-            glm::tvec3<real_t> rgb = glm::tvec3<real_t>(*(s + 0), *(s + 1), *(s + 2));
-            rgb_bias += rgb; 
+            glm::tvec3<real_t> rgb = glm::tvec3<real_t>(s[0], s[1], s[2]);
+            rgb_bias += rgb;
             s += bpp;
         }
         real_t inv_area = 1.0 / area;
@@ -187,7 +184,7 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
        normalmap_params.conversion != CONVERT_DUDV_TO_NORMAL && 
        normalmap_params.conversion != CONVERT_HEIGHTMAP)
     {
-        unsigned char* s = rgba_src;
+        unsigned char* s = src;
         for(int i = 0; i < area; ++i)
         {
             real_t val;
@@ -218,12 +215,13 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
 #define HEIGHT(x,y) (heights[(glm::max(0, glm::min(width - 1, (x)))) + (glm::max(0, glm::min(height - 1, (y)))) * width])
 #define HEIGHT_WRAP(x,y) (heights[((x) < 0 ? (width + (x)) : ((x) >= width ? ((x) - width) : (x))) + (((y) < 0 ? (height + (y)) : ((y) >= height ? ((y) - height) : (y))) * width)])
 
+    int idx = 0;
     for(int y = 0; y < height; ++y)
     {
         for(int x = 0; x < width; ++x)
         {
-            unsigned char* d = rgba_dst + ((y * rowbytes) + (x * bpp));
-            unsigned char* s = rgba_src + ((y * rowbytes) + (x * bpp));
+            unsigned char* d = dst + 4 * idx;
+            unsigned char* s = src + bpp * idx;
 
             glm::tvec3<real_t> n;
             if(normalmap_params.conversion == CONVERT_NORMALIZE_ONLY || normalmap_params.conversion == CONVERT_HEIGHTMAP)
@@ -278,7 +276,7 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
             if(normalmap_params.xinvert) n.x = -n.x;
             if(normalmap_params.yinvert) n.y = -n.y;          
          
-            if(!normalmap_params.dudv)
+            if(normalmap_params.dudv == DUDV_NONE)
             {
                 *d++ = inv_127_5 * (n.x + one);
                 *d++ = inv_127_5 * (n.y + one);
@@ -319,14 +317,19 @@ template<typename real_t> void normalmap(unsigned char* rgba_src, unsigned char*
                     *d16++ = inv_32767_5 * n.y;
                 }
             }
+            idx++;
         }
     }
 
+/*
     if(normalmap_params.conversion == CONVERT_HEIGHTMAP)
         make_heightmap(rgba_dst, width, height, bpp, normalmap_params);
-
+*/
 #undef HEIGHT
 #undef HEIGHT_WRAP
 
     free(heights);
 }
+
+template void normalmap<float> (unsigned char*, unsigned char*, int, int, int, const normalmap_params_t&);
+template void normalmap<double>(unsigned char*, unsigned char*, int, int, int, const normalmap_params_t&);
