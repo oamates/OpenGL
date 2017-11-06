@@ -22,7 +22,7 @@ void main()
     vec3 v = normalize(view);
     
     vec3 diffuse_color = texture(diffuse_tex, uv).rgb;
-    vec3 ambient_color = 0.125f * diffuse_color;
+    vec3 ambient_color = 0.0625f * diffuse_color;
     vec3 specular_color = vec3(1.0f);
 
     float cos_theta = dot(b, l);
@@ -42,7 +42,7 @@ void main()
         vec3 h = normalize(l + v);
         float cos_alpha = max(dot(h, b), 0.0f);
 
-        color += pow(cos_alpha, Ns) * specular_color;
+        color += 0.15 * pow(cos_alpha, Ns) * specular_color;
     }
 
     FragmentColor = vec4(color, 1.0f);                 

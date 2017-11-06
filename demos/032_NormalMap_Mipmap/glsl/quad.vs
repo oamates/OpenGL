@@ -1,6 +1,5 @@
 #version 330 core
 
-uniform vec4 quad;
 out vec2 uv;
 
 const vec2 uvs[4] = vec2[4] 
@@ -14,6 +13,5 @@ const vec2 uvs[4] = vec2[4]
 void main(void)
 {
     uv = uvs[gl_VertexID];
-    vec2 screen_xy = mix(quad.xy, quad.zw, uv.xy);
-    gl_Position = vec4(screen_xy, 0.0f, 1.0f);
+    gl_Position = vec4(2.0 * uv - 1.0, 0.0f, 1.0f);
 }

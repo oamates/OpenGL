@@ -59,10 +59,21 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
 
     glm::vec2 polygon[5];
     const glm::vec2 square_center = glm::vec2(0.5f);
-    for (int i = 0; i < Q; ++i)
+
+    if (Q != 4)
     {
-        float alpha = (constants::two_pi * i) / Q;
-        polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha)); 
+        for (int i = 0; i < Q; ++i)
+        {
+            float alpha = (constants::two_pi * i) / Q;
+            polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha)); 
+        }
+    }
+    else
+    {
+        polygon[0] = glm::vec2( 1.0f,  1.0f);
+        polygon[1] = glm::vec2(-1.0f,  1.0f);
+        polygon[2] = glm::vec2(-1.0f, -1.0f);
+        polygon[3] = glm::vec2( 1.0f, -1.0f);
     }
 
     int index = 0, buffer_index = 0;
@@ -84,12 +95,12 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
             if (invert_normals)
             {
                 vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);  
-                vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);  
+                vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);
             }
             else
             {
                 vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);  
-                vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);  
+                vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);
             }
             int k = (j == Q - 1) ? 0 : j + 1;
             vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + k]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[k]);  
@@ -118,10 +129,21 @@ void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, cons
 
     glm::vec2 polygon[5];
     const glm::vec2 square_center = glm::vec2(0.5f);
-    for (int i = 0; i < Q; ++i)
+
+    if (Q != 4)
     {
-        float alpha = (constants::two_pi * i) / Q;
-        polygon[i] = glm::vec2(cos(alpha), sin(alpha)); 
+        for (int i = 0; i < Q; ++i)
+        {
+            float alpha = (constants::two_pi * i) / Q;
+            polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha)); 
+        }
+    }
+    else
+    {
+        polygon[0] = glm::vec2( 1.0f,  1.0f);
+        polygon[1] = glm::vec2(-1.0f,  1.0f);
+        polygon[2] = glm::vec2(-1.0f, -1.0f);
+        polygon[3] = glm::vec2( 1.0f, -1.0f);
     }
 
     int index = 0, buffer_index = 0;

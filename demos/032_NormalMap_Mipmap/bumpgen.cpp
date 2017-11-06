@@ -23,14 +23,15 @@
 
 struct demo_window_t : public imgui_window_t
 {
+    const int MAX_LOD = 5;
     int texture = 0;
+    int level = 0;
     bool pause = false;
     camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
-        camera.infinite_perspective(constants::two_pi / 6.0f, 2.0 * aspect(), 0.5f);
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
     }
 
@@ -53,6 +54,19 @@ struct demo_window_t : public imgui_window_t
             if (texture > 6) texture = 0;
         }
 
+        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
+        {
+            level++;
+            if (level == MAX_LOD) level--;
+        }
+
+        if ((key == GLFW_KEY_KP_SUBTRACT) && (action == GLFW_RELEASE))
+        {
+            level--;
+            if (level < 0) level = 0;
+        }
+
+
     }
 
     void on_mouse_move() override
@@ -66,21 +80,6 @@ struct demo_window_t : public imgui_window_t
     {
     }
 };
-
-GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
-{
-    GLuint tex_id;
-    glActiveTexture(unit);
-    glGenTextures(1, &tex_id);
-    glBindTexture(GL_TEXTURE_2D, tex_id);
-    glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R,  GL_MIRRORED_REPEAT);
-    return tex_id;
-}
 
 const char* internal_format_name(GLint format)
 {
@@ -218,7 +217,7 @@ struct separable_filter_t
             double w = w0 + w1;
             total_weight += w;
             weight_d[p] = w;
-            radius_f[p] = p2 + w0 / w; 
+            radius_f[p] = p2 + w1 / w; 
         }
 
         double inv_factor = 0.5 / total_weight;
@@ -240,6 +239,43 @@ struct separable_filter_t
     }
 };
 
+GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
+{
+    GLuint tex_id;
+    glActiveTexture(unit);
+    glGenTextures(1, &tex_id);
+    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R,  GL_MIRRORED_REPEAT);
+    return tex_id;
+}
+
+GLuint generate_mipmap_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
+{
+    GLsizei levels = 0;
+    GLsizei max_res = glm::max(res_x, res_y);
+    while(max_res)
+    {
+        max_res >>= 1;
+        levels++;
+    }
+
+    GLuint tex_id;
+    glActiveTexture(unit);
+    glGenTextures(1, &tex_id);
+    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glTexStorage2D(GL_TEXTURE_2D, levels, internal_format, res_x, res_y);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R,  GL_MIRRORED_REPEAT);
+    return tex_id;
+}
 
 int main(int argc, char *argv[])
 {
@@ -262,14 +298,11 @@ int main(int argc, char *argv[])
     // Unit 2 : luminosity texture, GL_R32F
     // Unit 3 : blurred luminosity texture, GL_R32F
     // Unit 4 : normal texture, GL_RGBA32F
-    // Unit 5 : displacement texture, GL_R32F
-    // Unit 6 : roughness texture, GL_R32F
-    // Unit 7 : shininess texture, GL_R32F
-    // Unit 8 : auxiliary texture, GL_RGBA32F
-    // Unit 9 : auxiliary texture, GL_R32F
+    // Unit 6 : auxiliary texture, GL_RGBA32F
+    // Unit 7 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/gold_tile.png", 0, GL_LINEAR, GL_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint tex_res_x, tex_res_y;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);
@@ -279,20 +312,19 @@ int main(int argc, char *argv[])
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
 
-    GLuint blurred_tex_id      = generate_texture(GL_TEXTURE1, tex_res_x, tex_res_y, GL_RGBA32F);
-    GLuint luma_tex_id         = generate_texture(GL_TEXTURE2, tex_res_x, tex_res_y, GL_R32F);
-    GLuint luma_blurred_tex_id = generate_texture(GL_TEXTURE3, tex_res_x, tex_res_y, GL_R32F);
-    GLuint normal_tex_id       = generate_texture(GL_TEXTURE4, tex_res_x, tex_res_y, GL_RGBA32F);
-    GLuint aux_rgba_tex_id     = generate_texture(GL_TEXTURE5, tex_res_x, tex_res_y, GL_RGBA32F);
-    GLuint aux_r_tex_id        = generate_texture(GL_TEXTURE6, tex_res_x, tex_res_y, GL_R32F);
-
+    GLuint blurred_tex_id      = generate_mipmap_texture(GL_TEXTURE1, tex_res_x, tex_res_y, GL_RGBA32F);
+    GLuint luma_tex_id         = generate_mipmap_texture(GL_TEXTURE2, tex_res_x, tex_res_y, GL_R32F);
+    GLuint luma_blurred_tex_id = generate_mipmap_texture(GL_TEXTURE3, tex_res_x, tex_res_y, GL_R32F);
+    GLuint normal_tex_id       = generate_mipmap_texture(GL_TEXTURE4, tex_res_x, tex_res_y, GL_RGBA32F);
+    GLuint aux_rgba_tex_id     = generate_mipmap_texture(GL_TEXTURE5, tex_res_x, tex_res_y, GL_RGBA32F);
+    GLuint aux_r_tex_id        = generate_mipmap_texture(GL_TEXTURE6, tex_res_x, tex_res_y, GL_R32F);
 
     glBindImageTexture(0, diffuse_tex_id,      0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA32F);
     glBindImageTexture(1, blurred_tex_id,      0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     glBindImageTexture(2, luma_tex_id,         0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
     glBindImageTexture(3, luma_blurred_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
     glBindImageTexture(4, normal_tex_id,       0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(5, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    glBindImageTexture(5, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     glBindImageTexture(6, aux_r_tex_id,        0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
     //===================================================================================================================================================================================================================
@@ -319,6 +351,9 @@ int main(int argc, char *argv[])
     gauss_filter.uni_conv_axis = glm::vec2(0.0f, texel_size_y);
     gauss_filter.convolve(5, 1, tex_res_x, tex_res_y);
 
+    glActiveTexture(GL_TEXTURE1);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
     //===================================================================================================================================================================================================================
     // compute luminosity from diffuse map
     //===================================================================================================================================================================================================================
@@ -333,6 +368,9 @@ int main(int argc, char *argv[])
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+    glActiveTexture(GL_TEXTURE2);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
     //===================================================================================================================================================================================================================
     // compute blurred luminosity map from blurred diffuse map
     //===================================================================================================================================================================================================================
@@ -340,6 +378,9 @@ int main(int argc, char *argv[])
     uni_lf_luma_image = 3;
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    glActiveTexture(GL_TEXTURE3);
+    glGenerateMipmap(GL_TEXTURE_2D);
 
     //===================================================================================================================================================================================================================
     // compute normal map from luminosity by using Sobel/Scharr derivative filters
@@ -349,12 +390,15 @@ int main(int argc, char *argv[])
     uniform_t uni_nf_amplitude = normal_filter["amplitude"];
     uniform_t uni_nf_texel_size = normal_filter["texel_size"];
     uniform_t uni_nf_normal_image = normal_filter["normal_image"];
-    uni_nf_luma_tex = 3;
+    uni_nf_luma_tex = 1;
     uni_nf_normal_image = 4;
     uni_nf_amplitude = 4.0f;
     uni_nf_texel_size = texel_size;
     glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    glActiveTexture(GL_TEXTURE4);
+    glGenerateMipmap(GL_TEXTURE_2D);
 
     //===================================================================================================================================================================================================================
     // quad rendering shader and fake VAO for rendering quads
@@ -362,9 +406,8 @@ int main(int argc, char *argv[])
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
-
-    uniform_t uniform_quad = quad_renderer["quad"];
-    uniform_t uniform_teximage = quad_renderer["teximage"];
+    uniform_t uni_qr_teximage = quad_renderer["teximage"];
+    uniform_t uni_qr_texlevel = quad_renderer["texlevel"];
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -378,15 +421,15 @@ int main(int argc, char *argv[])
 
     simple_light.enable();
 
-    uniform_t uniform_projection_matrix = simple_light["projection_matrix"];
-    uniform_t uniform_view_matrix       = simple_light["view_matrix"];      
-    uniform_t uniform_time              = simple_light["time"];             
-    uniform_t uniform_light_ws          = simple_light["light_ws"];         
-    uniform_t uniform_camera_ws         = simple_light["camera_ws"];         
+    uniform_t uni_sl_projection_matrix = simple_light["projection_matrix"];
+    uniform_t uni_sl_view_matrix       = simple_light["view_matrix"];      
+    uniform_t uni_sl_time              = simple_light["time"];             
+    uniform_t uni_sl_light_ws          = simple_light["light_ws"];         
+    uniform_t uni_sl_camera_ws         = simple_light["camera_ws"];         
 
     simple_light["solid_scale"] = 1.0f;
     simple_light["diffuse_tex"] = 0;
-    simple_light["normal_tex"] = 1;
+    simple_light["normal_tex"] = 4;
 
     glm::vec4 shift_rotor[128];
 
@@ -414,10 +457,20 @@ int main(int argc, char *argv[])
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    uniform_projection_matrix = window.camera.projection_matrix;
 
     float t = 0.0f;
+
     const int half_res_x = res_x / 2;
+    const int half_res_y = res_y / 2;
+    const int margin_x = 16;
+    const int margin_y = half_res_y - half_res_x / 2 + margin_x;
+
+    const glm::ivec4 left_vp  = glm::ivec4(margin_x, margin_y, half_res_x - 2 * margin_x, res_y - 2 * margin_y);
+    const glm::ivec4 right_vp = glm::ivec4(half_res_x + margin_x, margin_y, half_res_x - 2 * margin_x, res_y - 2 * margin_y);
+
+    window.camera.infinite_perspective(constants::two_pi / 6.0f, 1.0, 0.5f);
+    uni_sl_projection_matrix = window.camera.projection_matrix;
+
     //===================================================================================================================================================================================================================
     // The main loop
     //===================================================================================================================================================================================================================
@@ -429,32 +482,29 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // wait for the compute shader to finish its work and show both original and processed image
         //===============================================================================================================================================================================================================
-        glViewport(0, 0, res_x, res_y);
+        glViewport(left_vp.x, left_vp.y, left_vp.z, left_vp.w);
         quad_renderer.enable();
         glBindVertexArray(vao_id);
 
-        const float margin = 0.125;
-        float aspect = window.aspect();
+        uni_qr_teximage = window.texture;
+        uni_qr_texlevel = window.level;
 
-        uniform_quad = glm::vec4(-1.0f, -0.5f * aspect, 0.0f, 0.5f * aspect) + margin * glm::vec4(1.0f, aspect, -1.0f, -aspect);
-        uniform_teximage = 0;
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-
-        glViewport(half_res_x, 0, half_res_x, res_y);
+        glViewport(right_vp.x, right_vp.y, right_vp.z, right_vp.w);
         simple_light.enable();
 
         if (!window.pause)
             t += window.frame_dt;
 
-        uniform_time = t;
-        uniform_view_matrix = window.camera.view_matrix;
+        uni_sl_time = t;
+        uni_sl_view_matrix = window.camera.view_matrix;
     
         glm::vec3 light_ws = cell_size * glm::vec3(glm::cos(0.25f * t), glm::sin(0.25f * t), 2.0f);
-        uniform_light_ws = light_ws;
+        uni_sl_light_ws = light_ws;
 
         glm::vec3 camera_ws = window.camera.position();
-        uniform_camera_ws = camera_ws;
+        uni_sl_camera_ws = camera_ws;
 
         cube.instanced_render(64);
 
