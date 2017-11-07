@@ -42,7 +42,7 @@ void main()
         vec3 h = normalize(l + v);
         float cos_alpha = max(dot(h, b), 0.0f);
 
-        color += 0.15 * pow(cos_alpha, Ns) * specular_color;
+        //color += 0.15 * pow(cos_alpha, Ns) * specular_color;
     }
 
     FragmentColor = vec4(color, 1.0f);                 

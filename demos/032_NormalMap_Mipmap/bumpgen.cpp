@@ -21,16 +21,18 @@
 #include "polyhedron.hpp"
 #include "plato.hpp"
 
+const int MAX_LOD = 7;
+
 struct demo_window_t : public imgui_window_t
 {
-    const int MAX_LOD = 5;
     int texture = 0;
     int level = 0;
     bool pause = false;
     camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
+          camera(32.0, 0.125, glm::mat4(1.0f))        
     {
         gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
     }
@@ -51,7 +53,7 @@ struct demo_window_t : public imgui_window_t
         if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
         {
             texture++;
-            if (texture > 6) texture = 0;
+            if (texture > 4) texture = 0;
         }
 
         if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
@@ -159,86 +161,6 @@ const char* internal_format_name(GLint format)
     return "Unknown";
 }
 
-struct gauss_kernel_t
-{
-    const double sigma = 4.0;
-    const double gamma = 0.5 / (sigma * sigma);
-
-    double operator () (int l)
-        { return exp(-gamma * l * l); }
-};
-
-struct separable_filter_t
-{
-    static const int MAX_KERNEL_SIZE = 16;
-    int kernel_size;
-    glsl_program_t conv1d;
-
-    uniform_t uni_kernel_size;
-    uniform_t uni_radius;
-    uniform_t uni_weight;
-    uniform_t uni_texel_size;
-    uniform_t uni_conv_axis;
-
-    uniform_t uni_input_tex;
-    uniform_t uni_conv_image;
-
-    separable_filter_t(const char* cs_file_name)
-        : conv1d(glsl_shader_t(GL_COMPUTE_SHADER, cs_file_name))
-    {
-        uni_kernel_size = conv1d["kernel_size"];
-        uni_radius      = conv1d["radius"];
-        uni_weight      = conv1d["weight"];
-        uni_texel_size  = conv1d["texel_size"];
-        uni_conv_axis   = conv1d["axis"];
-        uni_input_tex   = conv1d["input_tex"];
-        uni_conv_image  = conv1d["conv_image"];
-    }
-
-    void enable()
-        { conv1d.enable(); };
-
-    template<typename kernel_t> void set_kernel(int kernel_size)
-    {
-        separable_filter_t::kernel_size = kernel_size;
-
-        kernel_t kernel;
-        double weight_d[MAX_KERNEL_SIZE];
-        double total_weight = 0.0;
-        float weight_f[MAX_KERNEL_SIZE];
-        float radius_f[MAX_KERNEL_SIZE];
-
-        for(int p = 0; p < kernel_size; ++p)
-        {
-            int p2 = p + p;
-            double w0 = kernel(p2);
-            if (p == 0) w0 *= 0.5;
-            double w1 = kernel(p2 + 1);
-            double w = w0 + w1;
-            total_weight += w;
-            weight_d[p] = w;
-            radius_f[p] = p2 + w1 / w; 
-        }
-
-        double inv_factor = 0.5 / total_weight;
-
-        for(int p = 0; p < kernel_size; ++p)
-            weight_f[p] = inv_factor * weight_d[p];
-
-        uni_kernel_size = kernel_size;
-        glUniform1fv(uni_radius.location, kernel_size, radius_f);
-        glUniform1fv(uni_weight.location, kernel_size, weight_f);
-    }
-
-    void convolve(int input_tex, int output_image, int res_x, int res_y)
-    {
-        uni_input_tex = input_tex;
-        uni_conv_image = output_image;
-        glDispatchCompute(res_x >> 3, res_y >> 3, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    }
-};
-
 GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
 {
     GLuint tex_id;
@@ -254,16 +176,8 @@ GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum intern
     return tex_id;
 }
 
-GLuint generate_mipmap_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
+GLuint generate_mipmap_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format, GLsizei levels)
 {
-    GLsizei levels = 0;
-    GLsizei max_res = glm::max(res_x, res_y);
-    while(max_res)
-    {
-        max_res >>= 1;
-        levels++;
-    }
-
     GLuint tex_id;
     glActiveTexture(unit);
     glGenTextures(1, &tex_id);
@@ -304,97 +218,105 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE0);
     GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
-    GLint tex_res_x, tex_res_y;
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &tex_res_x);
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &tex_res_y);
-
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
 
-    GLuint blurred_tex_id      = generate_mipmap_texture(GL_TEXTURE1, tex_res_x, tex_res_y, GL_RGBA32F);
-    GLuint luma_tex_id         = generate_mipmap_texture(GL_TEXTURE2, tex_res_x, tex_res_y, GL_R32F);
-    GLuint luma_blurred_tex_id = generate_mipmap_texture(GL_TEXTURE3, tex_res_x, tex_res_y, GL_R32F);
-    GLuint normal_tex_id       = generate_mipmap_texture(GL_TEXTURE4, tex_res_x, tex_res_y, GL_RGBA32F);
-    GLuint aux_rgba_tex_id     = generate_mipmap_texture(GL_TEXTURE5, tex_res_x, tex_res_y, GL_RGBA32F);
-    GLuint aux_r_tex_id        = generate_mipmap_texture(GL_TEXTURE6, tex_res_x, tex_res_y, GL_R32F);
+    GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
+    for (int l = 0; l < MAX_LOD; ++l)
+    {
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, l, GL_TEXTURE_WIDTH,  &tex_res_x[l]);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, l, GL_TEXTURE_HEIGHT, &tex_res_y[l]);
+        debug_msg("\tLevel %u size = %u x %u", l, tex_res_x[l], tex_res_y[l]);
+    }
 
-    glBindImageTexture(0, diffuse_tex_id,      0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA32F);
-    glBindImageTexture(1, blurred_tex_id,      0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(2, luma_tex_id,         0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(3, luma_blurred_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-    glBindImageTexture(4, normal_tex_id,       0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(5, aux_rgba_tex_id,     0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(6, aux_r_tex_id,        0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+    GLuint luma_tex_id            = generate_mipmap_texture(GL_TEXTURE1, tex_res_x[0], tex_res_y[0], GL_R32F,    MAX_LOD);
+    GLuint normal_tex_id          = generate_mipmap_texture(GL_TEXTURE2, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
+    GLuint normal_ext_tex_id      = generate_mipmap_texture(GL_TEXTURE3, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
+    GLuint normal_combined_tex_id = generate_mipmap_texture(GL_TEXTURE4, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
 
     //===================================================================================================================================================================================================================
-    // compute shader compilation and subroutine indices querying
+    // compute shader compilation
     //===================================================================================================================================================================================================================
-    glsl_program_t luminosity_filter  (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/luminosity_filter.cs"));
-    glsl_program_t normal_filter      (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal_filter.cs"));
+    glsl_program_t luminosity_filter    (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/luminosity_filter.cs"));
+    glsl_program_t normal_filter        (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal_filter.cs"));
+    glsl_program_t extension_filter     (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/extension_filter.cs"));
+    glsl_program_t level_combine_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/level_combine_filter.cs"));
 
-    //===================================================================================================================================================================================================================
-    // compute blurred diffuse map
-    //===================================================================================================================================================================================================================
-    float texel_size_x = 1.0f / tex_res_x;
-    float texel_size_y = 1.0f / tex_res_y;
-    glm::vec2 texel_size = glm::vec2(texel_size_x, texel_size_y);
-
-    separable_filter_t gauss_filter("glsl/conv1d_filter.cs");
-    gauss_filter.enable();
-    gauss_filter.set_kernel<gauss_kernel_t>(8);
-    gauss_filter.uni_texel_size = texel_size;
-    
-    gauss_filter.uni_conv_axis = glm::vec2(texel_size_x, 0.0f);
-    gauss_filter.convolve(0, 5, tex_res_x, tex_res_y);
-
-    gauss_filter.uni_conv_axis = glm::vec2(0.0f, texel_size_y);
-    gauss_filter.convolve(5, 1, tex_res_x, tex_res_y);
-
-    glActiveTexture(GL_TEXTURE1);
-    glGenerateMipmap(GL_TEXTURE_2D);
 
     //===================================================================================================================================================================================================================
-    // compute luminosity from diffuse map
+    // compute luminosity texture for each mip level
     //===================================================================================================================================================================================================================
     luminosity_filter.enable();
     uniform_t uni_lf_diffuse_tex = luminosity_filter["diffuse_tex"];
-    uniform_t uni_lf_luma_image = luminosity_filter["luma_image"];
-    uniform_t uni_lf_texel_size = luminosity_filter["texel_size"];
+    uniform_t uni_lf_luma_image  = luminosity_filter["luma_image"];
+    uniform_t uni_lf_tex_level   = luminosity_filter["tex_level"];
 
     uni_lf_diffuse_tex = 0;
-    uni_lf_luma_image = 2;
-    uni_lf_texel_size = texel_size;
-    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    uni_lf_luma_image = 1;
+
+    for (int l = 0; l < MAX_LOD; ++l)
+    {
+        uni_lf_tex_level = l;
+        glBindImageTexture(1, luma_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+        glDispatchCompute(tex_res_x[l] >> 3, tex_res_y[l] >> 3, 1);
+    }
+
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    glActiveTexture(GL_TEXTURE2);
-    glGenerateMipmap(GL_TEXTURE_2D);
+    //===================================================================================================================================================================================================================
+    // compute normal texture for each mip level
+    //===================================================================================================================================================================================================================
+    normal_filter.enable();
+    uniform_t uni_nf_luma_tex      = normal_filter["luma_tex"];
+    uniform_t uni_nf_inv_amplitude = normal_filter["inv_amplitude"];
+    uniform_t uni_nf_normal_image  = normal_filter["normal_image"];
+    uniform_t uni_nf_tex_level     = normal_filter["tex_level"];
 
-    //===================================================================================================================================================================================================================
-    // compute blurred luminosity map from blurred diffuse map
-    //===================================================================================================================================================================================================================
-    uni_lf_diffuse_tex = 1;
-    uni_lf_luma_image = 3;
-    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    uni_nf_luma_tex = 1;
+    uni_nf_normal_image = 2;
+
+    for (int l = 0; l < MAX_LOD; ++l)
+    {
+        uni_nf_tex_level = l;
+        uni_nf_inv_amplitude = 1.0f;
+        glBindImageTexture(2, normal_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glDispatchCompute(tex_res_x[l] >> 3, tex_res_y[l] >> 3, 1);
+    }
+
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    glActiveTexture(GL_TEXTURE3);
-    glGenerateMipmap(GL_TEXTURE_2D);
+    //===================================================================================================================================================================================================================
+    // extend normals with normal extension filter
+    //===================================================================================================================================================================================================================
+    extension_filter.enable();
+    uniform_t uni_ef_normal_tex   = extension_filter["normal_tex"];
+    uniform_t uni_ef_normal_image = extension_filter["normal_ext_image"];
+    uniform_t uni_ef_tex_level    = extension_filter["tex_level"];
+
+    uni_ef_normal_tex = 2;
+    uni_ef_normal_image = 3;
+
+    for (int l = 0; l < MAX_LOD; ++l)
+    {
+        uni_ef_tex_level = l;
+        glBindImageTexture(3, normal_ext_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glDispatchCompute(tex_res_x[l] >> 3, tex_res_y[l] >> 3, 1);
+    }
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     //===================================================================================================================================================================================================================
     // compute normal map from luminosity by using Sobel/Scharr derivative filters
     //===================================================================================================================================================================================================================
-    normal_filter.enable();
-    uniform_t uni_nf_luma_tex = normal_filter["luma_tex"];
-    uniform_t uni_nf_amplitude = normal_filter["amplitude"];
-    uniform_t uni_nf_texel_size = normal_filter["texel_size"];
-    uniform_t uni_nf_normal_image = normal_filter["normal_image"];
-    uni_nf_luma_tex = 1;
-    uni_nf_normal_image = 4;
-    uni_nf_amplitude = 4.0f;
-    uni_nf_texel_size = texel_size;
-    glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+    level_combine_filter.enable();
+    uniform_t uni_lc_normal_ext_tex = normal_filter["normal_ext_tex"];
+    uniform_t uni_lc_normal_combined_image = normal_filter["normal_combined_image"];
+
+    uni_lc_normal_ext_tex = 3;
+    uni_lc_normal_combined_image = 4;
+
+    glDispatchCompute(tex_res_x[0] >> 3, tex_res_y[0] >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     glActiveTexture(GL_TEXTURE4);
@@ -523,8 +445,7 @@ int main(int argc, char *argv[])
         glDisable(GL_BLEND);
     }
 
-    GLuint textures[] = {diffuse_tex_id, blurred_tex_id, luma_tex_id, luma_blurred_tex_id, normal_tex_id, aux_rgba_tex_id, aux_r_tex_id};
-
+    GLuint textures[] = {diffuse_tex_id, luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id};
     glDeleteTextures(sizeof(textures) / sizeof(GLuint), textures);
 
     //===================================================================================================================================================================================================================
