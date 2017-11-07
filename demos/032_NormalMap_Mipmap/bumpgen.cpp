@@ -76,8 +76,65 @@ struct demo_window_t : public imgui_window_t
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
 
+    //===================================================================================================================================================================================================================
+    // UI variables
+    //===================================================================================================================================================================================================================
+    char fps_str[32];
+    bool show_test_window = true;
+    bool show_another_window = true;
+    int e = 0;
+    float f1 = 0.123f, f2 = 0.0f;
+    bool blur0 = true;
+    bool blur1 = true;
+
     void update_ui()
     {
+        sprintf(fps_str, "Average FPS: %2.1f", fps());
+        set_title(fps_str);
+
+        if (show_another_window)
+        {
+            ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+            ImGui::Begin("Ambient Occlusion", &show_another_window);
+            ImGui::Text("Application average %.3f ms/frame (%.3f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+            if (ImGui::CollapsingHeader("Algorithms"))
+            {
+                ImGui::RadioButton("World-Space AO with normal + distance textures", &e, 0);
+                ImGui::RadioButton("Camera-Space AO with normal + distance textures", &e, 1);
+            }
+
+
+            if (ImGui::CollapsingHeader("Algorithm settings"))
+            {
+                switch(e)
+                {
+                    case 0:
+                        ImGui::SliderFloat("Radius", &f1,   0.0f,  1.0f, "%.4f");
+                        ImGui::SliderFloat("Bias",   &f2, -10.0f, 10.0f, "%.4f");
+                        ImGui::Checkbox("Use Blur", &blur0);
+                    break;
+
+                    case 1:
+                        ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
+                        ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
+                        ImGui::Checkbox("Use Blur", &blur1);
+                    break;
+
+                    default:
+                    break;
+                }
+            }
+
+            ImGui::End();
+        }
+
+        if (show_test_window)
+        {
+            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+            ImGui::ShowTestWindow(&show_test_window);            
+        }
+
     }
 };
 
@@ -136,7 +193,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
@@ -178,7 +235,7 @@ int main(int argc, char *argv[])
     {
         uni_lf_tex_level = l;
         glBindImageTexture(1, luma_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-        glDispatchCompute(tex_res_x[l] >> 3, tex_res_y[l] >> 3, 1);
+        glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
     }
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -200,7 +257,7 @@ int main(int argc, char *argv[])
         uni_nf_tex_level = l;
         uni_nf_inv_amplitude = 1.0f;
         glBindImageTexture(2, normal_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glDispatchCompute(tex_res_x[l] >> 3, tex_res_y[l] >> 3, 1);
+        glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
     }
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -220,7 +277,7 @@ int main(int argc, char *argv[])
     {
         uni_ef_tex_level = l;
         glBindImageTexture(3, normal_ext_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glDispatchCompute(tex_res_x[l] >> 3, tex_res_y[l] >> 3, 1);
+        glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
     }
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -236,7 +293,7 @@ int main(int argc, char *argv[])
     uni_lc_normal_combined_image = 4;
 
     glBindImageTexture(4, normal_combined_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-    glDispatchCompute(tex_res_x[0] >> 3, tex_res_y[0] >> 3, 1);
+    glDispatchCompute((tex_res_x[0] + 7) >> 3, (tex_res_y[0] + 7) >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     glActiveTexture(GL_TEXTURE4);

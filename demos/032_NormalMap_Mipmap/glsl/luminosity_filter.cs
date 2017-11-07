@@ -21,11 +21,12 @@ float luma_max_gc(vec3 rgb)
     { return pow(max(rgb.r, max(rgb.g, rgb.b)), 2.2); }
 
 float luma_p(vec3 rgb)
-    { return 1.0 - (1.0 - rgb.r) * (1.0 - rgb.g) * (1.0 - rgb.b); }
+    { return pow(1.0 - (1.0 - rgb.r) * (1.0 - rgb.g) * (1.0 - rgb.b), 2.2); }
 
 float luma(vec3 rgb)
 {
     return luma_p(rgb);
+    //return luma_bt709_gc(rgb);
 }
 
 //==============================================================================================================================================================

@@ -267,11 +267,11 @@ vec2 prewitt5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 
 vec2 derivative_filter(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
-    //return symm_diff(sampler, uv, texel_size, lod);
+    return symm_diff(sampler, uv, texel_size, lod);
     //return sobel3x3(sampler, uv, texel_size, lod);
     //return sobel5x5(sampler, uv, texel_size, lod);
     //return scharr3x3(sampler, uv, texel_size, lod);
-    return scharr5x5(sampler, uv, texel_size, lod);
+    //return scharr5x5(sampler, uv, texel_size, lod);
     //return prewitt3x3(sampler, uv, texel_size, lod);
     //return prewitt5x5(sampler, uv, texel_size, lod);
 }
@@ -290,7 +290,7 @@ void main()
     float lod = tex_level;
 
     vec2 dL = derivative_filter(luma_tex, uv, texel_size, lod);
-    vec3 n = normalize(vec3(-dL, inv_amplitude));
+    vec3 n = normalize(vec3(-1.8 * dL, inv_amplitude));
 
     imageStore(normal_image, P, vec4(0.5 + 0.5 * n, 1.0));
 }
