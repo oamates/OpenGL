@@ -4,7 +4,7 @@
 #include <cstdio>
 
 #include "log.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "glfw_window.hpp"
 #include "shader.hpp"
 #include "glsl_noise.hpp"
@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 
     int samples = 8;
     glfw_window_t window("GLSL Noise perfomance test", samples, 4, 0, 1920, 1080, true);
-    gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+    gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     
     //===================================================================================================================================================================================================================
     // Create the two textures required for the TEXTURE lookup noise implementations

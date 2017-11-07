@@ -14,7 +14,7 @@
 
 #include "log.hpp"
 #include "imgui_window.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "shader.hpp"
 #include "image.hpp"
 
@@ -81,7 +81,7 @@ struct demo_window_t : public imgui_window_t
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
 
         for (int i = 0; i < SUBROUTINE_COUNT; ++i)
             header_opened[i] = false;
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
     demo_window_t window("Image Filtering", 4, 4, 3, 1920, 1080, true);
-    gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
+    gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
 
     //===================================================================================================================================================================================================================
     // compute shader compilation and subroutine indices querying

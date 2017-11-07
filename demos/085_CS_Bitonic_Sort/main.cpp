@@ -5,7 +5,7 @@
 #include <random>
 
 #include "log.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "glfw_window.hpp"
 #include "shader.hpp"
 #include "sort.hpp"

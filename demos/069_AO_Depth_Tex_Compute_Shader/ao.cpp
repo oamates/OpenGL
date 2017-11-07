@@ -16,7 +16,7 @@
 
 #include "log.hpp"
 #include "constants.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "imgui_window.hpp"
 #include "camera.hpp"
 #include "shader.hpp"
@@ -48,7 +48,7 @@ struct demo_window_t : public imgui_window_t
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5f);
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
     //===================================================================================================================================================================================================================

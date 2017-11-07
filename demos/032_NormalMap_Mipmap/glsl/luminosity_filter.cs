@@ -14,9 +14,18 @@ float luma_bt709(vec3 rgb)
 float luma_bt709_gc(vec3 rgb)
     { return dot(pow(rgb, vec3(2.2f)), rgb_power_bt709); }
 
+float luma_max(vec3 rgb)
+    { return max(rgb.r, max(rgb.g, rgb.b)); }
+
+float luma_max_gc(vec3 rgb)
+    { return pow(max(rgb.r, max(rgb.g, rgb.b)), 2.2); }
+
+float luma_p(vec3 rgb)
+    { return 1.0 - (1.0 - rgb.r) * (1.0 - rgb.g) * (1.0 - rgb.b); }
+
 float luma(vec3 rgb)
 {
-    return luma_bt709_gc(rgb);
+    return luma_p(rgb);
 }
 
 //==============================================================================================================================================================

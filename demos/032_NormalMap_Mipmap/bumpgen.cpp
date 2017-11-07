@@ -14,7 +14,7 @@
 
 #include "log.hpp"
 #include "imgui_window.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "shader.hpp"
 #include "image.hpp"
 #include "camera.hpp"
@@ -32,9 +32,9 @@ struct demo_window_t : public imgui_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(32.0, 0.125, glm::mat4(1.0f))        
+          camera(4.0, 0.125, glm::mat4(1.0f))        
     {
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
+        gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
     }
 
     //===================================================================================================================================================================================================================
@@ -67,8 +67,6 @@ struct demo_window_t : public imgui_window_t
             level--;
             if (level < 0) level = 0;
         }
-
-
     }
 
     void on_mouse_move() override
@@ -83,83 +81,6 @@ struct demo_window_t : public imgui_window_t
     }
 };
 
-const char* internal_format_name(GLint format)
-{
-    switch (format)
-    {
-        /* Base Internal Formats */
-        case GL_DEPTH_COMPONENT : return "GL_DEPTH_COMPONENT";
-        case GL_DEPTH_STENCIL :   return "GL_DEPTH_STENCIL";
-        case GL_RED :             return "GL_RED";
-        case GL_RG :              return "GL_RG";
-        case GL_RGB :             return "GL_RGB";
-        case GL_RGBA :            return "GL_RGBA";
-
-        /* Sized Internal Formats */
-        case GL_R8 :              return "GL_R8";
-        case GL_R8_SNORM :        return "GL_R8_SNORM";
-        case GL_R16 :             return "GL_R16";
-        case GL_R16_SNORM :       return "GL_R16_SNORM";
-        case GL_RG8 :             return "GL_RG8";
-        case GL_RG8_SNORM :       return "GL_RG8_SNORM";
-        case GL_RG16 :            return "GL_RG16";
-        case GL_RG16_SNORM :      return "GL_RG16_SNORM";
-        case GL_R3_G3_B2 :        return "GL_R3_G3_B2";
-        case GL_RGB4 :            return "GL_RGB4";
-        case GL_RGB5 :            return "GL_RGB5";
-        case GL_RGB8 :            return "GL_RGB8";
-        case GL_RGB8_SNORM :      return "GL_RGB8_SNORM";
-        case GL_RGB10 :           return "GL_RGB10";
-        case GL_RGB12 :           return "GL_RGB12";
-        case GL_RGB16_SNORM :     return "GL_RGB16_SNORM";
-        case GL_RGBA2 :           return "GL_RGBA2";
-        case GL_RGBA4 :           return "GL_RGBA4";
-        case GL_RGB5_A1 :         return "GL_RGB5_A1";
-        case GL_RGBA8 :           return "GL_RGBA8";
-        case GL_RGBA8_SNORM :     return "GL_RGBA8_SNORM";
-        case GL_RGB10_A2 :        return "GL_RGB10_A2";
-        case GL_RGB10_A2UI :      return "GL_RGB10_A2UI";
-        case GL_RGBA12 :          return "GL_RGBA12";
-        case GL_RGBA16 :          return "GL_RGBA16";
-        case GL_SRGB8 :           return "GL_SRGB8";
-        case GL_SRGB8_ALPHA8 :    return "GL_SRGB8_ALPHA8";
-        case GL_R16F :            return "GL_R16F";
-        case GL_RG16F :           return "GL_RG16F";
-        case GL_RGB16F :          return "GL_RGB16F";
-        case GL_RGBA16F :         return "GL_RGBA16F";
-        case GL_R32F :            return "GL_R32F";
-        case GL_RG32F :           return "GL_RG32F";
-        case GL_RGB32F :          return "GL_RGB32F";
-        case GL_RGBA32F :         return "GL_RGBA32F";
-        case GL_R11F_G11F_B10F :  return "GL_R11F_G11F_B10F";
-        case GL_RGB9_E5 :         return "GL_RGB9_E5";
-        case GL_R8I :             return "GL_R8I";
-        case GL_R8UI :            return "GL_R8UI";
-        case GL_R16I :            return "GL_R16I";
-        case GL_R16UI :           return "GL_R16UI";
-        case GL_R32I :            return "GL_R32I";
-        case GL_R32UI :           return "GL_R32UI";
-        case GL_RG8I :            return "GL_RG8I";
-        case GL_RG8UI :           return "GL_RG8UI";
-        case GL_RG16I :           return "GL_RG16I";
-        case GL_RG16UI :          return "GL_RG16UI";
-        case GL_RG32I :           return "GL_RG32I";
-        case GL_RG32UI :          return "GL_RG32UI";
-        case GL_RGB8I :           return "GL_RGB8I";
-        case GL_RGB8UI :          return "GL_RGB8UI";
-        case GL_RGB16I :          return "GL_RGB16I";
-        case GL_RGB16UI :         return "GL_RGB16UI";
-        case GL_RGB32I :          return "GL_RGB32I";
-        case GL_RGB32UI :         return "GL_RGB32UI";
-        case GL_RGBA8I :          return "GL_RGBA8I";
-        case GL_RGBA8UI :         return "GL_RGBA8UI";
-        case GL_RGBA16I :         return "GL_RGBA16I";
-        case GL_RGBA16UI :        return "GL_RGBA16UI";
-        case GL_RGBA32I :         return "GL_RGBA32I";
-        case GL_RGBA32UI :        return "GL_RGBA32UI";
-    }
-    return "Unknown";
-}
 
 GLuint generate_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum internal_format)
 {
@@ -208,19 +129,18 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Texture units and that will be used for bump generation
     // Unit 0 : input diffuse texture, GL_RGBA32F
-    // Unit 1 : blurred diffuse texture, GL_RGBA32F
-    // Unit 2 : luminosity texture, GL_R32F
-    // Unit 3 : blurred luminosity texture, GL_R32F
-    // Unit 4 : normal texture, GL_RGBA32F
-    // Unit 6 : auxiliary texture, GL_RGBA32F
-    // Unit 7 : auxiliary texture, GL_R32F
+    // Unit 1 : luminosity texture, GL_R32F
+    // Unit 2 : normal texture, GL_RGBA32F
+    // Unit 3 : extended normal texture, GL_RGBA32F
+    // Unit 4 : combined normal texture, GL_RGBA32F
     //===================================================================================================================================================================================================================
+
     glActiveTexture(GL_TEXTURE0);
     GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
-    debug_msg("Texture internal format is %u. Format name = %s", internal_format, internal_format_name(internal_format));
+    debug_msg("Texture internal format is %u. Format name = %s", internal_format, gl_aux::internal_format_name(internal_format));
 
     GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
     for (int l = 0; l < MAX_LOD; ++l)
@@ -242,7 +162,6 @@ int main(int argc, char *argv[])
     glsl_program_t normal_filter        (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal_filter.cs"));
     glsl_program_t extension_filter     (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/extension_filter.cs"));
     glsl_program_t level_combine_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/level_combine_filter.cs"));
-
 
     //===================================================================================================================================================================================================================
     // compute luminosity texture for each mip level
@@ -310,12 +229,13 @@ int main(int argc, char *argv[])
     // compute normal map from luminosity by using Sobel/Scharr derivative filters
     //===================================================================================================================================================================================================================
     level_combine_filter.enable();
-    uniform_t uni_lc_normal_ext_tex = normal_filter["normal_ext_tex"];
-    uniform_t uni_lc_normal_combined_image = normal_filter["normal_combined_image"];
+    uniform_t uni_lc_normal_ext_tex = level_combine_filter["normal_ext_tex"];
+    uniform_t uni_lc_normal_combined_image = level_combine_filter["normal_combined_image"];
 
     uni_lc_normal_ext_tex = 3;
     uni_lc_normal_combined_image = 4;
 
+    glBindImageTexture(4, normal_combined_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     glDispatchCompute(tex_res_x[0] >> 3, tex_res_y[0] >> 3, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 

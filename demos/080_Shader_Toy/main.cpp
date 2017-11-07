@@ -9,7 +9,7 @@
 
 #include "log.hpp"
 #include "glfw_window.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "shader.hpp"
 #include "image.hpp"
 #include "glsl_noise.hpp"
@@ -25,7 +25,7 @@ struct demo_window_t : public glfw_window_t
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */),
           mouse_pos(0.0f, 0.0f, -1.0f)
     {
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         pause_ts = frame_ts;
     }
 

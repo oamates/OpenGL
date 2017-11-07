@@ -2,7 +2,7 @@
 // DEMO 001 : Empty OpenGL window
 //========================================================================================================================================================================================================================
 #include "log.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "glfw_window.hpp"
 
 //=======================================================================================================================================================================================================================
@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
     glfw_window_t window("Empty OpenGL 3.3 window", 4, 4, 3, 1920, 1080, true);
-    gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
+    gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup : background color -- dark blue

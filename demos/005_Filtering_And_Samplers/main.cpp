@@ -14,7 +14,7 @@
 
 #include "log.hpp"
 #include "constants.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "imgui_window.hpp"
 #include "shader.hpp"
 #include "vertex.hpp"
@@ -67,7 +67,7 @@ struct demo_window_t : public imgui_window_t
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);        
+        gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);        
     }
 
     void set_texture(int texture_index)

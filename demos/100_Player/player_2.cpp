@@ -14,7 +14,7 @@ extern "C"
 }
 
 #include "log.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "glfw_window.hpp"
 #include "shader.hpp"
 
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
     glfw_window_t window("YUV420P Video player", 4, 3, 3, 1280, 720, false /*, true */);
-    gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+    gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
 
     //===================================================================================================================================================================================================================
     // compile  shader

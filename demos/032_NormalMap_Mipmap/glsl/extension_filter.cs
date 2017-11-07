@@ -19,33 +19,22 @@ void main()
     vec2 uv0 = texel_size * (vec2(P) + 0.5);
 
     float lod = tex_level;
-    vec3 n = textureLod(normal_tex, uv0, lod).rgb;
-
-
-    imageStore(normal_ext_image, P, vec4(n, 1.0));
-}
-
-/*
-subroutine(filterModeType) vec4 mode_normal_expansion_filter()
-{
-    vec3 filt  = vec3(0);
-    float wtotal = 0.0;
-    int radius   = int(gui_filter_radius);
+    vec3 n = vec3(0.0);
+    const int radius = 3;
 
     for(int i = -radius; i <= radius; i++)
     {
         for(int j = -radius; j <= radius; j++)
         {
-            vec2 coords = vec2(v2QuadCoords.xy + vec2(i,j) * dxy);
-            vec3 normal = normalize(2*texture(layerA,coords).xyz-1);
+            vec2 p = vec2(i, j);
+            vec2 uv = uv0 + texel_size * vec2(i, j);
+            vec3 normal = 2.0 * texture(normal_tex, uv, lod).rgb - 1.0;
+            float l = pow(length(normal.xy), 2.4);
 
-            float w = mix(length(normal.xy), 1 / (20 * gaussian(vec2(i, j), gui_filter_radius) * length(normal.xy) + 1), gui_normal_flatting + 0.001);
-            wtotal += w;
-            filt += normal * w;
+            n += l * exp2(-length(p)) * normal;
         }
     }
 
-    filt /= (wtotal);                                                               // normalization
-    return vec4(0.5 * normalize(filt) + 0.5, 1.0f);
+    n = normalize(n);
+    imageStore(normal_ext_image, P, vec4(0.5 + 0.5 * n, 1.0));
 }
-*/

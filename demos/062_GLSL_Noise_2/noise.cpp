@@ -14,7 +14,7 @@
 
 #include "log.hpp"
 #include "constants.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "glfw_window.hpp"
 #include "utils.hpp"
 #include "vao.hpp"
@@ -40,7 +40,7 @@ struct demo_window_t : public glfw_window_t
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, frue */)
     {
-        gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+        gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         camera.view_matrix = glm::translate(glm::vec3(0.0f, 0.0f, -9000.0f));
     }

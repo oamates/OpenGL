@@ -12,7 +12,7 @@
 #include <glm/gtx/transform.hpp>
 
 #include "log.hpp"
-#include "gl_info.hpp"
+#include "gl_aux.hpp"
 #include "glfw_window.hpp"
 #include "shader.hpp"
 
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
     glfw_window_t window("Ray Tracer", 8, 4, 0, 1920, 1080, true /*, true */);
-    gl_info::dump(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
+    gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
 
     //===================================================================================================================================================================================================================
     // shaders

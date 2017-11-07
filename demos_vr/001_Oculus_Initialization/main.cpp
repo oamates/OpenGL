@@ -7,8 +7,6 @@
 #include <glm/glm.hpp>
 
 #include "log.hpp"
-#include "gl_info.hpp"
-#include "glfw_window.hpp"
 #include "constants.hpp"
 
 #include "ovr/ovr_hmd.hpp"
