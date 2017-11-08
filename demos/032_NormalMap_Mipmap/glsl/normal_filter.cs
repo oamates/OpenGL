@@ -8,10 +8,13 @@ layout (rgba32f) uniform image2D normal_image;
 uniform float inv_amplitude;
 uniform int tex_level;
 
+subroutine vec2 derivative_filter_func(sampler2D sampler, vec2 uv, vec2 texel_size, float lod);
+subroutine uniform derivative_filter_func derivative_func;
+
 //==============================================================================================================================================================
 // Symmetric difference filter : 4 texture reads
 //==============================================================================================================================================================
-vec2 symm_diff(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 symm_diff(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float SYMM_DIFF_NORMALIZATION_FACTOR = 1.0f / 2.0f;
 
@@ -31,7 +34,7 @@ vec2 symm_diff(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 //==============================================================================================================================================================
 // Sobel 3x3 filter : 8 texture reads
 //==============================================================================================================================================================
-vec2 sobel3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 sobel3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float SOBEL_3x3_NORMALIZATION_FACTOR = 1.0f / 8.0f;
 
@@ -57,7 +60,7 @@ vec2 sobel3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 //==============================================================================================================================================================
 // Sobel 5x5 filter : 24 texture reads
 //==============================================================================================================================================================
-vec2 sobel5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 sobel5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float SOBEL_5x5_NORMALIZATION_FACTOR = 1.0f / 96.0f;
 
@@ -113,7 +116,7 @@ vec2 sobel5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 //==============================================================================================================================================================
 // Scharr 3x3 filter : 8 texture reads
 //==============================================================================================================================================================
-vec2 scharr3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 scharr3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float SCHARR_3x3_NORMALIZATION_FACTOR = 1.0f / 32.0f;
 
@@ -139,7 +142,7 @@ vec2 scharr3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 //==============================================================================================================================================================
 // Scharr 5x5 filter : 24 texture reads
 //==============================================================================================================================================================
-vec2 scharr5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 scharr5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float SCHARR_5x5_NORMALIZATION_FACTOR = 1.0f / 42.0f;
 
@@ -195,7 +198,7 @@ vec2 scharr5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 //==============================================================================================================================================================
 // Prewitt 3x3 filter : 8 texture reads
 //==============================================================================================================================================================
-vec2 prewitt3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 prewitt3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float PREWITT_3x3_NORMALIZATION_FACTOR = 1.0f / 6.0f;
 
@@ -221,7 +224,7 @@ vec2 prewitt3x3(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 //==============================================================================================================================================================
 // Prewitt 5x5 filter : 24 texture reads
 //==============================================================================================================================================================
-vec2 prewitt5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+subroutine(derivative_filter_func) vec2 prewitt5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float PREWITT_5x5_NORMALIZATION_FACTOR = 1.0f / 30.0f;
 
@@ -265,17 +268,6 @@ vec2 prewitt5x5(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
     return PREWITT_5x5_NORMALIZATION_FACTOR * dL;
 }
 
-vec2 derivative_filter(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
-{
-    return symm_diff(sampler, uv, texel_size, lod);
-    //return sobel3x3(sampler, uv, texel_size, lod);
-    //return sobel5x5(sampler, uv, texel_size, lod);
-    //return scharr3x3(sampler, uv, texel_size, lod);
-    //return scharr5x5(sampler, uv, texel_size, lod);
-    //return prewitt3x3(sampler, uv, texel_size, lod);
-    //return prewitt5x5(sampler, uv, texel_size, lod);
-}
-
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
@@ -289,7 +281,7 @@ void main()
     vec2 uv = texel_size * (vec2(P) + 0.5);
     float lod = tex_level;
 
-    vec2 dL = derivative_filter(luma_tex, uv, texel_size, lod);
+    vec2 dL = derivative_func(luma_tex, uv, texel_size, lod);
     vec3 n = normalize(vec3(-1.8 * dL, inv_amplitude));
 
     imageStore(normal_image, P, vec4(0.5 + 0.5 * n, 1.0));

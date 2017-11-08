@@ -23,6 +23,40 @@
 
 const int MAX_LOD = 7;
 
+struct subroutine_t
+{
+    const char* name;
+    const char* description;
+    GLint index;
+};
+
+subroutine_t luma_subroutines[] = 
+{
+    {"luma_bt709",      "BT.709 luminosity function",                                  -1},
+    {"luma_bt709_gc",   "BT.709 luminosity function with gamma-correction",            -1},
+    {"luma_max",        "L = max(r, g, b) luminosity function",                        -1},
+    {"luma_max_gc",     "L = max(r, g, b) luminosity function with gamma-correction",  -1},
+    {"luma_product",    "L = 1 - (1 - r)*(1 - g)*(1 - b) luminosity function",         -1},
+    {"luma_product_gc", "L = 1 - (1 - r)*(1 - g)*(1 - r) luminosity function with gc", -1},
+    {"luma_laplace",    "Laplace filter",                                              -1},
+    {"luma_laplace_gc", "Laplace filter with gamma-correction",                        -1}
+};
+
+const int LUMA_SUBROUTINES = sizeof(luma_subroutines) / sizeof(subroutine_t);
+
+subroutine_t derivative_subroutines[] = 
+{
+    {"symm_diff",  "Symmetric difference derivative routine (4 texture fetches)", -1},
+    {"sobel3x3",   "Sobel 3x3 filter (8 fetches)",                                -1},
+    {"sobel5x5",   "Sobel 5x5 filter (24 fetches)",                               -1},
+    {"scharr3x3",  "Scharr 3x3 filter (8)",                                       -1},
+    {"scharr5x5",  "Scharr 5x5 filter (24)",                                      -1},
+    {"prewitt3x3", "Prewitt 3x3 filter (8)",                                      -1},
+    {"prewitt5x5", "Prewitt 5x5 filter (24)",                                     -1}
+};
+
+const int DERIVATIVE_SUBROUTINES = sizeof(derivative_subroutines) / sizeof(subroutine_t);
+
 struct demo_window_t : public imgui_window_t
 {
     int texture = 0;
@@ -32,7 +66,7 @@ struct demo_window_t : public imgui_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(4.0, 0.125, glm::mat4(1.0f))        
+          camera(32.0, 0.125, glm::mat4(1.0f))        
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
     }
@@ -79,62 +113,59 @@ struct demo_window_t : public imgui_window_t
     //===================================================================================================================================================================================================================
     // UI variables
     //===================================================================================================================================================================================================================
-    char fps_str[32];
-    bool show_test_window = true;
-    bool show_another_window = true;
-    int e = 0;
+    int step = 0;
+    int luma_subroutine = 0;
+    int derivative_subroutine = 0;
+
     float f1 = 0.123f, f2 = 0.0f;
     bool blur0 = true;
     bool blur1 = true;
 
     void update_ui()
     {
-        sprintf(fps_str, "Average FPS: %2.1f", fps());
-        set_title(fps_str);
+        ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+        ImGui::Begin("Normalmap generator settings", 0);
+        ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);
 
-        if (show_another_window)
+        if (ImGui::CollapsingHeader("Compute steps"))
         {
-            ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
-            ImGui::Begin("Ambient Occlusion", &show_another_window);
-            ImGui::Text("Application average %.3f ms/frame (%.3f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-            if (ImGui::CollapsingHeader("Algorithms"))
-            {
-                ImGui::RadioButton("World-Space AO with normal + distance textures", &e, 0);
-                ImGui::RadioButton("Camera-Space AO with normal + distance textures", &e, 1);
-            }
-
-
-            if (ImGui::CollapsingHeader("Algorithm settings"))
-            {
-                switch(e)
-                {
-                    case 0:
-                        ImGui::SliderFloat("Radius", &f1,   0.0f,  1.0f, "%.4f");
-                        ImGui::SliderFloat("Bias",   &f2, -10.0f, 10.0f, "%.4f");
-                        ImGui::Checkbox("Use Blur", &blur0);
-                    break;
-
-                    case 1:
-                        ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
-                        ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
-                        ImGui::Checkbox("Use Blur", &blur1);
-                    break;
-
-                    default:
-                    break;
-                }
-            }
-
-            ImGui::End();
+            ImGui::RadioButton("Luminosity filter", &step, 0);
+            ImGui::RadioButton("Initial normal computation filter", &step, 1);
+            ImGui::RadioButton("Normal extension filter", &step, 2);
+            ImGui::RadioButton("Mipmap levels combine filter", &step, 3);
         }
 
-        if (show_test_window)
+        if (ImGui::CollapsingHeader("Algorithm settings"))
         {
-            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-            ImGui::ShowTestWindow(&show_test_window);            
+            switch(step)
+            {
+                case 0:
+                    for(int l = 0; l < LUMA_SUBROUTINES; ++l)
+                        ImGui::RadioButton(luma_subroutines[l].description, &luma_subroutine, l);
+                break;
+
+                case 1:
+                    for(int l = 0; l < DERIVATIVE_SUBROUTINES; ++l)
+                        ImGui::RadioButton(derivative_subroutines[l].description, &derivative_subroutine, l);
+                break;
+
+                case 2:
+                    ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
+                    ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
+                    ImGui::Checkbox("Use Blur", &blur1);
+                break;
+                default:    // 3
+                    ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
+                    ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
+                    ImGui::Checkbox("Use Blur", &blur1);
+                break;
+            }
         }
 
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+        ImGui::ShowTestWindow(0);            
     }
 };
 
@@ -169,6 +200,171 @@ GLuint generate_mipmap_texture(GLuint unit, GLsizei res_x, GLsizei res_y, GLenum
     return tex_id;
 }
 
+struct normalmap_generator_t
+{
+    int input_texture;
+
+    //===================================================================================================================================================================================================================
+    // compute shaders
+    //===================================================================================================================================================================================================================
+    glsl_program_t luminosity_filter;
+    glsl_program_t normal_filter;
+    glsl_program_t extension_filter;
+    glsl_program_t level_combine_filter;
+
+    //===================================================================================================================================================================================================================
+    // luminosity shader uniforms
+    //===================================================================================================================================================================================================================
+    uniform_t uni_lf_diffuse_tex,
+              uni_lf_luma_image,
+              uni_lf_tex_level;
+
+    //===================================================================================================================================================================================================================
+    // normal compute shader uniforms
+    //===================================================================================================================================================================================================================
+    uniform_t uni_nf_luma_tex,
+              uni_nf_inv_amplitude,
+              uni_nf_normal_image,
+              uni_nf_tex_level;
+
+    //===================================================================================================================================================================================================================
+    // normal extension compute shader uniforms
+    //===================================================================================================================================================================================================================
+    uniform_t uni_ef_normal_tex,
+              uni_ef_normal_image,
+              uni_ef_tex_level;
+
+    //===================================================================================================================================================================================================================
+    // normal combine compute shader uniforms
+    //===================================================================================================================================================================================================================
+    uniform_t uni_lc_normal_ext_tex,
+              uni_lc_normal_combined_image;
+
+
+    GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
+
+    GLuint luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id;
+
+    normalmap_generator_t(GLuint input_texture) :
+        input_texture(input_texture),
+        luminosity_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/luminosity_filter.cs")),
+        normal_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal_filter.cs")),
+        extension_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/extension_filter.cs")),
+        level_combine_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/level_combine_filter.cs"))
+    {
+        uni_lf_diffuse_tex   = luminosity_filter["diffuse_tex"];
+        uni_lf_luma_image    = luminosity_filter["luma_image"];
+        uni_lf_tex_level     = luminosity_filter["tex_level"];
+
+        uni_nf_luma_tex      = normal_filter["luma_tex"];
+        uni_nf_inv_amplitude = normal_filter["inv_amplitude"];
+        uni_nf_normal_image  = normal_filter["normal_image"];
+        uni_nf_tex_level     = normal_filter["tex_level"];
+
+        uni_ef_normal_tex    = extension_filter["normal_tex"];
+        uni_ef_normal_image  = extension_filter["normal_ext_image"];
+        uni_ef_tex_level     = extension_filter["tex_level"];
+
+        uni_lc_normal_ext_tex        = level_combine_filter["normal_ext_tex"];
+        uni_lc_normal_combined_image = level_combine_filter["normal_combined_image"];
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, input_texture);
+
+        for (int l = 0; l < MAX_LOD; ++l)
+        {
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, l, GL_TEXTURE_WIDTH,  &tex_res_x[l]);
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, l, GL_TEXTURE_HEIGHT, &tex_res_y[l]);
+            debug_msg("\tLevel %u size = %u x %u", l, tex_res_x[l], tex_res_y[l]);
+        }
+
+        luma_tex_id            = generate_mipmap_texture(GL_TEXTURE1, tex_res_x[0], tex_res_y[0], GL_R32F,    MAX_LOD);
+        normal_tex_id          = generate_mipmap_texture(GL_TEXTURE2, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
+        normal_ext_tex_id      = generate_mipmap_texture(GL_TEXTURE3, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
+        normal_combined_tex_id = generate_mipmap_texture(GL_TEXTURE4, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
+    }
+
+    //===================================================================================================================================================================================================================
+    // compute luminosity texture for each mip level
+    //===================================================================================================================================================================================================================
+    void compute_luminosity()
+    {
+        luminosity_filter.enable();
+        uni_lf_diffuse_tex = 0;
+        uni_lf_luma_image = 1;
+
+        for (int l = 0; l < MAX_LOD; ++l)
+        {
+            uni_lf_tex_level = l;
+            glBindImageTexture(1, luma_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+            glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
+        }
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+    //===================================================================================================================================================================================================================
+    // compute normal texture for each mip level
+    //===================================================================================================================================================================================================================
+    void compute_normals()
+    {
+        normal_filter.enable();
+        uni_nf_luma_tex = 1;
+        uni_nf_normal_image = 2;
+
+        for (int l = 0; l < MAX_LOD; ++l)
+        {
+            uni_nf_tex_level = l;
+            uni_nf_inv_amplitude = 1.0f;
+            glBindImageTexture(2, normal_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+            glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
+        }
+
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+    //===================================================================================================================================================================================================================
+    // extend normals with normal extension filter
+    //===================================================================================================================================================================================================================
+    void extend_normals()
+    {
+        extension_filter.enable();
+        uni_ef_normal_tex = 2;
+        uni_ef_normal_image = 3;
+
+        for (int l = 0; l < MAX_LOD; ++l)
+        {
+            uni_ef_tex_level = l;
+            glBindImageTexture(3, normal_ext_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+            glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
+        }
+
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+    //===================================================================================================================================================================================================================
+    // mipmap levels combine filter
+    //===================================================================================================================================================================================================================
+    void combine_mip_levels()
+    {
+        level_combine_filter.enable();
+        uni_lc_normal_ext_tex = 3;
+        uni_lc_normal_combined_image = 4;
+
+        glBindImageTexture(4, normal_combined_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glDispatchCompute((tex_res_x[0] + 7) >> 3, (tex_res_y[0] + 7) >> 3, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        glActiveTexture(GL_TEXTURE4);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    ~normalmap_generator_t()
+    {
+        GLuint tex_ids[] = {luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id};
+        glDeleteTextures(4, tex_ids);
+    }
+};
+
 int main(int argc, char *argv[])
 {
     const int res_x = 1920;
@@ -199,105 +395,12 @@ int main(int argc, char *argv[])
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, gl_aux::internal_format_name(internal_format));
 
-    GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
-    for (int l = 0; l < MAX_LOD; ++l)
-    {
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, l, GL_TEXTURE_WIDTH,  &tex_res_x[l]);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, l, GL_TEXTURE_HEIGHT, &tex_res_y[l]);
-        debug_msg("\tLevel %u size = %u x %u", l, tex_res_x[l], tex_res_y[l]);
-    }
+    normalmap_generator_t normalmap_generator(diffuse_tex_id);
 
-    GLuint luma_tex_id            = generate_mipmap_texture(GL_TEXTURE1, tex_res_x[0], tex_res_y[0], GL_R32F,    MAX_LOD);
-    GLuint normal_tex_id          = generate_mipmap_texture(GL_TEXTURE2, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
-    GLuint normal_ext_tex_id      = generate_mipmap_texture(GL_TEXTURE3, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
-    GLuint normal_combined_tex_id = generate_mipmap_texture(GL_TEXTURE4, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
-
-    //===================================================================================================================================================================================================================
-    // compute shader compilation
-    //===================================================================================================================================================================================================================
-    glsl_program_t luminosity_filter    (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/luminosity_filter.cs"));
-    glsl_program_t normal_filter        (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal_filter.cs"));
-    glsl_program_t extension_filter     (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/extension_filter.cs"));
-    glsl_program_t level_combine_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/level_combine_filter.cs"));
-
-    //===================================================================================================================================================================================================================
-    // compute luminosity texture for each mip level
-    //===================================================================================================================================================================================================================
-    luminosity_filter.enable();
-    uniform_t uni_lf_diffuse_tex = luminosity_filter["diffuse_tex"];
-    uniform_t uni_lf_luma_image  = luminosity_filter["luma_image"];
-    uniform_t uni_lf_tex_level   = luminosity_filter["tex_level"];
-
-    uni_lf_diffuse_tex = 0;
-    uni_lf_luma_image = 1;
-
-    for (int l = 0; l < MAX_LOD; ++l)
-    {
-        uni_lf_tex_level = l;
-        glBindImageTexture(1, luma_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-        glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
-    }
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    //===================================================================================================================================================================================================================
-    // compute normal texture for each mip level
-    //===================================================================================================================================================================================================================
-    normal_filter.enable();
-    uniform_t uni_nf_luma_tex      = normal_filter["luma_tex"];
-    uniform_t uni_nf_inv_amplitude = normal_filter["inv_amplitude"];
-    uniform_t uni_nf_normal_image  = normal_filter["normal_image"];
-    uniform_t uni_nf_tex_level     = normal_filter["tex_level"];
-
-    uni_nf_luma_tex = 1;
-    uni_nf_normal_image = 2;
-
-    for (int l = 0; l < MAX_LOD; ++l)
-    {
-        uni_nf_tex_level = l;
-        uni_nf_inv_amplitude = 1.0f;
-        glBindImageTexture(2, normal_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
-    }
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    //===================================================================================================================================================================================================================
-    // extend normals with normal extension filter
-    //===================================================================================================================================================================================================================
-    extension_filter.enable();
-    uniform_t uni_ef_normal_tex   = extension_filter["normal_tex"];
-    uniform_t uni_ef_normal_image = extension_filter["normal_ext_image"];
-    uniform_t uni_ef_tex_level    = extension_filter["tex_level"];
-
-    uni_ef_normal_tex = 2;
-    uni_ef_normal_image = 3;
-
-    for (int l = 0; l < MAX_LOD; ++l)
-    {
-        uni_ef_tex_level = l;
-        glBindImageTexture(3, normal_ext_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
-    }
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    //===================================================================================================================================================================================================================
-    // compute normal map from luminosity by using Sobel/Scharr derivative filters
-    //===================================================================================================================================================================================================================
-    level_combine_filter.enable();
-    uniform_t uni_lc_normal_ext_tex = level_combine_filter["normal_ext_tex"];
-    uniform_t uni_lc_normal_combined_image = level_combine_filter["normal_combined_image"];
-
-    uni_lc_normal_ext_tex = 3;
-    uni_lc_normal_combined_image = 4;
-
-    glBindImageTexture(4, normal_combined_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-    glDispatchCompute((tex_res_x[0] + 7) >> 3, (tex_res_y[0] + 7) >> 3, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    glActiveTexture(GL_TEXTURE4);
-    glGenerateMipmap(GL_TEXTURE_2D);
+    normalmap_generator.compute_luminosity();
+    normalmap_generator.compute_normals();
+    normalmap_generator.extend_normals();
+    normalmap_generator.combine_mip_levels();
 
     //===================================================================================================================================================================================================================
     // quad rendering shader and fake VAO for rendering quads
@@ -407,8 +510,6 @@ int main(int argc, char *argv[])
 
         cube.instanced_render(64);
 
-        window.end_frame();
-
         //===============================================================================================================================================================================================================
         // After end_frame call ::
         //  - GL_DEPTH_TEST is disabled
@@ -418,16 +519,16 @@ int main(int argc, char *argv[])
         //  - VAO binding is destroyed
         //===============================================================================================================================================================================================================
         window.end_frame();
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
         glDisable(GL_SCISSOR_TEST);
         glDisable(GL_BLEND);
     }
 
-    GLuint textures[] = {diffuse_tex_id, luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id};
-    glDeleteTextures(sizeof(textures) / sizeof(GLuint), textures);
-
     //===================================================================================================================================================================================================================
     // terminate the program and exit
     //===================================================================================================================================================================================================================
+    glDeleteTextures(1, &diffuse_tex_id);
     glfw::terminate();
     return 0;
 }
