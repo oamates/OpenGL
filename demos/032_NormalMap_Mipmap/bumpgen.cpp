@@ -25,19 +25,24 @@ const int MAX_LOD = 7;
 
 struct normalmap_params_t
 {
-    int luma_subroutine = 0;                            /* luminosity computation subroutine index */
-    int derivative_subroutine = 0;                      /* derivative subroutine index */
-    float extension_radius = 3.0f;                      /* normal extension radius, in pixels */
+    int luma_subroutine;                                /* luminosity computation subroutine index */
+    float gamma;                                        /* gamma parameter used in luminosity conversion */
+    float brightness;                                   /* brightness factor used in luminosity conversion */
+    int derivative_subroutine;                          /* derivative subroutine index */
+    float radius;                                       /* normal extension radius, in pixels */
+    float sharpness;                                    /* normal extension sharpness */
     float lod_intensity[MAX_LOD];                       /* intensities of the LOD input into final blended normal */
 
     normalmap_params_t()
     {
         luma_subroutine = 0;
+        gamma = 2.2f;
+        brightness = 1.0f;
         derivative_subroutine = 0;
-        extension_radius = 3.0f;
+        radius = 3.0f;
+        sharpness = 1.0f;
         for(int i = 0; i < MAX_LOD; ++i)
             lod_intensity[i] = 0.0f;
-
     }
 };
 
@@ -92,7 +97,7 @@ struct demo_window_t : public imgui_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(32.0, 0.125, glm::mat4(1.0f))        
+          camera(8.0, 0.125, glm::mat4(1.0f))        
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
     }
@@ -130,6 +135,8 @@ struct demo_window_t : public imgui_window_t
         {
             for(int i = 0; i < LUMA_SUBROUTINES; ++i)
                 params_changed |= ImGui::RadioButton(luma_subroutines[i].description, &normalmap_params.luma_subroutine, i);
+            params_changed |= ImGui::SliderFloat("Gamma", &normalmap_params.gamma, 1.0f, 4.0f, "%.3f");
+            params_changed |= ImGui::SliderFloat("Brightness", &normalmap_params.brightness, 0.0f, 8.0f, "%.3f");
         }
 
         if (ImGui::CollapsingHeader("Initial normal computation filter settings"))
@@ -140,7 +147,8 @@ struct demo_window_t : public imgui_window_t
 
         if (ImGui::CollapsingHeader("Normal extension filter"))
         {
-            params_changed |= ImGui::SliderFloat("Extension radius", &normalmap_params.extension_radius, 0.0f, 1.0f, "%.3f");
+            params_changed |= ImGui::SliderFloat("Extension radius", &normalmap_params.radius, 1.0f, 16.0f, "%.3f");
+            params_changed |= ImGui::SliderFloat("Sharpness", &normalmap_params.sharpness, 0.125f, 8.0f, "%.3f");
         }
 
         if (ImGui::CollapsingHeader("Mipmap levels combine filter"))
@@ -226,7 +234,9 @@ struct normalmap_generator_t
     //===================================================================================================================================================================================================================
     uniform_t uni_lf_diffuse_tex,
               uni_lf_luma_image,
-              uni_lf_tex_level;
+              uni_lf_tex_level,
+              uni_lf_gamma,
+              uni_lf_brightness;
 
     GLuint luma_subroutine_index[LUMA_SUBROUTINES];
 
@@ -246,7 +256,8 @@ struct normalmap_generator_t
     uniform_t uni_ef_normal_tex,
               uni_ef_normal_image,
               uni_ef_tex_level,
-              uni_ef_extension_radius;
+              uni_ef_radius,
+              uni_ef_sharpness;
 
     //===================================================================================================================================================================================================================
     // normal combine compute shader uniforms
@@ -269,6 +280,8 @@ struct normalmap_generator_t
         uni_lf_diffuse_tex   = luminosity_filter["diffuse_tex"];
         uni_lf_luma_image    = luminosity_filter["luma_image"];
         uni_lf_tex_level     = luminosity_filter["tex_level"];
+        uni_lf_gamma         = luminosity_filter["gamma"];
+        uni_lf_brightness    = luminosity_filter["brightness"];
 
         for(int i = 0; i < LUMA_SUBROUTINES; ++i)
             luma_subroutine_index[i] = luminosity_filter.subroutine_index(GL_COMPUTE_SHADER, luma_subroutines[i].name);
@@ -284,7 +297,8 @@ struct normalmap_generator_t
         uni_ef_normal_tex       = extension_filter["normal_tex"];
         uni_ef_normal_image     = extension_filter["normal_ext_image"];
         uni_ef_tex_level        = extension_filter["tex_level"];
-        uni_ef_extension_radius = extension_filter["extension_radius"];
+        uni_ef_radius           = extension_filter["radius"];
+        uni_ef_sharpness        = extension_filter["sharpness"];
 
         uni_lc_normal_ext_tex        = level_combine_filter["normal_ext_tex"];
         uni_lc_normal_combined_image = level_combine_filter["normal_combined_image"];
@@ -314,6 +328,8 @@ struct normalmap_generator_t
         luminosity_filter.enable();
         uni_lf_diffuse_tex = 0;
         uni_lf_luma_image = 1;
+        uni_lf_gamma = params.gamma;
+        uni_lf_brightness = params.brightness;
 
         uniform_t::subroutine(GL_COMPUTE_SHADER, &luma_subroutine_index[params.luma_subroutine]);
 
@@ -356,7 +372,8 @@ struct normalmap_generator_t
         extension_filter.enable();
         uni_ef_normal_tex = 2;
         uni_ef_normal_image = 3;
-        uni_ef_extension_radius = params.extension_radius;
+        uni_ef_radius = params.radius;
+        uni_ef_sharpness = params.sharpness;
 
         for (int l = 0; l < MAX_LOD; ++l)
         {
