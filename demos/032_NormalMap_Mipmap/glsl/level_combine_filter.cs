@@ -2,10 +2,12 @@
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-const int MAX_LOD = 4;
+const int MAX_LOD = 7;
 
 uniform sampler2D normal_ext_tex;
 layout (r32f) uniform image2D normal_combined_image;
+
+uniform float lod_intensity[MAX_LOD];
 
 //==============================================================================================================================================================
 // shader entry point
@@ -25,8 +27,9 @@ void main()
     for(int l = 0; l < MAX_LOD; ++l)
     {
         float lod = l;
+        float intensity = lod_intensity[l];
         vec3 n_lod = 2.0 * textureLod(normal_ext_tex, uv0, lod).rgb - 1.0;
-        n += magnitude * normalize(n_lod);
+        n += magnitude * vec3(intensity, intensity, 1.0f) * normalize(n_lod);
         magnitude *= 0.5;
     }
 

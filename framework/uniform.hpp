@@ -100,7 +100,7 @@ struct uniform_t
     // arrays of floating point single-precision vectors
     //===================================================================================================================================================================================================================
     template <size_t S> void operator = (const float (&arg) [S]) 
-        { glUniform1fv(location, S, &arg); }
+        { glUniform1fv(location, S, (const GLfloat*) &arg); }
     template <size_t S> void operator = (const glm::vec2 (&arg) [S]) 
         { glUniform2fv(location, S, glm::value_ptr(arg[0])); }
     template <size_t S> void operator = (const glm::vec3 (&arg) [S]) 

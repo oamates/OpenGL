@@ -5,6 +5,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 uniform sampler2D normal_tex;
 layout (r32f) uniform image2D normal_ext_image;
 uniform int tex_level;
+uniform float extension_radius;
 
 //==============================================================================================================================================================
 // shader entry point

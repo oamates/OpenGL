@@ -23,6 +23,24 @@
 
 const int MAX_LOD = 7;
 
+struct normalmap_params_t
+{
+    int luma_subroutine = 0;                            /* luminosity computation subroutine index */
+    int derivative_subroutine = 0;                      /* derivative subroutine index */
+    float extension_radius = 3.0f;                      /* normal extension radius, in pixels */
+    float lod_intensity[MAX_LOD];                       /* intensities of the LOD input into final blended normal */
+
+    normalmap_params_t()
+    {
+        luma_subroutine = 0;
+        derivative_subroutine = 0;
+        extension_radius = 3.0f;
+        for(int i = 0; i < MAX_LOD; ++i)
+            lod_intensity[i] = 0.0f;
+
+    }
+};
+
 struct subroutine_t
 {
     const char* name;
@@ -32,37 +50,45 @@ struct subroutine_t
 
 subroutine_t luma_subroutines[] = 
 {
-    {"luma_bt709",      "BT.709 luminosity function",                                  -1},
-    {"luma_bt709_gc",   "BT.709 luminosity function with gamma-correction",            -1},
-    {"luma_max",        "L = max(r, g, b) luminosity function",                        -1},
-    {"luma_max_gc",     "L = max(r, g, b) luminosity function with gamma-correction",  -1},
-    {"luma_product",    "L = 1 - (1 - r)*(1 - g)*(1 - b) luminosity function",         -1},
-    {"luma_product_gc", "L = 1 - (1 - r)*(1 - g)*(1 - r) luminosity function with gc", -1},
-    {"luma_laplace",    "Laplace filter",                                              -1},
-    {"luma_laplace_gc", "Laplace filter with gamma-correction",                        -1}
+    {"luma_bt709",      "BT.709 luminosity function"},
+    {"luma_bt709_gc",   "BT.709 luminosity function with gamma-correction"},
+    {"luma_max",        "L = max(r, g, b) luminosity function"},
+    {"luma_max_gc",     "L = max(r, g, b) luminosity function with gamma-correction"},
+    {"luma_product",    "L = 1 - (1 - r)*(1 - g)*(1 - b) luminosity function"},
+    {"luma_product_gc", "L = 1 - (1 - r)*(1 - g)*(1 - r) luminosity function with gc"},
+    {"luma_laplace",    "Laplace filter"},
+    {"luma_laplace_gc", "Laplace filter with gamma-correction"}
 };
 
 const int LUMA_SUBROUTINES = sizeof(luma_subroutines) / sizeof(subroutine_t);
 
 subroutine_t derivative_subroutines[] = 
 {
-    {"symm_diff",  "Symmetric difference derivative routine (4 texture fetches)", -1},
-    {"sobel3x3",   "Sobel 3x3 filter (8 fetches)",                                -1},
-    {"sobel5x5",   "Sobel 5x5 filter (24 fetches)",                               -1},
-    {"scharr3x3",  "Scharr 3x3 filter (8)",                                       -1},
-    {"scharr5x5",  "Scharr 5x5 filter (24)",                                      -1},
-    {"prewitt3x3", "Prewitt 3x3 filter (8)",                                      -1},
-    {"prewitt5x5", "Prewitt 5x5 filter (24)",                                     -1}
+    {"symm_diff",  "Symmetric difference derivative routine (4 texture fetches)"},
+    {"sobel3x3",   "Sobel 3x3 filter (8 fetches)"},
+    {"sobel5x5",   "Sobel 5x5 filter (24 fetches)"},
+    {"scharr3x3",  "Scharr 3x3 filter (8)"},
+    {"scharr5x5",  "Scharr 5x5 filter (24)"},
+    {"prewitt3x3", "Prewitt 3x3 filter (8)"},
+    {"prewitt5x5", "Prewitt 5x5 filter (24)"}
 };
 
 const int DERIVATIVE_SUBROUTINES = sizeof(derivative_subroutines) / sizeof(subroutine_t);
 
+
 struct demo_window_t : public imgui_window_t
 {
-    int texture = 0;
+    camera_t camera;
+
+    //===================================================================================================================================================================================================================
+    // UI variables
+    //===================================================================================================================================================================================================================
+    bool params_changed;                                /* true if any of the normalmap generation parameters has changed */
+    int texture = 0;                                    /* left rendering params :: texture and mip level to display */
     int level = 0;
     bool pause = false;
-    camera_t camera;
+    normalmap_params_t normalmap_params;                /* normalmap generation parameters */
+
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
@@ -83,24 +109,6 @@ struct demo_window_t : public imgui_window_t
 
         if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
             pause = !pause;
-
-        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
-        {
-            texture++;
-            if (texture > 4) texture = 0;
-        }
-
-        if ((key == GLFW_KEY_KP_ADD) && (action == GLFW_RELEASE))
-        {
-            level++;
-            if (level == MAX_LOD) level--;
-        }
-
-        if ((key == GLFW_KEY_KP_SUBTRACT) && (action == GLFW_RELEASE))
-        {
-            level--;
-            if (level < 0) level = 0;
-        }
     }
 
     void on_mouse_move() override
@@ -110,62 +118,63 @@ struct demo_window_t : public imgui_window_t
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
 
-    //===================================================================================================================================================================================================================
-    // UI variables
-    //===================================================================================================================================================================================================================
-    int step = 0;
-    int luma_subroutine = 0;
-    int derivative_subroutine = 0;
-
-    float f1 = 0.123f, f2 = 0.0f;
-    bool blur0 = true;
-    bool blur1 = true;
-
     void update_ui()
     {
+        params_changed = false;
+
         ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
         ImGui::Begin("Normalmap generator settings", 0);
         ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);
 
-        if (ImGui::CollapsingHeader("Compute steps"))
+        if (ImGui::CollapsingHeader("Luminosity filter settings"))
         {
-            ImGui::RadioButton("Luminosity filter", &step, 0);
-            ImGui::RadioButton("Initial normal computation filter", &step, 1);
-            ImGui::RadioButton("Normal extension filter", &step, 2);
-            ImGui::RadioButton("Mipmap levels combine filter", &step, 3);
+            for(int i = 0; i < LUMA_SUBROUTINES; ++i)
+                params_changed |= ImGui::RadioButton(luma_subroutines[i].description, &normalmap_params.luma_subroutine, i);
         }
 
-        if (ImGui::CollapsingHeader("Algorithm settings"))
+        if (ImGui::CollapsingHeader("Initial normal computation filter settings"))
         {
-            switch(step)
+            for(int i = 0; i < DERIVATIVE_SUBROUTINES; ++i)
+                params_changed |= ImGui::RadioButton(derivative_subroutines[i].description, &normalmap_params.derivative_subroutine, i);
+        }
+
+        if (ImGui::CollapsingHeader("Normal extension filter"))
+        {
+            params_changed |= ImGui::SliderFloat("Extension radius", &normalmap_params.extension_radius, 0.0f, 1.0f, "%.3f");
+        }
+
+        if (ImGui::CollapsingHeader("Mipmap levels combine filter"))
+        {
+            for(int i = 0; i < MAX_LOD; ++i)
             {
-                case 0:
-                    for(int l = 0; l < LUMA_SUBROUTINES; ++l)
-                        ImGui::RadioButton(luma_subroutines[l].description, &luma_subroutine, l);
-                break;
+                char level_name[16];
+                sprintf(level_name, "LOD%u intensity", i);
+                params_changed |= ImGui::SliderFloat(level_name, &normalmap_params.lod_intensity[i], -1.0f, 1.0f, "%.3f");
+            }
+        }
 
-                case 1:
-                    for(int l = 0; l < DERIVATIVE_SUBROUTINES; ++l)
-                        ImGui::RadioButton(derivative_subroutines[l].description, &derivative_subroutine, l);
-                break;
+        if (ImGui::CollapsingHeader("Rendering settings :: texture"))
+        {
+            ImGui::RadioButton("Diffuse texture", &texture, 0);
+            ImGui::RadioButton("Luminosity texture", &texture, 1);
+            ImGui::RadioButton("Initial normal texture", &texture, 2);
+            ImGui::RadioButton("Extended normal texture", &texture, 3);
+            ImGui::RadioButton("Combined normal texture", &texture, 4);
+        }
 
-                case 2:
-                    ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
-                    ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
-                    ImGui::Checkbox("Use Blur", &blur1);
-                break;
-                default:    // 3
-                    ImGui::SliderFloat("Radius", &f1, 0.0f, 1.0f, "ratio = %.3f");
-                    ImGui::SliderFloat("Bias", &f2, -10.0f, 10.0f, "%.4f", 3.0f);
-                    ImGui::Checkbox("Use Blur", &blur1);
-                break;
+        if (ImGui::CollapsingHeader("Rendering settings :: mipmap level"))
+        {
+            for(int i = 0; i < MAX_LOD; ++i)
+            {
+                char level_name[16];
+                sprintf(level_name, "LOD%u", i);
+                ImGui::RadioButton(level_name, &level, i);
             }
         }
 
         ImGui::End();
-
-        ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-        ImGui::ShowTestWindow(0);            
+        // ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+        // ImGui::ShowTestWindow(0);            
     }
 };
 
@@ -219,6 +228,8 @@ struct normalmap_generator_t
               uni_lf_luma_image,
               uni_lf_tex_level;
 
+    GLuint luma_subroutine_index[LUMA_SUBROUTINES];
+
     //===================================================================================================================================================================================================================
     // normal compute shader uniforms
     //===================================================================================================================================================================================================================
@@ -227,19 +238,22 @@ struct normalmap_generator_t
               uni_nf_normal_image,
               uni_nf_tex_level;
 
+    GLuint derivative_subroutine_index[DERIVATIVE_SUBROUTINES];
+
     //===================================================================================================================================================================================================================
     // normal extension compute shader uniforms
     //===================================================================================================================================================================================================================
     uniform_t uni_ef_normal_tex,
               uni_ef_normal_image,
-              uni_ef_tex_level;
+              uni_ef_tex_level,
+              uni_ef_extension_radius;
 
     //===================================================================================================================================================================================================================
     // normal combine compute shader uniforms
     //===================================================================================================================================================================================================================
     uniform_t uni_lc_normal_ext_tex,
-              uni_lc_normal_combined_image;
-
+              uni_lc_normal_combined_image,
+              uni_lc_lod_intensity;
 
     GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
 
@@ -256,17 +270,25 @@ struct normalmap_generator_t
         uni_lf_luma_image    = luminosity_filter["luma_image"];
         uni_lf_tex_level     = luminosity_filter["tex_level"];
 
+        for(int i = 0; i < LUMA_SUBROUTINES; ++i)
+            luma_subroutine_index[i] = luminosity_filter.subroutine_index(GL_COMPUTE_SHADER, luma_subroutines[i].name);
+
         uni_nf_luma_tex      = normal_filter["luma_tex"];
         uni_nf_inv_amplitude = normal_filter["inv_amplitude"];
         uni_nf_normal_image  = normal_filter["normal_image"];
         uni_nf_tex_level     = normal_filter["tex_level"];
 
-        uni_ef_normal_tex    = extension_filter["normal_tex"];
-        uni_ef_normal_image  = extension_filter["normal_ext_image"];
-        uni_ef_tex_level     = extension_filter["tex_level"];
+        for(int i = 0; i < DERIVATIVE_SUBROUTINES; ++i)
+            derivative_subroutine_index[i] = normal_filter.subroutine_index(GL_COMPUTE_SHADER, derivative_subroutines[i].name);
+
+        uni_ef_normal_tex       = extension_filter["normal_tex"];
+        uni_ef_normal_image     = extension_filter["normal_ext_image"];
+        uni_ef_tex_level        = extension_filter["tex_level"];
+        uni_ef_extension_radius = extension_filter["extension_radius"];
 
         uni_lc_normal_ext_tex        = level_combine_filter["normal_ext_tex"];
         uni_lc_normal_combined_image = level_combine_filter["normal_combined_image"];
+        uni_lc_lod_intensity         = level_combine_filter["lod_intensity"];
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, input_texture);
@@ -287,11 +309,13 @@ struct normalmap_generator_t
     //===================================================================================================================================================================================================================
     // compute luminosity texture for each mip level
     //===================================================================================================================================================================================================================
-    void compute_luminosity()
+    void compute_luminosity(const normalmap_params_t& params)
     {
         luminosity_filter.enable();
         uni_lf_diffuse_tex = 0;
         uni_lf_luma_image = 1;
+
+        uniform_t::subroutine(GL_COMPUTE_SHADER, &luma_subroutine_index[params.luma_subroutine]);
 
         for (int l = 0; l < MAX_LOD; ++l)
         {
@@ -305,11 +329,13 @@ struct normalmap_generator_t
     //===================================================================================================================================================================================================================
     // compute normal texture for each mip level
     //===================================================================================================================================================================================================================
-    void compute_normals()
+    void compute_normals(const normalmap_params_t& params)
     {
         normal_filter.enable();
         uni_nf_luma_tex = 1;
         uni_nf_normal_image = 2;
+
+        uniform_t::subroutine(GL_COMPUTE_SHADER, &derivative_subroutine_index[params.derivative_subroutine]);
 
         for (int l = 0; l < MAX_LOD; ++l)
         {
@@ -325,11 +351,12 @@ struct normalmap_generator_t
     //===================================================================================================================================================================================================================
     // extend normals with normal extension filter
     //===================================================================================================================================================================================================================
-    void extend_normals()
+    void extend_normals(const normalmap_params_t& params)
     {
         extension_filter.enable();
         uni_ef_normal_tex = 2;
         uni_ef_normal_image = 3;
+        uni_ef_extension_radius = params.extension_radius;
 
         for (int l = 0; l < MAX_LOD; ++l)
         {
@@ -344,11 +371,12 @@ struct normalmap_generator_t
     //===================================================================================================================================================================================================================
     // mipmap levels combine filter
     //===================================================================================================================================================================================================================
-    void combine_mip_levels()
+    void combine_mip_levels(const normalmap_params_t& params)
     {
         level_combine_filter.enable();
         uni_lc_normal_ext_tex = 3;
         uni_lc_normal_combined_image = 4;
+        uni_lc_lod_intensity = params.lod_intensity;
 
         glBindImageTexture(4, normal_combined_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
         glDispatchCompute((tex_res_x[0] + 7) >> 3, (tex_res_y[0] + 7) >> 3, 1);
@@ -356,6 +384,14 @@ struct normalmap_generator_t
 
         glActiveTexture(GL_TEXTURE4);
         glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
+    void process(const normalmap_params_t& params)
+    {
+        compute_luminosity(params);
+        compute_normals(params);
+        extend_normals(params);
+        combine_mip_levels(params);
     }
 
     ~normalmap_generator_t()
@@ -396,11 +432,7 @@ int main(int argc, char *argv[])
     debug_msg("Texture internal format is %u. Format name = %s", internal_format, gl_aux::internal_format_name(internal_format));
 
     normalmap_generator_t normalmap_generator(diffuse_tex_id);
-
-    normalmap_generator.compute_luminosity();
-    normalmap_generator.compute_normals();
-    normalmap_generator.extend_normals();
-    normalmap_generator.combine_mip_levels();
+    normalmap_generator.process(window.normalmap_params);
 
     //===================================================================================================================================================================================================================
     // quad rendering shader and fake VAO for rendering quads
@@ -482,9 +514,29 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //===============================================================================================================================================================================================================
-        // wait for the compute shader to finish its work and show both original and processed image
+        // if some parameters have changed in ui regenerate normal map
         //===============================================================================================================================================================================================================
-        glViewport(left_vp.x, left_vp.y, left_vp.z, left_vp.w);
+        if (window.params_changed)
+            normalmap_generator.process(window.normalmap_params);
+
+        //===============================================================================================================================================================================================================
+        // wait for the compute shader to finish its work and show texture
+        //===============================================================================================================================================================================================================
+
+        int tex_res_x = normalmap_generator.tex_res_x[window.level];
+        int tex_res_y = normalmap_generator.tex_res_y[window.level];
+        glm::ivec4 tex_vp;
+
+        if ((left_vp.w > tex_res_x) && (left_vp.z > tex_res_y))         /* if texture level does not fit use full viewport, otherwise, shrink the viewport */
+        {
+            int tex_margin_x = margin_x + glm::min(left_vp.w - tex_res_x, left_vp.z - tex_res_y) / 2;
+            int tex_margin_y = half_res_y - half_res_x / 2 + tex_margin_x;
+            tex_vp = glm::ivec4(tex_margin_x, tex_margin_y, half_res_x - 2 * tex_margin_x, res_y - 2 * tex_margin_y);
+        }
+        else
+            tex_vp = left_vp;
+
+        glViewport(tex_vp.x, tex_vp.y, tex_vp.z, tex_vp.w);
         quad_renderer.enable();
         glBindVertexArray(vao_id);
 
@@ -493,6 +545,9 @@ int main(int argc, char *argv[])
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+        //===============================================================================================================================================================================================================
+        // show cubes using created normal texture
+        //===============================================================================================================================================================================================================
         glViewport(right_vp.x, right_vp.y, right_vp.z, right_vp.w);
         simple_light.enable();
 
