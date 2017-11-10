@@ -13,7 +13,7 @@ uniform vec3 light_ws;
 uniform float time;
 uniform float solid_scale;
 
-uniform vec4 shift_rotor[128];
+uniform vec4 shift_rotor[16];
 
 out vec3 view;
 out vec3 light;
@@ -24,8 +24,6 @@ out vec2 uv;
 
 mat3 rotation_matrix(vec3 axis, float angle)
 {
-    // Rodrigues' formula for rotation in 3-space
-
     float sn = sin(angle);
     float cs = cos(angle);
 
@@ -43,9 +41,9 @@ void main()
 
     vec3 shift = shift_rotor[index + 0].xyz;
     vec4 rotor = shift_rotor[index + 1];
-    mat3 rotation_matrix = rotation_matrix(rotor.xyz, rotor.w * time);
+    mat3 rm = rotation_matrix(rotor.xyz, rotor.w * time);
 
-    vec3 position_ws = shift + solid_scale * rotation_matrix * position_in;
+    vec3 position_ws = shift + solid_scale * rm * position_in;
 
     view = camera_ws - position_ws;
     light = light_ws - position_ws;

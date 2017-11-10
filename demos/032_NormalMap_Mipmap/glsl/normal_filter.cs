@@ -5,7 +5,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 uniform sampler2D luma_tex;
 layout (rgba32f) uniform image2D normal_image;
 
-uniform float inv_amplitude;
+uniform float amplitude;
 uniform int tex_level;
 
 subroutine vec2 derivative_filter_func(sampler2D sampler, vec2 uv, vec2 texel_size, float lod);
@@ -282,7 +282,7 @@ void main()
     float lod = tex_level;
 
     vec2 dL = derivative_func(luma_tex, uv, texel_size, lod);
-    vec3 n = normalize(vec3(dL, inv_amplitude));
+    vec3 n = normalize(vec3(amplitude * dL, 1.0));
 
     imageStore(normal_image, P, vec4(0.5 + 0.5 * n, 1.0));
 }

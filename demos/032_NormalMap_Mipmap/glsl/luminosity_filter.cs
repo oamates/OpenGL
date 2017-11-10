@@ -13,7 +13,6 @@ const vec3 rgb_power_bt709 = vec3(0.2126f, 0.7152f, 0.0722f);
 subroutine float luminosity_filter_func(sampler2D sampler, vec2 uv, float lod);
 subroutine uniform luminosity_filter_func luminosity_func;
 
-
 //==============================================================================================================================================================
 // different diffuse --> luminosity converting functions
 //==============================================================================================================================================================

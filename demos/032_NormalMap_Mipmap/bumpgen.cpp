@@ -31,7 +31,7 @@ struct normalmap_params_t
 
     int derivative_subroutine;                          /* derivative subroutine index */
     float amplitude;                                    /* amplitude for initial normal calculation */
-    float radius;                                       /* normal extension radius, in pixels */
+    int radius;                                         /* normal extension radius, in pixels */
     float sharpness;                                    /* normal extension sharpness */
     float lod_intensity[MAX_LOD];                       /* intensities of the LOD input into final blended normal */
 
@@ -44,7 +44,7 @@ struct normalmap_params_t
         derivative_subroutine = 0;
         amplitude = 1.0f;
 
-        radius = 3.0f;
+        radius = 1;
         sharpness = 1.0f;
         for(int i = 0; i < MAX_LOD; ++i)
             lod_intensity[i] = 0.0f;
@@ -55,7 +55,6 @@ struct subroutine_t
 {
     const char* name;
     const char* description;
-    GLint index;
 };
 
 subroutine_t luma_subroutines[] = 
@@ -153,7 +152,7 @@ struct demo_window_t : public imgui_window_t
 
         if (ImGui::CollapsingHeader("Normal extension filter"))
         {
-            params_changed |= ImGui::SliderFloat("Extension radius", &normalmap_params.radius, 1.0f, 16.0f, "%.3f");
+            params_changed |= ImGui::SliderInt("Extension radius", &normalmap_params.radius, 1, 8);
             params_changed |= ImGui::SliderFloat("Sharpness", &normalmap_params.sharpness, 0.125f, 8.0f, "%.3f");
         }
 
@@ -250,7 +249,7 @@ struct normalmap_generator_t
     // normal compute shader uniforms
     //===================================================================================================================================================================================================================
     uniform_t uni_nf_luma_tex,
-              uni_nf_inv_amplitude,
+              uni_nf_amplitude,
               uni_nf_normal_image,
               uni_nf_tex_level;
 
@@ -293,7 +292,7 @@ struct normalmap_generator_t
             luma_subroutine_index[i] = luminosity_filter.subroutine_index(GL_COMPUTE_SHADER, luma_subroutines[i].name);
 
         uni_nf_luma_tex      = normal_filter["luma_tex"];
-        uni_nf_inv_amplitude = normal_filter["inv_amplitude"];
+        uni_nf_amplitude     = normal_filter["amplitude"];
         uni_nf_normal_image  = normal_filter["normal_image"];
         uni_nf_tex_level     = normal_filter["tex_level"];
 
@@ -356,7 +355,7 @@ struct normalmap_generator_t
         normal_filter.enable();
         uni_nf_luma_tex = 1;
         uni_nf_normal_image = 2;
-        uni_nf_inv_amplitude = 1.0f / params.amplitude;
+        uni_nf_amplitude = params.amplitude;
 
         uniform_t::subroutine(GL_COMPUTE_SHADER, &derivative_subroutine_index[params.derivative_subroutine]);
 
@@ -448,7 +447,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock2.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
@@ -481,21 +480,20 @@ int main(int argc, char *argv[])
     uniform_t uni_sl_projection_matrix = simple_light["projection_matrix"];
     uniform_t uni_sl_view_matrix       = simple_light["view_matrix"];      
     uniform_t uni_sl_time              = simple_light["time"];             
-    uniform_t uni_sl_light_ws          = simple_light["light_ws"];         
+    uniform_t uni_sl_light_ws          = simple_light["light_ws"];
     uniform_t uni_sl_camera_ws         = simple_light["camera_ws"];         
 
     simple_light["solid_scale"] = 1.0f;
     simple_light["diffuse_tex"] = 0;
     simple_light["normal_tex"] = 4;
 
-    glm::vec4 shift_rotor[128];
+    glm::vec4 shift_rotor[16];
 
-    float middle = 1.5f;
     float cell_size = 2.0f;
     int index = 0;
-    for (int i = 0; i < 4; ++i) for (int j = 0; j < 4; ++j) for (int k = 0; k < 4; ++k)
+    for (int i = 0; i < 2; ++i) for (int j = 0; j < 2; ++j) for (int k = 0; k < 2; ++k)
     {
-        shift_rotor[index++] = glm::vec4(cell_size * glm::vec3(float(i) - middle, float(j) - middle, float(k) - middle), 0.0f);
+        shift_rotor[index++] = glm::vec4(cell_size * glm::vec3(float(i) - 0.5f, float(j) - 0.5f, float(k) - 0.5f), 0.0f);
         shift_rotor[index++] = glm::vec4(glm::sphericalRand(1.0f), glm::gaussRand(0.0f, 1.0f));
     }
 
@@ -589,7 +587,7 @@ int main(int argc, char *argv[])
         glm::vec3 camera_ws = window.camera.position();
         uni_sl_camera_ws = camera_ws;
 
-        cube.instanced_render(64);
+        cube.instanced_render(8);
 
         //===============================================================================================================================================================================================================
         // After end_frame call ::

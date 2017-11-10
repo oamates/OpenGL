@@ -5,7 +5,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 uniform sampler2D normal_tex;
 layout (r32f) uniform image2D normal_ext_image;
 uniform int tex_level;
-uniform float radius;
+uniform int radius;
 uniform float sharpness;
 
 const float sqrt_half = 0.70710678118f;
@@ -47,13 +47,12 @@ void main()
     float lod = tex_level;
     vec3 n = vec3(0.0);
 
-    for(int i = 0; i < 16; ++i)
+    for(int i = -radius; i <= radius; ++i)
     {
-        vec2 d = texel_size * right_16gon[i];
-        for(int j = 0; j < 4; ++j)
+        for(int j = -radius; j <= radius; ++j)
         {
-            float r = radius * j;
-            vec2 uv = uv0 + r * d;
+            vec2 d = texel_size * vec2(i, j);
+            vec2 uv = uv0 + d;
             vec3 n0 = 2.0 * texture(normal_tex, uv, lod).rgb - 1.0;
             float l = pow(length(n0.xy), sharpness);
             n += l * n0;

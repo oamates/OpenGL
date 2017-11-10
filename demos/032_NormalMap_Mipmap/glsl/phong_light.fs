@@ -26,27 +26,12 @@ void main()
     vec3 specular_color = vec3(1.0f);
     vec3 color = ambient_color;
 
-    if (dot(n, l) > 0.0f) 
-    {
-        float cos_theta = max(dot(b, l), 0.0);
-        color += cos_theta * diffuse_color;
+    float cos_theta = 0.5 + 0.5 * dot(b, l);
+    color += cos_theta * diffuse_color;
 
-        // Phong lighting
-//        vec3 r = reflect(-l, n);
-//        float cos_alpha = max(dot(v, r), 0.0f);
-//        float exponent = 0.25f * specular_exponent();
-        
-        // Blinn - Phong lighting
-        vec3 h = normalize(l + v);
-        float cos_alpha = max(dot(h, b), 0.0f);
-
-        //color += 0.15 * pow(cos_alpha, Ns) * specular_color;
-    }
+    vec3 h = normalize(l + v);
+    float cos_alpha = max(dot(h, b), 0.0f);
+    color += 0.15 * pow(cos_alpha, Ns) * specular_color;
 
     FragmentColor = vec4(color, 1.0f);                 
 }
-
-
-
-
-
