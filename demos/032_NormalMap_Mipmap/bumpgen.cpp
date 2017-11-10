@@ -21,14 +21,16 @@
 #include "polyhedron.hpp"
 #include "plato.hpp"
 
-const int MAX_LOD = 7;
+const int MAX_LOD = 5;
 
 struct normalmap_params_t
 {
     int luma_subroutine;                                /* luminosity computation subroutine index */
     float gamma;                                        /* gamma parameter used in luminosity conversion */
     float brightness;                                   /* brightness factor used in luminosity conversion */
+
     int derivative_subroutine;                          /* derivative subroutine index */
+    float amplitude;                                    /* amplitude for initial normal calculation */
     float radius;                                       /* normal extension radius, in pixels */
     float sharpness;                                    /* normal extension sharpness */
     float lod_intensity[MAX_LOD];                       /* intensities of the LOD input into final blended normal */
@@ -38,7 +40,10 @@ struct normalmap_params_t
         luma_subroutine = 0;
         gamma = 2.2f;
         brightness = 1.0f;
+
         derivative_subroutine = 0;
+        amplitude = 1.0f;
+
         radius = 3.0f;
         sharpness = 1.0f;
         for(int i = 0; i < MAX_LOD; ++i)
@@ -143,6 +148,7 @@ struct demo_window_t : public imgui_window_t
         {
             for(int i = 0; i < DERIVATIVE_SUBROUTINES; ++i)
                 params_changed |= ImGui::RadioButton(derivative_subroutines[i].description, &normalmap_params.derivative_subroutine, i);
+            params_changed |= ImGui::SliderFloat("Amplitude", &normalmap_params.amplitude, 0.125f, 8.0f, "%.3f");
         }
 
         if (ImGui::CollapsingHeader("Normal extension filter"))
@@ -163,9 +169,9 @@ struct demo_window_t : public imgui_window_t
 
         if (ImGui::CollapsingHeader("Rendering settings :: texture"))
         {
-            ImGui::RadioButton("Diffuse texture", &texture, 0);
-            ImGui::RadioButton("Luminosity texture", &texture, 1);
-            ImGui::RadioButton("Initial normal texture", &texture, 2);
+            ImGui::RadioButton("Diffuse texture",         &texture, 0);
+            ImGui::RadioButton("Luminosity texture",      &texture, 1);
+            ImGui::RadioButton("Initial normal texture",  &texture, 2);
             ImGui::RadioButton("Extended normal texture", &texture, 3);
             ImGui::RadioButton("Combined normal texture", &texture, 4);
         }
@@ -350,13 +356,13 @@ struct normalmap_generator_t
         normal_filter.enable();
         uni_nf_luma_tex = 1;
         uni_nf_normal_image = 2;
+        uni_nf_inv_amplitude = 1.0f / params.amplitude;
 
         uniform_t::subroutine(GL_COMPUTE_SHADER, &derivative_subroutine_index[params.derivative_subroutine]);
 
         for (int l = 0; l < MAX_LOD; ++l)
         {
             uni_nf_tex_level = l;
-            uni_nf_inv_amplitude = 1.0f;
             glBindImageTexture(2, normal_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
             glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
         }
@@ -442,7 +448,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock2.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
@@ -540,11 +546,12 @@ int main(int argc, char *argv[])
         // wait for the compute shader to finish its work and show texture
         //===============================================================================================================================================================================================================
 
+        /*
         int tex_res_x = normalmap_generator.tex_res_x[window.level];
         int tex_res_y = normalmap_generator.tex_res_y[window.level];
-        glm::ivec4 tex_vp;
 
-        if ((left_vp.w > tex_res_x) && (left_vp.z > tex_res_y))         /* if texture level does not fit use full viewport, otherwise, shrink the viewport */
+        glm::ivec4 tex_vp;
+        if ((left_vp.w > tex_res_x) && (left_vp.z > tex_res_y))
         {
             int tex_margin_x = margin_x + glm::min(left_vp.w - tex_res_x, left_vp.z - tex_res_y) / 2;
             int tex_margin_y = half_res_y - half_res_x / 2 + tex_margin_x;
@@ -552,7 +559,9 @@ int main(int argc, char *argv[])
         }
         else
             tex_vp = left_vp;
+        */
 
+        glm::ivec4 tex_vp = left_vp;
         glViewport(tex_vp.x, tex_vp.y, tex_vp.z, tex_vp.w);
         quad_renderer.enable();
         glBindVertexArray(vao_id);

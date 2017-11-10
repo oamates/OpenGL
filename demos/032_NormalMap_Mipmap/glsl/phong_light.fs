@@ -24,13 +24,11 @@ void main()
     vec3 diffuse_color = texture(diffuse_tex, uv).rgb;
     vec3 ambient_color = 0.0625f * diffuse_color;
     vec3 specular_color = vec3(1.0f);
-
-    float cos_theta = dot(b, l);
-
     vec3 color = ambient_color;
 
-    if (cos_theta > 0.0f) 
+    if (dot(n, l) > 0.0f) 
     {
+        float cos_theta = max(dot(b, l), 0.0);
         color += cos_theta * diffuse_color;
 
         // Phong lighting

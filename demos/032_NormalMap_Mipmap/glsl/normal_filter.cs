@@ -282,7 +282,7 @@ void main()
     float lod = tex_level;
 
     vec2 dL = derivative_func(luma_tex, uv, texel_size, lod);
-    vec3 n = normalize(vec3(-1.8 * dL, inv_amplitude));
+    vec3 n = normalize(vec3(dL, inv_amplitude));
 
     imageStore(normal_image, P, vec4(0.5 + 0.5 * n, 1.0));
 }

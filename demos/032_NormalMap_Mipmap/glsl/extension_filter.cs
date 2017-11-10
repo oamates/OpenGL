@@ -56,7 +56,7 @@ void main()
             vec2 uv = uv0 + r * d;
             vec3 n0 = 2.0 * texture(normal_tex, uv, lod).rgb - 1.0;
             float l = pow(length(n0.xy), sharpness);
-            n += l * exp2(-r) * n0;
+            n += l * n0;
         }
     }
 
