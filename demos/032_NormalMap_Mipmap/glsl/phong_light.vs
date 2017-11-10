@@ -48,9 +48,9 @@ void main()
     view = camera_ws - position_ws;
     light = light_ws - position_ws;
 
-    normal = rotation_matrix * normal_in;
-    tangent_x = rotation_matrix * tangent_x_in;
-    tangent_y = rotation_matrix * tangent_y_in;
+    normal = rm * normal_in;
+    tangent_x = rm * tangent_x_in;
+    tangent_y = rm * tangent_y_in;
 
     gl_Position = projection_matrix * view_matrix * vec4(position_ws, 1.0);
     uv = uv_in;

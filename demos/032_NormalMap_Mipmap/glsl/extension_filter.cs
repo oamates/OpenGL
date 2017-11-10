@@ -53,7 +53,7 @@ void main()
         {
             vec2 d = texel_size * vec2(i, j);
             vec2 uv = uv0 + d;
-            vec3 n0 = 2.0 * texture(normal_tex, uv, lod).rgb - 1.0;
+            vec3 n0 = 2.0 * textureLod(normal_tex, uv, lod).rgb - 1.0;
             float l = pow(length(n0.xy), sharpness);
             n += l * n0;
         }
