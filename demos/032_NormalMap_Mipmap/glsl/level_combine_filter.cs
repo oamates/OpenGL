@@ -30,7 +30,6 @@ void main()
         float intensity = lod_intensity[l];
         vec3 n_lod = 2.0 * textureLod(normal_ext_tex, uv0, lod).rgb - 1.0;
         n += magnitude * vec3(intensity, intensity, 1.0f) * normalize(n_lod);
-        magnitude *= 0.87;
     }
 
     n = normalize(n);

@@ -260,10 +260,10 @@ subroutine(derivative_filter_func) vec2 prewitt5x5(sampler2D sampler, vec2 uv, v
     float p2_m2 = textureLod(sampler, vec2(uvp2.x, uvm2.y), lod).r;
 
     vec2 dL;
-    dL.x =       ((p2_p2 - m2_p2) + (p2_p1 - m2_p1) + (p2_oo - p1_oo) + (p2_m1 - p1_m1) + (p2_m2 - p1_m2)) + 
-           2.0 * ((p1_p2 - m1_p2) + (p1_p1 - m1_p1) + (p1_oo - m1_oo) + (p1_m1 - m1_m1) + (p1_m2 - m1_m2));
-    dL.x =       ((p2_p2 - p2_m2) + (p1_p2 - p1_m2) + (oo_p2 - oo_p1) + (m1_p2 - m1_p1) + (m2_p2 - m2_p1)) + 
-           2.0 * ((p2_p1 - p2_m1) + (p1_p1 - p1_m1) + (oo_p1 - oo_m1) + (m1_p1 - m1_m1) + (m2_p1 - m2_m1));
+    dL.x = 2.0 * ((p2_p2 - m2_p2) + (p2_p1 - m2_p1) + (p2_oo - m2_oo) + (p2_m1 - m2_m1) + (p2_m2 - m2_m2)) + 
+                 ((p1_p2 - m1_p2) + (p1_p1 - m1_p1) + (p1_oo - m1_oo) + (p1_m1 - m1_m1) + (p1_m2 - m1_m2));
+    dL.y = 2.0 * ((p2_p2 - p2_m2) + (p1_p2 - p1_m2) + (oo_p2 - oo_m2) + (m1_p2 - m1_m2) + (m2_p2 - m2_m2)) + 
+                 ((p2_p1 - p2_m1) + (p1_p1 - p1_m1) + (oo_p1 - oo_m1) + (m1_p1 - m1_m1) + (m2_p1 - m2_m1));
 
     return PREWITT_5x5_NORMALIZATION_FACTOR * dL;
 }

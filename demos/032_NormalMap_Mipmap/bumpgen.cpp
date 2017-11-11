@@ -60,13 +60,9 @@ struct subroutine_t
 subroutine_t luma_subroutines[] = 
 {
     {"luma_bt709",      "BT.709 luminosity function"},
-    {"luma_bt709_gc",   "BT.709 luminosity function with gamma-correction"},
     {"luma_max",        "L = max(r, g, b) luminosity function"},
-    {"luma_max_gc",     "L = max(r, g, b) luminosity function with gamma-correction"},
     {"luma_product",    "L = 1 - (1 - r)*(1 - g)*(1 - b) luminosity function"},
-    {"luma_product_gc", "L = 1 - (1 - r)*(1 - g)*(1 - r) luminosity function with gc"},
     {"luma_laplace",    "Laplace filter"},
-    {"luma_laplace_gc", "Laplace filter with gamma-correction"}
 };
 
 const int LUMA_SUBROUTINES = sizeof(luma_subroutines) / sizeof(subroutine_t);
@@ -96,12 +92,12 @@ struct demo_window_t : public imgui_window_t
     int texture = 0;                                    /* left rendering params :: texture and mip level to display */
     int level = 0;
     bool pause = false;
+    bool gamma_correction = false;
     normalmap_params_t normalmap_params;                /* normalmap generation parameters */
-
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(8.0, 0.125, glm::mat4(1.0f))        
+          camera(32.0, 0.125, glm::mat4(1.0f))        
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO | OPENGL_COMPUTE_SHADER_INFO);
     }
@@ -139,15 +135,24 @@ struct demo_window_t : public imgui_window_t
         {
             for(int i = 0; i < LUMA_SUBROUTINES; ++i)
                 params_changed |= ImGui::RadioButton(luma_subroutines[i].description, &normalmap_params.luma_subroutine, i);
-            params_changed |= ImGui::SliderFloat("Gamma", &normalmap_params.gamma, 1.0f, 4.0f, "%.3f");
-            params_changed |= ImGui::SliderFloat("Brightness", &normalmap_params.brightness, 0.0f, 8.0f, "%.3f");
+
+            ImGui::Checkbox("checkbox", &gamma_correction);
+            if (gamma_correction)
+            {
+                ImGui::SameLine();
+                params_changed |= ImGui::SliderFloat("Gamma", &normalmap_params.gamma, 0.125f, 8.0f, "%.3f");
+            }
+            else
+                normalmap_params.gamma = 1.0f;
+
+            params_changed |= ImGui::SliderFloat("Brightness", &normalmap_params.brightness, 0.125f, 8.0f, "%.3f");
         }
 
         if (ImGui::CollapsingHeader("Initial normal computation filter settings"))
         {
             for(int i = 0; i < DERIVATIVE_SUBROUTINES; ++i)
                 params_changed |= ImGui::RadioButton(derivative_subroutines[i].description, &normalmap_params.derivative_subroutine, i);
-            params_changed |= ImGui::SliderFloat("Amplitude", &normalmap_params.amplitude, 0.125f, 8.0f, "%.3f");
+            params_changed |= ImGui::SliderFloat("Amplitude", &normalmap_params.amplitude, 0.0625f, 16.0f, "%.3f");
         }
 
         if (ImGui::CollapsingHeader("Normal extension filter"))
@@ -175,19 +180,20 @@ struct demo_window_t : public imgui_window_t
             ImGui::RadioButton("Combined normal texture", &texture, 4);
         }
 
-        if (ImGui::CollapsingHeader("Rendering settings :: mipmap level"))
+        if (ImGui::CollapsingHeader("Level of details -- mipmap level"))
         {
             for(int i = 0; i < MAX_LOD; ++i)
             {
                 char level_name[16];
-                sprintf(level_name, "LOD%u", i);
+                sprintf(level_name, "%u", i);
                 ImGui::RadioButton(level_name, &level, i);
+                ImGui::SameLine();
             }
         }
 
         ImGui::End();
-        // ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-        // ImGui::ShowTestWindow(0);            
+        ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+        ImGui::ShowTestWindow(0);            
     }
 };
 
@@ -447,7 +453,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    //GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
