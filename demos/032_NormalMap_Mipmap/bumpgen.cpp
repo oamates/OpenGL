@@ -447,10 +447,12 @@ struct harmonic_solver_t
               uni_n2l_laplace_image;
 
     uniform_t uni_li_laplace_tex,
-              uni_li_output_image;
+              uni_li_input_tex,
+              uni_li_output_image,
+              uni_li_texel_size,
+              uni_li_delta;
 
-    GLuint laplace_tex_id;
-
+    GLuint laplace_tex_id, aux_tex_id;
 
     harmonic_solver_t(int res_x, int res_y) :
         res_x(res_x), res_y(res_y),
@@ -461,7 +463,11 @@ struct harmonic_solver_t
         uni_n2l_laplace_image = normal2laplace["laplace_image"];
 
         uni_li_laplace_tex  = laplace_inverter["laplace_tex"];
+        uni_li_input_tex    = laplace_inverter["input_tex"];
         uni_li_output_image = laplace_inverter["output_image"];
+
+        laplace_tex_id = generate_texture(GL_TEXTURE1, res_x, res_y, GL_R32F);
+        aux_tex_id     = generate_texture(GL_TEXTURE1, res_x, res_y, GL_R32F);
     }
 
     void set_input(GLuint input_texture)
@@ -474,7 +480,7 @@ struct harmonic_solver_t
         glBindImageTexture(5, laplace_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
         glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
 
-        laplace_tex_id = generate_texture(GL_TEXTURE1, res_x, res_y, GL_R32F);
+
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
@@ -490,43 +496,36 @@ struct harmonic_solver_t
         glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    }
 
-/*
-    displacement_filter.enable();
-    uniform_t uni_df_normal_tex = displacement_filter["normal_tex"];
-    uniform_t uni_df_disp_tex = displacement_filter["disp_tex"];
-    uniform_t uni_df_output_image = displacement_filter["output_image"];
+        /*
+        uni_li_normal_tex = 4;
+        uni_li_texel_size = texel_size;
 
-    uniform_t uni_df_texel_size = displacement_filter["texel_size"];
-    uniform_t uni_df_delta = displacement_filter["delta"];
+        const float zero = 0.0f;
+        glClearTexImage(aux_tex_id, 0, GL_RED, GL_FLOAT, &zero);
+        float delta = 32.0f;
 
-    uni_df_normal_tex = 4;
-    uni_df_texel_size = texel_size;
-    const float zero = 0.0f;
-    glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
-    float dx = 32.0f;
+        glBindImageTexture(7, aux_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
 
-    glBindImageTexture(7, aux_r_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-
-    for(int i = 0; i < 6; ++i)
-    {
-        uni_df_delta = glm::vec2(dx / tex_res_x, dx / tex_res_y);
-        for(int j = 0; j < 2; ++j)
+        for(int i = 0; i < 6; ++i)
         {
-            uni_df_disp_tex = 5;
-            uni_df_output_image = 7;
-            glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            uni_df_delta = glm::vec2(dx / res_x, dx / tex_res_y);
+            for(int j = 0; j < 2; ++j)
+            {
+                uni_df_disp_tex = 5;
+                uni_df_output_image = 7;
+                glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-            uni_df_disp_tex = 9;
-            uni_df_output_image = 5;
-            glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                uni_df_disp_tex = 9;
+                uni_df_output_image = 5;
+                glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            }
+            delta *= 0.5;
         }
-        dx *= 0.5;
+        */
     }
-*/
 
 
     ~harmonic_solver_t()
