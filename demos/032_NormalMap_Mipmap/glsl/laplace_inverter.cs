@@ -14,7 +14,10 @@ uniform vec2 delta;
 //==============================================================================================================================================================
 void main()
 {
+    ivec2 Q = textureSize(laplace_tex, 0);
     ivec2 P = ivec2(gl_GlobalInvocationID.xy);
+    if ((P.x >= Q.x) || (P.y >= Q.y)) return;
+
     vec2 uv0 = texel_size * (vec2(P) + 0.5);
     vec2 uvp = uv0 + delta;
     vec2 uvm = uv0 - delta;
@@ -24,9 +27,9 @@ void main()
     float H_yp = texture(input_tex, vec2(uv0.x, uvp.y)).r;
     float H_ym = texture(input_tex, vec2(uv0.x, uvm.y)).r;
 
-    float nabla = texture(laplace_tex, xp).r;
+    float nabla = texture(laplace_tex, uv0).r;
 
-    float h = 0.25f * (H_xp + H_xm + H_yp + H_ym) - 0.25f * nabla;
+    float H_00 = 0.25f * (H_xp + H_xm + H_yp + H_ym) - 0.25f * nabla;
 
-    imageStore(output_image, P, vec4(h, 0.0, 0.0, 0.0));
+    imageStore(output_image, P, vec4(H_00, 0.0, 0.0, 0.0));
 }

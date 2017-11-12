@@ -93,6 +93,11 @@ struct demo_window_t : public imgui_window_t
     int level = 0;
     bool pause = false;
     bool gamma_correction = false;
+
+    bool tex_value_scale = false;
+    float tex_value_inf = 0.0f;
+    float tex_value_sup = 1.0f;
+
     normalmap_params_t normalmap_params;                /* normalmap generation parameters */
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
@@ -178,6 +183,22 @@ struct demo_window_t : public imgui_window_t
             ImGui::RadioButton("Initial normal texture",  &texture, 2);
             ImGui::RadioButton("Extended normal texture", &texture, 3);
             ImGui::RadioButton("Combined normal texture", &texture, 4);
+            ImGui::RadioButton("Laplace texture",         &texture, 5);
+            ImGui::RadioButton("Auxiliary texture",       &texture, 6);
+            ImGui::RadioButton("Heightmap texture",       &texture, 7);
+
+            ImGui::Checkbox("Scale texture values", &tex_value_scale);
+
+            if (tex_value_scale)
+            {
+                ImGui::SliderFloat("Infimum",  &tex_value_inf, -8.0f, 8.0f, "%.3f");
+                ImGui::SliderFloat("Supremum", &tex_value_sup, -8.0f, 8.0f, "%.3f");
+            }
+            else
+            {
+                tex_value_inf = 0.0f;
+                tex_value_sup = 1.0f;
+            }
         }
 
         if (ImGui::CollapsingHeader("Level of details -- mipmap level"))
@@ -430,9 +451,6 @@ struct normalmap_generator_t
 };
 
 
-
-    GLuint displacement_tex_id = generate_texture(GL_TEXTURE5, tex_res_x, tex_res_y, GL_R32F);
-
 struct harmonic_solver_t
 {
     //===================================================================================================================================================================================================================
@@ -465,21 +483,22 @@ struct harmonic_solver_t
         uni_li_laplace_tex  = laplace_inverter["laplace_tex"];
         uni_li_input_tex    = laplace_inverter["input_tex"];
         uni_li_output_image = laplace_inverter["output_image"];
+        uni_li_texel_size   = laplace_inverter["texel_size"];
+        uni_li_delta        = laplace_inverter["delta"];
 
-        laplace_tex_id = generate_texture(GL_TEXTURE1, res_x, res_y, GL_R32F);
-        aux_tex_id     = generate_texture(GL_TEXTURE1, res_x, res_y, GL_R32F);
+        laplace_tex_id = generate_texture(GL_TEXTURE5, res_x, res_y, GL_R32F);
+        aux_tex_id     = generate_texture(GL_TEXTURE7, res_x, res_y, GL_R32F);
     }
 
-    void set_input(GLuint input_texture)
+    void set_input()
     {
-        input_generator.enable();
+        normal2laplace.enable();
 
-        uni_n2l_normal_tex = input_texture;
+        uni_n2l_normal_tex = 4;
         uni_n2l_laplace_image = 5;
 
-        glBindImageTexture(5, laplace_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glBindImageTexture(5, laplace_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
         glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
-
 
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
@@ -487,44 +506,44 @@ struct harmonic_solver_t
 
     void process(GLuint output_tex_id)
     {
+        int workgroup_x = (res_x + 7) >> 3; 
+        int workgroup_y = (res_y + 7) >> 3;
+
+        glCopyImageSubData(laplace_tex_id, GL_TEXTURE_2D, 0, 0, 0, 0, 
+                           aux_tex_id,     GL_TEXTURE_2D, 0, 0, 0, 0, res_x, res_y, 1);
+
         laplace_inverter.enable();
 
+        glm::vec2 texel_size = glm::vec2(1.0f / res_x, 1.0f / res_y);
         uni_li_laplace_tex = 5;
-        uni_li_output_image = 6;
-
-        glBindImageTexture(6, output_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-        glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
-
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-        /*
-        uni_li_normal_tex = 4;
         uni_li_texel_size = texel_size;
 
-        const float zero = 0.0f;
-        glClearTexImage(aux_tex_id, 0, GL_RED, GL_FLOAT, &zero);
+        uni_li_input_tex = 7;
+        uni_li_output_image = 6;
+
+        glBindImageTexture(6, output_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+        glBindImageTexture(7, aux_tex_id,    0, GL_FALSE, 0, GL_READ_ONLY,  GL_R32F);
+        glDispatchCompute(workgroup_x, workgroup_y, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
         float delta = 32.0f;
-
-        glBindImageTexture(7, aux_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
-
         for(int i = 0; i < 6; ++i)
         {
-            uni_df_delta = glm::vec2(dx / res_x, dx / tex_res_y);
+            uni_li_delta = glm::vec2(delta / res_x, delta / res_y);
             for(int j = 0; j < 2; ++j)
             {
-                uni_df_disp_tex = 5;
-                uni_df_output_image = 7;
-                glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
+                uni_li_input_tex = 6;
+                uni_li_output_image = 7;
+                glDispatchCompute(workgroup_x, workgroup_y, 1);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-                uni_df_disp_tex = 9;
-                uni_df_output_image = 5;
-                glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
+                uni_li_input_tex = 7;
+                uni_li_output_image = 6;
+                glDispatchCompute(workgroup_x, workgroup_y, 1);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
             delta *= 0.5;
         }
-        */
     }
 
 
@@ -532,7 +551,7 @@ struct harmonic_solver_t
     {
         glDeleteTextures(1, &laplace_tex_id);
     }
-}
+};
 
 int main(int argc, char *argv[])
 {
@@ -555,6 +574,9 @@ int main(int argc, char *argv[])
     // Unit 2 : normal texture, GL_RGBA32F
     // Unit 3 : extended normal texture, GL_RGBA32F
     // Unit 4 : combined normal texture, GL_RGBA32F
+    // Unit 5 : laplace texture, GL_R32F
+    // Unit 6 : heightmap texture, GL_R32F
+    // Unit 7 : auxiliary texture, GL_R32F
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
@@ -568,14 +590,24 @@ int main(int argc, char *argv[])
     normalmap_generator_t normalmap_generator(diffuse_tex_id);
     normalmap_generator.process(window.normalmap_params);
 
+    int rx = normalmap_generator.tex_res_x[0];
+    int ry = normalmap_generator.tex_res_y[0];
+
+    harmonic_solver_t harmonic_solver(rx, ry);
+    harmonic_solver.set_input();
+    GLuint height_tex_id = generate_mipmap_texture(GL_TEXTURE6, rx, ry, GL_R32F, MAX_LOD);
+    harmonic_solver.process(height_tex_id);
+
     //===================================================================================================================================================================================================================
     // quad rendering shader and fake VAO for rendering quads
     //===================================================================================================================================================================================================================
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
-    uniform_t uni_qr_teximage = quad_renderer["teximage"];
-    uniform_t uni_qr_texlevel = quad_renderer["texlevel"];
+    uniform_t uni_qr_teximage      = quad_renderer["teximage"];
+    uniform_t uni_qr_texlevel      = quad_renderer["texlevel"];
+    uniform_t uni_qr_tex_value_inf = quad_renderer["tex_value_inf"];
+    uniform_t uni_qr_tex_value_sup = quad_renderer["tex_value_sup"];
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -650,7 +682,11 @@ int main(int argc, char *argv[])
         // if some parameters have changed in ui regenerate normal map
         //===============================================================================================================================================================================================================
         if (window.params_changed)
+        {
             normalmap_generator.process(window.normalmap_params);
+            harmonic_solver.set_input();
+            harmonic_solver.process(height_tex_id);
+        }
 
         //===============================================================================================================================================================================================================
         // wait for the compute shader to finish its work and show texture
@@ -678,6 +714,9 @@ int main(int argc, char *argv[])
 
         uni_qr_teximage = window.texture;
         uni_qr_texlevel = window.level;
+
+        uni_qr_tex_value_inf = window.tex_value_inf;
+        uni_qr_tex_value_sup = window.tex_value_sup;
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 

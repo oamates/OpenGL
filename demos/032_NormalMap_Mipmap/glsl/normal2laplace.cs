@@ -5,13 +5,13 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 uniform sampler2D normal_tex;
 layout (r32f) uniform image2D laplace_image;
 
-subroutine vec2 laplacian_filter_func(sampler2D sampler, vec2 uv, vec2 texel_size);
+subroutine float laplacian_filter_func(sampler2D sampler, vec2 uv, vec2 texel_size);
 subroutine uniform laplacian_filter_func laplacian_func;
 
 //==============================================================================================================================================================
 // Symmetric difference filter : 4 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 symm_diff(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float symm_diff(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float SYMM_DIFF_NORMALIZATION_FACTOR = 1.0f / 2.0f;
 
@@ -32,7 +32,7 @@ subroutine(derivative_filter_func) vec2 symm_diff(sampler2D sampler, vec2 uv, ve
 //==============================================================================================================================================================
 // Sobel 3x3 filter : 8 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 sobel3x3(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float sobel3x3(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float SOBEL_3x3_NORMALIZATION_FACTOR = 1.0f / 8.0f;
 
@@ -57,7 +57,7 @@ subroutine(derivative_filter_func) vec2 sobel3x3(sampler2D sampler, vec2 uv, vec
 //==============================================================================================================================================================
 // Sobel 5x5 filter : 24 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 sobel5x5(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float sobel5x5(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float SOBEL_5x5_NORMALIZATION_FACTOR = 1.0f / 96.0f;
 
@@ -112,7 +112,7 @@ subroutine(derivative_filter_func) vec2 sobel5x5(sampler2D sampler, vec2 uv, vec
 //==============================================================================================================================================================
 // Scharr 3x3 filter : 8 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 scharr3x3(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float scharr3x3(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float SCHARR_3x3_NORMALIZATION_FACTOR = 1.0f / 32.0f;
 
@@ -137,7 +137,7 @@ subroutine(derivative_filter_func) vec2 scharr3x3(sampler2D sampler, vec2 uv, ve
 //==============================================================================================================================================================
 // Scharr 5x5 filter : 24 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 scharr5x5(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float scharr5x5(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float SCHARR_5x5_NORMALIZATION_FACTOR = 1.0f / 42.0f;
 
@@ -192,7 +192,7 @@ subroutine(derivative_filter_func) vec2 scharr5x5(sampler2D sampler, vec2 uv, ve
 //==============================================================================================================================================================
 // Prewitt 3x3 filter : 8 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 prewitt3x3(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float prewitt3x3(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float PREWITT_3x3_NORMALIZATION_FACTOR = 1.0f / 6.0f;
 
@@ -218,7 +218,7 @@ subroutine(derivative_filter_func) vec2 prewitt3x3(sampler2D sampler, vec2 uv, v
 //==============================================================================================================================================================
 // Prewitt 5x5 filter : 24 texture reads
 //==============================================================================================================================================================
-subroutine(derivative_filter_func) vec2 prewitt5x5(sampler2D sampler, vec2 uv, vec2 texel_size)
+subroutine(laplacian_filter_func) float prewitt5x5(sampler2D sampler, vec2 uv, vec2 texel_size)
 {
     const float PREWITT_5x5_NORMALIZATION_FACTOR = 1.0f / 30.0f;
 
@@ -266,13 +266,13 @@ subroutine(derivative_filter_func) vec2 prewitt5x5(sampler2D sampler, vec2 uv, v
 //==============================================================================================================================================================
 void main()
 {
-    ivec2 Q = textureSize(luma_tex, tex_level);
+    ivec2 Q = textureSize(normal_tex, 0);
     ivec2 P = ivec2(gl_GlobalInvocationID.xy);
     if ((P.x >= Q.x) || (P.y >= Q.y)) return;
 
     vec2 texel_size = 1.0 / Q;
     vec2 uv = texel_size * (vec2(P) + 0.5);
 
-    float nabla = laplacian_func(luma_tex, uv, texel_size);
-    imageStore(normal_image, P, vec4(nabla, 0.0f, 0.0f, 0.0f));
+    float nabla = laplacian_func(normal_tex, uv, texel_size);
+    imageStore(laplace_image, P, vec4(nabla, 0.0f, 0.0f, 0.0f));
 }
