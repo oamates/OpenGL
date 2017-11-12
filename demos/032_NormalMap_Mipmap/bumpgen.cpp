@@ -429,6 +429,112 @@ struct normalmap_generator_t
     }
 };
 
+
+
+    GLuint displacement_tex_id = generate_texture(GL_TEXTURE5, tex_res_x, tex_res_y, GL_R32F);
+
+struct harmonic_solver_t
+{
+    //===================================================================================================================================================================================================================
+    // compute shaders
+    //===================================================================================================================================================================================================================
+    int res_x, res_y;
+
+    glsl_program_t normal2laplace;
+    glsl_program_t laplace_inverter;
+
+    uniform_t uni_n2l_normal_tex,
+              uni_n2l_laplace_image;
+
+    uniform_t uni_li_laplace_tex,
+              uni_li_output_image;
+
+    GLuint laplace_tex_id;
+
+
+    harmonic_solver_t(int res_x, int res_y) :
+        res_x(res_x), res_y(res_y),
+        normal2laplace(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal2laplace.cs")),
+        laplace_inverter(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/laplace_inverter.cs"))
+    {
+        uni_n2l_normal_tex    = normal2laplace["normal_tex"];
+        uni_n2l_laplace_image = normal2laplace["laplace_image"];
+
+        uni_li_laplace_tex  = laplace_inverter["laplace_tex"];
+        uni_li_output_image = laplace_inverter["output_image"];
+    }
+
+    void set_input(GLuint input_texture)
+    {
+        input_generator.enable();
+
+        uni_n2l_normal_tex = input_texture;
+        uni_n2l_laplace_image = 5;
+
+        glBindImageTexture(5, laplace_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
+
+        laplace_tex_id = generate_texture(GL_TEXTURE1, res_x, res_y, GL_R32F);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+
+    void process(GLuint output_tex_id)
+    {
+        laplace_inverter.enable();
+
+        uni_li_laplace_tex = 5;
+        uni_li_output_image = 6;
+
+        glBindImageTexture(6, output_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+        glDispatchCompute((res_x + 7) >> 3, (res_y + 7) >> 3, 1);
+
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    }
+
+/*
+    displacement_filter.enable();
+    uniform_t uni_df_normal_tex = displacement_filter["normal_tex"];
+    uniform_t uni_df_disp_tex = displacement_filter["disp_tex"];
+    uniform_t uni_df_output_image = displacement_filter["output_image"];
+
+    uniform_t uni_df_texel_size = displacement_filter["texel_size"];
+    uniform_t uni_df_delta = displacement_filter["delta"];
+
+    uni_df_normal_tex = 4;
+    uni_df_texel_size = texel_size;
+    const float zero = 0.0f;
+    glClearTexImage(displacement_tex_id, 0, GL_RED, GL_FLOAT, &zero);
+    float dx = 32.0f;
+
+    glBindImageTexture(7, aux_r_tex_id, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+
+    for(int i = 0; i < 6; ++i)
+    {
+        uni_df_delta = glm::vec2(dx / tex_res_x, dx / tex_res_y);
+        for(int j = 0; j < 2; ++j)
+        {
+            uni_df_disp_tex = 5;
+            uni_df_output_image = 7;
+            glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            uni_df_disp_tex = 9;
+            uni_df_output_image = 5;
+            glDispatchCompute(tex_res_x >> 3, tex_res_y >> 3, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        }
+        dx *= 0.5;
+    }
+*/
+
+
+    ~harmonic_solver_t()
+    {
+        glDeleteTextures(1, &laplace_tex_id);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     const int res_x = 1920;
