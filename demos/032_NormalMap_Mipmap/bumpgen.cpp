@@ -93,6 +93,7 @@ struct demo_window_t : public imgui_window_t
     int level = 0;
     bool pause = false;
     bool gamma_correction = false;
+    int grayscale = 0;
 
     bool tex_value_scale = false;
     float tex_value_inf = 0.0f;
@@ -178,14 +179,14 @@ struct demo_window_t : public imgui_window_t
 
         if (ImGui::CollapsingHeader("Rendering settings :: texture"))
         {
-            ImGui::RadioButton("Diffuse texture",         &texture, 0);
-            ImGui::RadioButton("Luminosity texture",      &texture, 1);
-            ImGui::RadioButton("Initial normal texture",  &texture, 2);
-            ImGui::RadioButton("Extended normal texture", &texture, 3);
-            ImGui::RadioButton("Combined normal texture", &texture, 4);
-            ImGui::RadioButton("Laplace texture",         &texture, 5);
-            ImGui::RadioButton("Auxiliary texture",       &texture, 6);
-            ImGui::RadioButton("Heightmap texture",       &texture, 7);
+            if (ImGui::RadioButton("Diffuse texture",         &texture, 0)) grayscale = 0;
+            if (ImGui::RadioButton("Luminosity texture",      &texture, 1)) grayscale = 1;
+            if (ImGui::RadioButton("Initial normal texture",  &texture, 2)) grayscale = 0;
+            if (ImGui::RadioButton("Extended normal texture", &texture, 3)) grayscale = 0;
+            if (ImGui::RadioButton("Combined normal texture", &texture, 4)) grayscale = 0;
+            if (ImGui::RadioButton("Laplace texture",         &texture, 5)) grayscale = 1;
+            if (ImGui::RadioButton("Auxiliary texture",       &texture, 6)) grayscale = 1;
+            if (ImGui::RadioButton("Heightmap texture",       &texture, 7)) grayscale = 1;
 
             ImGui::Checkbox("Scale texture values", &tex_value_scale);
 
@@ -526,11 +527,11 @@ struct harmonic_solver_t
         glDispatchCompute(workgroup_x, workgroup_y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-        float delta = 32.0f;
-        for(int i = 0; i < 6; ++i)
+        float delta = 64.0f;
+        for(int i = 0; i < 7; ++i)
         {
             uni_li_delta = glm::vec2(delta / res_x, delta / res_y);
-            for(int j = 0; j < 2; ++j)
+            for(int j = 0; j < 4 * (10 - i); ++j)
             {
                 uni_li_input_tex = 6;
                 uni_li_output_image = 7;
@@ -580,8 +581,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    //GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    //GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &internal_format);
@@ -608,6 +609,7 @@ int main(int argc, char *argv[])
     uniform_t uni_qr_texlevel      = quad_renderer["texlevel"];
     uniform_t uni_qr_tex_value_inf = quad_renderer["tex_value_inf"];
     uniform_t uni_qr_tex_value_sup = quad_renderer["tex_value_sup"];
+    uniform_t uni_qr_grayscale     = quad_renderer["grayscale"];
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -714,9 +716,9 @@ int main(int argc, char *argv[])
 
         uni_qr_teximage = window.texture;
         uni_qr_texlevel = window.level;
-
         uni_qr_tex_value_inf = window.tex_value_inf;
         uni_qr_tex_value_sup = window.tex_value_sup;
+        uni_qr_grayscale = window.grayscale;
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
