@@ -347,7 +347,7 @@ struct normalmap_generator_t
             debug_msg("\tLevel %u size = %u x %u", l, tex_res_x[l], tex_res_y[l]);
         }
 
-        luma_tex_id            = generate_mipmap_texture(GL_TEXTURE1, tex_res_x[0], tex_res_y[0], GL_R32F,    MAX_LOD);
+        luma_tex_id            = generate_mipmap_texture(GL_TEXTURE1, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
         normal_tex_id          = generate_mipmap_texture(GL_TEXTURE2, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
         normal_ext_tex_id      = generate_mipmap_texture(GL_TEXTURE3, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
         normal_combined_tex_id = generate_mipmap_texture(GL_TEXTURE4, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
@@ -369,7 +369,7 @@ struct normalmap_generator_t
         for (int l = 0; l < MAX_LOD; ++l)
         {
             uni_lf_tex_level = l;
-            glBindImageTexture(1, luma_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+            glBindImageTexture(1, luma_tex_id, l, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
             glDispatchCompute((tex_res_x[l] + 7) >> 3, (tex_res_y[l] + 7) >> 3, 1);
         }
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);

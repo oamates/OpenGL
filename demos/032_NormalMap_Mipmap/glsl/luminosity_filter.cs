@@ -3,7 +3,7 @@
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 uniform sampler2D diffuse_tex;
-layout (r32f) uniform image2D luma_image;
+layout (rgba32f) uniform image2D luma_image;
 uniform int tex_level;
 uniform float gamma;
 uniform float brightness;
