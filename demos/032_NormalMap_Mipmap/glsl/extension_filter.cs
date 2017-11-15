@@ -51,11 +51,12 @@ void main()
     {
         for(int j = -radius; j <= radius; ++j)
         {
-            vec2 d = texel_size * vec2(i, j);
+            vec2 w = vec2(i, j);
+            vec2 d = texel_size * w;
             vec2 uv = uv0 + d;
             vec3 n0 = 2.0 * textureLod(normal_tex, uv, lod).rgb - 1.0;
             float l = pow(length(n0.xy), sharpness);
-            n += l * n0;
+            n += l * n0 * exp2(-0.00625 * length(w));
         }
     }
 

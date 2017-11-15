@@ -14,6 +14,36 @@ subroutine uniform derivative_filter_func derivative_func;
 //==============================================================================================================================================================
 // Symmetric difference filter : 4 texture reads
 //==============================================================================================================================================================
+subroutine(derivative_filter_func) vec2 symm_diff_ls(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
+{
+    vec2 uv0 = uv;
+    vec2 uvp = uv + texel_size;
+    vec2 uvm = uv - texel_size;
+
+    vec4 bc = textureLod(sampler, vec2(uv0.x, uvm.y), lod);             // bottom center
+    vec4 cl = textureLod(sampler, vec2(uvm.x, uv0.y), lod);             // center left
+    vec4 cr = textureLod(sampler, vec2(uvp.x, uv0.y), lod);             // center right
+    vec4 tc = textureLod(sampler, vec2(uv0.x, uvp.y), lod);             // top center
+    
+    vec4 drl = cr - cl;
+    vec4 dtb = tc - bc;
+
+
+    vec2 dL0 = vec2(drl.r, dtb.r);
+    vec2 dS0 = vec2(drl.g, dtb.g);
+    vec2 dL1 = vec2(drl.b, dtb.b);
+    vec2 dS1 = vec2(drl.a, dtb.a);
+
+    float att = 1.0 / (0.25 + dot(dS0, dS0));
+
+    dL0 = att * dL0;
+
+    return dL0;
+}
+
+//==============================================================================================================================================================
+// Symmetric difference filter : 4 texture reads
+//==============================================================================================================================================================
 subroutine(derivative_filter_func) vec2 symm_diff(sampler2D sampler, vec2 uv, vec2 texel_size, float lod)
 {
     const float SYMM_DIFF_NORMALIZATION_FACTOR = 1.0f / 2.0f;

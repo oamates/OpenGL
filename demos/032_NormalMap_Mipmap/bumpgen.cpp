@@ -34,6 +34,7 @@ struct normalmap_params_t
     int radius;                                         /* normal extension radius, in pixels */
     float sharpness;                                    /* normal extension sharpness */
     float lod_intensity[MAX_LOD];                       /* intensities of the LOD input into final blended normal */
+    glm::vec3 light;
 
     normalmap_params_t()
     {
@@ -48,6 +49,8 @@ struct normalmap_params_t
         sharpness = 1.0f;
         for(int i = 0; i < MAX_LOD; ++i)
             lod_intensity[i] = 0.0f;
+
+        light = glm::vec3(0.0f, 0.0f, 1.0f);
     }
 };
 
@@ -59,6 +62,7 @@ struct subroutine_t
 
 subroutine_t luma_subroutines[] = 
 {
+    {"luma_bt709_4c",   "BT.709 luminosity + saturation for 2 mipmap levels"},
     {"luma_bt709",      "BT.709 luminosity function"},
     {"luma_max",        "L = max(r, g, b) luminosity function"},
     {"luma_product",    "L = 1 - (1 - r)*(1 - g)*(1 - b) luminosity function"},
@@ -69,13 +73,14 @@ const int LUMA_SUBROUTINES = sizeof(luma_subroutines) / sizeof(subroutine_t);
 
 subroutine_t derivative_subroutines[] = 
 {
-    {"symm_diff",  "Symmetric difference derivative routine (4 texture fetches)"},
-    {"sobel3x3",   "Sobel 3x3 filter (8 fetches)"},
-    {"sobel5x5",   "Sobel 5x5 filter (24 fetches)"},
-    {"scharr3x3",  "Scharr 3x3 filter (8)"},
-    {"scharr5x5",  "Scharr 5x5 filter (24)"},
-    {"prewitt3x3", "Prewitt 3x3 filter (8)"},
-    {"prewitt5x5", "Prewitt 5x5 filter (24)"}
+    {"symm_diff_ls", "Symmetric difference using saturation information (4 texture fetches)"},
+    {"symm_diff",    "Symmetric difference derivative routine (4 texture fetches)"},
+    {"sobel3x3",     "Sobel 3x3 filter (8 fetches)"},
+    {"sobel5x5",     "Sobel 5x5 filter (24 fetches)"},
+    {"scharr3x3",    "Scharr 3x3 filter (8)"},
+    {"scharr5x5",    "Scharr 5x5 filter (24)"},
+    {"prewitt3x3",   "Prewitt 3x3 filter (8)"},
+    {"prewitt5x5",   "Prewitt 5x5 filter (24)"}
 };
 
 const int DERIVATIVE_SUBROUTINES = sizeof(derivative_subroutines) / sizeof(subroutine_t);
@@ -93,7 +98,11 @@ struct demo_window_t : public imgui_window_t
     int level = 0;
     bool pause = false;
     bool gamma_correction = false;
-    int grayscale = 0;
+
+    bool single_channel = 0;
+    int channel = -1;
+
+    glm::vec3 light = glm::vec3(0.0f, 0.0f, 1.0f);
 
     bool tex_value_scale = false;
     float tex_value_inf = 0.0f;
@@ -133,16 +142,16 @@ struct demo_window_t : public imgui_window_t
     {
         params_changed = false;
 
-        ImGui::SetNextWindowSize(ImVec2(512, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(768, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
         ImGui::Begin("Normalmap generator settings", 0);
-        ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);
+        ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);        
 
         if (ImGui::CollapsingHeader("Luminosity filter settings"))
         {
             for(int i = 0; i < LUMA_SUBROUTINES; ++i)
                 params_changed |= ImGui::RadioButton(luma_subroutines[i].description, &normalmap_params.luma_subroutine, i);
 
-            ImGui::Checkbox("checkbox", &gamma_correction);
+            ImGui::Checkbox("Gamma correction", &gamma_correction);
             if (gamma_correction)
             {
                 ImGui::SameLine();
@@ -179,14 +188,14 @@ struct demo_window_t : public imgui_window_t
 
         if (ImGui::CollapsingHeader("Rendering settings :: texture"))
         {
-            if (ImGui::RadioButton("Diffuse texture",         &texture, 0)) grayscale = 0;
-            if (ImGui::RadioButton("Luminosity texture",      &texture, 1)) grayscale = 1;
-            if (ImGui::RadioButton("Initial normal texture",  &texture, 2)) grayscale = 0;
-            if (ImGui::RadioButton("Extended normal texture", &texture, 3)) grayscale = 0;
-            if (ImGui::RadioButton("Combined normal texture", &texture, 4)) grayscale = 0;
-            if (ImGui::RadioButton("Laplace texture",         &texture, 5)) grayscale = 1;
-            if (ImGui::RadioButton("Auxiliary texture",       &texture, 6)) grayscale = 1;
-            if (ImGui::RadioButton("Heightmap texture",       &texture, 7)) grayscale = 1;
+            ImGui::RadioButton("Diffuse texture",         &texture, 0);
+            ImGui::RadioButton("Luminosity texture",      &texture, 1);
+            ImGui::RadioButton("Initial normal texture",  &texture, 2);
+            ImGui::RadioButton("Extended normal texture", &texture, 3);
+            ImGui::RadioButton("Combined normal texture", &texture, 4);
+            ImGui::RadioButton("Laplace texture",         &texture, 5);
+            ImGui::RadioButton("Auxiliary texture",       &texture, 6);
+            ImGui::RadioButton("Heightmap texture",       &texture, 7);
 
             ImGui::Checkbox("Scale texture values", &tex_value_scale);
 
@@ -200,6 +209,18 @@ struct demo_window_t : public imgui_window_t
                 tex_value_inf = 0.0f;
                 tex_value_sup = 1.0f;
             }
+
+            ImGui::Checkbox("Show single channel", &single_channel);
+
+            if (single_channel)
+            {
+                ImGui::RadioButton("Red",   &channel, 0); ImGui::SameLine();
+                ImGui::RadioButton("Green", &channel, 1); ImGui::SameLine();
+                ImGui::RadioButton("Blue",  &channel, 2); ImGui::SameLine();
+                ImGui::RadioButton("Alpha", &channel, 3);
+            }
+            else
+                channel = -1;
         }
 
         if (ImGui::CollapsingHeader("Level of details -- mipmap level"))
@@ -212,6 +233,16 @@ struct demo_window_t : public imgui_window_t
                 ImGui::SameLine();
             }
         }
+
+        if (ImGui::CollapsingHeader("Anisotropic light"))
+        {
+            ImGui::Text("Adjust X, Y components of the light direction. Z is set to 1.");
+            ImGui::SliderFloat("Light X", &light.x, -4.0f, 4.0f, "x = %.3f");
+            ImGui::SliderFloat("Light Y", &light.y, -4.0f, 4.0f, "y = %.3f");
+            normalmap_params.light = glm::normalize(light);
+        }
+        else
+            light = glm::vec3(0.0f, 0.0f, 1.0f);
 
         ImGui::End();
         ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
@@ -581,7 +612,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/pink_stone.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
     //GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
@@ -609,7 +640,7 @@ int main(int argc, char *argv[])
     uniform_t uni_qr_texlevel      = quad_renderer["texlevel"];
     uniform_t uni_qr_tex_value_inf = quad_renderer["tex_value_inf"];
     uniform_t uni_qr_tex_value_sup = quad_renderer["tex_value_sup"];
-    uniform_t uni_qr_grayscale     = quad_renderer["grayscale"];
+    uniform_t uni_qr_channel       = quad_renderer["channel"];
 
     GLuint vao_id;
     glGenVertexArrays(1, &vao_id);
@@ -651,6 +682,13 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     polyhedron cube;
     cube.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces);
+
+/*
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+    cube.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces);
+*/
 
     //===================================================================================================================================================================================================================
     // global GL settings :
@@ -718,7 +756,7 @@ int main(int argc, char *argv[])
         uni_qr_texlevel = window.level;
         uni_qr_tex_value_inf = window.tex_value_inf;
         uni_qr_tex_value_sup = window.tex_value_sup;
-        uni_qr_grayscale = window.grayscale;
+        uni_qr_channel = window.channel;
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
