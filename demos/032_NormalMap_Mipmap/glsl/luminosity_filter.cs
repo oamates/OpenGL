@@ -8,6 +8,8 @@ uniform int tex_level;
 uniform float gamma;
 uniform float brightness;
 
+uniform vec3 light;
+
 const vec3 rgb_power_bt709 = vec3(0.2126f, 0.7152f, 0.0722f);
 const vec3 unit_rgb_power_bt709 = normalize(rgb_power_bt709);
 

@@ -300,7 +300,8 @@ struct normalmap_generator_t
               uni_lf_luma_image,
               uni_lf_tex_level,
               uni_lf_gamma,
-              uni_lf_brightness;
+              uni_lf_brightness,
+              uni_lf_light;
 
     GLuint luma_subroutine_index[LUMA_SUBROUTINES];
 
@@ -346,6 +347,8 @@ struct normalmap_generator_t
         uni_lf_tex_level     = luminosity_filter["tex_level"];
         uni_lf_gamma         = luminosity_filter["gamma"];
         uni_lf_brightness    = luminosity_filter["brightness"];
+        uni_lf_light         = luminosity_filter["light"];
+
 
         for(int i = 0; i < LUMA_SUBROUTINES; ++i)
             luma_subroutine_index[i] = luminosity_filter.subroutine_index(GL_COMPUTE_SHADER, luma_subroutines[i].name);
@@ -394,6 +397,7 @@ struct normalmap_generator_t
         uni_lf_luma_image = 1;
         uni_lf_gamma = params.gamma;
         uni_lf_brightness = params.brightness;
+        uni_lf_light = params.light;
 
         uniform_t::subroutine(GL_COMPUTE_SHADER, &luma_subroutine_index[params.luma_subroutine]);
 
