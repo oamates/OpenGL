@@ -10,6 +10,7 @@ layout (rgba32f) uniform image2D normal_image;
 
 uniform float amplitude;
 uniform vec2 texel_size;
+uniform vec3 light;
 
 //==============================================================================================================================================================
 // shader entry point

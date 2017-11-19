@@ -230,19 +230,19 @@ struct demo_window_t : public imgui_window_t
                 char level_name[16];
                 sprintf(level_name, "%u", i);
                 ImGui::RadioButton(level_name, &level, i);
-                ImGui::SameLine();
+                if (i != MAX_LOD - 1) ImGui::SameLine();
             }
         }
 
         if (ImGui::CollapsingHeader("Anisotropic light"))
         {
             ImGui::Text("Adjust X, Y components of the light direction. Z is set to 1.");
-            ImGui::SliderFloat("Light X", &light.x, -4.0f, 4.0f, "x = %.3f");
-            ImGui::SliderFloat("Light Y", &light.y, -4.0f, 4.0f, "y = %.3f");
+            params_changed |= ImGui::SliderFloat("Light X", &light.x, -4.0f, 4.0f, "x = %.3f");
+            params_changed |= ImGui::SliderFloat("Light Y", &light.y, -4.0f, 4.0f, "y = %.3f");
             normalmap_params.light = glm::normalize(light);
         }
         else
-            light = glm::vec3(0.0f, 0.0f, 1.0f);
+            normalmap_params.light = light = glm::vec3(0.0f, 0.0f, 1.0f);
 
         ImGui::End();
         ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
@@ -300,8 +300,7 @@ struct normalmap_generator_t
               uni_lf_luma_image,
               uni_lf_tex_level,
               uni_lf_gamma,
-              uni_lf_brightness,
-              uni_lf_light;
+              uni_lf_brightness;
 
     GLuint luma_subroutine_index[LUMA_SUBROUTINES];
 
@@ -311,7 +310,8 @@ struct normalmap_generator_t
     uniform_t uni_nf_luma_tex,
               uni_nf_amplitude,
               uni_nf_normal_image,
-              uni_nf_tex_level;
+              uni_nf_tex_level,
+              uni_nf_light;
 
     GLuint derivative_subroutine_index[DERIVATIVE_SUBROUTINES];
 
@@ -347,8 +347,6 @@ struct normalmap_generator_t
         uni_lf_tex_level     = luminosity_filter["tex_level"];
         uni_lf_gamma         = luminosity_filter["gamma"];
         uni_lf_brightness    = luminosity_filter["brightness"];
-        uni_lf_light         = luminosity_filter["light"];
-
 
         for(int i = 0; i < LUMA_SUBROUTINES; ++i)
             luma_subroutine_index[i] = luminosity_filter.subroutine_index(GL_COMPUTE_SHADER, luma_subroutines[i].name);
@@ -357,6 +355,7 @@ struct normalmap_generator_t
         uni_nf_amplitude     = normal_filter["amplitude"];
         uni_nf_normal_image  = normal_filter["normal_image"];
         uni_nf_tex_level     = normal_filter["tex_level"];
+        uni_nf_light         = normal_filter["light"];
 
         for(int i = 0; i < DERIVATIVE_SUBROUTINES; ++i)
             derivative_subroutine_index[i] = normal_filter.subroutine_index(GL_COMPUTE_SHADER, derivative_subroutines[i].name);
@@ -397,7 +396,6 @@ struct normalmap_generator_t
         uni_lf_luma_image = 1;
         uni_lf_gamma = params.gamma;
         uni_lf_brightness = params.brightness;
-        uni_lf_light = params.light;
 
         uniform_t::subroutine(GL_COMPUTE_SHADER, &luma_subroutine_index[params.luma_subroutine]);
 
@@ -419,6 +417,7 @@ struct normalmap_generator_t
         uni_nf_luma_tex = 1;
         uni_nf_normal_image = 2;
         uni_nf_amplitude = params.amplitude;
+        uni_nf_light = params.light;
 
         uniform_t::subroutine(GL_COMPUTE_SHADER, &derivative_subroutine_index[params.derivative_subroutine]);
 
@@ -681,18 +680,67 @@ int main(int argc, char *argv[])
     simple_light["shift_rotor"] = shift_rotor;
 
     //===================================================================================================================================================================================================================
-    // initialize buffers : vertex + tangent frame + texture coordinates 
-    // for five regular plato solids and load the diffuse + bump textures for each
+    // initialize simple cube vertex buffer
     //===================================================================================================================================================================================================================
     polyhedron cube;
     cube.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces);
 
-/*
-    GLuint vao_id;
-    glGenVertexArrays(1, &vao_id);
-    glBindVertexArray(vao_id);
-    cube.regular_pft2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces);
-*/
+    //===================================================================================================================================================================================================================
+    // initialize cube vertex buffer for tesselation 
+    //===================================================================================================================================================================================================================
+    glsl_program_t cube_tess(glsl_shader_t(GL_VERTEX_SHADER,          "glsl/cube_tess.vs"),
+                             glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/cube_tess.tcs"),
+                             glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/cube_tess.tes"),
+                             glsl_shader_t(GL_FRAGMENT_SHADER,        "glsl/cube_tess.fs"));
+
+    uniform_t uni_ct_pv_matrix    = cube_tess["projection_view_matrix"]; 
+    uniform_t uni_ct_camera_ws    = cube_tess["camera_ws"];
+    uniform_t uni_ct_light_ws     = cube_tess["light_ws"];
+    uniform_t uni_ct_disp_tex     = cube_tess["disp_tex"];
+    uniform_t uni_ct_diffuse_tex  = cube_tess["diffuse_tex"];
+
+    vertex_pf_t cube_quad[6] = 
+    {
+        {   /* +X */
+            .position  = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .normal    = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
+        },
+        {   /* -X */
+            .position  = glm::vec3(-1.0f,  0.0f,  0.0f),
+            .normal    = glm::vec3(-1.0f,  0.0f,  0.0f),
+            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f)
+        },
+        {   /* +Y */
+            .position  = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .normal    = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f)
+        },
+        {   /* -Y */
+            .position  = glm::vec3( 0.0f, -1.0f,  0.0f),
+            .normal    = glm::vec3( 0.0f, -1.0f,  0.0f),
+            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
+        },
+        {   /* +Z */
+            .position  = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .normal    = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f),
+        },
+        {   /* -Z */
+            .position  = glm::vec3( 0.0f,  0.0f, -1.0f),
+            .normal    = glm::vec3( 0.0f,  0.0f, -1.0f),
+            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f),
+        }
+    };
+
+    vbo_t vbo(cube_quad, 6);
+    glPatchParameteri(GL_PATCH_VERTICES, 1);
 
     //===================================================================================================================================================================================================================
     // global GL settings :
