@@ -3,14 +3,15 @@
 layout(quads, equal_spacing, ccw) in;
 
 /*
-    red channel   - displacement value,
-    green channel - displacement x-derivative,
-    blue channel  - displacement y-derivative
+    rgb channel - normal,
+    alpha channel - displacement
 */
 
-uniform sampler2D disp_tex;
-
 uniform mat4 projection_view_matrix;
+uniform vec3 camera_ws;
+uniform vec3 light_ws;
+
+uniform sampler2D disp_tex;
 
 in vec3 p[];
 in vec3 n[];
@@ -21,18 +22,16 @@ out vec3 view;
 out vec3 light;
 out vec3 normal;
 out vec2 uv;
-
-const float inv_pi = 0.31830988618379067;
  
 void main()
 {
-    vec3 rgb = texture(disp_tex, gl_TessCoord.xy).rgb - 0.5;
-    float d = rgb.r;
-    position = p[0] + (gl_TessCoord.x - 0.5) * t[0] + (gl_TessCoord.y - 0.5) * b[0] + d * n[0];
+    vec4 normal_disp = texture(disp_tex, gl_TessCoord.xy);
+    float disp = normal_disp.a;
+
+    vec3 position = p[0] + (2.0 * gl_TessCoord.x - 1.0) * t[0] + (2.0 * gl_TessCoord.y - 1.0) * b[0] + disp * n[0];
     view = camera_ws - position;
     light = light_ws - position;
-    vec3 c = normalize(vec3(rgb.gb, 1.0));
-    normal = normalize(c.x * t[0] + c.y * b[0] + c.z * n[0]);
+    normal = 2.0 * normal_disp.rgb - 1.0;
     uv = gl_TessCoord.xy;
     gl_Position = projection_view_matrix * vec4(position, 1.0);
 }

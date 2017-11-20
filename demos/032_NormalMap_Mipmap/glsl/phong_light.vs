@@ -11,8 +11,8 @@ uniform mat4 view_matrix;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
 uniform float time;
-uniform float solid_scale;
 
+uniform float scale;
 uniform vec4 shift_rotor[16];
 
 out vec3 view;
@@ -43,7 +43,7 @@ void main()
     vec4 rotor = shift_rotor[index + 1];
     mat3 rm = rotation_matrix(rotor.xyz, rotor.w * time);
 
-    vec3 position_ws = shift + solid_scale * rm * position_in;
+    vec3 position_ws = shift + scale * rm * position_in;
 
     view = camera_ws - position_ws;
     light = light_ws - position_ws;

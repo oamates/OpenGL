@@ -36,6 +36,8 @@ struct normalmap_params_t
     float lod_intensity[MAX_LOD];                       /* intensities of the LOD input into final blended normal */
     glm::vec3 light;
 
+    float displacement_amplitude;
+
     normalmap_params_t()
     {
         luma_subroutine = 0;
@@ -51,6 +53,7 @@ struct normalmap_params_t
             lod_intensity[i] = 0.0f;
 
         light = glm::vec3(0.0f, 0.0f, 1.0f);
+        displacement_amplitude = 1.0f;
     }
 };
 
@@ -107,6 +110,8 @@ struct demo_window_t : public imgui_window_t
     bool tex_value_scale = false;
     float tex_value_inf = 0.0f;
     float tex_value_sup = 1.0f;
+
+    int render_mode = 0;
 
     normalmap_params_t normalmap_params;                /* normalmap generation parameters */
 
@@ -186,6 +191,18 @@ struct demo_window_t : public imgui_window_t
             }
         }
 
+        if (ImGui::CollapsingHeader("RGB Normal + Alpha displacement shader"))
+        {
+            params_changed |= ImGui::SliderFloat("Displacement Amplitude", &normalmap_params.displacement_amplitude, -2.0f, 2.0f, "%.3f");
+        }
+
+        if (ImGui::CollapsingHeader("Rendering mode"))
+        {
+            ImGui::RadioButton("Normal map lighting",                &render_mode, 0);
+            ImGui::RadioButton("Parallax map lighting",              &render_mode, 1);
+            ImGui::RadioButton("Tesselation using displacement map", &render_mode, 2);
+        }
+
         if (ImGui::CollapsingHeader("Rendering settings :: texture"))
         {
             ImGui::RadioButton("Diffuse texture",         &texture, 0);
@@ -196,6 +213,7 @@ struct demo_window_t : public imgui_window_t
             ImGui::RadioButton("Laplace texture",         &texture, 5);
             ImGui::RadioButton("Auxiliary texture",       &texture, 6);
             ImGui::RadioButton("Heightmap texture",       &texture, 7);
+            ImGui::RadioButton("Displacement texture",    &texture, 8);
 
             ImGui::Checkbox("Scale texture values", &tex_value_scale);
 
@@ -292,6 +310,7 @@ struct normalmap_generator_t
     glsl_program_t normal_filter;
     glsl_program_t extension_filter;
     glsl_program_t level_combine_filter;
+    glsl_program_t displacement_filter;
 
     //===================================================================================================================================================================================================================
     // luminosity shader uniforms
@@ -331,16 +350,25 @@ struct normalmap_generator_t
               uni_lc_normal_combined_image,
               uni_lc_lod_intensity;
 
+    //===================================================================================================================================================================================================================
+    // final converter : integrated normals --> normal rgb + displacement alpha texture
+    //===================================================================================================================================================================================================================
+    uniform_t uni_df_heightmap_tex,
+              uni_df_normal_disp_image,
+              uni_df_amplitude;
+
+
     GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
 
-    GLuint luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id;
+    GLuint luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id, displacement_tex_id;
 
     normalmap_generator_t(GLuint input_texture) :
         input_texture(input_texture),
         luminosity_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/luminosity_filter.cs")),
         normal_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/normal_filter.cs")),
         extension_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/extension_filter.cs")),
-        level_combine_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/level_combine_filter.cs"))
+        level_combine_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/level_combine_filter.cs")),
+        displacement_filter (glsl_shader_t(GL_COMPUTE_SHADER, "glsl/displacement_filter.cs"))
     {
         uni_lf_diffuse_tex   = luminosity_filter["diffuse_tex"];
         uni_lf_luma_image    = luminosity_filter["luma_image"];
@@ -370,6 +398,10 @@ struct normalmap_generator_t
         uni_lc_normal_combined_image = level_combine_filter["normal_combined_image"];
         uni_lc_lod_intensity         = level_combine_filter["lod_intensity"];
 
+        uni_df_heightmap_tex     = displacement_filter["heightmap_tex"];
+        uni_df_normal_disp_image = displacement_filter["normal_disp_image"];
+        uni_df_amplitude         = displacement_filter["amplitude"];
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, input_texture);
 
@@ -384,6 +416,7 @@ struct normalmap_generator_t
         normal_tex_id          = generate_mipmap_texture(GL_TEXTURE2, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
         normal_ext_tex_id      = generate_mipmap_texture(GL_TEXTURE3, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
         normal_combined_tex_id = generate_mipmap_texture(GL_TEXTURE4, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
+        displacement_tex_id    = generate_mipmap_texture(GL_TEXTURE8, tex_res_x[0], tex_res_y[0], GL_RGBA32F, MAX_LOD);
     }
 
     //===================================================================================================================================================================================================================
@@ -478,10 +511,25 @@ struct normalmap_generator_t
         combine_mip_levels(params);
     }
 
+    void compute_displacement(const normalmap_params_t& params)
+    {
+        displacement_filter.enable();        
+        uni_df_heightmap_tex = 7;
+        uni_df_normal_disp_image = 7;
+        uni_df_amplitude = params.displacement_amplitude;
+
+        glBindImageTexture(7, displacement_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        glDispatchCompute((tex_res_x[0] + 7) >> 3, (tex_res_y[0] + 7) >> 3, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        glActiveTexture(GL_TEXTURE8);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
     ~normalmap_generator_t()
     {
-        GLuint tex_ids[] = {luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id};
-        glDeleteTextures(4, tex_ids);
+        GLuint tex_ids[] = {luma_tex_id, normal_tex_id, normal_ext_tex_id, normal_combined_tex_id, displacement_tex_id};
+        glDeleteTextures(sizeof(tex_ids) / sizeof(GLuint), tex_ids);
     }
 };
 
@@ -588,6 +636,62 @@ struct harmonic_solver_t
     }
 };
 
+struct tesselated_cube_t
+{
+    vbo_t vbo;
+
+    const vertex_pf_t cube_quad[6] = 
+    {
+        {   /* +X */
+            .position  = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .normal    = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
+        },
+        {   /* -X */
+            .position  = glm::vec3(-1.0f,  0.0f,  0.0f),
+            .normal    = glm::vec3(-1.0f,  0.0f,  0.0f),
+            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f)
+        },
+        {   /* +Y */
+            .position  = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .normal    = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f)
+        },
+        {   /* -Y */
+            .position  = glm::vec3( 0.0f, -1.0f,  0.0f),
+            .normal    = glm::vec3( 0.0f, -1.0f,  0.0f),
+            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
+        },
+        {   /* +Z */
+            .position  = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .normal    = glm::vec3( 0.0f,  0.0f,  1.0f),
+            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
+            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f),
+        },
+        {   /* -Z */
+            .position  = glm::vec3( 0.0f,  0.0f, -1.0f),
+            .normal    = glm::vec3( 0.0f,  0.0f, -1.0f),
+            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
+            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f),
+        }
+    };
+
+    tesselated_cube_t() 
+        : vbo(cube_quad, 6)
+        { glPatchParameteri(GL_PATCH_VERTICES, 1); }
+
+    void render()
+        { vbo.render(GL_PATCHES); }
+
+    void instanced_render(GLsizei primcount)
+        { vbo.instanced_render(GL_PATCHES, primcount); }
+
+};
+
 int main(int argc, char *argv[])
 {
     const int res_x = 1920;
@@ -612,6 +716,7 @@ int main(int argc, char *argv[])
     // Unit 5 : laplace texture, GL_R32F
     // Unit 6 : heightmap texture, GL_R32F
     // Unit 7 : auxiliary texture, GL_R32F
+    // Unit 8 : normal + displacement texture, GL_RGBA32F
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
@@ -663,7 +768,7 @@ int main(int argc, char *argv[])
     uniform_t uni_sl_light_ws          = simple_light["light_ws"];
     uniform_t uni_sl_camera_ws         = simple_light["camera_ws"];         
 
-    simple_light["solid_scale"] = 1.0f;
+    simple_light["scale"] = 1.0f;
     simple_light["diffuse_tex"] = 0;
     simple_light["normal_tex"] = 4;
 
@@ -688,59 +793,22 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // initialize cube vertex buffer for tesselation 
     //===================================================================================================================================================================================================================
-    glsl_program_t cube_tess(glsl_shader_t(GL_VERTEX_SHADER,          "glsl/cube_tess.vs"),
-                             glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/cube_tess.tcs"),
-                             glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/cube_tess.tes"),
-                             glsl_shader_t(GL_FRAGMENT_SHADER,        "glsl/cube_tess.fs"));
+    glsl_program_t cube_tess(glsl_shader_t(GL_VERTEX_SHADER,          "glsl/quad_tess.vs"),
+                             glsl_shader_t(GL_TESS_CONTROL_SHADER,    "glsl/quad_tess.tcs"),
+                             glsl_shader_t(GL_TESS_EVALUATION_SHADER, "glsl/quad_tess.tes"),
+                             glsl_shader_t(GL_FRAGMENT_SHADER,        "glsl/quad_tess.fs"));
 
+    cube_tess.enable();
     uniform_t uni_ct_pv_matrix    = cube_tess["projection_view_matrix"]; 
     uniform_t uni_ct_camera_ws    = cube_tess["camera_ws"];
     uniform_t uni_ct_light_ws     = cube_tess["light_ws"];
     uniform_t uni_ct_disp_tex     = cube_tess["disp_tex"];
     uniform_t uni_ct_diffuse_tex  = cube_tess["diffuse_tex"];
+    uniform_t uni_ct_time         = cube_tess["time"];
+    cube_tess["scale"] = 1.0f;
+    cube_tess["shift_rotor"] = shift_rotor;
 
-    vertex_pf_t cube_quad[6] = 
-    {
-        {   /* +X */
-            .position  = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .normal    = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
-        },
-        {   /* -X */
-            .position  = glm::vec3(-1.0f,  0.0f,  0.0f),
-            .normal    = glm::vec3(-1.0f,  0.0f,  0.0f),
-            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f)
-        },
-        {   /* +Y */
-            .position  = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .normal    = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f)
-        },
-        {   /* -Y */
-            .position  = glm::vec3( 0.0f, -1.0f,  0.0f),
-            .normal    = glm::vec3( 0.0f, -1.0f,  0.0f),
-            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
-        },
-        {   /* +Z */
-            .position  = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .normal    = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f),
-        },
-        {   /* -Z */
-            .position  = glm::vec3( 0.0f,  0.0f, -1.0f),
-            .normal    = glm::vec3( 0.0f,  0.0f, -1.0f),
-            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f),
-        }
-    };
-
-    vbo_t vbo(cube_quad, 6);
-    glPatchParameteri(GL_PATCH_VERTICES, 1);
+    tesselated_cube_t tesselated_cube;
 
     //===================================================================================================================================================================================================================
     // global GL settings :
@@ -778,6 +846,7 @@ int main(int argc, char *argv[])
             normalmap_generator.process(window.normalmap_params);
             harmonic_solver.set_input();
             harmonic_solver.process(height_tex_id);
+            normalmap_generator.compute_displacement(window.normalmap_params);
         }
 
         //===============================================================================================================================================================================================================
@@ -816,21 +885,37 @@ int main(int argc, char *argv[])
         // show cubes using created normal texture
         //===============================================================================================================================================================================================================
         glViewport(right_vp.x, right_vp.y, right_vp.z, right_vp.w);
-        simple_light.enable();
 
         if (!window.pause)
             t += window.frame_dt;
 
-        uni_sl_time = t;
-        uni_sl_view_matrix = window.camera.view_matrix;
-    
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
         glm::vec3 light_ws = cell_size * glm::vec3(glm::cos(0.25f * t), glm::sin(0.25f * t), 2.0f);
-        uni_sl_light_ws = light_ws;
-
         glm::vec3 camera_ws = window.camera.position();
-        uni_sl_camera_ws = camera_ws;
 
-        cube.instanced_render(8);
+        if (window.render_mode == 0)
+        {
+            simple_light.enable();
+            uni_sl_time = t;
+            uni_sl_light_ws = light_ws;
+            uni_sl_camera_ws = camera_ws;
+            uni_sl_view_matrix = window.camera.view_matrix;
+            cube.instanced_render(8);
+        }
+        else
+        {
+            cube_tess.enable();
+            uni_ct_pv_matrix    = projection_view_matrix; 
+            uni_ct_camera_ws    = camera_ws;
+            uni_ct_light_ws     = light_ws;
+            uni_ct_disp_tex     = 8;
+            uni_ct_diffuse_tex  = 0;
+            uni_ct_time         = t;
+            tesselated_cube.instanced_render(8);
+        }
+
+
+
 
         //===============================================================================================================================================================================================================
         // After end_frame call ::
