@@ -30,6 +30,8 @@ struct normalmap_params_t
     float brightness;                                   /* brightness factor used in luminosity conversion */
 
     int derivative_subroutine;                          /* derivative subroutine index */
+    int d2n_subroutine;                                 /* displacement-to-normal subroutine conversion subroutine index */
+
     float amplitude;                                    /* amplitude for initial normal calculation */
     int radius;                                         /* normal extension radius, in pixels */
     float sharpness;                                    /* normal extension sharpness */
@@ -45,6 +47,8 @@ struct normalmap_params_t
         brightness = 1.0f;
 
         derivative_subroutine = 0;
+        d2n_subroutine = 0;
+
         amplitude = 1.0f;
 
         radius = 1;
@@ -88,6 +92,18 @@ subroutine_t derivative_subroutines[] =
 
 const int DERIVATIVE_SUBROUTINES = sizeof(derivative_subroutines) / sizeof(subroutine_t);
 
+subroutine_t d2n_subroutines[] = 
+{
+    {"symm_diff",    "Symmetric difference"},
+    {"sobel3x3",     "Sobel 3x3 filter"},
+    {"sobel5x5",     "Sobel 5x5 filter"},
+    {"scharr3x3",    "Scharr 3x3 filter"},
+    {"scharr5x5",    "Scharr 5x5 filter"},
+    {"prewitt3x3",   "Prewitt 3x3 filter"},
+    {"prewitt5x5",   "Prewitt 5x5 filter"}
+};
+
+const int D2N_SUBROUTINES = sizeof(d2n_subroutines) / sizeof(subroutine_t);
 
 struct demo_window_t : public imgui_window_t
 {
@@ -193,6 +209,8 @@ struct demo_window_t : public imgui_window_t
 
         if (ImGui::CollapsingHeader("RGB Normal + Alpha displacement shader"))
         {
+            for(int i = 0; i < D2N_SUBROUTINES; ++i)
+                params_changed |= ImGui::RadioButton(d2n_subroutines[i].description, &normalmap_params.d2n_subroutine, i);
             params_changed |= ImGui::SliderFloat("Displacement Amplitude", &normalmap_params.displacement_amplitude, -2.0f, 2.0f, "%.3f");
         }
 
@@ -357,6 +375,8 @@ struct normalmap_generator_t
               uni_df_normal_disp_image,
               uni_df_amplitude;
 
+    GLuint d2n_subroutine_index[D2N_SUBROUTINES];
+
 
     GLsizei tex_res_x[MAX_LOD], tex_res_y[MAX_LOD];
 
@@ -401,6 +421,11 @@ struct normalmap_generator_t
         uni_df_heightmap_tex     = displacement_filter["heightmap_tex"];
         uni_df_normal_disp_image = displacement_filter["normal_disp_image"];
         uni_df_amplitude         = displacement_filter["amplitude"];
+
+        for(int i = 0; i < D2N_SUBROUTINES; ++i)
+            d2n_subroutine_index[i] = displacement_filter.subroutine_index(GL_COMPUTE_SHADER, d2n_subroutines[i].name);
+
+        d2n_subroutines
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, input_texture);
