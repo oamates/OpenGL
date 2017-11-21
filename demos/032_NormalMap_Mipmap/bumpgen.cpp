@@ -129,6 +129,8 @@ struct demo_window_t : public imgui_window_t
 
     int render_mode = 0;
 
+    float disp_scale = 0.25f;
+
     normalmap_params_t normalmap_params;                /* normalmap generation parameters */
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
@@ -257,6 +259,8 @@ struct demo_window_t : public imgui_window_t
             }
             else
                 channel = -1;
+
+            ImGui::SliderFloat("Displacement scale", &disp_scale, -1.0f, 1.0f, "%.3f");
         }
 
         if (ImGui::CollapsingHeader("Level of details -- mipmap level"))
@@ -425,8 +429,6 @@ struct normalmap_generator_t
         for(int i = 0; i < D2N_SUBROUTINES; ++i)
             d2n_subroutine_index[i] = displacement_filter.subroutine_index(GL_COMPUTE_SHADER, d2n_subroutines[i].name);
 
-        d2n_subroutines
-
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, input_texture);
 
@@ -542,6 +544,8 @@ struct normalmap_generator_t
         uni_df_heightmap_tex = 7;
         uni_df_normal_disp_image = 7;
         uni_df_amplitude = params.displacement_amplitude;
+
+        uniform_t::subroutine(GL_COMPUTE_SHADER, &d2n_subroutine_index[params.d2n_subroutine]);
 
         glBindImageTexture(7, displacement_tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
         glDispatchCompute((tex_res_x[0] + 7) >> 3, (tex_res_y[0] + 7) >> 3, 1);
@@ -663,58 +667,38 @@ struct harmonic_solver_t
 
 struct tesselated_cube_t
 {
+    GLuint vao_id;
     vbo_t vbo;
 
     const vertex_pf_t cube_quad[6] = 
     {
-        {   /* +X */
-            .position  = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .normal    = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
-        },
-        {   /* -X */
-            .position  = glm::vec3(-1.0f,  0.0f,  0.0f),
-            .normal    = glm::vec3(-1.0f,  0.0f,  0.0f),
-            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f)
-        },
-        {   /* +Y */
-            .position  = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .normal    = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .tangent_x = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f)
-        },
-        {   /* -Y */
-            .position  = glm::vec3( 0.0f, -1.0f,  0.0f),
-            .normal    = glm::vec3( 0.0f, -1.0f,  0.0f),
-            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .tangent_y = glm::vec3( 0.0f,  0.0f,  1.0f)
-        },
-        {   /* +Z */
-            .position  = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .normal    = glm::vec3( 0.0f,  0.0f,  1.0f),
-            .tangent_x = glm::vec3( 1.0f,  0.0f,  0.0f),
-            .tangent_y = glm::vec3( 0.0f,  1.0f,  0.0f),
-        },
-        {   /* -Z */
-            .position  = glm::vec3( 0.0f,  0.0f, -1.0f),
-            .normal    = glm::vec3( 0.0f,  0.0f, -1.0f),
-            .tangent_x = glm::vec3( 0.0f,  1.0f,  0.0f),
-            .tangent_y = glm::vec3( 1.0f,  0.0f,  0.0f),
-        }
+        { glm::vec3( 0.5f,  0.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f)}, /* +X */
+        { glm::vec3(-0.5f,  0.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f)}, /* -X */
+        { glm::vec3( 0.0f,  0.5f,  0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f)}, /* +Y */
+        { glm::vec3( 0.0f, -0.5f,  0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f)}, /* -Y */
+        { glm::vec3( 0.0f,  0.0f,  0.5f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3( 0.0f,  1.0f,  0.0f)}, /* +Z */
+        { glm::vec3( 0.0f,  0.0f, -0.5f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f)}  /* -Z */
     };
 
     tesselated_cube_t() 
-        : vbo(cube_quad, 6)
-        { glPatchParameteri(GL_PATCH_VERTICES, 1); }
+    {
+        glGenVertexArrays(1, &vao_id);
+        glBindVertexArray(vao_id);
+        vbo.init(cube_quad, 6);
+        glPatchParameteri(GL_PATCH_VERTICES, 1);
+    }
 
     void render()
-        { vbo.render(GL_PATCHES); }
+    {
+        glBindVertexArray(vao_id);
+        vbo.render(GL_PATCHES);
+    }
 
     void instanced_render(GLsizei primcount)
-        { vbo.instanced_render(GL_PATCHES, primcount); }
-
+    {
+        glBindVertexArray(vao_id);
+        vbo.instanced_render(GL_PATCHES, primcount);
+    }
 };
 
 int main(int argc, char *argv[])
@@ -745,7 +729,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
+    GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/rock_wall.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
     //GLuint diffuse_tex_id = image::png::texture2d("../../../resources/tex2d/nature/rocks/6.png", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_MIRRORED_REPEAT);
 
     GLint internal_format;
@@ -829,6 +813,7 @@ int main(int argc, char *argv[])
     uniform_t uni_ct_light_ws     = cube_tess["light_ws"];
     uniform_t uni_ct_disp_tex     = cube_tess["disp_tex"];
     uniform_t uni_ct_diffuse_tex  = cube_tess["diffuse_tex"];
+    uniform_t uni_ct_disp_scale   = cube_tess["disp_scale"];
     uniform_t uni_ct_time         = cube_tess["time"];
     cube_tess["scale"] = 1.0f;
     cube_tess["shift_rotor"] = shift_rotor;
@@ -935,12 +920,10 @@ int main(int argc, char *argv[])
             uni_ct_light_ws     = light_ws;
             uni_ct_disp_tex     = 8;
             uni_ct_diffuse_tex  = 0;
+            uni_ct_disp_scale   = window.disp_scale;
             uni_ct_time         = t;
             tesselated_cube.instanced_render(8);
         }
-
-
-
 
         //===============================================================================================================================================================================================================
         // After end_frame call ::

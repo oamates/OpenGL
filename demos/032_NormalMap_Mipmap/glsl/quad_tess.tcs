@@ -19,7 +19,7 @@ void main()
     vec3 delta = camera_ws - position[gl_InvocationID];
     float dp = dot(delta, delta); 
     const float lambda = 7.171;
-    float level = 80.0f / (1.0f + lambda * dp);
+    float level = 256.0f;
 
     gl_TessLevelOuter[0] = level;
     gl_TessLevelOuter[1] = level;

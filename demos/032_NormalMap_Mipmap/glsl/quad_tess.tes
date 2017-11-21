@@ -10,6 +10,7 @@ layout(quads, equal_spacing, ccw) in;
 uniform mat4 projection_view_matrix;
 uniform vec3 camera_ws;
 uniform vec3 light_ws;
+uniform float disp_scale;
 
 uniform sampler2D disp_tex;
 
@@ -26,9 +27,12 @@ out vec2 uv;
 void main()
 {
     vec4 normal_disp = texture(disp_tex, gl_TessCoord.xy);
-    float disp = normal_disp.a;
 
-    vec3 position = p[0] + (2.0 * gl_TessCoord.x - 1.0) * t[0] + (2.0 * gl_TessCoord.y - 1.0) * b[0] + disp * n[0];
+    float q = 1.0 - gl_TessCoord.x * (1.0 - gl_TessCoord.x) * gl_TessCoord.y * (1.0 - gl_TessCoord.y);
+    q = 1.0 - pow(q, 20.0);
+    float disp = q * disp_scale * normal_disp.a;
+
+    vec3 position = p[0] + (gl_TessCoord.x - 0.5) * t[0] + (gl_TessCoord.y - 0.5) * b[0] + disp * n[0];
     view = camera_ws - position;
     light = light_ws - position;
     normal = 2.0 * normal_disp.rgb - 1.0;
