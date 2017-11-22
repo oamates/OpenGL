@@ -2,7 +2,7 @@
 #include "uniform.hpp"
 #include "log.hpp"
 
-uniform_t::uniform_t(glsl_program_t* program, const char* name) : program(program)
+uniform_t::uniform_t(const glsl_program_t* program, const char* name) : program(program)
 {
     uniform_t::name = name;
     location = glGetUniformLocation(program->id, name);

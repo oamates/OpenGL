@@ -63,13 +63,13 @@ struct glfw_window_t
     //===================================================================================================================================================================================================================
     // event handlers
     //===================================================================================================================================================================================================================
-    virtual void on_key(int key, int scancode, int action, int mods) {};
-    virtual void on_mouse_button(int button, int action, int mods) {};
-    virtual void on_mouse_move() {};
-    virtual void on_cursor_enter(int enter) {};
-    virtual void on_character(unsigned int codepoint) {};
-    virtual void on_scroll(double xoffset, double yoffset) {};
-    virtual void on_resize(int width, int height) {};
+    virtual void on_key(int key, int scancode, int action, int mods) {}
+    virtual void on_mouse_button(int button, int action, int mods) {}
+    virtual void on_mouse_move() {}
+    virtual void on_cursor_enter(int enter) {}
+    virtual void on_character(unsigned int codepoint) {}
+    virtual void on_scroll(double xoffset, double yoffset) {}
+    virtual void on_resize(int width, int height) {}
 
     //===================================================================================================================================================================================================================
     // window-dependent interface functions of GLFW

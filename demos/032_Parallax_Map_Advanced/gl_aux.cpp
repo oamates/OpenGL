@@ -1,13 +1,10 @@
-#include "GLHelper.hpp"
+#include "gl_aux.hpp"
 
 #include <stdexcept>
 #include <string>
 #include <iostream>
 
-#include <SFML/OpenGL.hpp>
-
-#define TINYOBJLOADER_IMPLEMENTATION // define this in only *one* .cc
-#include "tiny_obj_loader.h"
+#include "tiny_obj_loader.hpp"
 
 
 void gl_CheckError(const char* file, unsigned int line, const char* expression)
@@ -74,25 +71,19 @@ void gl_CheckError(const char* file, unsigned int line, const char* expression)
 }
 
 
-GLuint getShaderHandle (sf::Shader const& shader, bool throwExcept)
+GLuint getShaderHandle (const glsl_program_t& program)
 {
-    GLuint shaderID = -1;
-    shaderID = shader.getNativeHandle();
-    return shaderID;
+    return program.id;
 }
 
-GLuint getShaderUniformLoc (GLuint shaderHandle, std::string const& name, bool throwExcept)
+GLuint getShaderUniformLoc (const glsl_program_t& program, std::string const& name)
 {
-    GLuint uniformID = -1;
-    uniformID = glGetUniformLocation(shaderHandle, name.c_str());
-    return uniformID;
+    return glGetUniformLocation(program.id, name.c_str());
 }
 
-GLuint getShaderAttributeLoc (GLuint shaderHandle, std::string const& name, bool throwExcept)
+GLuint getShaderAttributeLoc (const glsl_program_t& program, std::string const& name)
 {
-    GLuint attributeID = -1;
-    attributeID = glGetAttribLocation(shaderHandle, name.c_str());
-    return attributeID;
+    return glGetAttribLocation(program.id, name.c_str());
 }
 
 void computeCube (std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& normals)
@@ -126,7 +117,7 @@ void computeCube (std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& norm
     vertices[18+4] = glm::vec3(0, 0, 0);
     vertices[18+5] = glm::vec3(0, 0, 1);
 
-    normals.resize(4*3*2);
+    normals.resize(4 * 3 * 2);
     for (unsigned int i = 0 ; i < normals.size() ; ++i) {
         int face = i / 6u;
         if (face == 0)
@@ -148,14 +139,14 @@ bool read_obj(const std::string& filename,
 {
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
-    std::string err;
 
-    bool ret = tinyobj::LoadObj(shapes, materials, err, filename.c_str());
+    std::string err = tinyobj::LoadObj(shapes, materials, filename.c_str(), 0);
 
     if (!err.empty())
+    {
         std::cerr << err << std::endl;
-
-    if (!ret) exit(-1);
+        exit(-1);
+    }
 
     for (size_t i = 0; i < shapes.size(); i++)
     {
@@ -187,5 +178,5 @@ bool read_obj(const std::string& filename,
             texcoords[t] = glm::vec2(shapes[i].mesh.texcoords[2 * t + 0], shapes[i].mesh.texcoords[2 * t + 1]);
     }
 
-    return ret;
+    return true;
 }

@@ -4,13 +4,15 @@
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
+#include "shader.hpp"
+
 struct Camera
 {
     Camera () {}
     virtual ~Camera() {}
 
     /* Assumes the shader is already binded */
-    virtual void sendToShader (GLuint shaderHandle) const;
+    virtual void sendToShader (const glsl_program_t& program) const;
 
     /*  Matrice projection * viewMatrix */
     glm::mat4 getViewProjMatrix () const;
@@ -19,12 +21,12 @@ struct Camera
     virtual glm::mat4 const& getProjectionMatrix() const = 0;
 };
 
-class CameraPerspective: public Camera
+struct CameraPerspective: public Camera
 {
     CameraPerspective (float FoV = 3.141592654f / 2.0f, float aspectRatio = 1.0f, float nearClipping = 0.3f, float farClipping = 5.0f);
     virtual ~CameraPerspective() {}
     
-    virtual void sendToShader (GLuint shaderHandle) const;                          /* Assumes the shader is already bound */
+    virtual void sendToShader (const glsl_program_t& program) const;                          /* Assumes the shader is already bound */
     
     void setFov (float Fov);                                                        /* In radians */
     float getFov () const;

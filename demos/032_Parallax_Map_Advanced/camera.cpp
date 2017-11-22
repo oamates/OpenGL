@@ -6,26 +6,11 @@
 #include "gl_aux.hpp"
 
 
-void Camera::sendToShader(GLuint shaderHandle) const
+void Camera::sendToShader(const glsl_program_t& program) const
 {
-    if (shaderHandle == 0 || shaderHandle == (GLuint)(-1)) // shader not yet loaded
-        return;
-
-    /* First retrieve locations */
-    GLuint viewProjULoc = -1, projULoc = -1, viewULoc = -1;
-
-    viewProjULoc = getShaderUniformLoc(shaderHandle, "viewProjMatrix", false);
-    projULoc = getShaderUniformLoc(shaderHandle, "projMatrix", false);
-    viewULoc = getShaderUniformLoc(shaderHandle, "viewMatrix", false);
-
-    if(viewProjULoc != -1)
-        glUniformMatrix4fv(viewProjULoc, 1, GL_FALSE, glm::value_ptr(getViewProjMatrix()));
-
-    if(projULoc != -1)
-        glUniformMatrix4fv(projULoc, 1, GL_FALSE, glm::value_ptr(getProjectionMatrix()));
-
-    if(viewULoc != -1)
-        glUniformMatrix4fv(viewULoc, 1, GL_FALSE, glm::value_ptr(getViewMatrix()));
+    program["viewProjMatrix"] = getViewProjMatrix();
+    program["projMatrix"] = getProjectionMatrix();
+    program["viewMatrix"] = getViewMatrix();
 }
 
 glm::mat4 Camera::getViewProjMatrix() const
@@ -36,36 +21,21 @@ glm::mat4 Camera::getViewProjMatrix() const
 
 
 CameraPerspective::CameraPerspective(float FoV, float aspectRatio, float near, float far):
-            Camera::Camera(),
-            _FoV(std::min(3.1415f, std::max(0.f, FoV))),
-            _aspectRatio(aspectRatio),
-            _nearClipping(near),
-            _farClipping(far)
+    Camera::Camera(),
+    _FoV(std::min(3.1415f, std::max(0.0f, FoV))), _aspectRatio(aspectRatio), _nearClipping(near), _farClipping(far)
 {
     computeProjectionMatrix();
 }
 
-void CameraPerspective::sendToShader(GLuint shaderHandle) const
+void CameraPerspective::sendToShader(const glsl_program_t& program) const
 {
-    Camera::sendToShader(shaderHandle);
-
-    if (shaderHandle == 0 || shaderHandle == (GLuint)(-1)) // shader not yet loaded
-        return;
-
-    /* First retrieve locations */
-    GLuint eyeULoc = -1;
-    eyeULoc = getShaderUniformLoc(shaderHandle, "eyeWorldPos", false);
-
-    if(eyeULoc != -1)
-    {
-        glm::vec3 eyeWorldPos = getCameraPosition();
-        glUniform3f(eyeULoc, eyeWorldPos.x, eyeWorldPos.y, eyeWorldPos.z);
-    }
+    Camera::sendToShader(program);
+    program["eyeWorldPos"] = getCameraPosition();
 }
 
 void CameraPerspective::setFov (float FoV)
 {
-    _FoV = std::min(3.1415f, std::max(0.f, FoV));
+    _FoV = std::min(3.1415f, std::max(0.0f, FoV));
     computeProjectionMatrix();
 }
 float CameraPerspective::getFov () const

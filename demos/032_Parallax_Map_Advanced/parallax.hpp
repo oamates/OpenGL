@@ -1,12 +1,10 @@
 #ifndef SCENEPARALLAX_HPP_INCLUDED
 #define SCENEPARALLAX_HPP_INCLUDED
 
-#include "SpotLight.hpp"
-#include "TrackballCamera.hpp"
-
-#include <SFML/Graphics/Shader.hpp>
-#include <SFML/Graphics/Texture.hpp>
-#include <SFML/Window/Event.hpp>
+#include "shader.hpp"
+#include "tex2d.hpp"
+#include "light.hpp"
+#include "trackball_camera.hpp"
 
 struct SceneParallax
 {
@@ -14,22 +12,16 @@ struct SceneParallax
     ~SceneParallax();
 
     std::string getDisplayText (float fps) const;
+    
+    void mouseMoved(glm::dvec2 mouse_delta, bool shiftPressed);     /* Mouse moved. Movement is supposed to be given in normalized windows coordinates */
+    void render();                                                  /* Draws in the current OpenGL context. */
 
-    /* For parameters adjustments */
-    void handleEvents (sf::Event const& event);
-
-    /* Mouse moved. Movement is supposed to be given in normalized windows coordinates */
-    void mouseMoved(sf::Vector2f const& relativeMovement);
-
-    /* Draws in the current OpenGL context. */
-    void drawScene();
-
-    enum Mode{FLAT, NORMAL, PARALLAX};
+    enum Mode {FLAT = 0, NORMAL = 1, PARALLAX = 2};
 
     TrackballCamera _camera;
     SpotLight _spotlight;
 
-    Mode _displayMode;
+    int _displayMode;
     float _amplitude;
     unsigned int _nbLayers;
     bool _interpolation;
@@ -37,15 +29,16 @@ struct SceneParallax
     bool _crop;
     bool _specularMapping;
 
-    sf::Texture _colorTexture;
-    sf::Texture _normalsTexture;
-    sf::Texture _dispTexture;
-    sf::Texture _specTexture;
+    GLuint _colorTexture, 
+           _normalsTexture,
+           _dispTexture,
+           _specTexture;
 
-    GLuint _vertBufferID;
+    GLuint vao_id;
+    GLuint vbo_id;
 
-    sf::Shader _simpleShader;
-    sf::Shader _shader;
+    glsl_program_t _simpleShader;
+    glsl_program_t _shader;
 };
 
 #endif // SCENEPARALLAX_HPP_INCLUDED

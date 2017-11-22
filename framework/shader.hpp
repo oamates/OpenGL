@@ -70,13 +70,12 @@ struct glsl_program_t
 
     ~glsl_program_t(); 
 
-    uniform_t operator[] (const char* name);
-    GLint uniform_id(const char * name);
+    uniform_t operator[] (const char* name) const;
+    GLint uniform_id(const char * name) const;
 
-    GLuint subroutine_index(GLenum shader_type, const char* name);
-    GLuint subroutine_location(GLenum shader_type, const char* name);
-    void bind_ubo(const char* block_name, GLuint target);
-
+    GLuint subroutine_index(GLenum shader_type, const char* name) const;
+    GLuint subroutine_location(GLenum shader_type, const char* name) const;
+    void bind_ubo(const char* block_name, GLuint target) const;
 
     void enable();
     void disable();

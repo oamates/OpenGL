@@ -2,27 +2,24 @@
 #define RENDERABLE_HPP_INCLUDED
 
 #include <GL/glew.h>
-#include "glm.hpp"
-#include <SFML/OpenGL.hpp>
+#include <glm/glm.hpp>
 
-#include "Camera.hpp"
+#include "camera.hpp"
 
 
-class Renderable
+struct Renderable
 {
-    public:
-        /* A valid OpenGL context must be valid to call the constructor */
-        Renderable() {}
-        virtual ~Renderable() {}
+    Renderable() {}
+    virtual ~Renderable() {}
 
-        /* Draws in the current active OpenGL context.
-         * Assumes the shader is already binded.
-         */
-        virtual void draw(GLuint shaderHandle, Camera const& camera) const;
+    /* Draws in the current active OpenGL context. Assumes the shader is already binded. */
+    virtual void draw(const glsl_program_t& program, Camera const& camera) const
+    {
+        do_draw(program, camera);
+    }
 
-    protected:
-        /* Does the actual drawing, once Renderable::draw() checked the shader is ready. */
-        virtual void do_draw (GLuint shaderHandle, Camera const& camera) const = 0;
+    /* Does the actual drawing, once Renderable::draw() checked the shader is ready. */
+    virtual void do_draw (const glsl_program_t& program, Camera const& camera) const = 0;
 };
 
 #endif // RENDERABLE_HPP_INCLUDED

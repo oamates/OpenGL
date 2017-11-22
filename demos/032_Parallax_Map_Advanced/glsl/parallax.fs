@@ -1,27 +1,29 @@
-#version 130
-#define FLAT 0u
-#define NORMAL 1u
-#define PARALLAX 2u
+#version 330 core
+
+in vec3 vertWorldPos;
+
+const int FLAT = 0;
+const int NORMAL = 1;
+const int PARALLAX = 2;
 
 uniform sampler2D colorTexture;
 uniform sampler2D normalsTexture;
 uniform sampler2D dispTexture;
 uniform sampler2D specularTexture;
 
-uniform float amplitude=0.f;
-uniform uint mode=PARALLAX;
-uniform uint nbLayers=20u;
-uniform bool interpolation=true;
-uniform bool selfShadow=true;
-uniform bool crop=false;
-uniform bool specularMapping=true;
+uniform float amplitude = 0.0f;
+
+uniform int mode = PARALLAX;
+uniform int nbLayers = 20;
+uniform int interpolation = 1;
+uniform int selfShadow = 1;
+uniform int crop = 0;
+uniform int specularMapping = 1;
 
 uniform vec3 eyeWorldPos;
 uniform vec3 lightWorldPos;
 
-in vec3 vertWorldPos;
-
-out vec4 fragColor;
+out vec4 FragmentColor;
 
 
 vec3 extractNormal (vec4 color)
@@ -36,24 +38,19 @@ float extractDepth (vec4 color)
     return color.r;
 }
 
-/* Constant term */
 float computeAmbient ()
 {
     return 1.0;
 }
 
-float computeDiffuse (const vec3 normalizedNormal,
-                      const vec3 normalizedToLight)
+float computeDiffuse (const vec3 normalizedNormal, const vec3 normalizedToLight)
 {
     return max(0.0, dot(normalizedNormal, normalizedToLight));
 }
 
-float computeSpecular (const vec3 normalizedNormal,
-                       const vec3 normalizedToLight,
-                       const vec3 normalizedToEye)
+float computeSpecular (const vec3 normalizedNormal, const vec3 normalizedToLight, const vec3 normalizedToEye)
 {
     vec3 H = normalize(normalizedToEye + normalizedToLight); //for blinnphong
-    
     return pow(max(0.0, dot(normalizedNormal,H)), 2); //blinnphong;
 }
 
@@ -61,15 +58,17 @@ void main( void )
 {
     vec2 coordsOnTex = vertWorldPos.xy;
     vec3 fragWorldPos = vertWorldPos;
-    vec3 normalizedNormal = vec3(0,0,1);
+    vec3 normalizedNormal = vec3(0.0f, 0.0f, 1.0f);
     float selfShadowFactor = 1.0;
     
-    if (crop) {
+    if (crop != 0)
+    {
         if (coordsOnTex.x < 0 || coordsOnTex.y < 0 || coordsOnTex.x > 1 || coordsOnTex.y > 1)
             discard;
     }
     
-    if (mode == PARALLAX) {
+    if (mode == PARALLAX)
+    {
         float layerDepth = 1.0 / float(nbLayers);
         
         /* First parallax computation */
@@ -104,7 +103,8 @@ void main( void )
         vec2 tmpCoords = coordsOnTex;
         float currMapDepth = extractDepth(texture(dispTexture, tmpCoords));
         currLayerDepth = currMapDepth;
-        while (currLayerDepth > 0) {
+        while (currLayerDepth > 0)
+        {
             tmpCoords += toLight.xy;
             currLayerDepth -= layerDepth;
             currMapDepth = extractDepth(texture(dispTexture, tmpCoords));
@@ -115,24 +115,25 @@ void main( void )
         selfShadowFactor = max(0, selfShadowFactor);
     }
     
-    if (mode != FLAT) {
+    if (mode != FLAT)
         normalizedNormal = extractNormal(texture(normalsTexture, coordsOnTex));
-    }
     
     vec3 normalizedToEye = normalize(eyeWorldPos - fragWorldPos);
     vec3 normalizedToLight = normalize(lightWorldPos);
     
-    if (!selfShadow)
+    if (selfShadow == 0)
         selfShadowFactor = 1.0;
         
     float specularFactor = texture(specularTexture, coordsOnTex).r;
-    if (!specularMapping)
+    if (specularMapping == 0)
         specularFactor = 1.0;
     
     vec4 color = texture(colorTexture, coordsOnTex);
-    fragColor = vec4(0);
+    vec4 fragColor = vec4(0);
     
     fragColor += color * computeAmbient() * 0.5;
     fragColor += color * selfShadowFactor * computeDiffuse(normalizedNormal, normalizedToLight) * 0.5;
     fragColor += color * selfShadowFactor * specularFactor * computeSpecular(normalizedNormal, normalizedToLight, normalizedToEye) * 1;
+
+    FragmentColor = fragColor;
 }

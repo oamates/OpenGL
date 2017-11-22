@@ -53,7 +53,8 @@ MeshRenderable::~MeshRenderable()
 
 void MeshRenderable::loadUVTexture(std::string const& filename)
 {
-    _textured  = _textured || _UVTexture.loadFromFile(filename);
+    _UVTexture.loadFromFile(filename.c_str());
+    _textured = true;
 }
 
 void MeshRenderable::setTextured(bool textured)
@@ -76,32 +77,16 @@ void MeshRenderable::setModelMatrix (glm::mat4 const& matrix)
     _modelMatrix = matrix;
 }
 
-void MeshRenderable::do_draw(GLuint shaderHandle, Camera const& camera) const
+void MeshRenderable::do_draw(const glsl_program_t& program, Camera const& camera) const
 {
     glm::mat4 normalMatrix = glm::inverseTranspose(camera.getViewMatrix() * _modelMatrix);
 
-    GLuint posALoc = -1, colorALoc = -1, normalALoc = -1, texALoc = -1;                         /* First retrieve locations */
-    GLuint modelMatrixULoc = -1, normalMatrixULoc = -1, texturedULoc = -1, UVULoc = -1;
+    program["modelMatrix"] = _modelMatrix;
+    program["normalMatrix"] = normalMatrix;
+    program["textured"] = (int) _textured;
+    glBindTexture(GL_TEXTURE_2D, _UVTexture.id);
 
-    modelMatrixULoc = getShaderUniformLoc(shaderHandle, "modelMatrix", false);
-    normalMatrixULoc = getShaderUniformLoc(shaderHandle, "normalMatrix", false);
-    texturedULoc = getShaderUniformLoc(shaderHandle, "textured", false);
-    UVULoc = getShaderUniformLoc(shaderHandle, "UVTexture", false);
-
-    posALoc = getShaderAttributeLoc(shaderHandle, "vPosition", false);
-    colorALoc = getShaderAttributeLoc(shaderHandle, "vColor", false);
-    normalALoc = getShaderAttributeLoc(shaderHandle, "vNormal", false);
-    texALoc = getShaderAttributeLoc(shaderHandle, "vTexCoords", false);
-
-    if (modelMatrixULoc != -1)
-        glUniformMatrix4fv(modelMatrixULoc, 1, GL_FALSE, glm::value_ptr(_modelMatrix));
-    if (normalMatrixULoc != -1)
-        glUniformMatrix4fv(normalMatrixULoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
-    if (texturedULoc != -1)
-        glUniform1ui(texturedULoc, _textured);
-    if (UVULoc != -1)
-        glBindTexture(GL_TEXTURE_2D, _UVTexture.getNativeHandle());
-
+    GLuint posALoc = getShaderAttributeLoc(program, "vPosition");
     if (posALoc != -1)
     {
         glEnableVertexAttribArray(posALoc);
@@ -109,21 +94,24 @@ void MeshRenderable::do_draw(GLuint shaderHandle, Camera const& camera) const
         glVertexAttribPointer(posALoc, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
     }
 
-    if(colorALoc != -1 && !_colors.empty())
+    GLuint colorALoc = getShaderAttributeLoc(program, "vColor");
+    if (colorALoc != -1 && !_colors.empty())
     {
-        GLCHECK(glEnableVertexAttribArray(colorALoc));
-        GLCHECK(glBindBuffer(GL_ARRAY_BUFFER, _cBuffer));
-        GLCHECK(glVertexAttribPointer(colorALoc, 4, GL_FLOAT, GL_FALSE, 0, (void*)0));
+        glEnableVertexAttribArray(colorALoc);
+        glBindBuffer(GL_ARRAY_BUFFER, _cBuffer);
+        glVertexAttribPointer(colorALoc, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
     }
 
-    if(texALoc != -1 && !_texCoords.empty())
+    GLuint texALoc = getShaderAttributeLoc(program, "vTexCoords");
+    if (texALoc != -1 && !_texCoords.empty())
     {
         glEnableVertexAttribArray(texALoc);
         glBindBuffer(GL_ARRAY_BUFFER, _tBuffer);
         glVertexAttribPointer(texALoc, 2, GL_FLOAT, GL_FALSE, 0, (void*) 0);
     }
 
-    if(normalALoc != -1 && !_normals.empty())
+    GLuint normalALoc = getShaderAttributeLoc(program, "vNormal");
+    if (normalALoc != -1 && !_normals.empty())
     {
         glEnableVertexAttribArray(normalALoc);
         glBindBuffer(GL_ARRAY_BUFFER, _nBuffer);
@@ -134,21 +122,12 @@ void MeshRenderable::do_draw(GLuint shaderHandle, Camera const& camera) const
     glEnable(GL_CULL_FACE);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _iBuffer);
     glDrawElements(GL_TRIANGLES, _indices.size(), GL_UNSIGNED_INT, (void*) 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
-    if (UVULoc != -1)
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-    if (posALoc != -1)
-        glDisableVertexAttribArray(posALoc);
-
-    if (colorALoc != -1)
-        glDisableVertexAttribArray(colorALoc);
-
-    if (texALoc != -1)
-        glDisableVertexAttribArray(texALoc);
-
-    if (normalALoc != -1)
-        glDisableVertexAttribArray(normalALoc);
+    if (posALoc != -1)    glDisableVertexAttribArray(posALoc);
+    if (colorALoc != -1)  glDisableVertexAttribArray(colorALoc);
+    if (texALoc != -1)    glDisableVertexAttribArray(texALoc);
+    if (normalALoc != -1) glDisableVertexAttribArray(normalALoc);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

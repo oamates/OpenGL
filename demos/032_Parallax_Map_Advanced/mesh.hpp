@@ -1,14 +1,12 @@
 #ifndef MESH_RENDERABLE_HPP
 #define MESH_RENDERABLE_HPP
 
-#include "Renderable.hpp"
-
-#include <SFML/Graphics/Texture.hpp>
-
 #include <string>
 #include <vector>
 #include <memory>
 
+#include "tex2d.hpp"
+#include "renderable.hpp"
 
 struct MeshRenderable : public Renderable
 {
@@ -24,10 +22,10 @@ struct MeshRenderable : public Renderable
     glm::mat4 const& getModelMatrix() const;
     void setModelMatrix (glm::mat4 const& matrix);
 
-    virtual void do_draw (GLuint shaderHandle, Camera const& camera) const;
+    virtual void do_draw (const glsl_program_t& program, Camera const& camera) const;
 
     bool _textured;
-    sf::Texture _UVTexture;
+    tex2d_t _UVTexture;
 
     glm::mat4 _modelMatrix;
 

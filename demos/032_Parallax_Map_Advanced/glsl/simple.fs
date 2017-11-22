@@ -1,12 +1,9 @@
-#version 130
-
+#version 330 core
 
 in vec4 vertColor;
-
-out vec4 fragColor;
-
+out vec4 FragmentColor;
 
 void main()
 {
-    fragColor = vertColor;
+    FragmentColor = vertColor;
 }

@@ -1,85 +1,72 @@
-#include "parallax.hpp"
-
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <cmath>
 
-#include "GLHelper.hpp"
+#include "gl_aux.hpp"
+#include "parallax.hpp"
+#include "image.hpp"
 
-
-SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight):
-            _camera(glm::vec3(0.5f, 0.5f, 0.0f), 1),
-            _displayMode(PARALLAX),
-            _amplitude(0.03f),
-            _nbLayers(10),
-            _interpolation(true),
-            _selfShadow(true),
-            _crop(false),
-            _specularMapping(true),
-            _vertBufferID(-1)
+SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight)
+    : _camera(glm::vec3(0.5f, 0.5f, 0.0f), 1),
+      _displayMode(PARALLAX),
+      _amplitude(0.03f),
+      _nbLayers(10),
+      _interpolation(true),
+      _selfShadow(true),
+      _crop(false),
+      _specularMapping(true),
+      vbo_id(-1),
+      vao_id(-1),
+      _simpleShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/simple.vs"),
+                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/simple.fs")),
+      _shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/parallax.vs"),
+              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/parallax.fs"))
 {
     _camera.setAspectRatio(screenWidth, screenHeight);
     _camera.setNearDist(0.01f);
-    _camera.setFarDist(20.f);
-    _spotlight.setFocusPoint(glm::vec3(0.5, 0.5, 0));
-    _spotlight.setLongitude(3.f);
-
-    /* Shader loading */
-    if (!_simpleShader.loadFromFile("shaders/simple.vert", "shaders/simple.frag")) {
-        std::cerr << "Error: unable to load shader simple" << std::endl;
-    }
-    if (!_shader.loadFromFile("shaders/parallax.vert", "shaders/parallax.frag")) {
-        std::cerr << "Error: unable to load parallax" << std::endl;
-    }
+    _camera.setFarDist(20.0f);
+    _spotlight.setFocusPoint(glm::vec3(0.5f, 0.5f, 0.0f));
+    _spotlight.setLongitude(3.0f);
 
     /* Textures loading */
-    if (!_colorTexture.loadFromFile("textures/color.jpg")) {
-        std::cerr << "Error: unable to load textures//color.jpg" << std::endl;
-    }
-    _colorTexture.setSmooth(true);
-    _colorTexture.setRepeated(true);
-    if (!_normalsTexture.loadFromFile("textures/normals.jpg")) {
-        std::cerr << "Error: unable to load textures/normals.jpg" << std::endl;
-    }
-    _normalsTexture.setSmooth(true);
-    _normalsTexture.setRepeated(true);
-    if (!_dispTexture.loadFromFile("textures/displacement.jpg")) {
-        std::cerr << "Error: unable to load textures/displacement.jpg" << std::endl;
-    }
-    _dispTexture.setSmooth(true);
-    _dispTexture.setRepeated(true);
-    if (!_specTexture.loadFromFile("textures/specular.jpg")) {
-        std::cerr << "Error: unable to load textures/specular.jpg" << std::endl;
-    }
-    _specTexture.setSmooth(true);
-    _specTexture.setRepeated(true);
+    glActiveTexture(GL_TEXTURE0);
+    _colorTexture   = image::png::texture2d("res/color.png");
+    glActiveTexture(GL_TEXTURE1);
+    _normalsTexture = image::png::texture2d("res/normals.png");
+    glActiveTexture(GL_TEXTURE2);
+    _dispTexture    = image::png::texture2d("res/displacement.png");
+    glActiveTexture(GL_TEXTURE3);
+    _specTexture    = image::png::texture2d("res/specular.png");
 
     /* Ground creation */
-    std::vector<glm::vec2> vert;
-    vert.push_back(glm::vec2(0,0));
-    vert.push_back(glm::vec2(+1,+1));
-    vert.push_back(glm::vec2(0,+1));
-    vert.push_back(glm::vec2(0,0));
-    vert.push_back(glm::vec2(+1,+1));
-    vert.push_back(glm::vec2(+1,0));
+    glm::vec2 vertices[] = 
+    {
+        glm::vec2(0.0f, 0.0f),
+        glm::vec2(1.0f, 1.0f),
+        glm::vec2(0.0f, 1.0f),
+        glm::vec2(0.0f, 0.0f),
+        glm::vec2(1.0f, 1.0f),
+        glm::vec2(1.0f, 0.0f)
+    };
 
-    for (glm::vec2& v : vert)
-        v = 10.f * (v - glm::vec2(.5, .5));
-    glGenBuffers(1, &_vertBufferID);
+    for (int v = 0; v < 6; ++v)
+        vertices[v] = 4.0f * (vertices[v] - glm::vec2(0.5f, 0.5f));
 
-    //Activate buffer and send data to the graphics card
-    glBindBuffer(GL_ARRAY_BUFFER, _vertBufferID);
-    glBufferData(GL_ARRAY_BUFFER, vert.size()*sizeof(glm::vec2), vert.data(), GL_STATIC_DRAW);
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), 0);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), glm::value_ptr(vertices[0]), GL_STATIC_DRAW);
 }
 
 SceneParallax::~SceneParallax()
 {
-    if (_vertBufferID != (GLuint)(-1)) {
-        GLCHECK(glDeleteBuffers(1, &_vertBufferID));
-    }
+    if (vbo_id != -1) glDeleteBuffers(1, &vbo_id);
+    if (vao_id != -1) glDeleteVertexArrays(1, &vao_id);
 }
 
 std::string SceneParallax::getDisplayText (float fps) const
@@ -105,139 +92,62 @@ std::string SceneParallax::getDisplayText (float fps) const
     return s.str();
 }
 
-void SceneParallax::handleEvents (sf::Event const& event)
+void SceneParallax::mouseMoved(glm::dvec2 mouse_delta, bool shiftPressed)
 {
-    switch (event.type) {
-        case sf::Event::Resized:
-            _camera.setAspectRatio(event.size.width, event.size.height);
-        break;
-        case sf::Event::KeyPressed:
-            if (event.key.code == sf::Keyboard::D) {
-                _displayMode = static_cast<Mode>((_displayMode + 1) % 3);
-            }
-            else if (event.key.code == sf::Keyboard::A) {
-                _amplitude += 0.01f;
-            } else if (event.key.code == sf::Keyboard::Z) {
-                _amplitude = std::max(0.f, _amplitude-0.01f);
-            }
-            else if (event.key.code == sf::Keyboard::L) {
-                _nbLayers++;
-            } else if (event.key.code == sf::Keyboard::M) {
-                _nbLayers = (_nbLayers == 1) ? 1 : _nbLayers-1;
-            }
-            else if (event.key.code == sf::Keyboard::I) {
-                _interpolation = !_interpolation;
-            }
-            else if (event.key.code == sf::Keyboard::S) {
-                _selfShadow = !_selfShadow;
-            }
-            else if (event.key.code == sf::Keyboard::C) {
-                _crop = !_crop;
-            }
-            else if (event.key.code == sf::Keyboard::V) {
-                _specularMapping = !_specularMapping;
-            }
-        break;
-        case sf::Event::MouseWheelScrolled:
-            {
-                float distance = _camera.getDistance();
-                distance *= 1.f + 0.02f * event.mouseWheelScroll.delta;
-                _camera.setDistance(distance);
-            }
-        break;
-        default:
-            break;
-    }
-}
-
-void SceneParallax::mouseMoved(sf::Vector2f const& relativeMovement)
-{
-    if (sf::Mouse::isButtonPressed(sf::Mouse::Left)) {
-        TrackballObject* trackball = nullptr;
-        float invertedAxis;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
-            trackball = &_spotlight;
-            invertedAxis = 1.f;
-        } else {
-            trackball = &_camera;
-            invertedAxis = -1.f;
-        }
-
-        float latitude = trackball->getLatitude();
-        float longitude = trackball->getLongitude();
-
-        longitude += invertedAxis * 2.f * M_PI * relativeMovement.x;
-        latitude += invertedAxis * 0.5f * M_PI * relativeMovement.y;
-
-        trackball->setLatitude(latitude);
-        trackball->setLongitude(longitude);
-    }
-}
-
-void SceneParallax::drawScene ()
-{
-    GLuint shaderHandle = _shader.getNativeHandle();
-    if (shaderHandle == 0 || shaderHandle == (GLuint)(-1))
-        return;
-
-    GLCHECK(glClearColor(0.8, 0.8, 0.8, 1.0));
-
-    /* Actual drawing */
-    sf::Shader::bind(&_shader);
-    _shader.setParameter("colorTexture", _colorTexture);
-    _shader.setParameter("normalsTexture", _normalsTexture);
-    _shader.setParameter("dispTexture", _dispTexture);
-    _shader.setParameter("specularTexture", _specTexture);
-    _shader.setParameter("amplitude", _amplitude);
-    _camera.sendToShader(shaderHandle);
-    _spotlight.sendToShader(shaderHandle);
-
-    GLuint posALoc = -1, modeULoc = -1, layersULoc = -1, interpolationULoc = -1, selfShadowULoc = -1, cropULoc = -1, specULoc = -1;
-    posALoc = getShaderAttributeLoc(shaderHandle, "vPosition");
-    modeULoc = getShaderUniformLoc(shaderHandle, "mode");
-    layersULoc = getShaderUniformLoc(shaderHandle, "nbLayers");
-    interpolationULoc = getShaderUniformLoc(shaderHandle, "interpolation");
-    selfShadowULoc = getShaderUniformLoc(shaderHandle, "selfShadow");
-    cropULoc = getShaderUniformLoc(shaderHandle, "crop");
-    specULoc = getShaderUniformLoc(shaderHandle, "specularMapping");
-
-    if (modeULoc != -1)
-        glUniform1ui(modeULoc, _displayMode);
-
-    if (posALoc != -1)
+    TrackballObject* trackball = nullptr;
+    float invertedAxis;
+    if (shiftPressed)
     {
-        glEnableVertexAttribArray(posALoc);
-        glBindBuffer(GL_ARRAY_BUFFER, _vertBufferID);
-        glVertexAttribPointer(posALoc, 2, GL_FLOAT, GL_FALSE, 0, (void*) 0);
+        trackball = &_spotlight;
+        invertedAxis = 1.0f;
+    }
+    else
+    {
+        trackball = &_camera;
+        invertedAxis = -1.0f;
     }
 
-    if (layersULoc != -1)
-        glUniform1ui(layersULoc, _nbLayers);
+    float latitude = trackball->getLatitude();
+    float longitude = trackball->getLongitude();
 
-    if (interpolationULoc != -1) 
-        glUniform1ui(interpolationULoc, _interpolation);
+    longitude += invertedAxis * 2.0f * M_PI * mouse_delta.x;
+    latitude += invertedAxis * 0.5f * M_PI * mouse_delta.y;
 
-    if (selfShadowULoc != -1)
-        glUniform1ui(selfShadowULoc, _selfShadow);
+    trackball->setLatitude(latitude);
+    trackball->setLongitude(longitude);
+}
 
-    if (cropULoc != -1)
-        glUniform1ui(cropULoc, _crop);
+void SceneParallax::render ()
+{
+    glClearColor(0.8, 0.8, 0.8, 1.0);
 
-    if (specULoc != -1)
-        glUniform1ui(specULoc, _specularMapping);
+    _shader.enable();
 
+    _shader["colorTexture"]    = 0;
+    _shader["normalsTexture"]  = 1;
+    _shader["dispTexture"]     = 2;
+    _shader["specularTexture"] = 3;
+
+    _shader["amplitude"]       = _amplitude;
+
+    _shader["mode"]            = (int) _displayMode;
+    _shader["nbLayers"]        = (int) _nbLayers;
+    _shader["interpolation"]   = (int) _interpolation;
+    _shader["selfShadow"]      = (int) _selfShadow;
+    _shader["crop"]            = (int) _crop;
+    _shader["specularMapping"] = (int) _specularMapping;
+
+    _camera.sendToShader(_shader);
+    _spotlight.sendToShader(_shader);
+
+    glBindVertexArray(vao_id);
     glDisable(GL_CULL_FACE);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    if(posALoc != -1)
-        glDisableVertexAttribArray(posALoc);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    _simpleShader.enable();
+    _camera.sendToShader(_simpleShader);
+    _spotlight.draw(_simpleShader, _camera);
 
 
-    sf::Shader::bind(&_simpleShader);
-    _camera.sendToShader(_simpleShader.getNativeHandle());
-    _spotlight.draw(_simpleShader.getNativeHandle(), _camera);
-
-
-    sf::Shader::bind(0);
+    glUseProgram(0);
 }

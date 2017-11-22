@@ -160,27 +160,27 @@ void glsl_program_t::link()
 glsl_program_t::~glsl_program_t() 
     { glDeleteProgram(id); }
 
-uniform_t glsl_program_t::operator[] (const char* name)
+uniform_t glsl_program_t::operator[] (const char* name) const
     { return uniform_t(this, name); }
 
-GLint glsl_program_t::uniform_id(const char * name) 
+GLint glsl_program_t::uniform_id(const char * name) const
     { return glGetUniformLocation(id, name); }
 
-GLuint glsl_program_t::subroutine_index(GLenum shader_type, const char* name)
+GLuint glsl_program_t::subroutine_index(GLenum shader_type, const char* name) const
 {
     GLuint index = glGetSubroutineIndex(id, shader_type, name);
     debug_msg("Program [%i] subroutine [%s] in shader of type = [%d] has index = [%d]", id, name, shader_type, index);
     return index;
 }
 
-GLuint glsl_program_t::subroutine_location(GLenum shader_type, const char* name)
+GLuint glsl_program_t::subroutine_location(GLenum shader_type, const char* name) const
 {
     GLuint location = glGetSubroutineUniformLocation(id, shader_type, name);
     debug_msg("Program [%i] subroutine [%s] uniform in shader of type = [%d] has location = [%d]", id, name, shader_type, location);
     return location;
 }
 
-void glsl_program_t::bind_ubo(const char* block_name, GLuint target)
+void glsl_program_t::bind_ubo(const char* block_name, GLuint target) const
 {
     GLuint ubi = glGetUniformBlockIndex(id, block_name);
     glUniformBlockBinding(id, ubi, target);

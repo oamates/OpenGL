@@ -14,12 +14,12 @@ struct glsl_program_t;
 
 struct uniform_t
 {
-    glsl_program_t* program;
+    const glsl_program_t* program;
     const char* name;
     GLint location;
 
     uniform_t() {};
-    uniform_t(glsl_program_t* program, const char* name);
+    uniform_t(const glsl_program_t* program, const char* name);
     ~uniform_t() {}
     
     operator GLint() const 

@@ -36,7 +36,7 @@ struct TrackballObject
 // Trackball camera class, computing viewMatrix annd projectionMatrix.
 // Position is defined by a latitude, a longitutde and a distance from focusPoint.
 
-class TrackballCamera: public CameraPerspective, public TrackballObject
+struct TrackballCamera: public CameraPerspective, public TrackballObject
 {
     TrackballCamera (glm::vec3 const& focusPoint = glm::vec3(0.0f), float distance = 2.0f, float latitude = 3.1415f / 8.0f, float longitude = -3.1415f / 4.0f);
 

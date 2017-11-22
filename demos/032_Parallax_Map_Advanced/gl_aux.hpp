@@ -1,14 +1,13 @@
 #ifndef GLHELPER_HPP_INCLUDED
 #define GLHELPER_HPP_INCLUDED
 
+#include <string>
 #include <vector>
-
 #include <GL/glew.h>
-#include <SFML/OpenGL.hpp>
-#include <SFML/Graphics/Shader.hpp>
 
 #include <glm/glm.hpp>
 
+#include "shader.hpp"
 
 void gl_CheckError(const char* file, unsigned int line, const char* expression);
 
@@ -19,17 +18,17 @@ void gl_CheckError(const char* file, unsigned int line, const char* expression);
     #define GLCHECK(expr) (expr)
 #endif // DEBUG
 
-GLuint getShaderHandle (sf::Shader const& shader, bool throwExcept=false);
-GLuint getShaderUniformLoc (GLuint shaderHandle, std::string const& name, bool throwExcept=false);
-GLuint getShaderAttributeLoc (GLuint shaderHandle, std::string const& name, bool throwExcept=false);
+GLuint getShaderHandle (const glsl_program_t& program);
+GLuint getShaderUniformLoc (const glsl_program_t& program, std::string const& name);
+GLuint getShaderAttributeLoc (const glsl_program_t& program, std::string const& name);
 
 /* Only computes the 4 lateral sides of a cube. */
 void computeCube (std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& normals);
 
 bool read_obj(const std::string& filename,
-              std::vector<glm::vec3>& positions,
-              std::vector<unsigned int>& triangles,
-              std::vector<glm::vec3>& normals,
-              std::vector<glm::vec2>& texcoords);
+    std::vector<glm::vec3>& positions,
+    std::vector<unsigned int>& triangles,
+    std::vector<glm::vec3>& normals,
+    std::vector<glm::vec2>& texcoords);
 
 #endif // GLHELPER_HPP_INCLUDED
