@@ -35,6 +35,7 @@ struct MeshRenderable : public Renderable
     std::vector<glm::vec2> _texCoords;
     std::vector< unsigned int > _indices;
 
+    GLuint vao_id;
     GLuint _pBuffer;
     GLuint _cBuffer;
     GLuint _nBuffer;

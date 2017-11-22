@@ -29,7 +29,6 @@ SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight
     _spotlight.setFocusPoint(glm::vec3(0.5f, 0.5f, 0.0f));
     _spotlight.setLongitude(3.0f);
 
-    /* Textures loading */
     glActiveTexture(GL_TEXTURE0);
     _colorTexture   = image::png::texture2d("res/color.png");
     glActiveTexture(GL_TEXTURE1);
@@ -39,7 +38,6 @@ SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight
     glActiveTexture(GL_TEXTURE3);
     _specTexture    = image::png::texture2d("res/specular.png");
 
-    /* Ground creation */
     glm::vec2 vertices[] = 
     {
         glm::vec2(0.0f, 0.0f),
