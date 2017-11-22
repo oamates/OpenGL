@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "GLHelper.hpp"
+#include "gl_aux.hpp"
 
 
 void Camera::sendToShader(GLuint shaderHandle) const
@@ -18,17 +18,14 @@ void Camera::sendToShader(GLuint shaderHandle) const
     projULoc = getShaderUniformLoc(shaderHandle, "projMatrix", false);
     viewULoc = getShaderUniformLoc(shaderHandle, "viewMatrix", false);
 
-    if(viewProjULoc != (GLuint)(-1)) {
+    if(viewProjULoc != -1)
         glUniformMatrix4fv(viewProjULoc, 1, GL_FALSE, glm::value_ptr(getViewProjMatrix()));
-    }
 
-    if(projULoc != (GLuint)(-1)) {
+    if(projULoc != -1)
         glUniformMatrix4fv(projULoc, 1, GL_FALSE, glm::value_ptr(getProjectionMatrix()));
-    }
 
-    if(viewULoc != (GLuint)(-1)) {
+    if(viewULoc != -1)
         glUniformMatrix4fv(viewULoc, 1, GL_FALSE, glm::value_ptr(getViewMatrix()));
-    }
 }
 
 glm::mat4 Camera::getViewProjMatrix() const
@@ -59,10 +56,10 @@ void CameraPerspective::sendToShader(GLuint shaderHandle) const
     GLuint eyeULoc = -1;
     eyeULoc = getShaderUniformLoc(shaderHandle, "eyeWorldPos", false);
 
-    if(eyeULoc != (GLuint)(-1)) {
+    if(eyeULoc != -1)
+    {
         glm::vec3 eyeWorldPos = getCameraPosition();
-
-        GLCHECK(glUniform3f(eyeULoc, eyeWorldPos.x, eyeWorldPos.y, eyeWorldPos.z));
+        glUniform3f(eyeULoc, eyeWorldPos.x, eyeWorldPos.y, eyeWorldPos.z);
     }
 }
 

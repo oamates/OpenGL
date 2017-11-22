@@ -6,8 +6,8 @@
 #include <GL/glew.h>
 #include <SFML/OpenGL.hpp>
 
-#include "GLHelper.hpp"
-#include "SceneParallax.hpp"
+#include "gl_aux.hpp"
+#include "parallax.hpp"
 
 
 static void initGLEW()
@@ -94,14 +94,14 @@ int main()
 
         /* Drawing */
         fpsClock.restart();
-        GLCHECK(glViewport(0, 0, window.getSize().x, window.getSize().y));
-        GLCHECK(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-        GLCHECK(glClearColor(0.2, 0.2, 0.2, 1.0));
+        glViewport(0, 0, window.getSize().x, window.getSize().y);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
         scene.drawScene();
 
         /* For displaying text, SMFL used old OpenGL */
-        float fps = 1.f / fpsClock.getElapsedTime().asSeconds();
+        float fps = 1.0f / fpsClock.getElapsedTime().asSeconds();
         text.setString(scene.getDisplayText(fps));
         window.pushGLStates();
         window.draw(text);

@@ -2,67 +2,53 @@
 #define CAMERA_HPP_INCLUDED
 
 #include <GL/glew.h>
-#include "glm.hpp"
+#include <glm/glm.hpp>
 
-
-/* Camera */
-class Camera
+struct Camera
 {
-    public:
-        Camera () {}
-        virtual ~Camera() {}
+    Camera () {}
+    virtual ~Camera() {}
 
-        /* Assumes the shader is already binded */
-        virtual void sendToShader (GLuint shaderHandle) const;
+    /* Assumes the shader is already binded */
+    virtual void sendToShader (GLuint shaderHandle) const;
 
-        /*  Matrice projection * viewMatrix */
-        glm::mat4 getViewProjMatrix () const;
+    /*  Matrice projection * viewMatrix */
+    glm::mat4 getViewProjMatrix () const;
 
-        virtual glm::mat4 const& getViewMatrix() const = 0;
-        virtual glm::mat4 const& getProjectionMatrix() const = 0;
+    virtual glm::mat4 const& getViewMatrix() const = 0;
+    virtual glm::mat4 const& getProjectionMatrix() const = 0;
 };
 
 class CameraPerspective: public Camera
 {
-    public:
-        CameraPerspective (float FoV=3.141592654f/2.f,
-                           float aspectRatio=1.f,
-                           float nearClipping=0.3f,
-                           float farClipping=5.f);
-        virtual ~CameraPerspective() {}
+    CameraPerspective (float FoV = 3.141592654f / 2.0f, float aspectRatio = 1.0f, float nearClipping = 0.3f, float farClipping = 5.0f);
+    virtual ~CameraPerspective() {}
+    
+    virtual void sendToShader (GLuint shaderHandle) const;                          /* Assumes the shader is already bound */
+    
+    void setFov (float Fov);                                                        /* In radians */
+    float getFov () const;
 
-        /* Assumes the shader is already binded */
-        virtual void sendToShader (GLuint shaderHandle) const;
+    void setAspectRatio(float width, float height);
+    float getAspectRatio () const;
 
-        /* In radians */
-        void setFov (float Fov);
-        float getFov () const;
+    void setNearDist (float near);
+    float getNearDist () const;
 
-        void setAspectRatio(float width, float height);
-        float getAspectRatio () const;
+    void setFarDist (float far);
+    float getFarDist () const;
 
-        void setNearDist (float near);
-        float getNearDist () const;
+    virtual glm::mat4 const& getProjectionMatrix() const;
+    virtual glm::vec3 getCameraPosition () const = 0;                               /* Position of the camera */
 
-        void setFarDist (float far);
-        float getFarDist () const;
+    void computeProjectionMatrix();
 
-        virtual glm::mat4 const& getProjectionMatrix() const;
+    float _FoV;
+    float _aspectRatio;
+    float _nearClipping;
+    float _farClipping;
 
-        /* Position de la caméra */
-        virtual glm::vec3 getCameraPosition () const = 0;
-
-    private:
-        void computeProjectionMatrix();
-
-
-    private:
-        float _FoV;
-        float _aspectRatio;
-        float _nearClipping;
-        float _farClipping;
-
-        glm::mat4 _projectionMatrix;
+    glm::mat4 _projectionMatrix;
 };
 
 #endif // CAMERA_HPP_INCLUDED

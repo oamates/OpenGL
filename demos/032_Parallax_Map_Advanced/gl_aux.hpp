@@ -7,7 +7,7 @@
 #include <SFML/OpenGL.hpp>
 #include <SFML/Graphics/Shader.hpp>
 
-#include "glm.hpp"
+#include <glm/glm.hpp>
 
 
 void gl_CheckError(const char* file, unsigned int line, const char* expression);
@@ -19,16 +19,12 @@ void gl_CheckError(const char* file, unsigned int line, const char* expression);
     #define GLCHECK(expr) (expr)
 #endif // DEBUG
 
-
 GLuint getShaderHandle (sf::Shader const& shader, bool throwExcept=false);
-
 GLuint getShaderUniformLoc (GLuint shaderHandle, std::string const& name, bool throwExcept=false);
-
 GLuint getShaderAttributeLoc (GLuint shaderHandle, std::string const& name, bool throwExcept=false);
 
 /* Only computes the 4 lateral sides of a cube. */
-void computeCube (std::vector<glm::vec3>& vertices,
-                  std::vector<glm::vec3>& normals);
+void computeCube (std::vector<glm::vec3>& vertices, std::vector<glm::vec3>& normals);
 
 bool read_obj(const std::string& filename,
               std::vector<glm::vec3>& positions,

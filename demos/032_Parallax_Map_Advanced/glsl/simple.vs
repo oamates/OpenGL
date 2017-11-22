@@ -1,8 +1,7 @@
 #version 130
 
-
-uniform mat4 viewProjMatrix; //proj * view product, precomputed on CPU
-uniform mat4 modelMatrix; //model -> world
+uniform mat4 viewProjMatrix;    // proj * view product, precomputed on CPU
+uniform mat4 modelMatrix;       // model -> world
 
 attribute vec3 vPosition;
 attribute vec4 vColor;

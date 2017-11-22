@@ -74,9 +74,9 @@ glm::vec3 TrackballObject::getWorldPosition() const
 
 
 TrackballCamera::TrackballCamera (glm::vec3 const& focusPoint, float distance, float latitude, float longitude):
-            CameraPerspective::CameraPerspective(),
-            TrackballObject::TrackballObject(focusPoint, distance, latitude, longitude),
-            _cameraUp(glm::vec3(0,0,1))
+    CameraPerspective::CameraPerspective(),
+    TrackballObject::TrackballObject(focusPoint, distance, latitude, longitude),
+    _cameraUp(glm::vec3(0.0f, 0.0f, 1.0f))
 {
     computeViewMatrix();
 }

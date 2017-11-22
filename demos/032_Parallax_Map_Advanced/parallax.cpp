@@ -9,7 +9,7 @@
 
 
 SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight):
-            _camera(glm::vec3(0.5,0.5,0), 1),
+            _camera(glm::vec3(0.5f, 0.5f, 0.0f), 1),
             _displayMode(PARALLAX),
             _amplitude(0.03f),
             _nbLayers(10),
@@ -66,13 +66,13 @@ SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight
 
     for (glm::vec2& v : vert)
         v = 10.f * (v - glm::vec2(.5, .5));
-    GLCHECK(glGenBuffers(1, &_vertBufferID));
+    glGenBuffers(1, &_vertBufferID);
 
     //Activate buffer and send data to the graphics card
-    GLCHECK(glBindBuffer(GL_ARRAY_BUFFER, _vertBufferID));
-    GLCHECK(glBufferData(GL_ARRAY_BUFFER, vert.size()*sizeof(glm::vec2), vert.data(), GL_STATIC_DRAW));
+    glBindBuffer(GL_ARRAY_BUFFER, _vertBufferID);
+    glBufferData(GL_ARRAY_BUFFER, vert.size()*sizeof(glm::vec2), vert.data(), GL_STATIC_DRAW);
 
-    GLCHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 SceneParallax::~SceneParallax()
@@ -201,37 +201,37 @@ void SceneParallax::drawScene ()
     cropULoc = getShaderUniformLoc(shaderHandle, "crop");
     specULoc = getShaderUniformLoc(shaderHandle, "specularMapping");
 
-    if (modeULoc != (GLuint)(-1)) {
-        GLCHECK(glUniform1ui(modeULoc, _displayMode));
+    if (modeULoc != -1)
+        glUniform1ui(modeULoc, _displayMode);
+
+    if (posALoc != -1)
+    {
+        glEnableVertexAttribArray(posALoc);
+        glBindBuffer(GL_ARRAY_BUFFER, _vertBufferID);
+        glVertexAttribPointer(posALoc, 2, GL_FLOAT, GL_FALSE, 0, (void*) 0);
     }
-    if(posALoc != (GLuint)(-1)) {
-        GLCHECK(glEnableVertexAttribArray(posALoc));
-        GLCHECK(glBindBuffer(GL_ARRAY_BUFFER, _vertBufferID));
-        GLCHECK(glVertexAttribPointer(posALoc, 2, GL_FLOAT, GL_FALSE, 0, (void*)0));
-    }
-    if (layersULoc != (GLuint)(-1)) {
-        GLCHECK(glUniform1ui(layersULoc, _nbLayers));
-    }
-    if (interpolationULoc != (GLuint)(-1)) {
+
+    if (layersULoc != -1)
+        glUniform1ui(layersULoc, _nbLayers);
+
+    if (interpolationULoc != -1) 
         glUniform1ui(interpolationULoc, _interpolation);
-    }
-    if (selfShadowULoc != (GLuint)(-1)) {
-        GLCHECK(glUniform1ui(selfShadowULoc, _selfShadow));
-    }
-    if (cropULoc != (GLuint)(-1)) {
-        GLCHECK(glUniform1ui(cropULoc, _crop));
-    }
-    if (specULoc != (GLuint)(-1)) {
-        GLCHECK(glUniform1ui(specULoc, _specularMapping));
-    }
 
-    GLCHECK(glDisable(GL_CULL_FACE));
-    GLCHECK(glDrawArrays(GL_TRIANGLES, 0, 6));
+    if (selfShadowULoc != -1)
+        glUniform1ui(selfShadowULoc, _selfShadow);
 
-    if(posALoc != (GLuint)(-1)) {
-        GLCHECK(glDisableVertexAttribArray(posALoc));
-    }
-    GLCHECK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    if (cropULoc != -1)
+        glUniform1ui(cropULoc, _crop);
+
+    if (specULoc != -1)
+        glUniform1ui(specULoc, _specularMapping);
+
+    glDisable(GL_CULL_FACE);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    if(posALoc != -1)
+        glDisableVertexAttribArray(posALoc);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 
     sf::Shader::bind(&_simpleShader);
