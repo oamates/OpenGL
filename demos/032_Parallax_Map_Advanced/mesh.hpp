@@ -22,10 +22,10 @@ struct MeshRenderable : public Renderable
     glm::mat4 const& getModelMatrix() const;
     void setModelMatrix (glm::mat4 const& matrix);
 
-    virtual void do_draw (const glsl_program_t& program, Camera const& camera) const;
+    virtual void render(const glsl_program_t& program, Camera const& camera) const override;
 
     bool _textured;
-    tex2d_t _UVTexture;
+    GLuint _UVTexture;
 
     glm::mat4 _modelMatrix;
 

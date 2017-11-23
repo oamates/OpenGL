@@ -23,7 +23,7 @@ struct SceneParallax
 
     int _displayMode;
     float _amplitude;
-    unsigned int _nbLayers;
+    int _nbLayers;
     bool _interpolation;
     bool _selfShadow;
     bool _crop;

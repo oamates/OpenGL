@@ -18,7 +18,7 @@
 
 #include "log.hpp"
 #include "constants.hpp"
-#include "glfw_window.hpp"
+#include "imgui_window.hpp"
 #include "../../framework/gl_aux.hpp"
 #include "shader.hpp"
 #include "image.hpp"
@@ -29,14 +29,14 @@
 #include "gl_aux.hpp"
 #include "parallax.hpp"
 
-struct demo_window_t : public glfw_window_t
+struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
 
     SceneParallax* scene;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
           camera(16.0f, 0.5f, glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.125f);
@@ -52,27 +52,6 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
-
-        if (action != GLFW_RELEASE) return;
-
-        if (key == GLFW_KEY_D)
-            scene->_displayMode = (scene->_displayMode + 1) % 3;
-        if (key == GLFW_KEY_A)
-            scene->_amplitude += 0.01f;
-        if (key == GLFW_KEY_Z)
-            scene->_amplitude = std::max(0.f, scene->_amplitude - 0.01f);
-        if (key == GLFW_KEY_L)
-            scene->_nbLayers++;
-        if (key == GLFW_KEY_M)
-            scene->_nbLayers = (scene->_nbLayers == 1) ? 1 : scene->_nbLayers - 1;
-        if (key == GLFW_KEY_I)
-            scene->_interpolation = !scene->_interpolation;
-        if (key == GLFW_KEY_S)
-            scene->_selfShadow = !scene->_selfShadow;
-        if (key == GLFW_KEY_C)
-            scene->_crop = !scene->_crop;
-        if (key == GLFW_KEY_V)
-            scene->_specularMapping = !scene->_specularMapping;
     }
 
     void on_mouse_move() override
@@ -86,32 +65,41 @@ struct demo_window_t : public glfw_window_t
         scene->mouseMoved(ndelta, shiftPressed);
     }
 
-    void on_scroll(double xoffset, double yoffset)
+    void on_scroll(double xoffset, double yoffset) override
     {
         float distance = scene->_camera.getDistance();
         distance *= 1.f + 0.02f * yoffset / res_y;
         scene->_camera.setDistance(distance);
     }
+
+    void update_ui() override
+    {
+        ImGui::SetNextWindowSize(ImVec2(768, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+        ImGui::Begin("Parallax map demo", 0);
+        ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);
+
+        if (ImGui::CollapsingHeader("Display mode"))
+        {
+            ImGui::RadioButton("FLAT", &scene->_displayMode, SceneParallax::FLAT);
+            ImGui::SameLine();
+            ImGui::RadioButton("NORMAL", &scene->_displayMode, SceneParallax::NORMAL);
+            ImGui::SameLine();
+            ImGui::RadioButton("PARALLAX", &scene->_displayMode, SceneParallax::PARALLAX);
+        }
+
+        ImGui::SliderFloat("Amplitude", &scene->_amplitude, 0.25f * 0.03125f, 0.25f, "%.3f");
+        ImGui::SliderInt("Layers", &scene->_nbLayers, 1, 32);
+
+        ImGui::Checkbox("Interpolation", &scene->_interpolation);
+        ImGui::Checkbox("Self-shadowing", &scene->_selfShadow);
+        ImGui::Checkbox("Cropping", &scene->_crop);
+        ImGui::Checkbox("Specular Mapping", &scene->_specularMapping);
+
+        ImGui::End();
+    }
+
 };
 
-/*
-sf::Vector2f getRelativeMouseCoords(sf::Window const& window)
-{
-    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-
-    sf::Vector2f pos(mousePos.x, window.getSize().y - mousePos.y);
-    pos.x /= static_cast<float>(window.getSize().x);
-    pos.y /= static_cast<float>(window.getSize().y);
-    return pos;
-}
-
-bool isMouseInWindow(sf::Window const& window)
-{
-    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-    return (mousePos.x >= 0) && (mousePos.y >= 0) &&
-           (mousePos.x < window.getSize().x) && (mousePos.y < window.getSize().y);
-}
-*/
 int main(int argc, char *argv[])
 {
     const int res_x = 1920;
@@ -126,22 +114,8 @@ int main(int argc, char *argv[])
 
     demo_window_t window("Parallax mapping advanced", 4, 3, 3, res_x, res_y, true);
 
-    /* Font loading */
-    /*
-    sf::Font font;
-    if (!font.loadFromFile("fonts/font.ttf")) {
-        std::cerr << "Warning: unable to load fonts/font.ttf." << std::endl;
-    }
-    sf::Text text("", font, 18);
-    text.setColor(sf::Color::White);
-    */
-
-    /* Scene loading */
     SceneParallax scene(res_x, res_y);
     window.scene = &scene;
-
-    //    sf::Vector2f mousePos = getRelativeMouseCoords(window);
-    unsigned int loop = 0;
 
     //===================================================================================================================================================================================================================
     // The main loop
@@ -150,29 +124,23 @@ int main(int argc, char *argv[])
     {
         window.new_frame();
 
-        glViewport(0, 0, res_x, res_y);
-        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        glClearColor(0.04f, 0.09f, 0.16f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        /*
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            scene.handleEvents(event);
-
-        }
-
-
-        */
-
-        /* Drawing */
-        //fpsClock.restart();
         scene.render();
 
-        /* For displaying text, SMFL used old OpenGL */
-        //float fps = 1.0f / fpsClock.getElapsedTime().asSeconds();
-        //text.setString(scene.getDisplayText(fps));
-
+        //===============================================================================================================================================================================================================
+        // After end_frame call ::
+        //  - GL_DEPTH_TEST is disabled
+        //  - GL_CULL_FACE is disabled
+        //  - GL_SCISSOR_TEST is enabled
+        //  - GL_BLEND is enabled -- blending mode GL_SRC_ALPHA/GL_ONE_MINUS_SRC_ALPHA with blending function GL_FUNC_ADD
+        //  - VAO binding is destroyed
+        //===============================================================================================================================================================================================================
         window.end_frame();
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glDisable(GL_SCISSOR_TEST);
+        glDisable(GL_BLEND);
     }
 
     //===================================================================================================================================================================================================================

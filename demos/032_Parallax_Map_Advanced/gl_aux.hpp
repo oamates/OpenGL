@@ -9,17 +9,6 @@
 
 #include "shader.hpp"
 
-void gl_CheckError(const char* file, unsigned int line, const char* expression);
-
-#define DEBUG
-#ifdef DEBUG
-    #define GLCHECK(expr) do { expr; gl_CheckError(__FILE__, __LINE__, #expr); } while (false)
-#else
-    #define GLCHECK(expr) (expr)
-#endif // DEBUG
-
-GLuint getShaderHandle (const glsl_program_t& program);
-GLuint getShaderUniformLoc (const glsl_program_t& program, std::string const& name);
 GLuint getShaderAttributeLoc (const glsl_program_t& program, std::string const& name);
 
 /* Only computes the 4 lateral sides of a cube. */

@@ -9,6 +9,8 @@ Light::Light(glm::vec3 const& color, float intensity):
 {
 }
 
+Light::~Light() {}
+
 void Light::sendToShader(const glsl_program_t& program) const
 {
     program["lightColor"] = _color;
@@ -46,6 +48,8 @@ SpotLight::SpotLight (glm::vec3 const& focusPoint, float distance, float latitud
     _mesh = std::make_shared<MeshRenderable>("res/arrow.obj", glm::vec4(1.0f, 1.0f, 0.0f, 1.0f));
     updateMesh ();
 }
+
+SpotLight::~SpotLight() {}
 
 void SpotLight::sendToShader (const glsl_program_t& program) const
 {
@@ -89,9 +93,9 @@ void SpotLight::updateMesh ()
     _mesh->setModelMatrix (modelMatrix);
 }
 
-void SpotLight::do_draw (const glsl_program_t& program, Camera const& camera) const
+void SpotLight::render (const glsl_program_t& program, Camera const& camera) const
 {
     if (_mesh)
-        _mesh->draw (program, camera);
+        _mesh->render(program, camera);
 }
 

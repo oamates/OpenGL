@@ -3,6 +3,7 @@
 
 #include <glm/gtc/matrix_inverse.hpp>
 
+#include "image.hpp"
 #include "mesh.hpp"
 #include "gl_aux.hpp"
 #include "utilities.hpp"
@@ -23,7 +24,7 @@ MeshRenderable::MeshRenderable(std::string const& filename, glm::vec4 const& col
     }
 
     glGenVertexArrays(1, &vao_id);
-    glBindVertexArrays(vao_id);
+    glBindVertexArray(vao_id);
 
     glGenBuffers(1, &_pBuffer); //vertices
     glBindBuffer(GL_ARRAY_BUFFER, _pBuffer);
@@ -62,7 +63,8 @@ MeshRenderable::~MeshRenderable()
 
 void MeshRenderable::loadUVTexture(std::string const& filename)
 {
-    _UVTexture.loadFromFile(filename.c_str());
+    glActiveTexture(GL_TEXTURE4);
+    _UVTexture = image::png::texture2d(filename.c_str());
     _textured = true;
 }
 
@@ -86,7 +88,7 @@ void MeshRenderable::setModelMatrix (glm::mat4 const& matrix)
     _modelMatrix = matrix;
 }
 
-void MeshRenderable::do_draw(const glsl_program_t& program, Camera const& camera) const
+void MeshRenderable::render(const glsl_program_t& program, Camera const& camera) const
 {
     glm::mat4 normalMatrix = glm::inverseTranspose(camera.getViewMatrix() * _modelMatrix);
 
@@ -94,7 +96,8 @@ void MeshRenderable::do_draw(const glsl_program_t& program, Camera const& camera
     program["normalMatrix"] = normalMatrix;
     program["textured"] = (int) _textured;
 
-    glBindTexture(GL_TEXTURE_2D, _UVTexture.id);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, _UVTexture);
     glBindVertexArray(vao_id);
 
     glEnable(GL_DEPTH_TEST);

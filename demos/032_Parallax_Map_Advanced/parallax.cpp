@@ -53,41 +53,20 @@ SceneParallax::SceneParallax(unsigned int screenWidth, unsigned int screenHeight
 
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), 0);
 
     glGenBuffers(1, &vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), glm::value_ptr(vertices[0]), GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), 0);
+
 }
 
 SceneParallax::~SceneParallax()
 {
     if (vbo_id != -1) glDeleteBuffers(1, &vbo_id);
     if (vao_id != -1) glDeleteVertexArrays(1, &vao_id);
-}
-
-std::string SceneParallax::getDisplayText (float fps) const
-{
-    std::stringstream s;
-
-    s << "fps: " << static_cast<int>(fps) << std::endl << std::endl;
-
-    std::string mode = "FLAT";
-    if (_displayMode == NORMAL)
-        mode = "NORMAL";
-    else if (_displayMode == PARALLAX)
-        mode = "PARALLAX";
-    s << "display mode (D): " << mode << std::endl << std::endl;
-
-    s << "amplitude (A/Z): " << std::setprecision(3) << _amplitude << std::endl;
-    s << "layers (L/M): " << _nbLayers << std::endl;
-    s << "interpolation (I): " << _interpolation << std::endl;
-    s << "self-shadowing (S): " << _selfShadow << std::endl;
-    s << "cropping (C): " << _crop << std::endl;
-    s << "specular mapping (V): " << _specularMapping;
-
-    return s.str();
 }
 
 void SceneParallax::mouseMoved(glm::dvec2 mouse_delta, bool shiftPressed)
@@ -144,7 +123,7 @@ void SceneParallax::render ()
 
     _simpleShader.enable();
     _camera.sendToShader(_simpleShader);
-    _spotlight.draw(_simpleShader, _camera);
+    _spotlight.render(_simpleShader, _camera);
 
 
     glUseProgram(0);
