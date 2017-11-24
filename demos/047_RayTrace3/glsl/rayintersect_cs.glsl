@@ -11,7 +11,7 @@ void main(void)
 	// it avoids interesections with the primitive that spawned it.
 	r.origin = r.origin + r.dir * 0.001;
 		
-	trace(r);
+	trace(r, false);
 				
 	r.origin = r.origin - r.dir * 0.001;				
 	if(isinf(r.t)) 

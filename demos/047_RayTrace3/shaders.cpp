@@ -5,14 +5,14 @@
 #include "shaders.hpp"
 
 // Issue: longer shaders are so long they don't fit inside the console window.
-#define PRINT_SHADER_SRC_ON_ERROR
+//#define PRINT_SHADER_SRC_ON_ERROR
 
 void loadShader(std::string filename, GLenum shaderType, std::vector<ShaderInfo> & shaders)
 {
 	std::ifstream file(filename);
 	if(!file)
 	{
-		fprintf(stdout, "Unable to open file %s", filename.c_str());
+		printf("Unable to open file %s", filename.c_str());
 		return;
 	}
 	
@@ -26,8 +26,11 @@ void loadShader(std::string filename, GLenum shaderType, std::vector<ShaderInfo>
 	shaders.push_back(shaderInfo);
 }
 
+int q = 0;
+
 int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle)
 {	
+
 	GLuint pHandle = glCreateProgram();
 
 	std::vector<const GLchar *> shaderSrcPtr;
@@ -36,14 +39,13 @@ int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle
 	{		
 		shaderSrcPtr.push_back(shaders[i].source.c_str());
 
-		// If it's a shader header, it contains code that should 
-		// be added to the next shader that isn't a shader header
 		if (shaders[i].shaderType == SHADER_HEADER || shaders[i].shaderType == SHADER_VERSION_HEADER) {
 			continue;
 		}
 
 		GLuint shaderHandle = glCreateShader(shaders[i].shaderType);
 		shaders[i].shaderHandle = shaderHandle;		
+
 		glShaderSource(shaderHandle, shaderSrcPtr.size(), shaderSrcPtr.data(), 0);	
 		glCompileShader(shaderHandle);
 
@@ -51,25 +53,23 @@ int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle
 		glGetShaderiv( shaderHandle, GL_COMPILE_STATUS, &result );
 		if( result == GL_FALSE )
 		{
-			fprintf(stdout, "Shader compilation failed!\n");
+			printf("Shader compilation failed!\n");
 			for (int filenr = 0; filenr <= i; filenr++)
 			{
-				fprintf(stdout, "File %i: %s\n", filenr, shaders[filenr].filename.c_str());
+				printf("File %i: %s\n", filenr, shaders[filenr].filename.c_str());
 			}			
 
-#ifdef PRINT_SHADER_SRC_ON_ERROR
-			std::string s;
-			unsigned int totalLen = 0;
-			for (unsigned int j = 0; j < shaderSrcPtr.size(); j++)
-			{
-				totalLen += std::strlen(shaderSrcPtr[j]);
-			}
+			char file_name[128];
+			sprintf(file_name, "shader_source%u.txt", q);
+			FILE* f = fopen(file_name, "w");
 
-			s.resize(totalLen + 1);
-			GLsizei length;
-			glGetShaderSource(shaderHandle, s.size(), &length, (GLchar *)s.c_str());
-			fprintf(stdout, "Failed compiling shader :: \n%s\n", s.c_str());
-#endif
+			for(size_t s = 0; s < shaderSrcPtr.size(); ++s)
+			    fprintf(f, "@@@ %d @@@:%s", s + 1, shaderSrcPtr[s]);
+
+			fclose(f);
+
+			printf("shader[%u].sourceLength = %u\n", q, (int)shaderSrcPtr.size());
+
 			GLint logLen;
 			glGetShaderiv( shaderHandle, GL_INFO_LOG_LENGTH, &logLen );
 			if( logLen > 0 )
@@ -77,22 +77,11 @@ int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle
 				char * log = (char *)malloc(logLen);
 				GLsizei written;
 				glGetShaderInfoLog(shaderHandle, logLen, &written, log);
-				fprintf(stdout, "Shader log:\n%s", log);
+				printf("Shader log:\n%s", log);
 				free(log);				
 			}
-
-			std::string errFileName = "errdump_" + shaders[i].filename;
-			std::ofstream f(errFileName.c_str());
-			if(f.is_open())
-			{
-				for (auto j = 0; j < shaderSrcPtr.size(); j++)
-				{
-					f << shaderSrcPtr[j];
-				}
-				f.close();
-				fprintf(stdout, "Shader written to %s\n", errFileName.c_str());
-			}
 			
+			exit(-1);
 			return -1;
 		}
 
@@ -105,10 +94,10 @@ int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle
 	glGetProgramiv( pHandle, GL_LINK_STATUS, &status );
 	if( status == GL_FALSE ) 
 	{
-		fprintf(stdout, "Failed to link shader program!\n" );
+		printf("Failed to link shader program!\n" );
 		for (unsigned int i = 0; i < shaders.size(); i++)
 		{
-			fprintf(stdout, "%s\n", shaders[i].filename.c_str());
+			printf("%s\n", shaders[i].filename.c_str());
 		}		
 		GLint logLen;
 		glGetProgramiv(pHandle, GL_INFO_LOG_LENGTH, &logLen);
@@ -117,7 +106,7 @@ int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle
 			char * log = (char *)malloc(logLen);
 			GLsizei written;
 			glGetProgramInfoLog(pHandle, logLen, &written, log);
-			fprintf(stdout, "Program log: \n%s", log);
+			printf("Program log: \n%s", log);
 			free(log);			
 		}
 		return -2;
@@ -127,5 +116,6 @@ int compileShaderProgram(std::vector<ShaderInfo>& shaders, GLuint& programHandle
 		programHandle = pHandle;
 		return 0;
 	}
+	++q;
 }
 	

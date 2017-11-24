@@ -174,7 +174,7 @@ void CompileRaytracerShader(int threadGroupSize, GLuint & raygenprog,
 {	
 	ShaderInfo threadGroupShaderInfo;	
 	threadGroupShaderInfo.source =
-		"#version 430 core\n"
+		"#version 430 core\n\n"
 		"layout(local_size_x = ";
 	threadGroupShaderInfo.source += std::to_string(threadGroupSize);
 	threadGroupShaderInfo.source += ", local_size_y = 1) in;\n";

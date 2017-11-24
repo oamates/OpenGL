@@ -115,7 +115,7 @@ bool intersectSphere(vec3 origin, vec3 dir, const sphere s, out float t0, out fl
 }
 
 // Do intersection tests with all the geometry in the scene
-void trace(in out ray r, bool earlyExit = false)
+void trace(in out ray r, bool earlyExit)
 {
 	// Set initial value to infinity
 	r.t = 1.0 / 0.0;	
@@ -157,7 +157,7 @@ void trace(in out ray r, bool earlyExit = false)
 	const int num_spheres = 2;
 	sphere spheres[num_spheres];
 	spheres[0] = sphere(vec3(0.0f, -0.7f, 2.0f), 0.5f);	
-	spheres[1] = sphere(vec3(-2.0f, -00f, 0.0f), 0.2f);	
+	spheres[1] = sphere(vec3(-2.0f, -0.0f, 0.0f), 0.2f);	
 
 	for(int i = 0; i < num_spheres; i++)
 	{	
