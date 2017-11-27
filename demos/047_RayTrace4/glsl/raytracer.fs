@@ -230,7 +230,7 @@ vec3 point_color(in vec3 inter, in vec3 normal, in vec3 eye2inter, in material_t
             vec3 ref_ray = reflect(-normalize(inter2light), normal);                            // specular light
             float spec = dot(ref_ray, -eye2inter);
             spec = max(spec, 0.0f);
-            float specular = spec * material.kS;
+            float specular = spec * material.kS * material.shininess;
             color += (pointlight[i].k * falloff * (diffuse + specular)) * material.color;       // add all
         }
     }
@@ -281,8 +281,7 @@ void main()
     }
 
     sample_color *= (1.0f / SAMPLES_PER_PIXEL);
-//    FragmentColor = vec4(sample_color, 1.0f);
-    FragmentColor = vec4(1.0f);
+    FragmentColor = vec4(sample_color, 1.0f);
 }
 
 

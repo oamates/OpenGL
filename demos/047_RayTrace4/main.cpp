@@ -21,7 +21,8 @@ struct demo_window_t : public glfw_window_t
     camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
+          camera(16.0f, 0.25f, glm::mat4(1.0f))
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -270,15 +271,71 @@ int main(int argc, char *argv[])
         uni_camera_matrix = camera_matrix;
         uni_camera_ws = camera_ws;
 
+
         for(int i = 0; i < NUM_SPHERES;   i++) transform(sphere[i],     view_matrix);
         for(int i = 0; i < NUM_CYLINDERS; i++) transform(cylinder[i],   view_matrix);
         for(int i = 0; i < NUM_PLANES;    i++) transform(plane[i],      view_matrix);
         for(int i = 0; i < NUM_LIGHTS;    i++) transform(pointlight[i], view_matrix);
 
+            /*
         glUniform1fv(uni_sphere.location,     sizeof(sphere) / sizeof(float),     (const GLfloat*) sphere);
         glUniform1fv(uni_plane.location,      sizeof(plane) / sizeof(float),      (const GLfloat*) plane);
         glUniform1fv(uni_cylinder.location,   sizeof(cylinder) / sizeof(float),   (const GLfloat*) cylinder);
         glUniform1fv(uni_pointlight.location, sizeof(pointlight) / sizeof(float), (const GLfloat*) pointlight);
+            */
+        raytracer["sphere[0].position"] = sphere[0].position;
+        raytracer["sphere[0].radius"] = sphere[0].radius;
+        raytracer["sphere[0].material.kA"] = sphere[0].material.kA;
+        raytracer["sphere[0].material.kD"] = sphere[0].material.kD;
+        raytracer["sphere[0].material.kS"] = sphere[0].material.kS;
+        raytracer["sphere[0].material.kR"] = sphere[0].material.kR;
+        raytracer["sphere[0].material.shininess"] = sphere[0].material.shininess;
+        raytracer["sphere[0].material.color"] = sphere[0].material.color;
+
+        raytracer["sphere[1].position"] = sphere[1].position;
+        raytracer["sphere[1].radius"] = sphere[1].radius;
+        raytracer["sphere[1].material.kA"] = sphere[1].material.kA;
+        raytracer["sphere[1].material.kD"] = sphere[1].material.kD;
+        raytracer["sphere[1].material.kS"] = sphere[1].material.kS;
+        raytracer["sphere[1].material.kR"] = sphere[1].material.kR;
+        raytracer["sphere[1].material.shininess"] = sphere[1].material.shininess;
+        raytracer["sphere[1].material.color"] = sphere[1].material.color;
+
+        raytracer["plane[0].normal"] = plane[0].normal;
+        raytracer["plane[0].d"] = plane[0].d;
+        raytracer["plane[0].material.kA"] = plane[0].material.kA;
+        raytracer["plane[0].material.kD"] = plane[0].material.kD;
+        raytracer["plane[0].material.kS"] = plane[0].material.kS;
+        raytracer["plane[0].material.kR"] = plane[0].material.kR;
+        raytracer["plane[0].material.shininess"] = plane[0].material.shininess;
+        raytracer["plane[0].material.color"] = plane[0].material.color;
+
+        raytracer["plane[1].normal"] = plane[1].normal;
+        raytracer["plane[1].d"] = plane[1].d;
+        raytracer["plane[1].material.kA"] = plane[1].material.kA;
+        raytracer["plane[1].material.kD"] = plane[1].material.kD;
+        raytracer["plane[1].material.kS"] = plane[1].material.kS;
+        raytracer["plane[1].material.kR"] = plane[1].material.kR;
+        raytracer["plane[1].material.shininess"] = plane[1].material.shininess;
+        raytracer["plane[1].material.color"] = plane[1].material.color;
+
+        raytracer["cylinder[0].position"] = cylinder[0].position;
+        raytracer["cylinder[0].a"] = cylinder[0].a;
+        raytracer["cylinder[0].material.kA"] = cylinder[0].material.kA;
+        raytracer["cylinder[0].material.kD"] = cylinder[0].material.kD;
+        raytracer["cylinder[0].material.kS"] = cylinder[0].material.kS;
+        raytracer["cylinder[0].material.kR"] = cylinder[0].material.kR;
+        raytracer["cylinder[0].material.shininess"] = cylinder[0].material.shininess;
+        raytracer["cylinder[0].material.color"] = cylinder[0].material.color;
+
+        raytracer["pointlight[0].position"] = pointlight[0].position;
+        raytracer["pointlight[0].k"] = pointlight[0].k;
+        raytracer["pointlight[0].falloff"] = pointlight[0].falloff;
+
+        raytracer["pointlight[1].position"] = pointlight[1].position;
+        raytracer["pointlight[1].k"] = pointlight[1].k;
+        raytracer["pointlight[1].falloff"] = pointlight[1].falloff;
+
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         window.end_frame();
