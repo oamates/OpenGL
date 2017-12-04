@@ -3,9 +3,7 @@
 
 #include <math.h>
 
-#include "config.hpp"
 #include "utility.hpp"
-
 #include "dgmath.hpp"
 #include "simpleRNG.hpp"
 

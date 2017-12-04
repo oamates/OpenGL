@@ -22,7 +22,6 @@
 #include "Point4.h"
 #include "Primitive3D.h"
 
-class BasisR3;
 class OBB;
 class Sphere;
 

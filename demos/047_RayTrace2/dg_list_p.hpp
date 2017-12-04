@@ -38,63 +38,61 @@ template<typename T> class list_p
 
   public:
 
-      //--------------------------------------------------------------------------------
-      //        Constant Iterator
-      //--------------------------------------------------------------------------------
-      class const_iterator
-      {
+    //--------------------------------------------------------------------------------
+    //        Constant Iterator
+    //--------------------------------------------------------------------------------
+    class const_iterator
+    {
       private:
-          friend class list_p;
-        
-      private:
-          //Special constructor, not for external use
-          const_iterator(const DataContainer* _ptr) {ptr = _ptr;}
+        friend class list_p;
+        const DataContainer *ptr;
+        const_iterator(const DataContainer* _ptr)                       // Special constructor, not for external use
+            { ptr = _ptr; }
 
       public:
-          //Constructor / destructor
-          const_iterator(){}
-          ~const_iterator(){}
+        const_iterator(){}
+        ~const_iterator(){}
 
-          //Copy operations
-          const_iterator(const const_iterator& it): ptr(it.ptr){}
-          const_iterator& operator= (const const_iterator&);
+        //Copy operations
+        const_iterator(const const_iterator& it): ptr(it.ptr){}
+        const_iterator& operator= (const const_iterator&);
         
-          //Comparison
-          bool operator==(const const_iterator& it) const {return ptr == it.ptr;}
-          bool operator!=(const const_iterator& it) const {return ptr != it.ptr;}
+        //Comparison
+        bool operator == (const const_iterator& it) const
+            { return ptr == it.ptr; }
+        bool operator != (const const_iterator& it) const
+            { return ptr != it.ptr; }
 
-          //operators
-          const_iterator& operator++();
-          const_iterator operator++(int);
-          const_iterator& operator--();
-          const_iterator operator--(int);
+        const_iterator& operator++();
+        const_iterator  operator++(int);
+        const_iterator& operator--();
+        const_iterator  operator--(int);
 
-          //Conversion
-          const T* operator->() const {return &(ptr->element);}
-          const T& operator*() const {return ptr->element;}
-
-      private:
-          //Data members
-          const DataContainer *ptr;
-
-      };
-
-
-      //--------------------------------------------------------------------------------
-      //        Iterator
-      //--------------------------------------------------------------------------------
-      class iterator
-      {
-          friend class list_p;
+        const T* operator->() const
+            { return &(ptr->element); }
+        const T& operator*() const
+            { return ptr->element; }
 
       private:
-          //Special constructor, not for external use
-          iterator(DataContainer* _ptr) {ptr = _ptr;}
+
+    };
+
+
+    //--------------------------------------------------------------------------------
+    //        Iterator
+    //--------------------------------------------------------------------------------
+    class iterator
+    {
+        friend class list_p;
+
+      private:
+          
+        iterator(DataContainer* _ptr)                                   // Special constructor, not for external use
+            { ptr = _ptr; }
 
       public:
-          //Constructor / destructor
-          iterator(){}
-          ~iterator(){}
+        iterator(){}
+        ~iterator(){}
 
           //Copy operations
           iterator(const iterator& it): ptr(it.ptr){}
@@ -727,155 +725,91 @@ template<typename T> class list_p
   } //End: list_p::insert()
 
 
-  //--------------------------------------------------------------------------------
-  //    @   list_p<T>::erase()
-  //--------------------------------------------------------------------------------
-  //        Erase an element from the list
-  //--------------------------------------------------------------------------------
-  template<class T>
-  void list_p<T>::erase(iterator& it)
-  {
-      //Remember previous element
-      DataContainer* next = it.ptr->next;
-
-      //Break element from chain
-      it.ptr->previous->next = it.ptr->next;        //prev points to next
-      it.ptr->next->previous = it.ptr->previous;    //next points to previous
-
-      //Add this broken item to the begining of the free list
-      it.ptr->next = m_nextFree;                //put item in between m_nextFree and end of the list
-    
-      //Reset m_nextFree
-      m_nextFree = it.ptr;
-    
-      //Deincrement m_currentSize
-      m_currentSize--;
-
-      //Return iterator to the next container
-      it = iterator(next);
-
-  } //End: list_p::erase()
-
-
-  //--------------------------------------------------------------------------------
-  //    @   list_p<T>::extend()
-  //--------------------------------------------------------------------------------
-  //        Increases the size of the underlying arrays by a factor of 1.5
-  //--------------------------------------------------------------------------------
-  template<class T>
-  void list_p<T>::extend()
-  {
-      //Calculate new size
-      size_t new_size = m_arraySize << 1;
-    
-    if (new_size < m_arraySize)
-    {
-      throw std::overflow_error("m_arraySize");
+    //--------------------------------------------------------------------------------
+    //        Erase an element from the list
+    //--------------------------------------------------------------------------------
+    template<class T> void list_p<T>::erase(iterator& it)
+    {  
+        DataContainer* next = it.ptr->next;                                 // remember previous element    
+        it.ptr->previous->next = it.ptr->next;                              // extract element from chain, prev points to next
+        it.ptr->next->previous = it.ptr->previous;                          // next points to previous
+        it.ptr->next = m_nextFree;                                          // add this broken item to the begining of the free list
+        m_nextFree = it.ptr;                                                // put item in between m_nextFree and end of the list and reset m_nextFree
+        m_currentSize--;                                                    // decrement m_currentSize      
+        it = iterator(next);                                                // return iterator to the next container
     }
 
-      //Create new array
-      DataContainer* new_data = static_cast<DataContainer *>(malloc(new_size * sizeof(DataContainer)));
-
-    if (new_data == nullptr)
+    //--------------------------------------------------------------------------------
+    //        Increases the size of the underlying arrays by a factor of 1.5
+    //--------------------------------------------------------------------------------
+    template<class T> void list_p<T>::extend()
     {
-      throw std::bad_alloc;
+        size_t new_size = m_arraySize << 1;                                 // Calculate new size
+    
+        if (new_size < m_arraySize)
+            throw std::overflow_error("m_arraySize");
+
+        DataContainer* new_data = static_cast<DataContainer *>(malloc(new_size * sizeof(DataContainer)));
+
+        if (new_data == nullptr)
+            throw std::bad_alloc;
+
+        for (size_t i = 0; i < new_size - 1; i++)                           // Assign pointers
+            new_data[i].next = &new_data[i + 1];
+        for (size_t i = 1; i < m_currentSize; i++)
+            new_data[i].previous = &new_data[i - 1];
+        
+        iterator it = begin();                                              // Assign values
+        for (size_t i = 0; it != end(); ++it, ++i)
+            new_data[i].element = *it;
+
+        free(m_data);                                                       // Assign m_data pointer
+        m_data = new_data;
+        m_nextFree = &new_data[m_currentSize];                              // Assign next free pointer
+        m_arraySize = new_size;                                             // Adjust sizes
+
+        if (m_currentSize == 0)                                             // Determine root and end pointers
+        {
+            m_rootContainer.next = &m_endContainer;
+            m_endContainer.previous = &m_rootContainer;
+        }
+        else
+        {
+            m_rootContainer.next = &m_data[0];
+            m_endContainer.previous = &m_data[m_currentSize - 1];
+            new_data[0].previous = &m_rootContainer;
+            new_data[m_currentSize - 1].next = &m_endContainer;
+        }
     }
 
-      //Assign pointers
-      for (size_t i = 0; i < new_size-1; i++)
-      {
-          new_data[i].next = &new_data[i+1];
-      }
-      for (size_t i = 1; i < m_currentSize; i++)
-      {
-          new_data[i].previous = &new_data[i-1];
-      }
+    //--------------------------------------------------------------------------------
+    //        Helpful functions
+    //--------------------------------------------------------------------------------
 
-      //Assign values
-      iterator it = begin();
-      for (size_t i = 0; it != end(); ++it, ++i)
-      {
-          new_data[i].element = *it;
-      }
-
-      //Assign m_data pointer
-      free(m_data);
-      m_data = new_data;
-    
-      //Assign next free pointer
-      m_nextFree = &new_data[m_currentSize];
-    
-      //Adjust sizes
-      m_arraySize = new_size;
-
-      //Determine root and end pointers
-      if (m_currentSize == 0)
-      {
-      m_rootContainer.next = &m_endContainer;
-      m_endContainer.previous = &m_rootContainer;
-      }
-      else
-      {
-          m_rootContainer.next = &m_data[0];
-          m_endContainer.previous = &m_data[m_currentSize-1];
-      new_data[0].previous = &m_rootContainer;
-      new_data[m_currentSize - 1].next = &m_endContainer;
-      }
-    
-  } //End: list_p<T>::extend()
-
-
-  //--------------------------------------------------------------------------------
-  //        Helpful functions
-  //--------------------------------------------------------------------------------
-
-
-  //--------------------------------------------------------------------------------
-  //    @   find()
-  //--------------------------------------------------------------------------------
-  //        Find a value in the list, returns iterator
-  //--------------------------------------------------------------------------------
-  template<class T>
-  typename list_p<T>::iterator find (
-      typename list_p<T>::iterator first, 
-      typename list_p<T>::iterator last, 
-      const T& val)
-  {
-    while (first!=last) 
+    //--------------------------------------------------------------------------------
+    //        Find a value in the list, returns iterator
+    //--------------------------------------------------------------------------------
+    template<class T> typename list_p<T>::iterator find (typename list_p<T>::iterator first, typename list_p<T>::iterator last, const T& val)
     {
-      if (*first==val) 
-            return first;
-
-      ++first;
+        while (first!=last) 
+        {
+            if (*first == val) return first;
+            ++first;
+        }
+        return last;
     }
 
-    return last;
-
-  } //End find()
-
-
-  //--------------------------------------------------------------------------------
-  //    @   find()
-  //--------------------------------------------------------------------------------
-  //        Find a value in the list, returns const_iterator
-  //--------------------------------------------------------------------------------
-  template<class T>
-  typename list_p<T>::const_iterator find (
-      typename list_p<T>::const_iterator first, 
-      typename list_p<T>::const_iterator last, 
-      const T& val)
-  {
-    while (first!=last) 
+    //--------------------------------------------------------------------------------
+    //        Find a value in the list, returns const_iterator
+    //--------------------------------------------------------------------------------
+    template<class T> typename list_p<T>::const_iterator find (typename list_p<T>::const_iterator first, typename list_p<T>::const_iterator last, const T& val)
     {
-      if (*first==val) 
-            return first;
-
-      ++first;
+        while (first != last) 
+        {
+            if (*first == val) return first;
+            ++first;
+        }
+        return last;
     }
-
-    return last;
-
-  } //End find()
-
 };
 #endif

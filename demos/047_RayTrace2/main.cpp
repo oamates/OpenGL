@@ -13,6 +13,8 @@
 #include "matrix44.hpp"
 #include "vector4.hpp"
 
+#include "vqs.hpp"
+#include "resource.hpp"
 
 struct GLFWwindow;
 

@@ -5,10 +5,9 @@
 #include <cstdlib>
 
 #include "raytracerconfig.hpp"
-#include "VQS.hpp"
-//#include "BasisR3.h"
+#include "vqs.hpp"
 
-typedef Dg::VQS<real>     vqs;
+typedef Dg::VQS<real> vqs;
 typedef Dg::Vector4<real> vec4;
 
 struct IntersectionData
@@ -18,89 +17,73 @@ struct IntersectionData
 
 struct Materials
 {
-  uint32_t color;
+    uint32_t color;
 };
 
 struct Sphere
 {
-  vec4 center;
-  real radius;
-  Materials materials;
+    vec4 center;
+    real radius;
+    Materials materials;
 };
 
 struct OBB
 {
-  vec4 center;
-  //BasisR3 basis;
-  real x, y, z;
-  Materials materials;
+    vec4 center;
+    real x, y, z;
+    Materials materials;
 };
 
 struct Torus
 {
-  vec4 center;
-  vec4 axis;
-  real radius_circle;
-  real radius_thick;
-  Materials materials;
+    vec4 center;
+    vec4 axis;
+    real radius_circle;
+    real radius_thick;
+    Materials materials;
 };
 
 struct Mesh
 {
-  vec4 * vertices;
-  int nVertices;
-  int * facets[3];
-  Materials materials;
+    vec4* vertices;
+    int nVertices;
+    int* facets[3];
+    Materials materials;
 };
 
 struct Ray
 {
-  vec4 origin;
-  vec4 direction;
+    vec4 origin;
+    vec4 direction;
 };
 
-template<typename T>
-class qArray
+template<typename T> struct qArray
 {
-public:
+    unsigned int size;
+    T* data;
 
-  qArray() : size(0), data(nullptr) {}
+    qArray() : size(0), data(0) {}
 
-  ~qArray() { free(data); }
+    ~qArray()
+        { free(data); }
 
-  void Resize(unsigned a_size) 
-  {
-    size = a_size;
-
-    if (a_size == 0)
+    void Resize(unsigned a_size) 
     {
-      free(data);
-      data = nullptr;
+        size = a_size;
+        if (!a_size)
+        {
+            free(data);
+            data = 0;
+            return;
+        }
+        data = realloc(data, size * sizeof(T));
     }
-    else
-    {
-      data = realloc(data, size * sizeof(T));
-    }
-  }
-
-public:
-
-  unsigned size;
-  T * data;
-
 };
 
-
-class Scene
+struct Scene
 {
-public:
-
-private:
-
-  qArray<Sphere> m_spheres;
-
-  vqs m_camera;
-
+    qArray<Sphere> m_spheres;
+    vqs m_camera;
 };
 
 #endif

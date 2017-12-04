@@ -2,25 +2,19 @@
 #define DG_MAP_P_H
 
 #include <exception>
-#include <assert.h>
+#include <stdexcept>
+#include <cassert>
 
-#include "impl_container_common.h"
+#include "impl_container_common.hpp"
 
 namespace Dg
 {
-  //! @ingroup Containers
-  //!
-  //! @class map_p
-  //!
-  //! Ordered map_pped list. 
-  //!
-  //! Assumed types are POD, so no construction / assignment operators called
-  //!
-  //! @author Frank B. Hart
-  //! @date 2/5/2015
-  template<typename U, typename T>
-  class map_p
-  {
+
+// Ordered map_pped list. 
+// Assumed types are POD, so no construction / assignment operators called
+
+template<typename U, typename T> class map_p
+{
     //Internal container which stores the m_data
     struct Container
     {
@@ -43,35 +37,35 @@ namespace Dg
     map_p(map_p const &);
 
     //! Assigns new contents to the container, replacing its current content.
-    map_p& operator= (map_p const &);
+    map_p& operator = (map_p const &);
 
     //! Returns a reference to the \a i<SUP>th</SUP> element in the map_p. 
     //! This function does not perform a range check.
-    T& operator[](unsigned int i)	{ return m_data[i].item; }
+    T& operator[](unsigned int i)   { return m_data[i].item; }
 
     //! Returns a const reference to the \a i<SUP>th</SUP> element in the map_p. 
     //! This function does not perform a range check.
     const T& operator[](unsigned int i) const { return m_data[i].item; }
 
     //! Return number of elements in the map_p.
-    int size() const	{ return m_currentSize; }
+    int size() const    { return m_currentSize; }
 
     //! Returns whether the map_p is empty.
-    bool empty() const	{ return m_currentSize == 0; }
+    bool empty() const  { return m_currentSize == 0; }
 
     //! Returns number of elements the map_p can hold before resizing.
-    int max_size() const	{ return m_arraySize; }
+    int max_size() const    { return m_arraySize; }
 
     //! Returns the key of the ith element in the map_p.
     //! This function does not perform a range check.
-    U query_key(int i)	const { return m_data[i].key; }
+    U query_key(int i)  const { return m_data[i].key; }
 
     //! Searches the map_p for an element with a key equivalent to \a k.
     //! \return True if the element was found with \a index being set to the 
     //!         index of the element inthe map_p. False if not found with \a index
     //!         set to one lower to where \a k would be.
     //! \param lower Set a low bound to the search sublist.
-    bool find(U k, int& index, int lower = 0) const;			 //Use binary search
+    bool find(U k, int& index, int lower = 0) const;             //Use binary search
 
     //! Searches the map_p for an element with a key equivalent to \a k.
     //! \return True if the element was found with \a index being set to the 
@@ -79,7 +73,7 @@ namespace Dg
     //!         set to one lower to where \a k would be.
     //! \param lower Set a low bound to the search sublist.
     //! \param upper Set an upper bound to the search sublist.
-    bool find(U k, int& index, int lower, int upper) const;	//Use binary search
+    bool find(U k, int& index, int lower, int upper) const; //Use binary search
 
     //! Extends the container by inserting new elements, effectively increasing 
     //! the container size by the number of elements inserted.
@@ -125,58 +119,37 @@ namespace Dg
   };
 
 
-  //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::map_p()
-  //--------------------------------------------------------------------------------
-  template<typename U, typename T>
-  map_p<U, T>::map_p()
-    : m_data(nullptr)
-    , m_arraySize(0)
-    , m_currentSize(0)
-  {
-    resize(DG_CONTAINER_DEFAULT_SIZE);
+    //--------------------------------------------------------------------------------
+    //    @   map_p<U,T>::map_p()
+    //--------------------------------------------------------------------------------
+    template<typename U, typename T> map_p<U, T>::map_p()
+        : m_data(0), m_arraySize(0), m_currentSize(0)
+        { resize(DG_CONTAINER_DEFAULT_SIZE); }
 
-  }	//End: map_p::map_p()
-
-
-  //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::map_p()
-  //--------------------------------------------------------------------------------
-  template<typename U, typename T>
-  map_p<U, T>::map_p(unsigned int a_size)
-    : m_data(nullptr)
-    , m_arraySize(0)
-    , m_currentSize(0)
-  {
-    assert(a_size > 0);
-
-    Container * tempPtr = static_cast<Container *>(malloc(sizeof(Container) * a_size));
-
-    if (tempPtr == nullptr)
+    //--------------------------------------------------------------------------------
+    //    @   map_p<U,T>::map_p()
+    //--------------------------------------------------------------------------------
+    template<typename U, typename T> map_p<U, T>::map_p(unsigned int a_size)
+        : m_data(nullptr) , m_arraySize(0) , m_currentSize(0)
     {
-      throw std::bad_alloc;
+        assert(a_size > 0);
+
+        Container* tempPtr = static_cast<Container *> (malloc(sizeof(Container) * a_size));
+        if (!tempPtr) throw std::bad_alloc();
+
+        m_data = tempPtr;
+        m_arraySize = a_size;
+        m_currentSize = 0;
     }
 
-    m_data = tempPtr;
-    m_arraySize = a_size;
-    m_currentSize = 0;
-
-  }	//End: map_p::map_p()
-
-
-  //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::~map_p()
-  //--------------------------------------------------------------------------------
-  template<typename U, typename T>
-  map_p<U, T>::~map_p()
-  {
-    free(m_data);
-
-  }	//End: map_p::~map_p()
-
+    //--------------------------------------------------------------------------------
+    //    @   map_p<U,T>::~map_p()
+    //--------------------------------------------------------------------------------
+    template<typename U, typename T> map_p<U, T>::~map_p()
+        { free(m_data); }
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::init()
+  //    @   map_p<U,T>::init()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   void map_p<U, T>::init(map_p const & a_other)
@@ -187,11 +160,11 @@ namespace Dg
 
     m_currentSize = a_other.m_currentSize;
 
-  }	//End: map_p::init()
+  } //End: map_p::init()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::map_p()
+  //    @   map_p<U,T>::map_p()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   map_p<U, T>::map_p(map_p const & a_other) :
@@ -199,11 +172,11 @@ namespace Dg
   {
     init(a_other);
 
-  }	//End: map_p::map_p()
+  } //End: map_p::map_p()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::operator=()
+  //    @   map_p<U,T>::operator=()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   map_p<U, T>& map_p<U, T>::operator=(map_p const & a_other)
@@ -215,11 +188,11 @@ namespace Dg
 
     return *this;
 
-  }	//End: map_p::operator=()
+  } //End: map_p::operator=()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::resize()
+  //    @   map_p<U,T>::resize()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   void map_p<U, T>::resize(int a_newSize)
@@ -241,22 +214,22 @@ namespace Dg
       m_currentSize = a_newSize;
     }
 
-  }	//End: map_p::resize()
+  } //End: map_p::resize()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::find()
+  //    @   map_p<U,T>::find()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   bool map_p<U, T>::find(U a_key, int& a_index, int a_lower) const
   {
     return find(a_key, a_index, a_lower, (m_currentSize - 1));
 
-  }	//End: map_p::find()
+  } //End: map_p::find()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::find()
+  //    @   map_p<U,T>::find()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   bool map_p<U, T>::find(U a_key, int& a_index, int a_lower, int a_upper) const
@@ -286,38 +259,27 @@ namespace Dg
     a_index = a_lower - 1;
     return false;
 
-  }	//End: map_p::find()
+  } //End: map_p::find()
 
 
-  //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::extend()
-  //--------------------------------------------------------------------------------
-  template<typename U, typename T>
-  void map_p<U, T>::extend()
-  {
-    //Calculate new size
-    int new_size = (m_arraySize << 1);
-
-    //overflow, map_p full
-    if (new_size <= m_arraySize)
+    //--------------------------------------------------------------------------------
+    //    @   map_p<U,T>::extend()
+    //--------------------------------------------------------------------------------
+    template<typename U, typename T> void map_p<U, T>::extend()
     {
-      throw std::overflow_error("m_arraySize");
+        int new_size = (m_arraySize << 1);                  // calculate new size
+        if (new_size <= m_arraySize)                        // overflow, map_p full
+            throw std::overflow_error("m_arraySize");
+
+        Container * tempPtr = static_cast<Container*>(realloc(m_data, sizeof(Container) * new_size));
+        if (!tempPtr)
+            throw std::bad_alloc();
+        m_data = tempPtr;
+        m_arraySize = new_size;
     }
 
-    Container * tempPtr = static_cast<Container*>(realloc(m_data, sizeof(Container) * new_size));
-    if (tempPtr == nullptr)
-    {
-      throw std::bad_alloc();
-    }
-
-    m_data = tempPtr;
-    m_arraySize = new_size;
-
-  }	//End: map_p::extend()
-
-
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::insert()
+  //    @   map_p<U,T>::insert()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   bool map_p<U, T>::insert(U a_key, T const & a_item)
@@ -325,7 +287,7 @@ namespace Dg
     //Find the index to insert to
     int index;
     if (find(a_key, index))
-      return false;	//element already exists
+      return false; //element already exists
 
     //Range check
     if (m_currentSize == m_arraySize)
@@ -343,11 +305,11 @@ namespace Dg
 
     return true;
 
-  }	//End: map_p::insert()
+  } //End: map_p::insert()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::erase()
+  //    @   map_p<U,T>::erase()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   void map_p<U, T>::erase(U a_key)
@@ -363,11 +325,11 @@ namespace Dg
 
     m_currentSize--;
 
-  }	//End: map_p::erase()
+  } //End: map_p::erase()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::erase_at_position()
+  //    @   map_p<U,T>::erase_at_position()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   void map_p<U, T>::erase_at_position(int a_i)
@@ -380,11 +342,11 @@ namespace Dg
       m_currentSize--;
     }
 
-  }	//End: map_p::erase_at_position()
+  } //End: map_p::erase_at_position()
 
 
   //--------------------------------------------------------------------------------
-  //	@	map_p<U,T>::set()
+  //    @   map_p<U,T>::set()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   bool map_p<U, T>::set(U a_key, T a_item)
@@ -393,18 +355,18 @@ namespace Dg
     int index;
     if (!find(a_key, index))
     {
-      return false;	//element does not exist
+      return false; //element does not exist
     }
         
     memcpy(&m_data[index].item, &a_item, sizeof(a_item));
 
     return true;
 
-  }	//End: map_p::set()
+  } //End: map_p::set()
 
 
   //--------------------------------------------------------------------------------
-  //	@	Dgmap_p<U,T>::reset()
+  //    @   Dgmap_p<U,T>::reset()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   void map_p<U, T>::reset()
@@ -412,18 +374,18 @@ namespace Dg
     clear();
     resize(DG_CONTAINER_DEFAULT_SIZE);
 
-  }	//End: map_p::reset()
+  } //End: map_p::reset()
 
 
   //--------------------------------------------------------------------------------
-  //	@	Dgmap_p<U,T>::clear()
+  //    @   Dgmap_p<U,T>::clear()
   //--------------------------------------------------------------------------------
   template<typename U, typename T>
   void map_p<U, T>::clear()
   {
     m_currentSize = 0;
 
-  }	//End: map_p::clear()
+  } //End: map_p::clear()
 };
 
 #endif
