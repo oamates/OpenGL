@@ -30,8 +30,7 @@ public:
 
 	//Constructor / destructor
 	BasisR3();
-	BasisR3(const Vector4& _x0, 
-			const Vector4& _x1);
+	BasisR3(const Vector4& _x0, const Vector4& _x1);
 
 	//Copy operations
 	BasisR3(const BasisR3&);
@@ -40,8 +39,7 @@ public:
 	friend DgReader& operator>>(DgReader&, BasisR3&);
 
 	//Set axis
-	void Set(const Vector4& _x0, 
-			 const Vector4& _x1);
+	void Set(const Vector4& _x0, const Vector4& _x1);
 
 	//Manipulators
 	BasisR3 Transform(const VQS&) const;

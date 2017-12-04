@@ -18,25 +18,17 @@ struct GLFWwindow;
 
 struct Application
 {
-    static Application * s_instance;
+    static Application* s_instance;
 
     Application(const Application&);
     Application& operator = (const Application&);
 
-    Application() :
-          m_window(nullptr)
-        , m_w(false)
-        , m_s(false)
-        , m_a(false)
-        , m_d(false)
-        , m_r(false)
-        , m_f(false){}
+    Application() : m_window(0) {}
 
     ~Application() {}
 
-    static Application * GetInstance();
+    static Application* GetInstance();
 
-    void Run();
     void Render(double currentTime);
     void OnResize(int w, int h);
     void OnKey(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -77,46 +69,37 @@ struct Application
     GLuint CreateQuadProgram();
     void InitQuadProgram();
     GLuint CreateFramebufferTexture();
-    void ShutDown();
-
 
 
     APPINFO         m_info;
     GLFWwindow*   m_window;
 
-    GLint         m_workGroupSizeX;
-    GLint         m_workGroupSizeY;
+    GLint m_workGroupSizeX;
+    GLint m_workGroupSizeY;
 
-    GLuint        m_vao;
-    GLuint        m_tex;
-    GLuint        m_computeProgram;
-    GLuint        m_quadProgram;
+    GLuint m_vao;
+    GLuint m_tex;
+    GLuint m_computeProgram;
+    GLuint m_quadProgram;
 
-    GLuint        m_eyeUniform;
-    GLuint        m_ray00Uniform;
-    GLuint        m_ray10Uniform;
-    GLuint        m_ray01Uniform;
-    GLuint        m_ray11Uniform;
+    GLuint m_eyeUniform;
+    GLuint m_ray00Uniform;
+    GLuint m_ray10Uniform;
+    GLuint m_ray01Uniform;
+    GLuint m_ray11Uniform;
     
-    double        m_mouseX;
-    double        m_mouseY; 
-    double        m_prevX; 
-    double        m_prevY;
+    double m_mouseX;
+    double m_mouseY; 
+    double m_prevX; 
+    double m_prevY;
     
-    bool          m_w;
-    bool          m_s;
-    bool          m_a;
-    bool          m_d;
-    bool          m_r;
-    bool          m_f;
-    
-    Camera        m_camera;
+    Camera m_camera;
 };  
 
 typedef Dg::Vector4<float> vec4;
 typedef Dg::Matrix44<float> mat4;
 
-Application * Application::s_instance(nullptr);
+Application* Application::s_instance = 0;
 
 static void OnKeyCallback(GLFWwindow* a_window, int a_key, int a_scancode, int a_action, int a_mods)
 {
@@ -135,55 +118,36 @@ Application* Application::GetInstance()
     return s_instance;
 }
 
-/*
-    Pre Condition: -None
-    Post Condition:
-        -Returns the ID of a compiled shader of the specified type from the specified file
-        -Reports error to console if file could not be found or compiled
-    Side Effects:
-        -None
-*/
+// Returns the ID of a compiled shader of the specified type from the specified file 
+// Reports error to console if file could not be found or compiled
 GLuint Application::LoadShaderFromFile(std::string a_path, GLenum a_shaderType)
 {
-    //Open file
     GLuint shaderID = 0;
     std::string shaderString;
-    std::ifstream sourceFile( a_path.c_str() );
+    std::ifstream sourceFile(a_path.c_str());                   // Open file
 
-    //Source file loaded
-    if (sourceFile)
+    if (sourceFile)                                             // Source file loaded, get shader source
     {
-        // Get shader source
-        shaderString.assign(std::istreambuf_iterator<char>(sourceFile), std::istreambuf_iterator<char>());
+        shaderString.assign(std::istreambuf_iterator<char> (sourceFile), std::istreambuf_iterator<char>());
+        shaderID = glCreateShader(a_shaderType);                // Create shader ID
+        const GLchar* shaderSource = shaderString.c_str();      // Set shader source
+        glShaderSource(shaderID, 1, (const GLchar**) &shaderSource, 0);
+        glCompileShader(shaderID);                              // Compile shader source
 
-        // Create shader ID
-        shaderID = glCreateShader(a_shaderType);
-
-        //Set shader source
-        const GLchar* shaderSource = shaderString.c_str();
-        glShaderSource( shaderID, 1, (const GLchar**)&shaderSource, NULL );
-
-        //Compile shader source
-        glCompileShader( shaderID );
-
-        //Check shader for errors
-        GLint shaderCompiled = GL_FALSE;
-        glGetShaderiv( shaderID, GL_COMPILE_STATUS, &shaderCompiled );
-        if( shaderCompiled != GL_TRUE )
+        GLint shaderCompiled = GL_FALSE;                        // Check shader for errors
+        glGetShaderiv(shaderID, GL_COMPILE_STATUS, &shaderCompiled);
+        if (shaderCompiled != GL_TRUE)
         {
-            printf( "Unable to compile shader %d!\n\nSource:\n%s\n", shaderID, shaderSource );
-            glDeleteShader( shaderID );
+            printf("Unable to compile shader %d!\n\nSource:\n%s\n", shaderID, shaderSource);
+            glDeleteShader(shaderID);
             shaderID = 0;
         }
     }
     else
-    {
         printf("Unable to open file %s\n", a_path.c_str());
-    }
 
     return shaderID;
 }
-
 
 GLuint Application::QuadFullScreenVao()
 {
@@ -193,26 +157,25 @@ GLuint Application::QuadFullScreenVao()
     glBindVertexArray(m_vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-    char screenVertices[12] = {-1, -1,
-                                1, -1,
-                                1,  1, 
-                                1,  1, 
-                               -1,  1, 
-                               -1, -1 };
+    float screenVertices[12] = {-1.0f, -1.0f,
+                                 1.0f, -1.0f,
+                                 1.0f,  1.0f, 
+                                 1.0f,  1.0f, 
+                                -1.0f,  1.0f, 
+                                -1.0f, -1.0f };
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(screenVertices), screenVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_BYTE, GL_FALSE, 0, 0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
     return m_vao;
 }
 
-
 GLuint Application::CreateQuadProgram()
 {
     GLuint quadProgram = glCreateProgram();
-    GLuint vshader = LoadShaderFromFile("glsl/quad_vs.glsl", GL_VERTEX_SHADER);
-    GLuint fshader = LoadShaderFromFile("glsl/quad_fs.glsl", GL_FRAGMENT_SHADER);
+    GLuint vshader = LoadShaderFromFile("glsl/quad.vs", GL_VERTEX_SHADER);
+    GLuint fshader = LoadShaderFromFile("glsl/quad.fs", GL_FRAGMENT_SHADER);
     glAttachShader(quadProgram, vshader);
     glAttachShader(quadProgram, fshader);
     glBindAttribLocation(quadProgram, 0, "vertex");
@@ -383,18 +346,11 @@ GLuint Application::CreateFramebufferTexture()
     return tex;
 }
 
-
-void Application::ShutDown()
-{
-}
-
-
 void Application::OnKey(GLFWwindow* m_window, int key, int scancode, int action, int mods)
 {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(m_window, GL_TRUE);
 }
-
 
 void Application::OnMouseMove(GLFWwindow* m_window, double x, double y)
 {
@@ -408,104 +364,68 @@ void Application::OnMouseMove(GLFWwindow* m_window, double x, double y)
 
 void Application::DoInput()
 {
-  if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS)         m_w = true;
-  else if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_RELEASE)  m_w = false;
-
-  if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS)         m_s = true;
-  else if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_RELEASE)  m_s = false;
-
-  if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS)         m_a = true;
-  else if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_RELEASE)  m_a = false;
-
-  if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS)         m_d = true;
-  else if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_RELEASE)  m_d = false;
-
-  if (glfwGetKey(m_window, GLFW_KEY_R) == GLFW_PRESS)         m_r = true;
-  else if (glfwGetKey(m_window, GLFW_KEY_R) == GLFW_RELEASE)  m_r = false;
-
-  if (glfwGetKey(m_window, GLFW_KEY_F) == GLFW_PRESS)         m_f = true;
-  else if (glfwGetKey(m_window, GLFW_KEY_F) == GLFW_RELEASE)  m_f = false;
-
-
-  if (m_w) m_camera.MoveForward(0.1);
-  if (m_s) m_camera.MoveForward(-0.1);
-  if (m_a) m_camera.MoveLeft(0.1);
-  if (m_d) m_camera.MoveLeft(-0.1);
-  if (m_r) m_camera.MoveWorldUp(0.1);
-  if (m_f) m_camera.MoveWorldUp(-0.1);
-  
+    if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) m_camera.MoveForward( 0.1);
+    if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS) m_camera.MoveForward(-0.1);
+    if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS) m_camera.MoveLeft( 0.1);
+    if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS) m_camera.MoveLeft(-0.1);
+    if (glfwGetKey(m_window, GLFW_KEY_R) == GLFW_PRESS) m_camera.MoveWorldUp( 0.1);
+    if (glfwGetKey(m_window, GLFW_KEY_F) == GLFW_PRESS) m_camera.MoveWorldUp(-0.1);
 }
-
 
 void Application::Trace()
 {
-  glUseProgram(m_computeProgram);
+    glUseProgram(m_computeProgram);
 
-  vec4 ray00, ray01, ray10, ray11, eye;
-  m_camera.GetCornerRays(ray00, ray01, ray10, ray11, eye);
-  glUniform3f(m_eyeUniform, eye[0], eye[1], eye[2]);
-  glUniform3f(m_ray00Uniform, ray00[0], ray00[1], ray00[2]);
-  glUniform3f(m_ray01Uniform, ray01[0], ray01[1], ray01[2]);
-  glUniform3f(m_ray10Uniform, ray10[0], ray10[1], ray10[2]);
-  glUniform3f(m_ray11Uniform, ray11[0], ray11[1], ray11[2]);
+    vec4 ray00, ray01, ray10, ray11, eye;
+    m_camera.GetCornerRays(ray00, ray01, ray10, ray11, eye);
+    glUniform3f(m_eyeUniform, eye[0], eye[1], eye[2]);
+    glUniform3f(m_ray00Uniform, ray00[0], ray00[1], ray00[2]);
+    glUniform3f(m_ray01Uniform, ray01[0], ray01[1], ray01[2]);
+    glUniform3f(m_ray10Uniform, ray10[0], ray10[1], ray10[2]);
+    glUniform3f(m_ray11Uniform, ray11[0], ray11[1], ray11[2]);
 
-  // Bind level 0 of framebuffer texture as writable image in the shader.
-  glBindImageTexture(0, m_tex, 0, false, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    // Bind level 0 of framebuffer texture as writable image in the shader.
+    glBindImageTexture(0, m_tex, 0, false, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-  // Compute appropriate invocation dimension.
-  int worksizeX = Dg::NextPower2(m_info.windowWidth);
-  int worksizeY = Dg::NextPower2(m_info.windowHeight);
+    // Compute appropriate invocation dimension.
+    int worksizeX = Dg::NextPower2(m_info.windowWidth);
+    int worksizeY = Dg::NextPower2(m_info.windowHeight);
 
-  /* Invoke the compute shader. */
-  glDispatchCompute(worksizeX / m_workGroupSizeX, worksizeY / m_workGroupSizeY, 1);
+    /* Invoke the compute shader. */
+    glDispatchCompute(worksizeX / m_workGroupSizeX, worksizeY / m_workGroupSizeY, 1);
 
-  /* Reset image binding. */
+    /* Reset image binding. */
     glBindImageTexture(0, 0, 0, false, 0, GL_READ_WRITE, GL_RGBA32F);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glUseProgram(0);
 
-  /*
-  * Draw the rendered image on the screen using textured full-screen
-  * quad.
-  */
-  glUseProgram(m_quadProgram);
-  glBindVertexArray(m_vao);
-  glBindTexture(GL_TEXTURE_2D, m_tex);
-  glDrawArrays(GL_TRIANGLES, 0, 6);
-  glBindTexture(GL_TEXTURE_2D, 0);
-  glBindVertexArray(0);
-  glUseProgram(0);
+    // Draw the rendered image on the screen using textured full-screen quad.
+    glUseProgram(m_quadProgram);
+    glBindVertexArray(m_vao);
+    glBindTexture(GL_TEXTURE_2D, m_tex);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
-
-
-void Application::Run()
-{
-  //Init all systems and data
-  Init();
-
-  //Run the app
-  while (glfwWindowShouldClose(m_window) == GL_FALSE) 
-  {
-    glfwPollEvents();
-    glViewport(0, 0, m_info.windowWidth, m_info.windowHeight);
-
-    DoInput();
-
-    Trace();
-
-    glfwSwapBuffers(m_window);
-  }
-
-  //Shut down and clean up.
-    ShutDown();
-
-    glfwDestroyWindow(m_window);
-    glfwTerminate();
-}
-
 
 int main()
 {
-    Application::GetInstance()->Run();
+    Application& application = *(Application::GetInstance());
+    application.Init();
+
+    while (glfwWindowShouldClose(application.m_window) == GL_FALSE) 
+    {
+        glfwPollEvents();
+        glViewport(0, 0, application.m_info.windowWidth, application.m_info.windowHeight);
+
+        application.DoInput();
+        application.Trace();
+
+        glfwSwapBuffers(application.m_window);
+    }
+
+    glfwDestroyWindow(application.m_window);
+    glfwTerminate();
     return 0;
 }
