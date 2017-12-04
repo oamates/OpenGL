@@ -1,11 +1,11 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-#include <stdint.h>
-#include <stdlib.h>
+#include <cstdint>
+#include <cstdlib>
 
-#include "RayTracerConfig.h"
-#include "VQS.h"
+#include "raytracerconfig.hpp"
+#include "VQS.hpp"
 //#include "BasisR3.h"
 
 typedef Dg::VQS<real>     vqs;

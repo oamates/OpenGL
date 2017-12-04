@@ -1,7 +1,4 @@
 //================================================================================
-// @ BasisR3.h
-// 
-// Class: Basis3D
 //
 // A set of 3 orthonormal vectors. A basis is built from  two vectors x0 and x1, 
 // the third is calculated by finding the cross product x0 cross x1.
@@ -11,11 +8,6 @@
 //                     |  /
 //                     | /
 //         x1__________|/
-//
-// -------------------------------------------------------------------------------
-//
-// Author: Frank Hart
-// Date last modified: 2013
 //
 //================================================================================
 

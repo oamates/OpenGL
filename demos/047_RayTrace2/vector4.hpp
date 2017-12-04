@@ -8,9 +8,9 @@
 #ifndef VECTOR4_H
 #define VECTOR4_H
 
-#include "SimpleRNG.h"
-#include "DgMatrix.h"
-#include "dgmath.h"
+#include "simpleRNG.hpp"
+#include "dgmatrix.hpp"
+#include "dgmath.hpp"
 
 namespace Dg
 {

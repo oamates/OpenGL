@@ -1,17 +1,12 @@
-//! @file dgmath.h
-//!
-//! @author Frank Hart
-//! @date 4/8/2015
-//!
 //! This files contains a variety of useful math functions and constants.
 #ifndef COMMONMATH_H
 #define COMMONMATH_H
 
-#include <math.h>
-#include <stdint.h>
+#include <cmath>
+#include <cstdint>
 
-#include "utility.h"
-#include "config.h"
+#include "utility.hpp"
+#include "config.hpp"
 
 namespace Dg
 {

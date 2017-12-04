@@ -1,10 +1,3 @@
-//! @file VQS.h
-//!
-//! @author: Frank B. Hart
-//! @date 4/10/2015
-//!
-//! Class declaration: VQS
-
 #ifndef VQS_H
 #define VQS_H
 
@@ -160,8 +153,7 @@ namespace Dg
   //--------------------------------------------------------------------------------
   //	@	VQS<Real>::Set()
   //--------------------------------------------------------------------------------
-  template<typename Real>
-  void VQS<Real>::SetV(Vector4<Real> const & a_v)
+template<typename Real> void VQS<Real>::SetV(Vector4<Real> const & a_v)
   {
     m_v = a_v;
     m_v.m_V[3] = static_cast<Real>(0.0);

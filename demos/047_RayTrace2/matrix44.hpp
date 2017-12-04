@@ -4,9 +4,9 @@
 
 //! Class declaration: Matrix44
 
-#include "dgmath.h"
-#include "DgMatrix.h"
-#include "Quaternion.h"
+#include "dgmath.hpp"
+#include "dgmatrix.hpp"
+#include "quaternion.hpp"
 
 //--------------------------------------------------------------------------------
 //	@	Matrix44

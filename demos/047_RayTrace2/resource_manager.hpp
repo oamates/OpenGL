@@ -1,10 +1,3 @@
-//! @file ResourceManager.h
-//!
-//! @author: Frank B. Hart
-//! @date 25/7/2015
-//!
-//! Class declaration: ResourceManager
-
 #ifndef RESOURCEMANAGER_H
 #define RESOURCEMANAGER_H
 

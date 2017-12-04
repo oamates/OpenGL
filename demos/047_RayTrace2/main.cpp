@@ -9,9 +9,9 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "Camera.h"
-#include "Matrix44.h"
-#include "Vector4.h"
+#include "camera.hpp"
+#include "matrix44.hpp"
+#include "vector4.hpp"
 
 
 struct GLFWwindow;
@@ -138,8 +138,7 @@ Application* Application::GetInstance()
 /*
     Pre Condition: -None
     Post Condition:
-        -Returns the ID of a compiled shader of the specified
-         type from the specified file
+        -Returns the ID of a compiled shader of the specified type from the specified file
         -Reports error to console if file could not be found or compiled
     Side Effects:
         -None
@@ -154,11 +153,11 @@ GLuint Application::LoadShaderFromFile(std::string a_path, GLenum a_shaderType)
     //Source file loaded
     if (sourceFile)
     {
-        //Get shader source
-        shaderString.assign((std::istreambuf_iterator< char >(sourceFile)), std::istreambuf_iterator< char >());
+        // Get shader source
+        shaderString.assign(std::istreambuf_iterator<char>(sourceFile), std::istreambuf_iterator<char>());
 
-        //Create shader ID
-        shaderID = glCreateShader( a_shaderType );
+        // Create shader ID
+        shaderID = glCreateShader(a_shaderType);
 
         //Set shader source
         const GLchar* shaderSource = shaderString.c_str();
@@ -261,23 +260,23 @@ GLuint Application::CreateComputeProgram()
 
 void Application::InitComputeProgram()
 {
-  glUseProgram(m_computeProgram);
-  GLint workGroupSize[3] = {};
-  glGetProgramiv(m_computeProgram, GL_COMPUTE_WORK_GROUP_SIZE, workGroupSize);
-  m_workGroupSizeX = workGroupSize[0];
-  m_workGroupSizeY = workGroupSize[1];
-  m_eyeUniform = glGetUniformLocation(m_computeProgram, "eye");
-  m_ray00Uniform = glGetUniformLocation(m_computeProgram, "ray00");
-  m_ray10Uniform = glGetUniformLocation(m_computeProgram, "ray10");
-  m_ray01Uniform = glGetUniformLocation(m_computeProgram, "ray01");
-  m_ray11Uniform = glGetUniformLocation(m_computeProgram, "ray11");
-  glUseProgram(0);
+    glUseProgram(m_computeProgram);
+    GLint workGroupSize[3] = {};
+    glGetProgramiv(m_computeProgram, GL_COMPUTE_WORK_GROUP_SIZE, workGroupSize);
+    m_workGroupSizeX = workGroupSize[0];
+    m_workGroupSizeY = workGroupSize[1];
+    m_eyeUniform = glGetUniformLocation(m_computeProgram, "eye");
+    m_ray00Uniform = glGetUniformLocation(m_computeProgram, "ray00");
+    m_ray10Uniform = glGetUniformLocation(m_computeProgram, "ray10");
+    m_ray01Uniform = glGetUniformLocation(m_computeProgram, "ray01");
+    m_ray11Uniform = glGetUniformLocation(m_computeProgram, "ray11");
+    glUseProgram(0);
 }
 
 
 void Application::Init()
 {
-  //Init defaults
+    // Init defaults
     strcpy(m_info.title, "Raytracer example");
     m_info.windowWidth = 800;
     m_info.windowHeight = 600;
@@ -358,10 +357,8 @@ void Application::Init()
     glewInit();
 
     // get version m_info
-    const GLubyte* renderer = glGetString(GL_RENDERER); // get renderer string
-    const GLubyte* version = glGetString(GL_VERSION); // version as a string
-    printf("Renderer: %s\n", renderer);
-    printf("OpenGL version supported %s\n", version);
+    printf("Renderer: %s\n", glGetString(GL_RENDERER));
+    printf("OpenGL version supported %s\n", glGetString(GL_VERSION));
 
     // Create all needed GL resources
     m_tex = CreateFramebufferTexture();

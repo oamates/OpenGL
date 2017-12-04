@@ -1,10 +1,3 @@
-//! @file Resource.h
-//!
-//! @author: Frank B. Hart
-//! @date 25/7/2015
-//!
-//! Class declaration: Resource
-
 #ifndef RESOURCE_H
 #define RESOURCE_H
 

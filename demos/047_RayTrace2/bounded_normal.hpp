@@ -1,20 +1,13 @@
-//! @file BoundedNormal.h
-//!
-//! @author Frank Hart
-//! @date 4/8/2015
-//!
-//! Class declaration: BoundedNormal
-
 #ifndef BOUNDEDNORMAL_H
 #define BOUNDEDNORMAL_H
 
 #include <math.h>
 
-#include "config.h"
-#include "utility.h"
+#include "config.hpp"
+#include "utility.hpp"
 
-#include "dgmath.h"
-#include "SimpleRNG.h"
+#include "dgmath.hpp"
+#include "simpleRNG.hpp"
 
 namespace Dg
 {

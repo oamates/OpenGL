@@ -16,13 +16,9 @@
 namespace Dg
 {
   //! @ingroup Containers
-  //!
   //! @class map
-  //!
   //! Ordered map_pped list. 
-  //!
   //! Assumed types are POD, so no construction / assignment operators called
-  //!
   //! @author Frank B. Hart
   //! @date 2/5/2015
   template<typename U, typename T>
@@ -132,8 +128,7 @@ namespace Dg
   //--------------------------------------------------------------------------------
   //	@	map<U,T>::map()
   //--------------------------------------------------------------------------------
-  template<typename U, typename T>
-  map<U, T>::map()
+  template<typename U, typename T> map<U, T>::map()
     : m_data(nullptr), m_arraySize(0), m_currentSize(0)
   {
     resize(DG_CONTAINER_DEFAULT_SIZE);

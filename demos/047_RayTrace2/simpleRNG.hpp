@@ -1,10 +1,3 @@
-//! @file SimpleRNG.cpp
-//!
-//! @author Frank Hart
-//! @date 4/8/2015
-//!
-//! Class declaration: SimpleRNG
-
 #ifndef RANDOMBASE_H
 #define RANDOMBASE_H
 
