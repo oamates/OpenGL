@@ -17,9 +17,9 @@ ShaderManager::ShaderManager()
 {
 }
 
-void ShaderManager::loadShader(std::string name, const char* vs_src, const char* tcs_src, const char* tes_src, const char* gs_src, const char* fs_src)
+void ShaderManager::loadShader(std::string name, const char* vs_src, const char* gs_src, const char* fs_src)
 {
-    GLuint id = ShaderLoader::loadShaders(vs_src, tcs_src, tes_src, gs_src, fs_src);
+    GLuint id = ShaderLoader::loadShaders(vs_src, gs_src, fs_src);
     shader_program_IDs.insert(std::pair<std::string, GLuint>(name, id));
 }
 

@@ -1,7 +1,5 @@
 #version 410 core
 
-#define gammacorr(x) pow(x, 1/2.6)
-
 struct Material
 {
 	vec3 color_diffuse;
@@ -18,39 +16,37 @@ struct LightSource
 	vec3 position;
 };
 
-in vec3 normal_viewspace;
-in vec3 normal_worldspace;
-in vec3 vertexPosition_viewspace;
-in vec3 vertexPosition_worldspace;
+in vec3 normal_cs;
+in vec3 normal_ws;
+in vec3 position_cs;
+in vec3 position_ws;
 
 uniform Material material;
 uniform LightSource light;
 
-out vec4 color;
+out vec4 FragmentColor;
 
 
 vec3 calculateLocalDiffuse()
 {
 	vec3 res = vec3(0,0,0);
-	vec3 n = normalize(normal_worldspace);
-	vec3 light_diff = vertexPosition_worldspace - light.position;
+	vec3 n = normalize(normal_ws);
+
+	vec3 light_diff = position_ws - light.position;
 	float light_dist = length(light_diff);
 	vec3 l = normalize(light_diff);
 
+	float cosTheta = dot(n, -l);
+	vec3 diffuse = light.color * light.intensity * max(cosTheta, 0.0f) / (light_dist * light_dist);
 
-	float cosTheta = dot(n,-l);
-	vec3 diffuse =
-		light.color * light.intensity *
-		max(cosTheta, 0) *
-		1 / pow(light_dist, 2);
-
-	vec3 ambient = vec3(0.0,0.0,0.0);
+	vec3 ambient = vec3(0.0f);
 	res = ambient + diffuse;
 	return res;
 }
 
-void main(){
-	color.rgb = calculateLocalDiffuse() * material.color_diffuse * material.reflectance * (1 - material.specular_reflectance);
-    color.a = 1;
-	color.rgb = vec3(gammacorr(color.r), gammacorr(color.g), gammacorr(color.b));
+void main()
+{
+    vec3 color = calculateLocalDiffuse() * material.color_diffuse * material.reflectance * (1 - material.specular_reflectance);
+    color = pow(color, vec3(1.0 / 2.6));
+	FragmentColor = vec4(color, 1.0f);
 }

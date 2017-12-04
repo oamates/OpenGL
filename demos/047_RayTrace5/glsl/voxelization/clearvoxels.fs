@@ -1,5 +1,4 @@
 #version 450
-#extension GL_ARB_shader_image_load_store : enable
 
 in vec3 normal_viewspace_f;
 in vec3 normal_worldspace_f;

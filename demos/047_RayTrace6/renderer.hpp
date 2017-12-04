@@ -68,7 +68,7 @@ struct Renderer : public singleton_t <Renderer>
     
     GLuint FNoeudTex;
         
-    bool FFoward;
+    bool FForward;
     bool FBackward;
     bool FLeftward;
     bool FRightward;

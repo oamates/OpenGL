@@ -4,8 +4,6 @@
 #include <sys/timeb.h>
 
 #include <glm/gtx/transform.hpp>
-//#include <AntTweakBar.h>
-
 #include "engine.hpp"
 
 class Planet;
@@ -18,9 +16,9 @@ struct Material
 {
     glm::vec3 color_diffuse;
     glm::vec3 color_specular;
-    float reflectance; // [0, 1]
-    float specular_reflectance; // [0, 1], part of reflectance
-    float specular_cone_angle; // [0, 1]
+    float reflectance;                  // [0, 1]
+    float specular_reflectance;         // [0, 1], part of reflectance
+    float specular_cone_angle;          // [0, 1]
     float radiosity;
 };
 
@@ -196,7 +194,15 @@ MyEngine::MyEngine()
     : SimpleGraphicsEngine()
 {
     mouse_control_ = true;
-    render_mode_ = RenderMode::global;
+
+    // afoksha
+    render_mode_ = RenderMode::voxels;
+
+/*
+    phong,
+    voxels,
+    global
+*/
 
     // TwInit(TW_OPENGL_CORE, NULL);
     // TwWindowSize(640 * 2, 480 * 2);
@@ -212,13 +218,13 @@ MyEngine::MyEngine()
     // TwAddVarRW(global_tweakbar_, "Render mode", render_mode_type, &render_mode_, " enum='0 {Phong}, 1 {Voxels}, 2 {Global}' ");
 
     // Shaders
-    ShaderManager::instance()->loadShader("SHADER_PHONG", "glsl/phong.vs", 0, 0, 0, "glsl/phong.fs");
-    ShaderManager::instance()->loadShader("SHADER_PLAINTEXTURE", "glsl/plaintextureshader.vs", 0, 0, 0, "glsl/plaintextureshader.fs");
-    ShaderManager::instance()->loadShader("SHADER_SIMPLEVOLUME", "glsl/simplevolumerenderer.vs", 0, 0, 0, "glsl/simplevolumerenderer.fs");
-    ShaderManager::instance()->loadShader("SHADER_WORLDPOSITIONOUTPUT", "glsl/worldpositionoutputshader.vs", 0, 0, 0, "glsl/worldpositionoutputshader.fs");
-    ShaderManager::instance()->loadShader("SHADER_GLOBALRENDERER", "glsl/globalrenderer.vs", 0, 0, 0, "glsl/globalrenderer.fs");
-    ShaderManager::instance()->loadShader("SHADER_VOXELIZATION", "glsl/voxelization/voxelization.vs", 0, 0, "glsl/voxelization/voxelization.gs", "glsl/voxelization/voxelization.fs");
-    ShaderManager::instance()->loadShader("SHADER_CLEARVOXELS", "glsl/voxelization/voxelization.vs", 0, 0, "glsl/voxelization/voxelization.gs", "glsl/voxelization/clearvoxels.fs");
+    ShaderManager::instance()->loadShader("SHADER_PHONG", "glsl/phong.vs", 0, "glsl/phong.fs");
+    ShaderManager::instance()->loadShader("SHADER_PLAINTEXTURE", "glsl/plaintextureshader.vs", 0, "glsl/plaintextureshader.fs");
+    ShaderManager::instance()->loadShader("SHADER_SIMPLEVOLUME", "glsl/simplevolumerenderer.vs", 0, "glsl/simplevolumerenderer.fs");
+    ShaderManager::instance()->loadShader("SHADER_WORLDPOSITIONOUTPUT", "glsl/worldpositionoutputshader.vs", 0, "glsl/worldpositionoutputshader.fs");
+    ShaderManager::instance()->loadShader("SHADER_GLOBALRENDERER", "glsl/globalrenderer.vs", 0, "glsl/globalrenderer.fs");
+    ShaderManager::instance()->loadShader("SHADER_VOXELIZATION", "glsl/voxelization/voxelization.vs", "glsl/voxelization/voxelization.gs", "glsl/voxelization/voxelization.fs");
+    ShaderManager::instance()->loadShader("SHADER_CLEARVOXELS", "glsl/voxelization/voxelization.vs", "glsl/voxelization/voxelization.gs", "glsl/voxelization/clearvoxels.fs");
   
     shader_phong_ = ShaderManager::instance()->getShader("SHADER_PHONG");
     shader_plaintexture_ = ShaderManager::instance()->getShader("SHADER_PLAINTEXTURE");
@@ -240,13 +246,15 @@ MyEngine::MyEngine()
 
     camera_->addChild(basic_cam_);
 
-    Material material1;
-    material1.color_diffuse = glm::vec3(1,1,1);
-    material1.color_specular = glm::vec3(1,1,1);
-    material1.reflectance = 1;
-    material1.specular_reflectance = 0.0;
-    material1.specular_cone_angle = 1.57;
-    material1.radiosity = 0.0;
+    Material material1 = 
+    {
+        .color_diffuse  = glm::vec3(1,1,1),     
+        .color_specular = glm::vec3(1,1,1),
+        .reflectance = 1,
+        .specular_reflectance = 0.0,           
+        .specular_cone_angle = 1.57,
+        .radiosity = 0.0
+    };
 
     Material red;
     red.color_diffuse = glm::vec3(1,0.2,0.2);
@@ -288,20 +296,20 @@ MyEngine::MyEngine()
     material_light.specular_cone_angle = 1.57;
     material_light.radiosity = 0.2 * 3;
 
-    quad_ = new Quad();
-    cube_ = new TriangleMesh("../data/meshes/cube.obj");
-    icosphere_ = new TriangleMesh("../data/meshes/icosphere.obj");
-    floor_mesh_ = new TriangleMesh("../data/meshes/floor.obj");
-    bunny_mesh_ = new TriangleMesh("../data/meshes/bunny.obj");
-    monkey_mesh_ = new TriangleMesh("../data/meshes/suzanne.obj");
+    quad_        = new Quad();
+    cube_        = new TriangleMesh("mesh/cube.obj");
+    icosphere_   = new TriangleMesh("mesh/icosphere.obj");
+    floor_mesh_  = new TriangleMesh("mesh/floor.obj");
+    bunny_mesh_  = new TriangleMesh("mesh/bunny.obj");
+    monkey_mesh_ = new TriangleMesh("mesh/suzanne.obj");
 
-    floor_ = new MyObject3D(material1);
-    roof_ = new MyObject3D(material1);
-    l_wall_ = new MyObject3D(red);
-    r_wall_ = new MyObject3D(green);
-    b_wall_ = new MyObject3D(material3);
-    bunny_ = new MyObject3D(material3);
-    monkey_ = new MyObject3D(material3);
+    floor_   = new MyObject3D(material1);
+    roof_    = new MyObject3D(material1);
+    l_wall_  = new MyObject3D(red);
+    r_wall_  = new MyObject3D(green);
+    b_wall_  = new MyObject3D(material3);
+    bunny_   = new MyObject3D(material3);
+    monkey_  = new MyObject3D(material3);
     light_object_ = new LightObject3D(icosphere_, material_light, scene_);
 
     // createObjectTweakbar(bunny_);
@@ -793,17 +801,17 @@ Quad::Quad()
 {
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
-    std::vector<unsigned short> elements;
+    std::vector<GLushort> elements;
 
-    positions.push_back(glm::vec3(-1,-1,1));
-    positions.push_back(glm::vec3(1,-1,1));
-    positions.push_back(glm::vec3(1,1,1));
-    positions.push_back(glm::vec3(-1,1,1));  
+    positions.push_back(glm::vec3(-1.0f, -1.0f, 1.0f));
+    positions.push_back(glm::vec3( 1.0f, -1.0f, 1.0f));
+    positions.push_back(glm::vec3( 1.0f,  1.0f, 1.0f));
+    positions.push_back(glm::vec3(-1.0f,  1.0f, 1.0f));  
 
-    normals.push_back(glm::vec3(0,0,1));
-    normals.push_back(glm::vec3(0,0,1));
-    normals.push_back(glm::vec3(0,0,1));
-    normals.push_back(glm::vec3(0,0,1));  
+    normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
+    normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
+    normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
+    normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));  
 
     elements.push_back(0);
     elements.push_back(1);

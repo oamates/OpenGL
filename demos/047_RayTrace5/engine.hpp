@@ -16,7 +16,7 @@ struct ShaderManager
     static ShaderManager* instance();
     ~ShaderManager();
 
-    void loadShader(std::string name, const char* vs_src, const char* tcs_src, const char* tes_src, const char* gs_src, const char* fs_src);
+    void loadShader(std::string name, const char* vs_src, const char* gs_src, const char* fs_src);
     GLuint getShader(std::string name);
 
     std::map<std::string, GLuint> shader_program_IDs;
@@ -111,9 +111,7 @@ struct PerspectiveCamera : public AbstractCamera
 struct OrthoCamera : public AbstractCamera
 {
     OrthoCamera(GLFWwindow* window = nullptr);
-    virtual void render(
-    glm::mat4 M,
-    GLuint program_ID);
+    virtual void render(glm::mat4 M, GLuint program_ID);
     virtual void render(glm::mat4 M, GLuint program_ID, float left, float right, float bottom, float top, float near, float far);
     GLFWwindow* window_;
 };

@@ -48,7 +48,7 @@ Renderer::Renderer()
 , FVertexbuffer(0)
 , FInitDone(false)
 , FLastTime(-1)
-, FFoward(false)
+, FForward(false)
 , FBackward(false)
 , FLeftward(false)
 , FRightward(false)
@@ -92,17 +92,17 @@ void Renderer::HandleKey(int parKey, int parAction)
 {
     if (parAction == GLFW_PRESS)
     {
-        if (parKey == GLFW_KEY_LEFT)  FLeftward  = true;
-        if (parKey == GLFW_KEY_RIGHT) FRightward = true;
-        if (parKey == GLFW_KEY_UP)    FFoward    = true;
-        if (parKey == GLFW_KEY_DOWN)  FBackward  = true;
+        if (parKey == GLFW_KEY_A) FLeftward  = true;
+        if (parKey == GLFW_KEY_D) FRightward = true;
+        if (parKey == GLFW_KEY_W) FForward    = true;
+        if (parKey == GLFW_KEY_S) FBackward  = true;
         return;
     }
 
-    if (parKey == GLFW_KEY_LEFT)  FLeftward  = false;
-    if (parKey == GLFW_KEY_RIGHT) FRightward = false;
-    if (parKey == GLFW_KEY_UP)    FFoward    = false;
-    if (parKey == GLFW_KEY_DOWN)  FBackward  = false;
+    if (parKey == GLFW_KEY_A) FLeftward  = false;
+    if (parKey == GLFW_KEY_D) FRightward = false;
+    if (parKey == GLFW_KEY_W) FForward   = false;
+    if (parKey == GLFW_KEY_S) FBackward  = false;
 }
 
 bool Renderer::Init(const char* scene, bool parOreille)
@@ -264,8 +264,7 @@ void Renderer::RenderResultToScreen()
 
 void Renderer::UpdateDisplacement()
 {
-    // Maj du déplacement de la camera
-    if(FFoward)    FCamera.Translate(glm::dvec3( 0.0, 0.0,-1.0));
+    if(FForward)   FCamera.Translate(glm::dvec3( 0.0, 0.0,-1.0));
     if(FBackward)  FCamera.Translate(glm::dvec3( 0.0, 0.0, 1.0));
     if(FLeftward)  FCamera.Translate(glm::dvec3( 1.0, 0.0, 0.0));
     if(FRightward) FCamera.Translate(glm::dvec3(-1.0, 0.0, 0.0));
@@ -275,7 +274,6 @@ void Renderer::UpdateDisplacement()
 void Renderer::Run()
 {
     glClearColor(0.0, 0.0, 0.0, 0.0);               // Update uniform camera parameters
-    
 
     FCamera.UpdateValues(FComputeShader);
     while (!glfwWindowShouldClose (FWindow)) 

@@ -7,12 +7,7 @@
 
 struct ShaderLoader
 {
-    static GLuint loadShaders(
-        const char * vertex_file_path,
-        const char * tesselation_control_file_path,
-        const char * tesselation_eval_file_path,
-        const char * geometry_file_path,
-        const char * fragment_file_path);
+    static GLuint loadShaders(const char * vertex_file_path, const char * geometry_file_path, const char * fragment_file_path);
 };
 
 #endif
