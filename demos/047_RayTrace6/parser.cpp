@@ -1,6 +1,9 @@
 
 // .dat scene file parser
 
+#include <glm/glm.hpp>
+
+#include "log.hpp"
 #include "parser.hpp"
 
 Scene* Parser::GetSceneFromFile(std::string filename)
@@ -10,7 +13,7 @@ Scene* Parser::GetSceneFromFile(std::string filename)
 
     if(fichierScene.is_open())
     {
-        PRINT_GREEN("Fchier de scene bien ouvert.");
+        debug_color_msg(DEBUG_GREEN_COLOR, "Scene file successfully opened.");
         scene = new Scene();
         EtatTraitementScene EtatCourant = TRAITEMENT_SCENE;
         EtatTraitementScene EtatNouveau = TRAITEMENT_SCENE;
@@ -68,7 +71,7 @@ Scene* Parser::GetSceneFromFile(std::string filename)
                                 scene->AddQuadric(quadric, materiau);
                                 break;
                             default:
-                                PRINT_RED("Cas non pris en charge.");
+                                debug_color_msg(DEBUG_RED_COLOR, "Unsupported primitive type.");
                             }
                         }
                     }
@@ -82,10 +85,10 @@ Scene* Parser::GetSceneFromFile(std::string filename)
 
                     bool IsGenericsurfaceInfo = true;
 
-                    if( STRING_CHECKFIND( buffer, "color:" ) )
+                    if(STRING_CHECKFIND(buffer, "color:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &R, &G, &B );
-                        materiau.color = Vector4(R, G, B, 1.0f);
+                        materiau.color = glm::dvec4(R, G, B, 1.0f);
                     }
                     /*else if( STRING_CHECKFIND( buffer, "ambient:" ) )
                     {
@@ -103,12 +106,12 @@ Scene* Parser::GetSceneFromFile(std::string filename)
                         surface->AjusterCoeffSpeculaire( Val0 );
                         surface->AjusterCoeffBrillance( Val1 );
                     }*/
-                    else if( STRING_CHECKFIND( buffer, "reflect:" ) )
+                    else if(STRING_CHECKFIND(buffer, "reflect:"))
                     {
                         sscanf( buffer.c_str(), "%s %f", line, &Val0 );
                         materiau.coeffReflexion = Val0;
                     }
-                    else if( STRING_CHECKFIND( buffer, "refract:" ) )
+                    else if(STRING_CHECKFIND(buffer, "refract:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f", line, &Val0, &Val1 );
                         materiau.coeffRefraction = Val0;
@@ -146,7 +149,7 @@ Scene* Parser::GetSceneFromFile(std::string filename)
                 }
 
                 // Remplir les infos spécifiques à l'objet
-                switch( EtatCourant )
+                switch(EtatCourant)
                 {
                 case TRAITEMENT_SCENE:
 
@@ -177,46 +180,46 @@ Scene* Parser::GetSceneFromFile(std::string filename)
 
                 case TRAITEMENT_LUMIERE:
 
-                    if( STRING_CHECKFIND( buffer, "position:" ) )
+                    if(STRING_CHECKFIND(buffer, "position:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &Val0, &Val1, &Val2 );
-                        light.position = Vector3(Val0, Val1, Val2);
+                        light.position = glm::dvec3(Val0, Val1, Val2);
                     }
-                    else if( STRING_CHECKFIND( buffer, "intens:" ) )
+                    else if(STRING_CHECKFIND(buffer, "intens:"))
                     {
-                        sscanf( buffer.c_str(), "%s %f", line, &Val0 );
+                        sscanf( buffer.c_str(), "%s %f", line, &Val0);
                         light.intensity = Val0;
                     }
-                    else if( STRING_CHECKFIND( buffer, "colorSpec:" ) )
+                    else if(STRING_CHECKFIND(buffer, "colorSpec:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &R, &G, &B );
-                        light.color = Vector3(R, G, B);
+                        light.color = glm::dvec3(R, G, B);
                     }
 
                     break;
 
                 case TRAITEMENT_TRIANGLE:
 
-                    if( STRING_CHECKFIND( buffer, "point:" ) )
+                    if(STRING_CHECKFIND(buffer, "point:"))
                     {
                         int PtIdx;
-                        sscanf( buffer.c_str(), "%s %i %f %f %f", line, &PtIdx, &Val0, &Val1, &Val2 );
+                        sscanf(buffer.c_str(), "%s %i %f %f %f", line, &PtIdx, &Val0, &Val1, &Val2);
                         switch(PtIdx)
                         {
                             case 0:
-                            triangle.p0 = Vector3(Val0, Val1, Val2);
-                            break;
+                                triangle.p0 = glm::dvec3(Val0, Val1, Val2);
+                                break;
                             case 1:
-                            triangle.p1 = Vector3(Val0, Val1, Val2);
-                            break;
+                                triangle.p1 = glm::dvec3(Val0, Val1, Val2);
+                                break;
                             case 2:
-                            triangle.p2 = Vector3(Val0, Val1, Val2);
-                            triangle.normale = Vector3::crossProduct(triangle.p1-triangle.p0,triangle.p2-triangle.p0);
-                            triangle.normale = triangle.normale/triangle.normale.Norm();
-                            break;
+                                triangle.p2 = glm::dvec3(Val0, Val1, Val2);
+                                triangle.normale = glm::cross(triangle.p1 - triangle.p0, triangle.p2 - triangle.p0);
+                                triangle.normale = glm::normalize(triangle.normale);
+                                break;
                         }
                     }
-                    else if( STRING_CHECKFIND( buffer, "uv:" ) )
+                    else if(STRING_CHECKFIND(buffer, "uv:"))
                     {
                         int PtIdx;
                         sscanf( buffer.c_str(), "%s %i %f %f", line, &PtIdx, &Val0, &Val1 );
@@ -238,14 +241,14 @@ Scene* Parser::GetSceneFromFile(std::string filename)
 
                 case TRAITEMENT_PLAN:
 
-                    if( STRING_CHECKFIND( buffer, "v_linear:" ) )
+                    if(STRING_CHECKFIND(buffer, "v_linear:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &Val0, &Val1, &Val2 );
                         //( ( CPlan* )surface )->AjusterNormale( CVecteur3( Val0, Val1, Val2 ) );
                     }
-                    else if( STRING_CHECKFIND( buffer, "v_const:" ) )
+                    else if(STRING_CHECKFIND(buffer, "v_const:"))
                     {
-                        sscanf( buffer.c_str(), "%s %f", line, &Val0 );
+                        sscanf(buffer.c_str(), "%s %f", line, &Val0);
                         //( ( CPlan* )surface )->AjusterConstante( Val0 );
                     }
 
@@ -253,35 +256,35 @@ Scene* Parser::GetSceneFromFile(std::string filename)
 
                 case TRAITEMENT_QUADRIQUE:
 
-                    if( STRING_CHECKFIND( buffer, "v_quad:" ) )
+                    if(STRING_CHECKFIND(buffer, "v_quad:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &Val0, &Val1, &Val2 );
                         quadric.A = Val0;
                         quadric.B = Val1;
                         quadric.C = Val2;
                     }
-                    else if( STRING_CHECKFIND( buffer, "v_mixte:" ) )
+                    else if(STRING_CHECKFIND(buffer, "v_mixte:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &Val0, &Val1, &Val2 );
                         quadric.D = Val0;
                         quadric.E = Val1;
                         quadric.F = Val2;
                     }
-                    else if( STRING_CHECKFIND( buffer, "v_linear:" ) )
+                    else if(STRING_CHECKFIND(buffer, "v_linear:"))
                     {
                         sscanf( buffer.c_str(), "%s %f %f %f", line, &Val0, &Val1, &Val2 );
                         quadric.G = Val0;
                         quadric.H = Val1;
                         quadric.I = Val2;
                     }
-                    else if( STRING_CHECKFIND( buffer, "v_const:" ) )
+                    else if(STRING_CHECKFIND(buffer, "v_const:"))
                     {
-                        sscanf( buffer.c_str(), "%s %f", line, &Val0 );
+                        sscanf(buffer.c_str(), "%s %f", line, &Val0 );
                         quadric.J = Val0;
                     }
                     break;
                 default:
-                    PRINT_RED("Cas non pris en charge.");
+                    debug_color_msg(DEBUG_RED_COLOR, "Invalid quadric parameters.");
                 }
             }
         }
@@ -305,11 +308,11 @@ Scene* Parser::GetSceneFromFile(std::string filename)
             scene->AddLight(light);
             break;
         default:
-            PRINT_RED("Cas non pris en charge.");
+            debug_color_msg(DEBUG_RED_COLOR, "Unsupported case.");
         }
     }
     else
-        PRINT_RED("[Parser::GetSceneFromFile()] : Incapable d'ouvrir " << filename);
+        debug_color_msg(DEBUG_RED_COLOR, "Parser::GetSceneFromFile:: Unable to open input file %s", filename.c_str());
 
     return scene;
 }

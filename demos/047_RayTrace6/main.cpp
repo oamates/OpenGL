@@ -1,10 +1,11 @@
+#include "log.hpp"
 #include "renderer.hpp"
 
-int main(int argc, char ** argv)
+int main(int argc, char** argv)
 {
 	if(argc < 2)
 	{
-		std::cout << "Pas assez d'arguments" << std::endl;
+		debug_color_msg(DEBUG_RED_COLOR, "Usage: %s [scene file path] [optional non-empty string]", argv[0]);
 		return -1;
 	}
 	

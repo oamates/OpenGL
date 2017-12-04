@@ -18,7 +18,7 @@ struct Texture
 	GLuint id;
 	int w;
 	int l;
-	unsigned char * content;
+	unsigned char* content;
 };
 
 struct ObjFile
@@ -31,7 +31,7 @@ struct ObjFile
 	const Texture* normalTex;
 };
 
-struct ResourceManager: public Singleton<ResourceManager>
+struct ResourceManager: public singleton_t <ResourceManager>
 {
 	ResourceManager();
 	~ResourceManager();

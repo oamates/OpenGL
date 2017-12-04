@@ -3,19 +3,20 @@
 
 #include <string>
 #include <vector>
+
+#include <glm/glm.hpp>
+
 #include "defines.hpp"
 #include "singleton.hpp"
 #include "primitive.hpp"
-#include "vector3.hpp"
 #include "octree.hpp"
 
 
-struct ShaderManager : public Singleton<ShaderManager>
+struct ShaderManager : public singleton_t <ShaderManager>
 {
-    // Constructeur
-    ShaderManager();
-    // Destructeur
-    ~ShaderManager();
+    ShaderManager()  {};
+    ~ShaderManager() {};
+    
     // Creation de la pipline de rendu principale
     GLuint CreateProgramVF();
     // Creation du compute shader avec les paramètres d'initialisation
@@ -37,7 +38,7 @@ struct ShaderManager : public Singleton<ShaderManager>
     // Méthode d'injection d'un double dans un shader
     void Injectd(GLuint parShaderID, double parValue, const std::string& parName);
     // Méthode d'injection d'un vec3 dan un shader
-    void InjectVec3(GLuint parShaderID, const Vector3& parValue, const std::string& parName);
+    void InjectVec3(GLuint parShaderID, const glm::dvec3& parValue, const std::string& parName);
 
     // Injection des lumières
     void InjectLight(GLuint parShaderID, const Light& parLight, int parIndex);

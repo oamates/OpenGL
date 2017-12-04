@@ -2,6 +2,7 @@
 #include <fstream>
 #include <sstream>
  
+#include "log.hpp"
 #include "resourcemanager.hpp"
 #include "defines.hpp"
 #include "helper.hpp"
@@ -9,10 +10,7 @@
 
 ResourceManager::ResourceManager()
     : FTexIndex(0)
-{
-
-}
-
+{ }
 
 ResourceManager::~ResourceManager()
 {
@@ -32,51 +30,41 @@ std::string concatenate(const std::string& parBase, int parIndex)
     return result;
 }
 
-// Fonction de chargement de texture, ne gère que les BMP
+// Loads texture from BMP file
 const Texture* ResourceManager::LoadTexture(const std::string& parFileName)
 {
-    PRINT_GREEN("Chargement de la texture: " << parFileName);
-    // Creation de la texture
-    Texture * newTex = new Texture();
-    // Onverture du fichier
+    debug_color_msg(DEBUG_GREEN_COLOR, "Loading texture: %s", parFileName.c_str());
     FILE* f = fopen(parFileName.c_str(), "rb");
 
-    if(f==NULL)
+    if(!f)
     {
-        PRINT_RED("Erreur ouverture fichier "<<parFileName);    
-        delete newTex;
-        return NULL;
+        debug_color_msg(DEBUG_RED_COLOR, "Error opening file: %s", parFileName.c_str());    
+        return 0;
     }
-    else
-    {
-        PRINT_GREEN("Fichier ouvert"<<parFileName); 
 
-    }
-    // Lecture de l'entete BMP de taille 54
-    unsigned char info[54];
+    Texture* newTex = new Texture();
+    debug_color_msg(DEBUG_GREEN_COLOR, "File %s successfully opened.", parFileName.c_str()); 
+
+    unsigned char info[54];                         // 54 byte BMP header
     fread(info, sizeof(unsigned char), 54, f); 
-
-    // Récupération des informations de taille de l'image
-    newTex->w = *(int*)&info[18];
-    newTex->l = *(int*)&info[22];
+    newTex->w = *(int*) &info[18];                  // Image dimensions
+    newTex->l = *(int*) &info[22];
     
-    // 3 composantesz RGB * tailleX * tailleY
-    int size = 3 * newTex->w  * newTex->l;
-    // Lecture de tout le reste du fichier
+    
+    int size = 3 * newTex->w  * newTex->l;          // Allocate space for rgb image 3 * dimX * dimY bytes
     unsigned char* data = new unsigned char[size];
     fread(data, sizeof(unsigned char), size, f);
-    // Fermeture du fichier
     fclose(f);
-    //Copie des données dans la structure data
-    for(int i = 0; i < size; i += 3)
+
+    for(int i = 0; i < size; i += 3)                // BGR <--> RGB
     {
-            unsigned char tmp = data[i];
-            data[i] = data[i+2];
-            data[i+2] = tmp;
+        unsigned char tmp = data[i];
+        data[i] = data[i + 2];
+        data[i + 2] = tmp;
     }
-    // Copie dans la structure textures
-    newTex->content = data;
-    // Génération d'une texture contenant ces données
+    
+    newTex->content = data;                         // Copie dans la structure textures
+
     glGenTextures(1, &newTex->id);
     glBindTexture(GL_TEXTURE_2D, newTex->id);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, newTex->w, newTex->l, 0, GL_RGB, GL_UNSIGNED_BYTE, newTex->content);
@@ -93,10 +81,8 @@ const Texture* ResourceManager::LoadTexture(const std::string& parFileName)
 // Inspiré de http://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Load_OBJ
 ObjFile* ResourceManager::LoadModel(const std::string& parFileName, const std::string& parAlbTexFileName, const std::string& parRugTexFileName, const std::string& parSpecTexFileName, const std::string& parNormalTexFileName )
 {
-    // Liste des points
-    std::vector<Vector3> vertices;
-    // Liste des normales par triangle
-    std::vector<Vector3> normales;
+    std::vector<glm::dvec3> vertices;           // Liste des points    
+    std::vector<glm::dvec3> normales;           // Liste des normales par triangle
     // Gestion des triangles
     std::vector<indexList> indexes;
     std::vector<indexList> uvList;
@@ -109,41 +95,35 @@ ObjFile* ResourceManager::LoadModel(const std::string& parFileName, const std::s
     in.open(parFileName.c_str(), std::fstream::in);
     if (!in) 
     { 
-        PRINT_RED("Cannot find model obj: " << parFileName); 
-        return NULL;
+        debug_color_msg(DEBUG_RED_COLOR, "Cannot find model obj: %s", parFileName.c_str()); 
+        return 0;
     }
-    else
-    {
-        PRINT_ORANGE("Parsing model obj: " << parFileName << " ..."); 
-    }
-    // Creation de l'objet
-    ObjFile * newModel = new ObjFile();
+    debug_color_msg(DEBUG_ORANGE_COLOR, "Parsing model obj: %s ...", parFileName.c_str()); 
+
+    ObjFile* newModel = new ObjFile();
     std::string line;
     while (getline(in, line)) 
     {
-        // On a trouvé "v " on est dans le cas d'un vertice
         if (line.substr(0, 2) == "v ") 
         {
             std::stringstream s(line.substr(2));
-            Vector3 v; 
+            glm::dvec3 v; 
             s >> v.x; 
             s >> v.y; 
             s >> v.z; 
-            // On sauvegarde un vertice
             vertices.push_back(v);
         }
         else if (line.substr(0, 2) == "f ") 
         {
-            // On a trouvé "f " C'est la définition d'un triangle avec son UV mapping
             std::stringstream s(line.substr(2));
             std::string a,b,c;
             std::vector<std::string> lineSplitted = split(line,' ');
             a = lineSplitted[1];
             b = lineSplitted[2];
             c = lineSplitted[3];
-            std::vector<std::string> index1 = split(a,'/');
-            std::vector<std::string> index2 = split(b,'/');
-            std::vector<std::string> index3 = split(c,'/');
+            std::vector<std::string> index1 = split(a, '/');
+            std::vector<std::string> index2 = split(b, '/');
+            std::vector<std::string> index3 = split(c, '/');
             indexList triangleIndex;
             triangleIndex.p0 = convertToInt(index1[0]);
             triangleIndex.p1 = convertToInt(index2[0]);
@@ -175,21 +155,16 @@ ObjFile* ResourceManager::LoadModel(const std::string& parFileName, const std::s
         else if(line[0] == 'v' && line[1] == 'n') 
         { 
             std::istringstream s(line.substr(2));
-            Vector3 normal;
+            glm::dvec3 normal;
             s >> normal.x;
             s >> normal.y;
             s >> normal.z;
             normales.push_back(normal);
         }
-        else if (line[0] == '#') 
-        { 
-            // Commentaire
-        }
     }           
     
     for (int i = 0; i < indexes.size(); i+=1) 
     {
-        // Création du triangle
         Triangle newTriangle;
         newTriangle.p0 = vertices[indexes[i].p0];
         newTriangle.p1 = vertices[indexes[i].p1];
@@ -197,20 +172,22 @@ ObjFile* ResourceManager::LoadModel(const std::string& parFileName, const std::s
         newTriangle.uv0 = mapping[uvList[i].p0];
         newTriangle.uv1 = mapping[uvList[i].p1];
         newTriangle.uv2 = mapping[uvList[i].p2];
-        // Calcul des normales
-        newTriangle.normale = Vector3::crossProduct(newTriangle.p1-newTriangle.p0,newTriangle.p2-newTriangle.p0);
-        newTriangle.normale/=newTriangle.normale.Norm();
+
+        newTriangle.normale = glm::cross(newTriangle.p1 - newTriangle.p0, newTriangle.p2 - newTriangle.p0);
+        newTriangle.normale = glm::normalize(newTriangle.normale);
         newModel->listTriangle.push_back(newTriangle);
     }
+
     // Creation du fichier de texture en dur pour l'obj
     foreach(triangle,newModel->listTriangle)
     {
-        newModel->material.color = Vector4(0.2,0.3,0.8,1.0);
+        newModel->material.color = glm::dvec4(0.2, 0.3, 0.8, 1.0);
         newModel->material.indiceRefraction = 1.44;
         newModel->material.texAlbedo = 0;
         newModel->material.texRough = 1;
         newModel->material.texSpec = 2;
     }
+
     // On charge les textures
     newModel->albTex = LoadTexture(parAlbTexFileName);
     newModel->rugTex = LoadTexture(parRugTexFileName);

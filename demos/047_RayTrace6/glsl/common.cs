@@ -214,51 +214,19 @@ Quadrique getQuadricByIndex(int parIndexQuad)
 	Quadrique uneQuad;
 
 	float quadNormIndex = 0.0;
-    uneQuad.A = texture(listQuadriques, vec2(0.0,quadNormIndex)).r;
-    uneQuad.B = texture(listQuadriques, vec2(1.0/9.0,quadNormIndex)).r;
- 	uneQuad.C = texture(listQuadriques, vec2(2.0/9.0,quadNormIndex)).r;
-
-    uneQuad.D = texture(listQuadriques, vec2(3.0/9.0,quadNormIndex)).r;
-    uneQuad.E = texture(listQuadriques, vec2(4.0/9.0,quadNormIndex)).r;
- 	uneQuad.F = texture(listQuadriques, vec2(5.0/9.0,quadNormIndex)).r;
- 	
-    uneQuad.G = texture(listQuadriques, vec2(6.0/9.0,quadNormIndex)).r;
-    uneQuad.H = texture(listQuadriques, vec2(7.0/9.0,quadNormIndex)).r;
- 	uneQuad.I = texture(listQuadriques, vec2(8.0/9.0,quadNormIndex)).r; 
- 	
- 	uneQuad.J = texture(listQuadriques, vec2(9.0/9.0,quadNormIndex)).r; 
- 	
-    uneQuad.A-= vec3(0.5);
-    uneQuad.B-= vec3(0.5);
-    uneQuad.C-= vec3(0.5);
-    
-    uneQuad.D-= vec3(0.5);
-    uneQuad.E-= vec3(0.5);
-    uneQuad.F-= vec3(0.5);
-    
-    uneQuad.G-= vec3(0.5);
-    uneQuad.H-= vec3(0.5);
-    uneQuad.I-= vec3(0.5);
-    
-    uneQuad.J-= vec3(0.5);
-    
-    uneQuad.A*=400;
-    uneQuad.B*=400;
-    uneQuad.C*=400;
-    
-    uneQuad.D*=400;
-    uneQuad.E*=400;
-    uneQuad.F*=400;
-    
-    uneQuad.G*=400;
-    uneQuad.H*=400;
-    uneQuad.I*=400;
-    
-    uneQuad.J*=400;
-
+    const float scale = 400.0;
+    uneQuad.A = scale * (texture(listQuadriques, vec2(0.0 / 9.0, quadNormIndex)).r - 0.5);
+    uneQuad.B = scale * (texture(listQuadriques, vec2(1.0 / 9.0, quadNormIndex)).r - 0.5);
+ 	uneQuad.C = scale * (texture(listQuadriques, vec2(2.0 / 9.0, quadNormIndex)).r - 0.5);
+    uneQuad.D = scale * (texture(listQuadriques, vec2(3.0 / 9.0, quadNormIndex)).r - 0.5);
+    uneQuad.E = scale * (texture(listQuadriques, vec2(4.0 / 9.0, quadNormIndex)).r - 0.5);
+ 	uneQuad.F = scale * (texture(listQuadriques, vec2(5.0 / 9.0, quadNormIndex)).r - 0.5);
+    uneQuad.G = scale * (texture(listQuadriques, vec2(6.0 / 9.0, quadNormIndex)).r - 0.5);
+    uneQuad.H = scale * (texture(listQuadriques, vec2(7.0 / 9.0, quadNormIndex)).r - 0.5);
+ 	uneQuad.I = scale * (texture(listQuadriques, vec2(8.0 / 9.0, quadNormIndex)).r - 0.5); 
+ 	uneQuad.J = scale * (texture(listQuadriques, vec2(9.0 / 9.0, quadNormIndex)).r - 0.5); 
     return uneQuad;
 }
-
 
 Primitive getPrimitiveByIndex(int parIndexPrim)
 {

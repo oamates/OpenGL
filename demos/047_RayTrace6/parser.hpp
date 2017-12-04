@@ -10,8 +10,6 @@
 #include "scene.hpp"
 #include "stringutils.hpp"
 #include "primitive.hpp"
-#include "vector3.hpp"
-#include "vector4.hpp"
 
 #define STRING_CHECKFIND(Buffer, String) (Buffer.find(String) != std::string::npos)
 

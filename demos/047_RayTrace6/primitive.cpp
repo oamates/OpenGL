@@ -1,21 +1,23 @@
 // File that allows to manage primitives in parallel with glsl
 
+#include <glm/gtx/string_cast.hpp>
+
 #include "primitive.hpp"
- 
+
  // Triangle
-std::ostream& operator<< (std::ostream& stream, const Triangle& parTriangle)
+std::ostream& operator << (std::ostream& stream, const Triangle& parTriangle)
 {
-	stream << "P0 " << parTriangle.p0 << std::endl;
-	stream << "P1 " << parTriangle.p1 << std::endl;
-	stream << "P3 " << parTriangle.p2 << std::endl;
-	stream << "normale " << parTriangle.normale << std::endl;
+	stream << "P0 = " << glm::to_string(parTriangle.p0) << std::endl;
+	stream << "P1 = " << glm::to_string(parTriangle.p1) << std::endl;
+	stream << "P2 = " << glm::to_string(parTriangle.p2) << std::endl;
+	stream << "N  = " << glm::to_string(parTriangle.normale) << std::endl;
 	return stream;
 }
 
 // Materiau 
 std::ostream& operator << (std::ostream& stream, const Materiau& parMat)
 {
-	stream << "color " << parMat.color << std::endl;
+	stream << "color " << glm::to_string(parMat.color) << std::endl;
 	stream << "refractance " << parMat.coeffReflexion << std::endl;
 	stream << "reflectance " << parMat.coeffRefraction << std::endl;
 	return stream;
@@ -34,8 +36,8 @@ std::ostream& operator << (std::ostream& stream, const Primitive& parTriangle)
 // Lumière
 std::ostream& operator << (std::ostream& stream, const Light& parLum)
 {
-	stream << "color " << parLum.color << std::endl;
+	stream << "color " << glm::to_string(parLum.color) << std::endl;
 	stream << "intensity " << parLum.intensity << std::endl;
-	stream << "position " << parLum.position << std::endl;
+	stream << "position " << glm::to_string(parLum.position) << std::endl;
 	return stream;
 }

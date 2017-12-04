@@ -3,6 +3,7 @@
 
 
 // Includes autres
+#include "log.hpp"
 #include "renderer.hpp"
 #include "helper.hpp"
 #include "defines.hpp"
@@ -19,7 +20,7 @@ double getTime()
 // Fonction d'error callback
 static void error_callback(int error, const char* description)
 {
-    PRINT_RED(error << " " << description);
+    debug_color_msg(DEBUG_RED_COLOR, "GLFW Error #%d : %s", error, description);
 }
 
 // Fonction de key callback
@@ -89,55 +90,33 @@ void Renderer::HandleMouse(float parX, float parY)
 // Prise en compte des entrées clavier
 void Renderer::HandleKey(int parKey, int parAction)
 {
-    if(parKey == GLFW_KEY_LEFT && parAction == GLFW_PRESS)
+    if (parAction == GLFW_PRESS)
     {
-        FLeftward = true;
+        if (parKey == GLFW_KEY_LEFT)  FLeftward  = true;
+        if (parKey == GLFW_KEY_RIGHT) FRightward = true;
+        if (parKey == GLFW_KEY_UP)    FFoward    = true;
+        if (parKey == GLFW_KEY_DOWN)  FBackward  = true;
+        return;
     }
-    if(parKey == GLFW_KEY_RIGHT && parAction == GLFW_PRESS)
-    {
-        FRightward = true;
-    }
-    if(parKey == GLFW_KEY_UP && parAction == GLFW_PRESS)
-    {
-        FFoward = true;
-    }
-    if(parKey == GLFW_KEY_DOWN && parAction == GLFW_PRESS)
-    {
-        FBackward = true;
-    }
-    if(parKey == GLFW_KEY_LEFT && parAction == GLFW_RELEASE)
-    {
-        FLeftward = false;
-    }
-    if(parKey == GLFW_KEY_RIGHT && parAction == GLFW_RELEASE)
-    {
-        FRightward = false;
-    }
-    if(parKey == GLFW_KEY_UP && parAction == GLFW_RELEASE)
-    {
-        FFoward = false;
-    }
-    if(parKey == GLFW_KEY_DOWN && parAction == GLFW_RELEASE)
-    {
-        FBackward = false;
-    }   
+
+    if (parKey == GLFW_KEY_LEFT)  FLeftward  = false;
+    if (parKey == GLFW_KEY_RIGHT) FRightward = false;
+    if (parKey == GLFW_KEY_UP)    FFoward    = false;
+    if (parKey == GLFW_KEY_DOWN)  FBackward  = false;
 }
 
-// méthode d'init du renderer
 bool Renderer::Init(const char* scene, bool parOreille)
 {
-    // Flag de prise en compte de l'oreille
     FOreille = parOreille;
-    PRINT_ORANGE("Oreille activée " << FOreille);
-    // Initialise GLFW
+    debug_color_msg(DEBUG_ORANGE_COLOR, "Ear model used: %u", FOreille ? 1 : 0);
     if(!glfwInit())
     {
-        PRINT_RED("The glfw init failed");
+        debug_color_msg(DEBUG_RED_COLOR, "GLFW initialization failed.");
         return false;
     }
     else
     {
-            PRINT_GREEN("The glfw init succeeded");
+        debug_color_msg(DEBUG_GREEN_COLOR, "GLFW successfully initialized");
     }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -145,33 +124,28 @@ bool Renderer::Init(const char* scene, bool parOreille)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); 
 
     // Open a window and create its OpenGL context
-    FWindow = glfwCreateWindow(1280, 720, "CS_RayTracer", 0, 0);
+    FWindow = glfwCreateWindow(1280, 720, "Compute Shader Ray Tracer", 0, 0);
     if(!FWindow)
     {
-        PRINT_RED("The glfw open windows failed");
+        debug_color_msg(DEBUG_RED_COLOR, "GLFW window creation failed");
         glfwTerminate();
         return false;
     }
-    // On set le contexte
     glfwMakeContextCurrent(FWindow);
-    // on défini les callback
     glfwSetErrorCallback(error_callback);
     glfwSetKeyCallback(FWindow, key_callback);
     glfwSetCursorPosCallback(FWindow, cursor_callback);
     
-    // Init glew
     glewExperimental = GL_TRUE;
     GLenum glewReturn = glewInit();
     if(glewReturn)
     {
-        PRINT_RED("Glew returned: " << glewGetErrorString(glewReturn));
+        debug_color_msg(DEBUG_RED_COLOR, "GLEW initialization failed: %s", glewGetErrorString(glewReturn));
+        return false;
     }
     
-    // Pour vérifier la version
-    const GLubyte* renderer = glGetString (GL_RENDERER); 
-    const GLubyte* version = glGetString (GL_VERSION); 
-    PRINT_ORANGE("Renderer: "<<renderer);
-    PRINT_ORANGE("Version: "<<version);
+    debug_color_msg(DEBUG_ORANGE_COLOR, "Renderer: %s", glGetString (GL_RENDERER));
+    debug_color_msg(DEBUG_ORANGE_COLOR, "GL Version: %s", glGetString (GL_VERSION));
     
     // Everything went ok let's render
     FIsRendering = true;
@@ -192,11 +166,9 @@ bool Renderer::Init(const char* scene, bool parOreille)
     // Injecting the scene to the shader
     InjectScene();
     
-    PRINT_GREEN("The renderer was created succesfully");
+    debug_color_msg(DEBUG_GREEN_COLOR, "The renderer has been successfully created.");
     
-    // Sauvegarde du temps intiial
     FLastTime = glfwGetTime();
-    // Blocage du curseur dans la fenetre
     glfwSetInputMode(FWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     return true;
 }
@@ -209,14 +181,22 @@ void Renderer::CreateRenderQuad()
     
     glGenBuffers(1, &FVertexbuffer);
     glBindBuffer(GL_ARRAY_BUFFER, FVertexbuffer);
-    
+
+    const GLfloat mainQuadArray[] = 
+    {
+        -1.0f, -1.0f,  0.0,   0.0, 0.0,
+        -1.0f,  1.0f,  0.0,   0.0, 1.0,
+         1.0f, -1.0f,  0.0,   1.0, 0.0,
+         1.0f,  1.0f,  0.0,   1.0, 1.0
+    };
+
     glBufferData(GL_ARRAY_BUFFER, sizeof(mainQuadArray), mainQuadArray, GL_STATIC_DRAW);
     GLuint posAtt = glGetAttribLocation(FPipelineShaderID, "Vertex_Pos");
     GLuint texAtt = glGetAttribLocation(FPipelineShaderID, "Vertex_TexCoord");
     glEnableVertexAttribArray (posAtt);
     glEnableVertexAttribArray (texAtt);
-    glVertexAttribPointer (posAtt, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glVertexAttribPointer (texAtt, 2, GL_FLOAT, GL_TRUE, sizeof (GLfloat) * 3, 0);
+    glVertexAttribPointer (posAtt, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (const GLvoid *) 0);
+    glVertexAttribPointer (texAtt, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (const GLvoid *) 12);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray (0);
 }
@@ -268,120 +248,80 @@ void Renderer::InitShaders()
 
 void Renderer::RayTracing()
 {
-    #ifndef SIMPLE
-    // On bind la pipeline comptue shader
     ShaderManager::Instance().BindProgram(FComputeShader);
-    // on dispatch les calcul
     glDispatchCompute(512 / 16, 512 / 16, 1);
-    // On debind le programme
     ShaderManager::Instance().BindProgram(0);
-    #endif
 }
 
 void Renderer::RenderResultToScreen()
 {
-    // On bind la pipline de dessin
-    ShaderManager::Instance().BindProgram(FPipelineShaderID);
-    // On dessine le full screen quad
-    glBindVertexArray (FVertexArrayID);
+    ShaderManager::Instance().BindProgram(FPipelineShaderID);   // bind quad program
+    glBindVertexArray (FVertexArrayID);                         // full screen quad
     glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray (0);
-    // On debind le programme
-    ShaderManager::Instance().BindProgram(0);
+    ShaderManager::Instance().BindProgram(0);                   // unbind program
 }
 
 void Renderer::UpdateDisplacement()
 {
     // Maj du déplacement de la camera
-    if(FFoward)
-    {
-        FCamera.Translate(Vector3(0.0,0.0,-1.0));
-    }
-    if(FBackward)
-    {
-        FCamera.Translate(Vector3(0.0,0.0,1.0));
-    }
-    if(FLeftward)
-    {
-        FCamera.Translate(Vector3(1.0,0.0,0.0));
-    }
-    if(FRightward)
-    {
-        FCamera.Translate(Vector3(-1.0,0.0,0.0));
-    }
+    if(FFoward)    FCamera.Translate(glm::dvec3( 0.0, 0.0,-1.0));
+    if(FBackward)  FCamera.Translate(glm::dvec3( 0.0, 0.0, 1.0));
+    if(FLeftward)  FCamera.Translate(glm::dvec3( 1.0, 0.0, 0.0));
+    if(FRightward) FCamera.Translate(glm::dvec3(-1.0, 0.0, 0.0));
     FCamera.UpdateValues(FComputeShader);       
 }
 
 void Renderer::Run()
 {
-    // Clear le viewport
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    // Injection première des valeurs de la camera
+    glClearColor(0.0, 0.0, 0.0, 0.0);               // Update uniform camera parameters
+    
+
     FCamera.UpdateValues(FComputeShader);
     while (!glfwWindowShouldClose (FWindow)) 
     {
-        // Temps initial
-        double timeA = getTime();
+//        double timeA = getTime();
+
         glClear (GL_COLOR_BUFFER_BIT);
-      
-        RayTracing();                     // Lancer de rayon
-      
-        RenderResultToScreen();           // Rendu a l'ecran
-      
-        UpdateDisplacement();             // Maj des deplacements
-      
+        RayTracing();                               // Lancer de rayon
+        RenderResultToScreen();                     // Rendu a l'ecran
+        UpdateDisplacement();                       // Maj des deplacements
         glfwPollEvents ();
         glfwSwapBuffers (FWindow);
-        double timeB = getTime();
-        PRINT_ORANGE("FPS" << 1.0 / (timeB - timeA));
+//        double timeB = getTime();
+//        debug_color_msg(DEBUG_ORANGE_COLOR, "FPS = %f", 1.0 / (timeB - timeA));
     }
 }
 
 
 void Renderer::LoadScene(const std::string& parFilename)
 {
-    // On charge la scene demandée
-    PRINT_GREEN("Fichier de scene demandé " << parFilename);
+    debug_color_msg(DEBUG_GREEN_COLOR, "Loading requested scene file: %s ...", parFilename.c_str());
     FScene = FParser.GetSceneFromFile(parFilename);
-    if(FScene == NULL)
-    {
-        PRINT_RED("Fichier de scene " << parFilename << " non trouve.");
-    }
+    if (!FScene)
+        debug_color_msg(DEBUG_RED_COLOR, "Scene file %s not found", parFilename.c_str());
     else
-    {
-        PRINT_GREEN("Fichier de scene " << parFilename << " trouve.");
-    }
+        debug_color_msg(DEBUG_GREEN_COLOR, "Scene file %s found. Scene loaded...", parFilename.c_str());
     
     // L'oreille a été demandée
     if(FOreille)
     {
         // on la charge
-        PRINT_ORANGE("Oreille  chargée");
-        FEarModel = ResourceManager::Instance().LoadModel("data/model/final/ear.obj", "data/model/final/diff.bmp","data/model/final/rugo.bmp", "data/model/final/spec.bmp","data/model/final/normal.bmp");
-
-        #ifndef SIMPLE
+        debug_color_msg(DEBUG_ORANGE_COLOR, "Loading ear model ... ");
+        FEarModel = ResourceManager::Instance().LoadModel("model/ear.obj", "model/diff.bmp","model/rugo.bmp", "model/spec.bmp","model/normal.bmp");
         FScene->AddMateriau(FEarModel->material);
         foreach(triangle, FEarModel->listTriangle)
-        {
-            //Ajoute un triangle ayant pour materiau le dernier materiau ajoute dans la scene
-            FScene->AddTriangle(*triangle);
-        }
-    #endif
+            { FScene->AddTriangle(*triangle); }     // uses the last material added to the scene
     }
     else
-    {
-        PRINT_ORANGE("Oreille non chargée");
-    }
+        debug_color_msg(DEBUG_ORANGE_COLOR, "Ear not used ...");
 }
 
 void Renderer::InjectScene()
 {   
-    // On injecte les lumières en uniform
-  #ifndef SIMPLE
-    int index = 0;
+    int index = 0;      // Setting light uniforms
     foreach(light, FScene->m_lights)
     {
         ShaderManager::Instance().InjectLight(FComputeShader, *light, index++);
     }
-  #endif
 }

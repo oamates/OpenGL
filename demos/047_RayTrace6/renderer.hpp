@@ -11,7 +11,7 @@
 #include "octree.hpp"
 #include "resourcemanager.hpp"
 
-struct Renderer : public Singleton<Renderer>
+struct Renderer : public singleton_t <Renderer>
 {
     Renderer();
     ~Renderer();
@@ -23,7 +23,7 @@ struct Renderer : public Singleton<Renderer>
 
     void RayTracing();
     void RenderResultToScreen();
-    GLuint GetComputeProgID() {return FComputeShader;}
+    GLuint GetComputeProgID() { return FComputeShader; }
 
     void HandleKey(int parKey, int parAction);
     void HandleMouse(float parX, float parY);

@@ -1,8 +1,8 @@
 #ifndef CAMERA
 #define CAMERA
 
-#include "matrix4.hpp"
-#include "vector3.hpp"
+#include <glm/glm.hpp>
+
 #include "defines.hpp"
 
 struct Camera
@@ -15,12 +15,12 @@ struct Camera
     void Yaw(double parAngle);
     void Pitch(double parAngle);
     // Methode de translation
-    void Translate(const Vector3& parDir);
+    void Translate(const glm::dvec3& parDir);
     // Mise a jour des valeurs dans un programme
     void UpdateValues(GLuint parShaderID);
 
     // Transformation
-    Matrix4 FTransformation;
+    glm::dmat4 FTransformation;
     // Informations de perspective
     double FLens;
     double FAngleView;

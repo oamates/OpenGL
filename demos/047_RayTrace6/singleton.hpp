@@ -3,11 +3,11 @@
 
 #include <iostream>
 
-template <typename T> struct Singleton
+template <typename T> struct singleton_t
 {
-    Singleton () { }
+    singleton_t () { }
 
-    ~Singleton ()
+    ~singleton_t ()
         { Destroy(); }
 
     static T* Instance_Ptr ()
@@ -33,8 +33,8 @@ template <typename T> struct Singleton
     }
 
     static T* FInstance;
-  };
+};
 
-template <typename T> T* Singleton<T>::FInstance = 0;
+template <typename T> T* singleton_t<T>::FInstance = 0;
 
 #endif

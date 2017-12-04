@@ -1,11 +1,13 @@
 #include <cmath>
 
+#include <glm/gtx/transform.hpp> 
+
 #include "camera.hpp"
 #include "shadermanager.hpp"
 #include "defines.hpp"
 
 Camera::Camera()
-: FTransformation(MatrixInit::Identity)
+: FTransformation(1.0)
 , FLens(50.0)
 , FAngleView(45.0)
 {
@@ -23,33 +25,33 @@ Camera::~Camera()
 // Rotation autour de Y
 void Camera::Yaw(double parAngle)
 {
-	FTransformation = FTransformation*Matrix4::rotateYAxis(parAngle);
+	FTransformation = FTransformation * glm::rotate(parAngle, glm::dvec3(0.0, 1.0, 0.0));
 }
 // Translation d'un vecteur
-void Camera::Translate(const Vector3& parDir)
+void Camera::Translate(const glm::dvec3& parDir)
 {
-	FTransformation = FTransformation*Matrix4::translate(parDir);
+	FTransformation = FTransformation * glm::translate(parDir);
 }
 // Rotation autour de X
 void Camera::Pitch(double parAngle)
 {
-	FTransformation = FTransformation*Matrix4::rotateXAxis(parAngle);
+	FTransformation = FTransformation * glm::rotate(parAngle, glm::dvec3(1.0, 0.0, 0.0));
 }
 void Camera::UpdateValues(GLuint parShaderID)
 {
 	// Transformations
-	const Vector3& pos = FTransformation.getTranslate();
-	const Vector3& zAxis = FTransformation.zAxis();
-	const Vector3& yAxis = FTransformation.yAxis();
-	const Vector3& xAxis = FTransformation.xAxis();
+	const glm::dvec3& pos   = glm::dvec3(FTransformation[3]);
+	const glm::dvec3& zAxis = glm::dvec3(FTransformation[2]);
+	const glm::dvec3& yAxis = glm::dvec3(FTransformation[1]);
+	const glm::dvec3& xAxis = glm::dvec3(FTransformation[0]);
 	// Injection de la position
-	ShaderManager::Instance().InjectVec3(parShaderID, FTransformation.getTranslate(), "cameraPosition");
+	ShaderManager::Instance().InjectVec3(parShaderID, pos, "cameraPosition");
 
 	// Precalcules 
-	const Vector3& centreEcran = pos+zAxis*FLens;
-	const Vector3& coinSupGauche = centreEcran - yAxis * FHauteurEcran - xAxis * FHauteurEcran * RATIO;
+	const glm::dvec3& centreEcran = pos+zAxis*FLens;
+	const glm::dvec3& coinSupGauche = centreEcran - yAxis * FHauteurEcran - xAxis * FHauteurEcran * RATIO;
 	// Injection des données pour calculer les rayons primaires
 	ShaderManager::Instance().InjectVec3(parShaderID, coinSupGauche, "coinSupGauche");
-	ShaderManager::Instance().InjectVec3(parShaderID, xAxis*FHauteurEcran*2, "unitX");
-	ShaderManager::Instance().InjectVec3(parShaderID, yAxis*FHauteurEcran*2, "unitY");
+	ShaderManager::Instance().InjectVec3(parShaderID, xAxis * FHauteurEcran * 2.0, "unitX");
+	ShaderManager::Instance().InjectVec3(parShaderID, yAxis * FHauteurEcran * 2.0, "unitY");
 }

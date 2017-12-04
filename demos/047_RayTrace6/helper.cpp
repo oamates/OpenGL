@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 
+#include "log.hpp"
 #include "defines.hpp"
 #include "helper.hpp"
 
@@ -52,14 +53,8 @@ int convertToInt(const std::string& parToConvert)
 
 void CheckGLState(const std::string& desc) 
 {
-    GLenum e = glGetError();
-    if (e != GL_NO_ERROR) {
-        PRINT_RED("OpenGL error in: " << desc.c_str() << " " << gluErrorString(e) << " " << e);
-    }
-    else
-    {
-        PRINT_ORANGE("No OpenGL errors@" << desc);
-    }
+    debug_msg("Checking OpenGL error: %s", desc.c_str());
+    gl_error_msg();
 }
 
 std::string convertToString(int parToConvert)

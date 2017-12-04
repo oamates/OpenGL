@@ -5,8 +5,8 @@
 
 #include <vector>
 #include <iostream>
-#include "vector3.hpp"
-#include "vector4.hpp"
+
+#include <glm/glm.hpp>
 
 enum TypePrimitive
 {
@@ -46,13 +46,13 @@ struct indexList
 
 struct Triangle
 {
-    Vector3 p0;
+    glm::dvec3 p0;
     vec2 uv0;
-    Vector3 p1;
+    glm::dvec3 p1;
     vec2 uv1;
-    Vector3 p2;
+    glm::dvec3 p2;
     vec2 uv2;
-    Vector3 normale;
+    glm::dvec3 normale;
 
 };
 
@@ -60,11 +60,11 @@ std::ostream& operator << (std::ostream& stream, const Triangle& parTriangle);
 
 struct Plan
 {
-    Vector3 p0;
-    Vector3 p1;
-    Vector3 p2;
-    Vector3 p3;
-    Vector3 normale;
+    glm::dvec3 p0;
+    glm::dvec3 p1;
+    glm::dvec3 p2;
+    glm::dvec3 p3;
+    glm::dvec3 normale;
 };
 
 struct Quadrique
@@ -95,16 +95,16 @@ std::ostream& operator << (std::ostream& stream, const Primitive& parTriangle);
 struct Intersection
 {
     bool isValid;
-    Vector3 point;
+    glm::dvec3 point;
     float distance;
-    Vector3 normal;
+    glm::dvec3 normal;
     Primitive obj;
 };
 
 //Materiau
 struct Materiau
 {
-    Vector4 color;
+    glm::dvec4 color;
     float coeffReflexion;
     float coeffRefraction;
     float indiceRefraction;
@@ -120,8 +120,8 @@ std::ostream& operator << (std::ostream& stream, const Materiau& parMat);
 // Lumieres
 struct Light
 {
-    Vector3 position;
-    Vector3 color;
+    glm::dvec3 position;
+    glm::dvec3 color;
     float intensity;
 };
 

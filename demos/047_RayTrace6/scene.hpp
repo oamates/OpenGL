@@ -18,6 +18,7 @@ struct Scene
     void AddQuadric(const Quadrique &quadric, const Materiau &materiau);
     void AddMateriau(const Materiau &materiau);
     void AddLight(const Light& light);
+
     std::vector<Plan> m_planes;
     std::vector<Triangle> m_triangles;
     std::vector<Quadrique> m_quadrics;
