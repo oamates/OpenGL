@@ -1,8 +1,18 @@
-#version 430 core
+#version 330 core
 
-layout(location = 0) in vec4 vert;
+out vec2 uv;
 
+const vec2 uvs[4] = vec2[4] 
+(
+    vec2(-1.0f,  1.0f),
+    vec2(-1.0f, -1.0f),
+    vec2( 1.0f,  1.0f),
+    vec2( 1.0f, -1.0f)
+);
+ 
 void main()
 {
-    gl_Position = vert;
+    vec2 q = uvs[gl_VertexID];
+    gl_Position = vec4(q, 0.0f, 1.0f);
+    uv = 0.5f + 0.5f * q;
 }

@@ -1,9 +1,11 @@
-#version 430 core
+#version 330 core
+
+in vec2 uv;
 
 layout (location = 0) out vec4 FragmentColor;
-uniform sampler2D output_image;
+uniform sampler2D raytrace_image;
 
 void main(void)
 {
-    FragmentColor = texture(output_image, vec2(gl_FragCoord.xy) / vec2(textureSize(output_image, 0)));
-};
+    FragmentColor = texture(raytrace_image, uv);
+}
