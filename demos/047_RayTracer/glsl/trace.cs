@@ -24,7 +24,7 @@ layout (binding = 0, offset = 4) uniform atomic_uint append_counter;
 
 layout (rgba32f, binding = 0) uniform image2D output_image;
 
-void main(void)
+void main()
 {
     uint ray_index = atomicCounterIncrement(consume_counter);
     ray_t input_ray = input_buffer.rays[ray_index];

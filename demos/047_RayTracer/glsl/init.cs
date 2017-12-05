@@ -19,7 +19,7 @@ layout (std430, binding = 0) buffer ray_buffer
     ray_t rays[];
 };
 
-void main(void)
+void main()
 {
     vec2 uv = inv_res * (vec2(gl_GlobalInvocationID.xy) + 0.5f);            // pixel half-integral coordinates
     vec2 ndc = 2.0f * uv - 1.0f;                                            // normalized device coordinates
