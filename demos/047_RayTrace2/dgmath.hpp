@@ -1,6 +1,7 @@
-//! This files contains a variety of useful math functions and constants.
 #ifndef COMMONMATH_H
 #define COMMONMATH_H
+
+//! This files contains a variety of useful math functions and constants.
 
 // Floating point precision. Define ONE of these option
 #define PRECISION_FLOAT32
@@ -14,7 +15,7 @@
 
 namespace Dg
 {
-    enum class EulerOrder { XYZ, XZY, YXZ, YZX, ZYX, ZXY, XYX, XZX, YXY, YZY, ZYZ, ZXZ };
+    enum struct EulerOrder { XYZ, XZY, YXZ, YZX, ZYX, ZXY, XYX, XZX, YXY, YZY, ZYZ, ZXZ };
 
     const float PI_f            = 3.141592653589793238462643383279f;
     const float INVPI_f         = 0.31830988618379067153776752674503f;

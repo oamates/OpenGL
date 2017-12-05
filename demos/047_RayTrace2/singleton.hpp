@@ -6,7 +6,6 @@ namespace Dg
 
 template<typename T> struct Singleton
 {
-
     static T* Instance() 
     {
         static T s_instance;
@@ -15,13 +14,11 @@ template<typename T> struct Singleton
    
   protected:
 
-    Singleton(); // Prevent construction
-    Singleton(Singleton const &); // Prevent construction by copying
-    Singleton & operator = (Singleton const &); // Prevent assignment
-    virtual ~Singleton(); // Prevent unwanted destruction
-
+    Singleton();                                    // Prevent construction
+    Singleton(Singleton const &);                   // Prevent construction by copying
+    Singleton & operator = (Singleton const &);     // Prevent assignment
+    virtual ~Singleton();                           // Prevent unwanted destruction
 };
-
 
 }
 
