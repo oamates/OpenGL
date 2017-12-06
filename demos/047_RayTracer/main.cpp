@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
 
 
     //===================================================================================================================================================================================================================
-    // ping-pong ray ssbo buffers and atomic counter buffers
+    // ping-pong ray ssbo buffers, atomic counter buffers, and uniform buffer for objects
     //===================================================================================================================================================================================================================
     GLuint ray_buffer[2], acbo_id;
     GLsizeiptr ssbo_size = 64 * res_x * res_y;
@@ -105,6 +105,13 @@ int main(int argc, char* argv[])
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, acbo_id);
     glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(zeros), zeros, GL_DYNAMIC_COPY);
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, acbo_id);
+
+    GLuint ubo_id;
+    glGenBuffers(1, &ubo_id);
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo_id);
+    glBufferData(GL_UNIFORM_BUFFER, 128, 0, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);
+
 
     //===================================================================================================================================================================================================================
     // fake VAO for full-screen quad rendering
