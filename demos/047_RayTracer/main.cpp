@@ -48,6 +48,42 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
+
+struct sphere_t
+{
+    glm::vec3 center;                           // sphere center
+    float radius;                               // sphere radius
+    glm::vec3 albedo;                           // surface albedo color
+    float alpha;                                // surface transparency
+    glm::vec3 emission;                         // surface emission color
+    float pad0;                                 // padding0
+    float reflectivity;                         // surface reflectivity
+    float ior;                                  // surface index of refraction
+    float pad1;                                 // padding1
+    float pad2;                                 // padding2
+};
+
+sphere_t spheres[] = 
+{
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f }
+};
+/*
+    spheres.push_back(sphere_t<real_t>(vec3( 0.0, -10004.0, -20.0), 10000.0, , ,          0.1,         0.22, 1.11));
+
+    spheres.push_back(sphere_t<real_t>(vec3( 0.0,      0.0, -20.0),     4.0, vec3(1.00, 1.32, 0.36), vec3(0.07, 0.12, 0.11),          0.3,         0.57, 1.17)); 
+    spheres.push_back(sphere_t<real_t>(vec3( 5.0,     -1.0, -15.0),     2.0, vec3(0.90, 0.76, 0.46), vec3(0.05, 0.06, 0.09),          0.5,         0.11, 1.31)); 
+    spheres.push_back(sphere_t<real_t>(vec3( 5.0,      0.0, -25.0),     3.0, vec3(0.65, 0.77, 0.97), vec3(0.03, 0.11, 0.17),          0.7,         0.13, 1.15)); 
+    spheres.push_back(sphere_t<real_t>(vec3(-5.5,      0.0, -15.0),     3.0, vec3(0.90, 0.90, 0.90), vec3(0.21, 0.10, 0.06),          0.9,         0.07, 1.07));
+    spheres.push_back(sphere_t<real_t>(vec3( 0.0,     20.0, -30.0),     3.0, vec3(0.00, 0.00, 0.00), vec3(3.00, 2.00, 3.00),          1.0,         0.21, 1.19));
+*/
+
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -109,7 +145,7 @@ int main(int argc, char* argv[])
     GLuint ubo_id;
     glGenBuffers(1, &ubo_id);
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_id);
-    glBufferData(GL_UNIFORM_BUFFER, 128, 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(spheres), spheres, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);
 
 
