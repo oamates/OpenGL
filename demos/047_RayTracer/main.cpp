@@ -54,26 +54,27 @@ struct sphere_t
     glm::vec3 center;                           // sphere center
     float radius;                               // sphere radius
     glm::vec3 albedo;                           // surface albedo color
-    float alpha;                                // surface transparency
+    float transparency;                         // surface transparency
     glm::vec3 emission;                         // surface emission color
-    float pad0;                                 // padding0
+    float energy;                               // emission energy
     float reflectivity;                         // surface reflectivity
     float ior;                                  // surface index of refraction
+    float pad0;                                 // padding0
     float pad1;                                 // padding1
-    float pad2;                                 // padding2
 };
 
 sphere_t spheres[] = 
 {
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .alpha = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .pad0 = 0.0f, .reflectivity = 0.57f, .ior = 1.17f, .pad1 = 0.0f, .pad2 = 0.0f }
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.0f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.71f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.2f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.23f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.3f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.00f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.5f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.02f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.6f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.41f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.7f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.8f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.11f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f }
 };
+
 /*
     spheres.push_back(sphere_t<real_t>(vec3( 0.0, -10004.0, -20.0), 10000.0, , ,          0.1,         0.22, 1.11));
 
@@ -113,7 +114,7 @@ int main(int argc, char* argv[])
     ray_initializer["inv_res"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     ray_initializer["focal_scale"] = window.camera.focal_scale();
 
-    glsl_program_t ray_tracer(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/trace.cs"));
+    glsl_program_t ray_tracer(glsl_shader_t(GL_COMPUTE_SHADER, "glsl/trace2.cs"));
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/render.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/render.fs"));
