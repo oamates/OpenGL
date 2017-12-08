@@ -54,19 +54,19 @@ layout (rgba32f, binding = 0) uniform image2D output_image;
 //==============================================================================================================================================================
 // intersection with sphere test
 //==============================================================================================================================================================
-bool intersect(int index, vec3 origin, vec3 direction, out float t0, out float t1)
+bool intersect(int index, vec3 ori, vec3 dir, out float t0, out float t1)
 {
     sphere_t sphere = spheres[index];
-    vec3 l = sphere.center - origin; 
-    float tca = dot(l, direction);
-    if (tca < 0.0)
+    vec3 l = sphere.center - ori; 
+    float dp = dot(l, dir);
+    if (dp < 0.0)
         return false;
-    float d = sphere.radius * sphere.radius + tca * tca - dot(l, l);
+    float d = sphere.radius * sphere.radius + dp * dp - dot(l, l);
     if (d < 0.0)
         return false;
-    float thc = sqrt(d);
-    t0 = tca - thc;
-    t1 = tca + thc;
+    float qq = sqrt(d);
+    t0 = dp - qq;
+    t1 = dp + qq;
     return true; 
 } 
 
@@ -129,6 +129,8 @@ void main()
             d = jmp[d];
             if (d < 0) break;
             r = ray[d];
+            jmp[d + 1] = jmp[d];
+            d++;
             continue;
         }
 
@@ -168,7 +170,7 @@ void main()
             //==================================================================================================================================================
             // ... independently of transparency proceed to next level working with reflected ray
             //==================================================================================================================================================
-            jmp[d + 2] = jmp[d + 1];                              // set back jump to the current level for now
+            jmp[d + 1] = jmp[d];                                                // set back jump to the current level for now
 
             r.ori = p + bias * n;
             r.dir = refl;
@@ -188,10 +190,10 @@ void main()
                 refr = normalize(refr); 
 
                 vec3 refr_col = sphere.transparency * (1.0 - fresnel_effect) * albedo;
-                ray[d + 1].ori = p - bias * n;
-                ray[d + 1].dir = refr;
-                ray[d + 1].col = refr_col;
-                jmp[d + 2] = d + 1;
+                ray[d].ori = p - bias * n;
+                ray[d].dir = refr;
+                ray[d].col = refr_col;
+                jmp[d + 1] = d;
             }
             d++;
         } 
@@ -200,6 +202,7 @@ void main()
             //==================================================================================================================================================
             // we reached maximal allowes depth, now just collect ray from all emitting spheres surrounding the current one
             //==================================================================================================================================================
+            /*
             vec3 c = vec3(0.0);
 
             for (int i = 0; i < sphere_count; ++i)
@@ -225,14 +228,17 @@ void main()
                     c += sphere.albedo * transmission * max(0.0, dot(n, light)) * spheres[i].emission;
                 }
             }
-            col += (c + sphere.emission) * r.col;
+            */
+            col += (/*c*/ vec3(1.0) + sphere.emission) * r.col;
+
             d = jmp[d];
             if (d < 0) break;
             r = ray[d];
             jmp[d + 1] = jmp[d];
+            d++;
+            continue;
         }
     }
 
     imageStore(output_image, ivec2(gl_GlobalInvocationID.xy), vec4(col, 1.0));
 }
-

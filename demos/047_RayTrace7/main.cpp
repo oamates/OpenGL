@@ -205,7 +205,6 @@ int main(int argc, char* argv[])
 
     /*                                                      center   radius            albedo color          emission color  transparency  reflectivity   ior */
     spheres.push_back(sphere_t<real_t>(vec3( 0.0, -10004.0, -20.0), 10000.0, vec3(0.80, 0.20, 0.20), vec3(0.01, 0.20, 0.04),          0.1,         0.22, 1.11));
-
     spheres.push_back(sphere_t<real_t>(vec3( 0.0,      0.0, -20.0),     4.0, vec3(1.00, 1.32, 0.36), vec3(0.07, 0.12, 0.11),          0.3,         0.57, 1.17)); 
     spheres.push_back(sphere_t<real_t>(vec3( 5.0,     -1.0, -15.0),     2.0, vec3(0.90, 0.76, 0.46), vec3(0.05, 0.06, 0.09),          0.5,         0.11, 1.31)); 
     spheres.push_back(sphere_t<real_t>(vec3( 5.0,      0.0, -25.0),     3.0, vec3(0.65, 0.77, 0.97), vec3(0.03, 0.11, 0.17),          0.7,         0.13, 1.15)); 

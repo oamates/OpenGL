@@ -14,16 +14,47 @@
 #include "log.hpp"
 #include "constants.hpp"
 #include "gl_aux.hpp"
-#include "glfw_window.hpp"
+#include "imgui_window.hpp"
 #include "camera.hpp"
 #include "shader.hpp"
 
-struct demo_window_t : public glfw_window_t
+struct sphere_t
+{
+    glm::vec3 center;                           // sphere center
+    float radius;                               // sphere radius
+    glm::vec3 albedo;                           // surface albedo color
+    float transparency;                         // surface transparency
+    glm::vec3 emission;                         // surface emission color
+    float energy;                               // emission energy
+    float reflectivity;                         // surface reflectivity
+    float ior;                                  // surface index of refraction
+    float pad0;                                 // padding0
+    float pad1;                                 // padding1
+};
+
+sphere_t spheres[] = 
+{
+    { .center = glm::vec3( 0.0f, -10007.7f,   0.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.71f, 0.07f), .transparency = 0.07f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.71f, .reflectivity = 0.27f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(10.0f,      1.7f,   5.0f), .radius =     4.0f, .albedo = glm::vec3(1.33f, 1.24f, 0.23f), .transparency = 0.41f, .emission = glm::vec3(0.07, 0.12, 0.11), .energy = 0.21f, .reflectivity = 0.67f, .ior = 1.27f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 3.0f,      2.3f, -20.0f), .radius =     2.0f, .albedo = glm::vec3(0.90f, 0.26f, 0.46f), .transparency = 0.23f, .emission = glm::vec3(0.05, 0.06, 0.09), .energy = 0.23f, .reflectivity = 0.47f, .ior = 1.37f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(-3.0f,      0.7f,  -1.0f), .radius =     3.0f, .albedo = glm::vec3(0.65f, 0.77f, 0.97f), .transparency = 0.33f, .emission = glm::vec3(0.03, 0.11, 0.17), .energy = 0.44f, .reflectivity = 0.37f, .ior = 1.11f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 1.5f,     -1.5f,  10.0f), .radius =     3.0f, .albedo = glm::vec3(0.90f, 0.31f, 0.90f), .transparency = 0.51f, .emission = glm::vec3(0.21, 0.10, 0.06), .energy = 0.09f, .reflectivity = 0.41f, .ior = 1.41f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(13.0f,      2.1f,  -5.0f), .radius =     2.2f, .albedo = glm::vec3(0.77f, 0.47f, 0.05f), .transparency = 0.59f, .emission = glm::vec3(0.91, 0.19, 0.11), .energy = 0.41f, .reflectivity = 0.35f, .ior = 1.21f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(-5.0f,     -1.5f, -15.0f), .radius =     4.7f, .albedo = glm::vec3(0.21f, 1.12f, 0.17f), .transparency = 0.71f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.43f, .ior = 1.25f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 3.0f,      1.2f,  17.0f), .radius =     4.2f, .albedo = glm::vec3(0.31f, 0.12f, 1.14f), .transparency = 0.43f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.11f, .reflectivity = 0.51f, .ior = 1.19f, .pad0 = 0.0f, .pad1 = 0.0f }
+};
+
+const int SPHERE_COUNT = sizeof(spheres) / sizeof(sphere_t);
+
+struct demo_window_t : public imgui_window_t
 {
     camera_t camera;
+    bool params_changed;
+    int index = 0;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
+        : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true*/ ),
+          camera(4.0, 0.25, glm::lookAt(glm::vec3(7.0f, 7.0f, 4.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.5);
@@ -46,44 +77,62 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
+
+    void update_ui() override
+    {
+        params_changed = false;
+
+        ImGui::SetNextWindowSize(ImVec2(768, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
+        ImGui::Begin("Raytrace Demo", 0);
+        ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);
+
+        ImGui::Text("Sphere index");
+
+        for(int i = 0; i < SPHERE_COUNT; ++i)
+        {
+            char index_str[8];
+            sprintf(index_str, "%d", i);
+            ImGui::RadioButton(index_str, &index, i);
+            if (i != SPHERE_COUNT - 1)
+                ImGui::SameLine();
+        }
+
+        sphere_t& sphere = spheres[index];
+
+        if (ImGui::CollapsingHeader("Center and radius"))
+        {
+            params_changed |= ImGui::SliderFloat("X", &sphere.center.x, -50.0f, 4.0f, "X = %.3f");
+            params_changed |= ImGui::SliderFloat("Y", &sphere.center.y, -50.0f, 4.0f, "Y = %.3f");
+            params_changed |= ImGui::SliderFloat("Z", &sphere.center.z, -2.0f, 20.0f, "Z = %.3f");
+            params_changed |= ImGui::SliderFloat("Radius", &sphere.radius, 0.125f, 8.0f, "R = %.3f");
+        }
+
+        if (ImGui::CollapsingHeader("Albedo color and transparency"))
+        {
+            params_changed |= ImGui::SliderFloat("Red  ", &sphere.albedo.x, 0.0f, 2.0f, "R = %.3f");
+            params_changed |= ImGui::SliderFloat("Green", &sphere.albedo.y, 0.0f, 2.0f, "G = %.3f");
+            params_changed |= ImGui::SliderFloat("Blue ", &sphere.albedo.z, 0.0f, 2.0f, "B = %.3f");
+            params_changed |= ImGui::SliderFloat("Alpha", &sphere.transparency, 0.0f, 1.0f, "A = %.3f");
+        }
+
+        if (ImGui::CollapsingHeader("Emission color and energy"))
+        {
+            params_changed |= ImGui::SliderFloat("Red   ", &sphere.emission.x, 0.0f, 2.0f, "R = %.3f");
+            params_changed |= ImGui::SliderFloat("Green ", &sphere.emission.y, 0.0f, 2.0f, "G = %.3f");
+            params_changed |= ImGui::SliderFloat("Blue  ", &sphere.emission.z, 0.0f, 2.0f, "B = %.3f");
+            params_changed |= ImGui::SliderFloat("Energy", &sphere.energy, 0.0625f, 4.0f, "E = %.3f");
+        }
+
+        if (ImGui::CollapsingHeader("Reflectivity and index of refraction"))
+        {
+            params_changed |= ImGui::SliderFloat("Reflectivity", &sphere.reflectivity, 0.0f, 2.0f, "R = %.3f");
+            params_changed |= ImGui::SliderFloat("IOR", &sphere.ior, 0.5f, 2.0f, "IOR = %.3f");
+        }
+
+        ImGui::End();
+    }
+
 };
-
-
-struct sphere_t
-{
-    glm::vec3 center;                           // sphere center
-    float radius;                               // sphere radius
-    glm::vec3 albedo;                           // surface albedo color
-    float transparency;                         // surface transparency
-    glm::vec3 emission;                         // surface emission color
-    float energy;                               // emission energy
-    float reflectivity;                         // surface reflectivity
-    float ior;                                  // surface index of refraction
-    float pad0;                                 // padding0
-    float pad1;                                 // padding1
-};
-
-sphere_t spheres[] = 
-{
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.0f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.71f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.1f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.2f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.23f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.3f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.00f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.5f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.02f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.6f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.41f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.7f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 0.0f, -10004.0f, -20.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.20f, 0.20f), .transparency = 0.8f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.11f, .reflectivity = 0.57f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f }
-};
-
-/*
-    spheres.push_back(sphere_t<real_t>(vec3( 0.0, -10004.0, -20.0), 10000.0, , ,          0.1,         0.22, 1.11));
-
-    spheres.push_back(sphere_t<real_t>(vec3( 0.0,      0.0, -20.0),     4.0, vec3(1.00, 1.32, 0.36), vec3(0.07, 0.12, 0.11),          0.3,         0.57, 1.17)); 
-    spheres.push_back(sphere_t<real_t>(vec3( 5.0,     -1.0, -15.0),     2.0, vec3(0.90, 0.76, 0.46), vec3(0.05, 0.06, 0.09),          0.5,         0.11, 1.31)); 
-    spheres.push_back(sphere_t<real_t>(vec3( 5.0,      0.0, -25.0),     3.0, vec3(0.65, 0.77, 0.97), vec3(0.03, 0.11, 0.17),          0.7,         0.13, 1.15)); 
-    spheres.push_back(sphere_t<real_t>(vec3(-5.5,      0.0, -15.0),     3.0, vec3(0.90, 0.90, 0.90), vec3(0.21, 0.10, 0.06),          0.9,         0.07, 1.07));
-    spheres.push_back(sphere_t<real_t>(vec3( 0.0,     20.0, -30.0),     3.0, vec3(0.00, 0.00, 0.00), vec3(3.00, 2.00, 3.00),          1.0,         0.21, 1.19));
-*/
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -114,13 +163,12 @@ int main(int argc, char* argv[])
 
     ray_tracer["inv_res"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     ray_tracer["focal_scale"] = window.camera.focal_scale();
-    ray_tracer["depth"] = 8;
+    ray_tracer["depth"] = 6;
     ray_tracer["sphere_count"] = 8;
-
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/render.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/render.fs"));
-
+    quad_renderer.enable();
     quad_renderer["raytrace_image"] = 0;
 
 
@@ -163,6 +211,13 @@ int main(int argc, char* argv[])
     {
         window.new_frame();
 
+        if (window.params_changed)
+        {
+            glBindBuffer(GL_UNIFORM_BUFFER, ubo_id);
+            glBufferData(GL_UNIFORM_BUFFER, sizeof(spheres), spheres, GL_DYNAMIC_DRAW);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);
+        }
+
         //===============================================================================================================================================================================================================
         // ray trace the scene
         //===============================================================================================================================================================================================================
@@ -180,10 +235,24 @@ int main(int argc, char* argv[])
         //===============================================================================================================================================================================================================
         // copy image to screen buffer
         //===============================================================================================================================================================================================================
+        glBindVertexArray(vao_id);
         quad_renderer.enable();
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         
         window.end_frame();
+
+        //===============================================================================================================================================================================================================
+        // After end_frame call ::
+        //  - GL_DEPTH_TEST is disabled
+        //  - GL_CULL_FACE is disabled
+        //  - GL_SCISSOR_TEST is enabled
+        //  - GL_BLEND is enabled -- blending mode GL_SRC_ALPHA/GL_ONE_MINUS_SRC_ALPHA with blending function GL_FUNC_ADD
+        //  - VAO binding is destroyed
+        //===============================================================================================================================================================================================================
+        window.end_frame();
+        glDisable(GL_SCISSOR_TEST);
+        glDisable(GL_BLEND);
+        glViewport(0, 0, res_x, res_y);
     }
 
     glDeleteTextures(1, &raytrace_image);
