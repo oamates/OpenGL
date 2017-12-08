@@ -49,7 +49,7 @@ layout (std140, binding = 0) uniform geometry_buffer
 //==============================================================================================================================================================
 // output image
 //==============================================================================================================================================================
-layout (rgba32f, binding = 0) uniform image2D output_image;
+layout (rgba8, binding = 0) uniform image2D output_image;
 
 //==============================================================================================================================================================
 // intersection with sphere test
@@ -83,10 +83,10 @@ void main()
     //==========================================================================================================================================================
     // initial eye ray
     //==========================================================================================================================================================
-    ray_t r;                                                                    // ray are currently working on
-    r.ori = camera_ws;
-    r.dir = v;
-    r.col = vec3(1.0);
+    ray_t ray;                                                                    // ray are currently working on
+    ray.ori = camera_ws;
+    ray.dir = v;
+    ray.col = vec3(1.0);
 
     //==========================================================================================================================================================
     // loop control variables
@@ -95,7 +95,7 @@ void main()
     int jmp[MAX_DEPTH];
     jmp[0] = -1;
 
-    ray_t ray[MAX_DEPTH];                                                       // ray storage
+    ray_t rays[MAX_DEPTH];                                                       // ray storage
     vec3 col = vec3(0.0);                                                     // accumulated pixel color
 
     //==========================================================================================================================================================
@@ -103,18 +103,18 @@ void main()
     //==========================================================================================================================================================
     while(true)
     {
-        float t = 1e8;                                                          // 'infinity'
+        float ti = 1e8;                                                         // 'infinity'
         int id = -1;
         for (int i = 0; i < sphere_count; ++i)                                  // find intersection of this ray with the sphere in the scene
         { 
             float t0, t1;
-            if (intersect(i, r.ori, r.dir, t0, t1))
+            if (intersect(i, ray.ori, ray.dir, t0, t1))
             { 
                 if (t0 < 0)
                     t0 = t1;
-                if (t0 < t)
+                if (t0 < ti)
                 {
-                    t = t0;
+                    ti = t0;
                     id = i;
                 }
             }
@@ -125,10 +125,10 @@ void main()
         //======================================================================================================================================================
         if (id == -1)
         {
-            col += r.col;
+            col += ray.col;
             d = jmp[d];
             if (d < 0) break;
-            r = ray[d];
+            ray = rays[d];
             jmp[d + 1] = jmp[d];
             d++;
             continue;
@@ -136,65 +136,65 @@ void main()
 
         sphere_t sphere = spheres[id];                                          // this is the sphere that we have intersected
 
-        vec3 p = r.ori + t * r.dir;                                             // point of intersection 
-        vec3 n = normalize(p - sphere.center);                                  // normal at the intersection point 
-
         const float bias = 1e-4;                                                // bias to shift the intersection point along normal
-
-        //======================================================================================================================================================
-        // If the normal and the view direction are from not opposite to each other reverse the normal direction. 
-        // That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want to be positive.
-        //======================================================================================================================================================
-        bool inside = false;
-        if (dot(r.dir, n) > 0.0)
-        {
-            n = -n;
-            inside = true;
-        }
 
         if (d < depth)
         {
             //==================================================================================================================================================
             // if we did not reach maximal depth, split the ray into reflected and refracted parts ...
             //==================================================================================================================================================
-            float facing_ratio = -dot(r.dir, n); 
-            float f = float(1.0) - facing_ratio;
-            f = f * f * f;
-            float fresnel_effect = 0.1 + 0.9 * f;                               // change the mix value to tweak the effect
-            vec3 refl = r.dir - 2.0 * dot(r.dir, n) * n;                        // reflection direction, automatically normalized
 
-            vec3 albedo = sphere.albedo * r.col;
-            vec3 refl_col = fresnel_effect * albedo;
+            vec3 p = ray.ori + ti * ray.dir;                                    // point of intersection 
+            vec3 n = normalize(p - sphere.center);                              // normal at the intersection point 
 
+            const float bias = 1e-2;                                            // bias to shift the intersection point along normal
+            vec3 i = ray.dir;                                                   // incident ray emanating from incidence point
+            float cosi = -dot(i, n);
+
+            //==================================================================================================================================================
+            // If the normal and the incident ray make acute angle revert the normal
+            // That also means we are inside the sphere so set the inside bool to true. Finally reverse the sign of IdotN which we want to be positive.
+            //==================================================================================================================================================
+
+            float ior = sphere.ior;
+
+            if (cosi < 0.0)                                                     // are we inside or outside the surface?
+            {
+                n = -n;
+                ior = 1.0 / ior;
+                cosi = -cosi;
+            }
+
+            vec3 r = i + (2.0 * cosi) * n;                                      // reflection direction, automatically normalized
+            float k = 1.0 - ior * ior * (1.0 - cosi * cosi);                    // the square of cosine of refraction angle, must be >= 0
+            float R = 1.0;                                                      // reflected energy
+
+            jmp[d + 1] = jmp[d];                                                // set back jump to the current back jump for now
+            vec3 albedo = sphere.albedo * ray.col;
+
+            //==============================================================================================================================================
+            // compute (transmission) refraction ray, store it on the current level and set back jump to this level
+            //==============================================================================================================================================
+            if (k >= 0.0)
+            {
+                float cost = pow(k, 0.8);
+                vec3 t = ior * i + (ior * cosi - cost) * n;                     // refracted direction, automatically normalized
+                float q1 = (ior * cosi - cost) / (ior * cosi + cost);
+                float q2 = (cosi - ior * cost) / (cosi + ior * cost);
+                R = 0.5 * (q1 * q1 + q2 * q2);                                  // Fresnel equations
+                rays[d].ori = p - bias * n;
+                rays[d].dir = t;
+                rays[d].col = (1.0 - R) * albedo;
+
+                jmp[d + 1] = d;                                                 // must return back and process this ray also
+            }
 
             //==================================================================================================================================================
             // ... independently of transparency proceed to next level working with reflected ray
             //==================================================================================================================================================
-            jmp[d + 1] = jmp[d];                                                // set back jump to the current level for now
-
-            r.ori = p + bias * n;
-            r.dir = refl;
-            r.col = refl_col;
-
-            if (sphere.transparency > 0.0)                                      
-            {
-                //==============================================================================================================================================
-                // if the sphere is transparent, compute (transmission) refraction ray, store it on the current level and set back jump to this level
-                //==============================================================================================================================================
-
-                float ior = sphere.ior; 
-                float eta = (inside) ? ior : 1.0 / ior;                         // are we inside or outside the surface? 
-                float cosi = -dot(n, r.dir); 
-                float k = 1.0 - eta * eta * (1.0 - cosi * cosi);
-                vec3 refr = r.dir * eta + n * (eta * cosi - sqrt(k));
-                refr = normalize(refr); 
-
-                vec3 refr_col = sphere.transparency * (1.0 - fresnel_effect) * albedo;
-                ray[d].ori = p - bias * n;
-                ray[d].dir = refr;
-                ray[d].col = refr_col;
-                jmp[d + 1] = d;
-            }
+            ray.ori = p + bias * n;
+            ray.dir = r;
+            ray.col = R * albedo;
             d++;
         } 
         else
@@ -229,11 +229,11 @@ void main()
                 }
             }
             */
-            col += (/*c*/ vec3(1.0) + sphere.emission) * r.col;
+            col += (/*c*/ vec3(1.0) + sphere.emission) * ray.col;
 
             d = jmp[d];
             if (d < 0) break;
-            r = ray[d];
+            ray = rays[d];
             jmp[d + 1] = jmp[d];
             d++;
             continue;

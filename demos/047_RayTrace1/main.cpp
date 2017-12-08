@@ -34,14 +34,14 @@ struct sphere_t
 
 sphere_t spheres[] = 
 {
-    { .center = glm::vec3( 0.0f, -10007.7f,   0.0f), .radius = 10000.0f, .albedo = glm::vec3(0.80f, 0.71f, 0.07f), .transparency = 0.07f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.71f, .reflectivity = 0.27f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3(10.0f,      1.7f,   5.0f), .radius =     4.0f, .albedo = glm::vec3(1.33f, 1.24f, 0.23f), .transparency = 0.41f, .emission = glm::vec3(0.07, 0.12, 0.11), .energy = 0.21f, .reflectivity = 0.67f, .ior = 1.27f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 3.0f,      2.3f, -20.0f), .radius =     2.0f, .albedo = glm::vec3(0.90f, 0.26f, 0.46f), .transparency = 0.23f, .emission = glm::vec3(0.05, 0.06, 0.09), .energy = 0.23f, .reflectivity = 0.47f, .ior = 1.37f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3(-3.0f,      0.7f,  -1.0f), .radius =     3.0f, .albedo = glm::vec3(0.65f, 0.77f, 0.97f), .transparency = 0.33f, .emission = glm::vec3(0.03, 0.11, 0.17), .energy = 0.44f, .reflectivity = 0.37f, .ior = 1.11f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 1.5f,     -1.5f,  10.0f), .radius =     3.0f, .albedo = glm::vec3(0.90f, 0.31f, 0.90f), .transparency = 0.51f, .emission = glm::vec3(0.21, 0.10, 0.06), .energy = 0.09f, .reflectivity = 0.41f, .ior = 1.41f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3(13.0f,      2.1f,  -5.0f), .radius =     2.2f, .albedo = glm::vec3(0.77f, 0.47f, 0.05f), .transparency = 0.59f, .emission = glm::vec3(0.91, 0.19, 0.11), .energy = 0.41f, .reflectivity = 0.35f, .ior = 1.21f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3(-5.0f,     -1.5f, -15.0f), .radius =     4.7f, .albedo = glm::vec3(0.21f, 1.12f, 0.17f), .transparency = 0.71f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.43f, .ior = 1.25f, .pad0 = 0.0f, .pad1 = 0.0f },
-    { .center = glm::vec3( 3.0f,      1.2f,  17.0f), .radius =     4.2f, .albedo = glm::vec3(0.31f, 0.12f, 1.14f), .transparency = 0.43f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.11f, .reflectivity = 0.51f, .ior = 1.19f, .pad0 = 0.0f, .pad1 = 0.0f }
+    { .center = glm::vec3( 0.0f,   0.0f,   -507.7f), .radius =   500.0f, .albedo = glm::vec3(0.80f, 0.71f, 0.07f), .transparency = 0.07f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.71f, .reflectivity = 0.27f, .ior = 1.17f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(10.0f,   5.0f,      1.7f), .radius =     4.0f, .albedo = glm::vec3(1.33f, 1.24f, 0.23f), .transparency = 0.41f, .emission = glm::vec3(0.07, 0.12, 0.11), .energy = 0.21f, .reflectivity = 0.67f, .ior = 1.27f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 3.0f, -20.0f,      2.3f), .radius =     2.0f, .albedo = glm::vec3(0.90f, 0.26f, 0.46f), .transparency = 0.23f, .emission = glm::vec3(0.05, 0.06, 0.09), .energy = 0.23f, .reflectivity = 0.47f, .ior = 1.37f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(-3.0f,  -1.0f,      0.7f), .radius =     3.0f, .albedo = glm::vec3(0.65f, 0.77f, 0.97f), .transparency = 0.33f, .emission = glm::vec3(0.03, 0.11, 0.17), .energy = 0.44f, .reflectivity = 0.37f, .ior = 1.11f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 1.5f,  10.0f,     -1.5f), .radius =     3.0f, .albedo = glm::vec3(0.90f, 0.31f, 0.90f), .transparency = 0.51f, .emission = glm::vec3(0.21, 0.10, 0.06), .energy = 0.09f, .reflectivity = 0.41f, .ior = 1.41f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(13.0f,  -5.0f,      2.1f), .radius =     2.2f, .albedo = glm::vec3(0.77f, 0.47f, 0.05f), .transparency = 0.59f, .emission = glm::vec3(0.91, 0.19, 0.11), .energy = 0.41f, .reflectivity = 0.35f, .ior = 1.21f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3(-5.0f, -15.0f,     -1.5f), .radius =     4.7f, .albedo = glm::vec3(0.21f, 1.12f, 0.17f), .transparency = 0.71f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.21f, .reflectivity = 0.43f, .ior = 1.25f, .pad0 = 0.0f, .pad1 = 0.0f },
+    { .center = glm::vec3( 3.0f,  17.0f,      1.2f), .radius =     4.2f, .albedo = glm::vec3(0.31f, 0.12f, 1.14f), .transparency = 0.43f, .emission = glm::vec3(0.01, 0.20, 0.04), .energy = 0.11f, .reflectivity = 0.51f, .ior = 1.19f, .pad0 = 0.0f, .pad1 = 0.0f }
 };
 
 const int SPHERE_COUNT = sizeof(spheres) / sizeof(sphere_t);
@@ -102,7 +102,7 @@ struct demo_window_t : public imgui_window_t
 
         sphere_t& sphere = spheres[index];
 
-        if (ImGui::CollapsingHeader("Center and radius"))
+        if ((index != 0) && ImGui::CollapsingHeader("Center and radius"))
         {
             params_changed |= ImGui::SliderFloat("X", &sphere.center.x, -50.0f, 4.0f, "X = %.3f");
             params_changed |= ImGui::SliderFloat("Y", &sphere.center.y, -50.0f, 4.0f, "Y = %.3f");
@@ -198,8 +198,8 @@ int main(int argc, char* argv[])
     GLuint raytrace_image;
     glGenTextures(1, &raytrace_image);
     glBindTexture(GL_TEXTURE_2D, raytrace_image);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA32F, res_x, res_y);
-    glBindImageTexture(0, raytrace_image, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, res_x, res_y);
+    glBindImageTexture(0, raytrace_image, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
 
     //===================================================================================================================================================================================================================
     // Global GL settings : DEPTH not needed, hence disabled
@@ -215,11 +215,7 @@ int main(int argc, char* argv[])
         window.new_frame();
 
         if (window.params_changed)
-        {
-            glBindBuffer(GL_UNIFORM_BUFFER, ubo_id);
             glBufferData(GL_UNIFORM_BUFFER, sizeof(spheres), spheres, GL_DYNAMIC_DRAW);
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);
-        }
 
         //===============================================================================================================================================================================================================
         // ray trace the scene
