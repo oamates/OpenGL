@@ -2,7 +2,7 @@
 
 in vec3 position_ws;
 
-uniform samplerCube environmentMap;
+uniform samplerCube environment_map;
 uniform float roughness;
 
 out vec4 FragmentColor;
@@ -118,7 +118,7 @@ void main()
             float saSample = 1.0 / (float(SAMPLE_COUNT) * pdf + 0.0001);
             float mipLevel = (roughness == 0.0) ? 0.0 : 0.5 * log2(saSample / saTexel); 
             
-            prefilteredColor += textureLod(environmentMap, L, mipLevel).rgb * NdotL;
+            prefilteredColor += textureLod(environment_map, L, mipLevel).rgb * NdotL;
             totalWeight += NdotL;
         }
     }

@@ -1,15 +1,20 @@
 #version 330 core
 
-layout (location = 0) in vec3 position_in;
+out vec3 view;
 
-uniform mat4 projection_matrix;
-uniform mat4 view_matrix;
+const vec2 uvs[4] = vec2[4] 
+(
+    vec2(-1.0f,  1.0f),
+    vec2(-1.0f, -1.0f),
+    vec2( 1.0f,  1.0f),
+    vec2( 1.0f, -1.0f)
+);
 
-out vec3 position_ws;
-
+uniform mat3 camera_matrix;
+ 
 void main()
 {
-    position_ws = position_in;  
-
-    gl_Position = projection_matrix * view_matrix * vec4(position_in, 1.0);
+    vec2 q = uvs[gl_VertexID];
+    gl_Position = vec4(q, 0.0f, 1.0f);
+    view = camera_matrix * vec3(q, 1.0);
 }

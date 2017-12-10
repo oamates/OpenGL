@@ -51,6 +51,7 @@ struct demo_window_t : public imgui_window_t
     camera_t camera;
     bool params_changed;
     int index = 0;
+    int depth = 8;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : imgui_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true*/ ),
@@ -85,6 +86,8 @@ struct demo_window_t : public imgui_window_t
         ImGui::SetNextWindowSize(ImVec2(768, 768), ImGuiWindowFlags_NoResize | ImGuiSetCond_FirstUseEver);
         ImGui::Begin("Raytrace Demo", 0);
         ImGui::Text("Application average framerate (%.3f FPS)", ImGui::GetIO().Framerate);
+
+        ImGui::SliderInt("Layers", &depth, 1, 16);
 
         ImGui::Text("Sphere index");
 
@@ -160,10 +163,10 @@ int main(int argc, char* argv[])
 
     uniform_t uni_rt_camera_ws = ray_tracer["camera_ws"];
     uniform_t uni_rt_camera_matrix = ray_tracer["camera_matrix"];
+    uniform_t uni_rt_depth = ray_tracer["depth"];
 
     ray_tracer["inv_res"] = glm::vec2(1.0f / res_x, 1.0f / res_y);
     ray_tracer["focal_scale"] = window.camera.focal_scale();
-    ray_tracer["depth"] = 6;
     ray_tracer["sphere_count"] = 8;
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/render.vs"),
@@ -226,6 +229,7 @@ int main(int argc, char* argv[])
         glm::vec3 camera_ws = glm::vec3(cmatrix4x4[3]);
 
         ray_tracer.enable();
+        uni_rt_depth = window.depth;
         uni_rt_camera_ws = camera_ws;
         uni_rt_camera_matrix = camera_matrix;
 
@@ -239,8 +243,6 @@ int main(int argc, char* argv[])
         quad_renderer.enable();
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         
-        window.end_frame();
-
         //===============================================================================================================================================================================================================
         // After end_frame call ::
         //  - GL_DEPTH_TEST is disabled

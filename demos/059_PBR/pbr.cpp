@@ -9,6 +9,8 @@
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/random.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include "image/stb_image.h"
 
@@ -27,12 +29,13 @@ struct demo_window_t : public glfw_window_t
     camera_t camera;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, true */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true)
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
+    bool env_map = true;
     //===================================================================================================================================================================================================================
     // event handlers
     //===================================================================================================================================================================================================================
@@ -42,6 +45,9 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
+
+        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
+            env_map = !env_map;
     }
 
     void on_mouse_move() override
@@ -52,9 +58,102 @@ struct demo_window_t : public glfw_window_t
     }
 };
 
-void renderSphere();
+struct pbr_material_t
+{
+    GLuint albedo_map;
+    GLuint normal_map;
+    GLuint metallic_map;
+    GLuint roughness_map;
+    GLuint ao_map;
+};
+
 void renderCube();
 void RenderQuad();
+
+struct sphere_t
+{
+    vao_t vao;
+
+    sphere_t(int res_x, int res_y)
+    {
+        int V = (res_x + 1) * (res_y + 1);
+        int I = 2 * (res_x + 1) * res_y;
+
+        vertex_pnt2_t* vertices = (vertex_pnt2_t*) malloc(V * sizeof(vertex_pnt2_t));
+        GLuint* indices = (GLuint*) malloc (I * sizeof(GLuint));
+
+        int v = 0;
+        for (int y = 0; y <= res_y; ++y)
+        {
+            for (int x = 0; x <= res_x; ++x)
+            {
+                glm::vec2 uv = glm::vec2(x, y) / glm::vec2(res_x, res_y);
+                glm::vec3 position;
+
+                float sn_y = glm::sin(uv.y * constants::pi);
+                position.x = glm::cos(uv.x * constants::two_pi) * sn_y;
+                position.y = glm::cos(uv.y * constants::pi);
+                position.z = glm::sin(uv.x * constants::two_pi) * sn_y;
+
+                vertices[v++] = vertex_pnt2_t(position, position, uv);
+            }
+        }
+
+        bool even_row = true;
+        int i = 0;
+        for (int y = 0; y < res_y; ++y)
+        {
+            if (even_row) // even rows: y == 0, y == 2; and so on
+            {
+                for (int x = 0; x <= res_x; ++x)
+                {
+                    indices[i++] = y * (res_x + 1) + x;
+                    indices[i++] = (y + 1) * (res_x + 1) + x;
+                }
+            }
+            else
+            {
+                for (int x = res_x; x >= 0; --x)
+                {
+                    indices[i++] = (y + 1) * (res_x + 1) + x;
+                    indices[i++] = y * (res_x + 1) + x;
+                }
+            }
+            even_row = !even_row;
+        }
+
+        vao = vao_t(GL_TRIANGLE_STRIP, vertices, V, indices, I);
+
+        free(vertices);
+        free(indices);
+    }
+
+    void render()
+        { vao.render(); }
+};
+
+//=======================================================================================================================================================================================================================
+// lights
+//=======================================================================================================================================================================================================================
+const int light_count = 4;
+
+glm::vec3 light_positions[light_count] = 
+{
+    glm::vec3(-10.0f,  10.0f, 10.0f),
+    glm::vec3( 10.0f,  10.0f, 10.0f),
+    glm::vec3(-10.0f, -10.0f, 10.0f),
+    glm::vec3( 10.0f, -10.0f, 10.0f),
+};
+
+glm::vec3 light_colors[light_count] = 
+{
+    glm::vec3(300.0f, 300.0f,   0.0f),
+    glm::vec3(300.0f,   0.0f, 300.0f),
+    glm::vec3(  0.0f, 300.0f, 300.0f),
+    glm::vec3(300.0f, 300.0f,   0.0f)
+};
+
+
 
 //=======================================================================================================================================================================================================================
 // program entry point
@@ -70,183 +169,176 @@ int main(int argc, char *argv[])
 
     demo_window_t window("Physics-Based Rendering", 4, 3, 3, 1920, 1080);
 
-    // Setup OpenGL state
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-    glm::mat4 projection_matrix = window.camera.projection_matrix;
-
     //===================================================================================================================================================================================================================
-    // lights
-    //===================================================================================================================================================================================================================
-    const int NR_LIGHTS = 4;
-    glm::vec3 lightPositions[NR_LIGHTS] = {
-        glm::vec3(-10.0f,  10.0f, 10.0f),
-        glm::vec3( 10.0f,  10.0f, 10.0f),
-        glm::vec3(-10.0f, -10.0f, 10.0f),
-        glm::vec3( 10.0f, -10.0f, 10.0f),
-    };
-    glm::vec3 lightColors[NR_LIGHTS] = {
-        glm::vec3(300.0f, 300.0f,   0.0f),
-        glm::vec3(300.0f,   0.0f, 300.0f),
-        glm::vec3(  0.0f, 300.0f, 300.0f),
-        glm::vec3(300.0f, 300.0f,   0.0f)
-    };
-
-    //===================================================================================================================================================================================================================
-    // load and initialize shaders
+    // main PBR shader initialization
     //===================================================================================================================================================================================================================
     glsl_program_t pbr_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/pbr.vs"),
                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/pbr.fs"));
     pbr_shader.enable();
-    pbr_shader["irradianceMap"] = 0;
-    pbr_shader["prefilterMap"]  = 1;
-    pbr_shader["brdfLUT"]       = 2;
-    pbr_shader["albedoMap"]     = 3;
-    pbr_shader["normalMap"]     = 4;
-    pbr_shader["metallicMap"]   = 5;
-    pbr_shader["roughnessMap"]  = 6;
-    pbr_shader["aoMap"]         = 7;
+    pbr_shader["irradiance_map"] = 0;
+    pbr_shader["prefilter_map"]  = 1;
+    pbr_shader["brdf"]           = 2;
+    pbr_shader["albedo_map"]     = 3;
+    pbr_shader["normal_map"]     = 4;
+    pbr_shader["metallic_map"]   = 5;
+    pbr_shader["roughness_map"]  = 6;
+    pbr_shader["ao_map"]         = 7;
 
-    uniform_t uni_pbr_pv_matrix = pbr_shader["projection_view_matrix"];
-    uniform_t uni_pbr_model_matrix = pbr_shader["model_matrix"];
-    uniform_t uni_pbr_camera_ws = pbr_shader["camera_ws"];
-    uniform_t uni_pbr_lightPositions = pbr_shader["lightPositions"];
-    uniform_t uni_pbr_lightColors = pbr_shader["lightColors"];
-    uni_pbr_lightPositions = lightPositions;
-    uni_pbr_lightColors = lightColors;
-
-    glsl_program_t background_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/background.vs"),
-                                     glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/background.fs"));
-    background_shader.enable();
-    background_shader["environmentMap"] = 0;
-    background_shader["projection_matrix"] = projection_matrix;
-    uniform_t uni_bg_view_matrix = background_shader["view_matrix"];
+    uniform_t uni_pbr_pv_matrix       = pbr_shader["projection_view_matrix"];
+    uniform_t uni_pbr_model_matrix    = pbr_shader["model_matrix"];
+    uniform_t uni_pbr_camera_ws       = pbr_shader["camera_ws"];
+    uniform_t uni_pbr_light_positions = pbr_shader["light_positions"];
+    uniform_t uni_pbr_light_colors    = pbr_shader["light_colors"];
+    uni_pbr_light_positions           = light_positions;
+    uni_pbr_light_colors              = light_colors;
 
     //===================================================================================================================================================================================================================
-    // load PBR material textures
+    // environmant (skybox) shader initialization
+    // assumes SRGB input and does HDR tonemap and gamma correction
     //===================================================================================================================================================================================================================
-
-    // rusted iron
-    GLuint ironAlbedoMap       = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/albedo.png");
-    GLuint ironNormalMap       = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/normal.png");
-    GLuint ironMetallicMap     = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/metallic.png");
-    GLuint ironRoughnessMap    = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/roughness.png");
-    GLuint ironAOMap           = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/ao.png");
-
-    // gold
-    GLuint goldAlbedoMap       = image::png::texture2d("../../../resources/tex2d/pbr/gold/albedo.png");
-    GLuint goldNormalMap       = image::png::texture2d("../../../resources/tex2d/pbr/gold/normal.png");
-    GLuint goldMetallicMap     = image::png::texture2d("../../../resources/tex2d/pbr/gold/metallic.png");
-    GLuint goldRoughnessMap    = image::png::texture2d("../../../resources/tex2d/pbr/gold/roughness.png");
-    GLuint goldAOMap           = image::png::texture2d("../../../resources/tex2d/pbr/gold/ao.png");
-
-    // grass
-    GLuint grassAlbedoMap      = image::png::texture2d("../../../resources/tex2d/pbr/grass/albedo.png");
-    GLuint grassNormalMap      = image::png::texture2d("../../../resources/tex2d/pbr/grass/normal.png");
-    GLuint grassMetallicMap    = image::png::texture2d("../../../resources/tex2d/pbr/grass/metallic.png");
-    GLuint grassRoughnessMap   = image::png::texture2d("../../../resources/tex2d/pbr/grass/roughness.png");
-    GLuint grassAOMap          = image::png::texture2d("../../../resources/tex2d/pbr/grass/ao.png");
-
-    // plastic
-    GLuint plasticAlbedoMap    = image::png::texture2d("../../../resources/tex2d/pbr/plastic/albedo.png");
-    GLuint plasticNormalMap    = image::png::texture2d("../../../resources/tex2d/pbr/plastic/normal.png");
-    GLuint plasticMetallicMap  = image::png::texture2d("../../../resources/tex2d/pbr/plastic/metallic.png");
-    GLuint plasticRoughnessMap = image::png::texture2d("../../../resources/tex2d/pbr/plastic/roughness.png");
-    GLuint plasticAOMap        = image::png::texture2d("../../../resources/tex2d/pbr/plastic/ao.png");
-
-    // wall
-    GLuint wallAlbedoMap       = image::png::texture2d("../../../resources/tex2d/pbr/wall/albedo.png");
-    GLuint wallNormalMap       = image::png::texture2d("../../../resources/tex2d/pbr/wall/normal.png");
-    GLuint wallMetallicMap     = image::png::texture2d("../../../resources/tex2d/pbr/wall/metallic.png");
-    GLuint wallRoughnessMap    = image::png::texture2d("../../../resources/tex2d/pbr/wall/roughness.png");
-    GLuint wallAOMap           = image::png::texture2d("../../../resources/tex2d/pbr/wall/ao.png");
+    glsl_program_t env_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/env.vs"),
+                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/env.fs"));
+    env_shader.enable();
+    uniform_t uni_env_view_matrix = env_shader["view_matrix"];
+    env_shader["environment_map"] = 0;
+    env_shader["projection_matrix"] = window.camera.projection_matrix;
 
     //===================================================================================================================================================================================================================
-    // pbr: setup framebuffer
+    // load PBR materials : 
+    // TODO :: combine metallic + roughness + ao into a single texture
     //===================================================================================================================================================================================================================
-    GLuint fbo_id;
-    glGenFramebuffers(1, &fbo_id);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
+    pbr_material_t pbr_materials[] = 
+    {
+        {   // rusted iron material
+            .albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/albedo.png"),
+            .normal_map    = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/normal.png"),
+            .metallic_map  = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/metallic.png"),
+            .roughness_map = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/roughness.png"),
+            .ao_map        = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/ao.png")
+        },
+        {   // gold
+            .albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/gold/albedo.png"),
+            .normal_map    = image::png::texture2d("../../../resources/tex2d/pbr/gold/normal.png"),
+            .metallic_map  = image::png::texture2d("../../../resources/tex2d/pbr/gold/metallic.png"),
+            .roughness_map = image::png::texture2d("../../../resources/tex2d/pbr/gold/roughness.png"),
+            .ao_map        = image::png::texture2d("../../../resources/tex2d/pbr/gold/ao.png")
+        },
+        {   // grass
+            .albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/grass/albedo.png"),
+            .normal_map    = image::png::texture2d("../../../resources/tex2d/pbr/grass/normal.png"),
+            .metallic_map  = image::png::texture2d("../../../resources/tex2d/pbr/grass/metallic.png"),
+            .roughness_map = image::png::texture2d("../../../resources/tex2d/pbr/grass/roughness.png"),
+            .ao_map        = image::png::texture2d("../../../resources/tex2d/pbr/grass/ao.png")
+        },
+        {   // plastic
+            .albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/plastic/albedo.png"),
+            .normal_map    = image::png::texture2d("../../../resources/tex2d/pbr/plastic/normal.png"),
+            .metallic_map  = image::png::texture2d("../../../resources/tex2d/pbr/plastic/metallic.png"),
+            .roughness_map = image::png::texture2d("../../../resources/tex2d/pbr/plastic/roughness.png"),
+            .ao_map        = image::png::texture2d("../../../resources/tex2d/pbr/plastic/ao.png")
+        },
+        {
+            // wall
+            .albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/wall/albedo.png"),
+            .normal_map    = image::png::texture2d("../../../resources/tex2d/pbr/wall/normal.png"),
+            .metallic_map  = image::png::texture2d("../../../resources/tex2d/pbr/wall/metallic.png"),
+            .roughness_map = image::png::texture2d("../../../resources/tex2d/pbr/wall/roughness.png"),
+            .ao_map        = image::png::texture2d("../../../resources/tex2d/pbr/wall/ao.png")
+        }
+    };
 
-    GLuint rbo_id;
-    glGenRenderbuffers(1, &rbo_id);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo_id);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_id);
+    const int pbr_material_count = sizeof(pbr_materials) / sizeof(pbr_material_t);
 
     //===================================================================================================================================================================================================================
-    // pbr: load the HDR environment map
+    // load the HDR environment map to unit 0
     //===================================================================================================================================================================================================================
+    glActiveTexture(GL_TEXTURE0);
     stbi_set_flip_vertically_on_load(true);
-    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/kiara_8_sunset_4k.hdr", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     //===================================================================================================================================================================================================================
-    // pbr: setup cubemap to render to and attach to framebuffer
+    // setup cubemap in unit 1 to render to and attach to framebuffer
     //===================================================================================================================================================================================================================
+    const int ENV_TEX_LEVELS = 10;
+    const int ENV_TEX_RESOLUTION = 1 << (ENV_TEX_LEVELS - 1);
+
+    glActiveTexture(GL_TEXTURE1);
     GLuint environment_cubemap;
     glGenTextures(1, &environment_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-    for (GLuint i = 0; i < 6; ++i)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 512, 512, 0, GL_RGB, GL_FLOAT, 0);
-
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, ENV_TEX_LEVELS, GL_RGB16F, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);      
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // enable pre-filter mipmap sampling (combatting visible dots artifact)
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   
     //===================================================================================================================================================================================================================
     // pbr: set up projection and view matrices for capturing data onto the 6 cubemap face directions
     //===================================================================================================================================================================================================================
-    const glm::mat4 hdr_projection_matrix = glm::perspective(constants::half_pi, 1.0f, 0.125f, 8.0f);
-    const glm::mat4 hdr_view_matrix[] =
+    const glm::mat3 cubemap_camera_matrix[] = 
     {
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+        glm::mat3(glm::vec3( 0.0f, 0.0f, -1.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f)),
+        glm::mat3(glm::vec3( 0.0f, 0.0f,  1.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f)),
+        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f)),
+        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f)),
+        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f)),
+        glm::mat3(glm::vec3(-1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3( 0.0f,  0.0f, -1.0f))
     };
 
-    glsl_shader_t cubemap_vertex(GL_VERTEX_SHADER, "glsl/cubemap.vs");
+    //===================================================================================================================================================================================================================
+    // fake VAO for full viewport quad rendering
+    //===================================================================================================================================================================================================================
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+    glsl_shader_t cubemap_vs(GL_VERTEX_SHADER, "glsl/cubemap.vs");
 
     //===================================================================================================================================================================================================================
-    // pbr: convert HDR equirectangular environment map to cubemap equivalent and let OpenGL generate mipmaps from the first mip face
+    // shader that converts HDR equirectangular environment map to cubemap equivalent
     //===================================================================================================================================================================================================================
-    glsl_program_t hdr_projector(cubemap_vertex, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hdr_projector.fs"));
+    glsl_program_t hdr_projector(cubemap_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hdr_projector.fs"));
 
     hdr_projector.enable();
-    hdr_projector["equirectangularMap"] = 0;
-    hdr_projector["projection_matrix"] = hdr_projection_matrix;
-    uniform_t uni_hp_view_matrix = hdr_projector["view_matrix"];
+    uniform_t uni_hp_camera_matrix = hdr_projector["camera_matrix"];
+    hdr_projector["equirectangular_map"] = 0;
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, hdr_texture_id);
+    //===================================================================================================================================================================================================================
+    // setup framebuffer
+    //===================================================================================================================================================================================================================
+    GLuint fbo_id;
+    glGenFramebuffers(1, &fbo_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
 
-    glViewport(0, 0, 512, 512);
+    glDisable(GL_DEPTH_TEST);
+    glViewport(0, 0, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);
     for (GLuint i = 0; i < 6; ++i)
     {
-        uni_hp_view_matrix = hdr_view_matrix[i];
+        uni_hp_camera_matrix = cubemap_camera_matrix[i];
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, environment_cubemap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        renderCube();
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
-    glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
+    //===================================================================================================================================================================================================================
+    // let OpenGL generate mipmaps from the first mip face
+    //===================================================================================================================================================================================================================
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
     //===================================================================================================================================================================================================================
     // pbr: create an irradiance cubemap, and re-scale capture FBO to irradiance scale
     //===================================================================================================================================================================================================================
+    const int IRRADIANCE_TEX_RESOLUTION = 32;
+
     GLuint irradiance_cubemap;
     glGenTextures(1, &irradiance_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_cubemap);
-    for (GLuint i = 0; i < 6; ++i)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB32F, 32, 32, 0, GL_RGB, GL_FLOAT, 0);
-
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGB32F, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);      
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -254,26 +346,27 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     //===================================================================================================================================================================================================================
-    // pbr: solve diffuse integral by convolution to create irradiance cubemap
+    // create irradiance cubemap by computing spherical convolution of environment map with ... kernel 
     //===================================================================================================================================================================================================================
-    glsl_program_t irradianceShader(cubemap_vertex, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/irradiance_convolution.fs"));
+    glsl_program_t irradiance_conv(cubemap_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/irradiance_conv.fs"));
 
-    irradianceShader.enable();
-    irradianceShader["environmentMap"] = 0;
+    irradiance_conv.enable();
+    irradiance_conv["environment_map"] = 0;
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-    irradianceShader["projection_matrix"] = hdr_projection_matrix;
+    uniform_t uni_ic_camera_matrix = irradiance_conv["camera_matrix"];
 
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
-    glViewport(0, 0, 32, 32);
+    glViewport(0, 0, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);
 
     for (GLuint i = 0; i < 6; ++i)
     {
-        irradianceShader["view_matrix"] = hdr_view_matrix[i];
+        uni_ic_camera_matrix = cubemap_camera_matrix[i];
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradiance_cubemap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        renderCube();
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
+
+/*
 
     //===================================================================================================================================================================================================================
     // pbr: create a pre-filter cubemap, and re-scale capture FBO to pre-filter scale
@@ -297,7 +390,7 @@ int main(int argc, char *argv[])
     glsl_program_t prefilterShader(cubemap_vertex, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/prefilter.fs"));
 
     prefilterShader.enable();
-    prefilterShader["environmentMap"] = 0;
+    prefilterShader["environment_map"] = 0;
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
     prefilterShader["projection_matrix"] = hdr_projection_matrix;
@@ -350,20 +443,21 @@ int main(int argc, char *argv[])
     RenderQuad();
 
 
-    //===================================================================================================================================================================================================================
-    // then before rendering, configure the viewport to the actual screen dimensions
-    //===================================================================================================================================================================================================================
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, window.res_x, window.res_y);
-
 
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
     quad_renderer["tex2d"] = 0;
 
-    GLuint vao_id;
-    glGenVertexArrays(1, &vao_id);
+
+
+    sphere_t sphere(64, 64);
+*/
+    //===================================================================================================================================================================================================================
+    // then before rendering, configure the viewport to the actual screen dimensions
+    //===================================================================================================================================================================================================================
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, window.res_x, window.res_y);
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -372,18 +466,13 @@ int main(int argc, char *argv[])
     {
         window.new_frame();
 
-/*
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, hdr_texture_id);
-        glBindVertexArray(vao_id);
-        quad_renderer.enable();
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);        
-*/
-
         GLfloat time = window.frame_ts;
         glm::vec3 camera_ws = window.camera.position();
         glm::mat4& view_matrix = window.camera.view_matrix;
+        glm::mat3 view_matrix3 = glm::mat3(view_matrix);
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+
+/*
 
         //===============================================================================================================================================================================================================
         // clear the colorbuffer
@@ -395,7 +484,6 @@ int main(int argc, char *argv[])
         // render scene, supplying the convoluted irradiance map to the final shader
         //===============================================================================================================================================================================================================
         pbr_shader.enable();
-        glm::mat4 model;
         glm::mat4 view = window.camera.view_matrix;
         uni_pbr_pv_matrix = projection_view_matrix;
         uni_pbr_camera_ws = camera_ws;
@@ -410,109 +498,55 @@ int main(int argc, char *argv[])
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
 
-        //===============================================================================================================================================================================================================
-        // rusted iron
-        //===============================================================================================================================================================================================================
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, ironAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, ironNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, ironMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, ironRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, ironAOMap);
-        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-5.0f, 0.0f, 2.0f));
-        renderSphere();
+
+        glm::vec3 sphere_centers[] = 
+        {
+            glm::vec3(-5.0f, 0.0f, 2.0f),
+            glm::vec3(-3.0f, 0.0f, 2.0f),
+            glm::vec3(-1.0f, 0.0f, 2.0f),
+            glm::vec3( 1.0f, 0.0f, 2.0f),
+            glm::vec3( 3.0f, 0.0f, 2.0f)
+        };
 
         //===============================================================================================================================================================================================================
-        // gold
+        // render 5 spheres with different material textures
         //===============================================================================================================================================================================================================
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, goldAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, goldNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, goldMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, goldRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, goldAOMap);
-        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-3.0f, 0.0f, 2.0f));
-        renderSphere();
+        for (int m = 0; m < pbr_material_count; ++m)
+        {
+            glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].albedo_map);
+            glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].normal_map);
+            glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].metallic_map);
+            glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].roughness_map);
+            glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].ao_map);
+            uni_pbr_model_matrix = glm::translate(sphere_centers[m]);
+            sphere.render();
+        }
 
-        //===============================================================================================================================================================================================================
-        // grass
-        //===============================================================================================================================================================================================================
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, grassAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, grassNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, grassMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, grassRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, grassAOMap);
-        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 2.0f));
-        renderSphere();
-
-        //===============================================================================================================================================================================================================
-        // plastic
-        //===============================================================================================================================================================================================================
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, plasticAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, plasticNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, plasticMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, plasticRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, plasticAOMap);
-        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 2.0f));
-        renderSphere();
-
-        //===============================================================================================================================================================================================================
-        // wall
-        //===============================================================================================================================================================================================================
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, wallAlbedoMap);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, wallNormalMap);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, wallMetallicMap);
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, wallRoughnessMap);
-        glActiveTexture(GL_TEXTURE7);
-        glBindTexture(GL_TEXTURE_2D, wallAOMap);
-        uni_pbr_model_matrix = glm::translate(glm::mat4(1.0f), glm::vec3(3.0f, 0.0f, 2.0f));
-        renderSphere();
- 
         //===============================================================================================================================================================================================================
         // render light source (simply re-render sphere at light positions)
         // this looks a bit off as we use the same shader, but it'll make their positions obvious and 
         // keeps the codeprint small.
         //===============================================================================================================================================================================================================
-        for (GLuint i = 0; i < NR_LIGHTS; ++i)
+        for (GLuint i = 0; i < light_count; ++i)
         {
-            glm::vec3 newPos = lightPositions[i] + glm::vec3(5.0f * sin(0.5f * time), 0.0f, 0.0f);
-            lightPositions[i] = newPos;
-            uni_pbr_model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), newPos), glm::vec3(0.5f));
-            renderSphere();
+            glm::vec3 new_position = light_positions[i] + glm::vec3(5.0f * sin(0.5f * time), 0.0f, 0.0f);
+            light_positions[i] = new_position;
+            uni_pbr_model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), new_position), glm::vec3(0.5f));
+            sphere.render();
         }
-        uni_pbr_lightPositions = lightPositions;
-
+        uni_pbr_light_positions = light_positions;
+*/
         //===============================================================================================================================================================================================================
         // render skybox (render as last to prevent overdraw)
         //===============================================================================================================================================================================================================
-        background_shader.enable();
-        uni_bg_view_matrix = view_matrix;
+
+
+        env_shader.enable();
+        uni_env_view_matrix = view_matrix3;
         glActiveTexture(GL_TEXTURE0);
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_cubemap); // display irradiance map
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_cubemap); // display prefilter map
+//        glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, window.env_map ? environment_cubemap : irradiance_cubemap); // display irradiance map
+        //glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_cubemap); // display prefilter map
         renderCube();
 
         //===============================================================================================================================================================================================================
@@ -521,8 +555,8 @@ int main(int argc, char *argv[])
         // RenderQuad();
         //===============================================================================================================================================================================================================
 
-        brdfShader.enable();
-        RenderQuad();
+        //brdfShader.enable();
+        //RenderQuad();
 
         window.end_frame();
     }
@@ -532,101 +566,6 @@ int main(int argc, char *argv[])
 }
 
 
-GLuint sphereVAO = 0;
-unsigned int indexCount;
-
-void renderSphere()
-{
-    if (sphereVAO == 0)
-    {
-        glGenVertexArrays(1, &sphereVAO);
-
-        unsigned int vbo, ebo;
-        glGenBuffers(1, &vbo);
-        glGenBuffers(1, &ebo);
-
-        std::vector<glm::vec3> positions;
-        std::vector<glm::vec3> normals;
-        std::vector<glm::vec2> uv;
-        std::vector<unsigned int> indices;
-
-        const unsigned int X_SEGMENTS = 64;
-        const unsigned int Y_SEGMENTS = 64;
-        const float PI = 3.14159265359;
-        for (unsigned int y = 0; y <= Y_SEGMENTS; ++y)
-        {
-            for (unsigned int x = 0; x <= X_SEGMENTS; ++x)
-            {
-                float xSegment = (float)x / (float)X_SEGMENTS;
-                float ySegment = (float)y / (float)Y_SEGMENTS;
-                float xPos = std::cos(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
-                float yPos = std::cos(ySegment * PI);
-                float zPos = std::sin(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
-
-                positions.push_back(glm::vec3(xPos, yPos, zPos));
-                uv.push_back(glm::vec2(xSegment, ySegment));
-                normals.push_back(glm::vec3(xPos, yPos, zPos));
-            }
-        }
-
-        bool oddRow = false;
-        for (int y = 0; y < Y_SEGMENTS; ++y)
-        {
-            if (!oddRow) // even rows: y == 0, y == 2; and so on
-            {
-                for (int x = 0; x <= X_SEGMENTS; ++x)
-                {
-                    indices.push_back(y       * (X_SEGMENTS + 1) + x);
-                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
-                }
-            }
-            else
-            {
-                for (int x = X_SEGMENTS; x >= 0; --x)
-                {
-                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + x);
-                    indices.push_back(y       * (X_SEGMENTS + 1) + x);
-                }
-            }
-            oddRow = !oddRow;
-        }
-        indexCount = indices.size();
-
-        std::vector<float> data;
-        for (int i = 0; i < positions.size(); ++i)
-        {
-            data.push_back(positions[i].x);
-            data.push_back(positions[i].y);
-            data.push_back(positions[i].z);
-            if (uv.size() > 0)
-            {
-                data.push_back(uv[i].x);
-                data.push_back(uv[i].y);
-            }
-            if (normals.size() > 0)
-            {
-                data.push_back(normals[i].x);
-                data.push_back(normals[i].y);
-                data.push_back(normals[i].z);
-            }
-        }
-        glBindVertexArray(sphereVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), &data[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
-        float stride = (3 + 2 + 3) * sizeof(float);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(5 * sizeof(float)));
-    }
-
-    glBindVertexArray(sphereVAO);
-    glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
-}
 // RenderCube() Renders a 1x1 3D cube in NDC.
 GLuint cubeVAO = 0;
 GLuint cubeVBO = 0;
