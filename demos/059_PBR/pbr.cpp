@@ -255,12 +255,12 @@ int main(int argc, char *argv[])
     // load the HDR environment map to unit 0
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-    stbi_set_flip_vertically_on_load(true);
+//    stbi_set_flip_vertically_on_load(true);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/kiara_8_sunset_4k.hdr", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     //===================================================================================================================================================================================================================
     // setup cubemap in unit 1 to render to and attach to framebuffer
@@ -284,12 +284,14 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     const glm::mat3 cubemap_camera_matrix[] = 
     {
-        glm::mat3(glm::vec3( 0.0f, 0.0f, -1.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f)),
-        glm::mat3(glm::vec3( 0.0f, 0.0f,  1.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f)),
-        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3( 0.0f, -1.0f,  0.0f)),
-        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3( 0.0f,  1.0f,  0.0f)),
-        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f)),
-        glm::mat3(glm::vec3(-1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3( 0.0f,  0.0f, -1.0f))
+        glm::mat3(glm::vec3( 0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f)),
+        glm::mat3(glm::vec3( 0.0f, 0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f)),
+
+        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f)),
+        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f)),
+
+        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f)),
+        glm::mat3(glm::vec3(-1.0f, 0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3( 0.0f,  0.0f, -1.0f))
     };
 
     //===================================================================================================================================================================================================================
@@ -333,7 +335,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // pbr: create an irradiance cubemap, and re-scale capture FBO to irradiance scale
     //===================================================================================================================================================================================================================
-    const int IRRADIANCE_TEX_RESOLUTION = 32;
+    const int IRRADIANCE_TEX_RESOLUTION = 64;
 
     GLuint irradiance_cubemap;
     glGenTextures(1, &irradiance_cubemap);
