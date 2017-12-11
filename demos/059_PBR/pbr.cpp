@@ -35,7 +35,8 @@ struct demo_window_t : public glfw_window_t
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
     }
 
-    bool env_map = true;
+    int env_map = 0;
+    int level = 0;
     //===================================================================================================================================================================================================================
     // event handlers
     //===================================================================================================================================================================================================================
@@ -47,7 +48,10 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
 
         if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
-            env_map = !env_map;
+            env_map = (env_map + 1) % 3;
+
+        if ((key == GLFW_KEY_SPACE) && (action == GLFW_RELEASE))
+            level = (level + 1) % 8;
     }
 
     void on_mouse_move() override
@@ -67,7 +71,6 @@ struct pbr_material_t
     GLuint ao_map;
 };
 
-void renderCube();
 void RenderQuad();
 
 struct sphere_t
@@ -169,7 +172,7 @@ int main(int argc, char *argv[])
 
     demo_window_t window("Physics-Based Rendering", 4, 3, 3, 1920, 1080);
 
-    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    //glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     //===================================================================================================================================================================================================================
     // main PBR shader initialization
@@ -193,17 +196,6 @@ int main(int argc, char *argv[])
     uniform_t uni_pbr_light_colors    = pbr_shader["light_colors"];
     uni_pbr_light_positions           = light_positions;
     uni_pbr_light_colors              = light_colors;
-
-    //===================================================================================================================================================================================================================
-    // environmant (skybox) shader initialization
-    // assumes SRGB input and does HDR tonemap and gamma correction
-    //===================================================================================================================================================================================================================
-    glsl_program_t env_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/env.vs"),
-                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/env.fs"));
-    env_shader.enable();
-    uniform_t uni_env_view_matrix = env_shader["view_matrix"];
-    env_shader["environment_map"] = 0;
-    env_shader["projection_matrix"] = window.camera.projection_matrix;
 
     //===================================================================================================================================================================================================================
     // load PBR materials : 
@@ -259,8 +251,8 @@ int main(int argc, char *argv[])
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/kiara_8_sunset_4k.hdr", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     //===================================================================================================================================================================================================================
     // setup cubemap in unit 1 to render to and attach to framebuffer
@@ -279,20 +271,6 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   
-    //===================================================================================================================================================================================================================
-    // pbr: set up projection and view matrices for capturing data onto the 6 cubemap face directions
-    //===================================================================================================================================================================================================================
-    const glm::mat3 cubemap_camera_matrix[] = 
-    {
-        glm::mat3(glm::vec3( 0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3( 1.0f,  0.0f,  0.0f)),
-        glm::mat3(glm::vec3( 0.0f, 0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(-1.0f,  0.0f,  0.0f)),
-
-        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3( 0.0f,  1.0f,  0.0f)),
-        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3( 0.0f, -1.0f,  0.0f)),
-
-        glm::mat3(glm::vec3( 1.0f, 0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3( 0.0f,  0.0f,  1.0f)),
-        glm::mat3(glm::vec3(-1.0f, 0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3( 0.0f,  0.0f, -1.0f))
-    };
 
     //===================================================================================================================================================================================================================
     // fake VAO for full viewport quad rendering
@@ -301,42 +279,32 @@ int main(int argc, char *argv[])
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
     glsl_shader_t cubemap_vs(GL_VERTEX_SHADER, "glsl/cubemap.vs");
+    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");
 
     //===================================================================================================================================================================================================================
     // shader that converts HDR equirectangular environment map to cubemap equivalent
     //===================================================================================================================================================================================================================
-    glsl_program_t hdr_projector(cubemap_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hdr_projector.fs"));
+    glsl_program_t hdr_projector(cubemap_vs, cubemap_gs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/hdr_projector.fs"));
 
     hdr_projector.enable();
-    uniform_t uni_hp_camera_matrix = hdr_projector["camera_matrix"];
     hdr_projector["equirectangular_map"] = 0;
 
     //===================================================================================================================================================================================================================
-    // setup framebuffer
+    // setup framebuffer and back project equirectangular map to cubemap, then let OpenGL generate mipmaps from the first mip face
     //===================================================================================================================================================================================================================
     GLuint fbo_id;
     glGenFramebuffers(1, &fbo_id);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_id);
-
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);
-    for (GLuint i = 0; i < 6; ++i)
-    {
-        uni_hp_camera_matrix = cubemap_camera_matrix[i];
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, environment_cubemap, 0);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    }
-
-    //===================================================================================================================================================================================================================
-    // let OpenGL generate mipmaps from the first mip face
-    //===================================================================================================================================================================================================================
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, environment_cubemap, 0);
+    glDrawArrays(GL_POINTS, 0, 1);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
     //===================================================================================================================================================================================================================
-    // pbr: create an irradiance cubemap, and re-scale capture FBO to irradiance scale
+    // create an irradiance cubemap, and re-scale capture FBO to irradiance scale
     //===================================================================================================================================================================================================================
     const int IRRADIANCE_TEX_RESOLUTION = 64;
-
     GLuint irradiance_cubemap;
     glGenTextures(1, &irradiance_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_cubemap);
@@ -348,76 +316,60 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     //===================================================================================================================================================================================================================
-    // create irradiance cubemap by computing spherical convolution of environment map with ... kernel 
+    // render to irradiance cubemap by computing spherical convolution of environment map with ... kernel 
     //===================================================================================================================================================================================================================
-    glsl_program_t irradiance_conv(cubemap_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/irradiance_conv.fs"));
+    glsl_program_t irradiance_conv(cubemap_vs, cubemap_gs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/irradiance_conv.fs"));
 
     irradiance_conv.enable();
     irradiance_conv["environment_map"] = 0;
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-    uniform_t uni_ic_camera_matrix = irradiance_conv["camera_matrix"];
-
     glViewport(0, 0, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, irradiance_cubemap, 0);
+    glDrawArrays(GL_POINTS, 0, 1);
 
-    for (GLuint i = 0; i < 6; ++i)
-    {
-        uni_ic_camera_matrix = cubemap_camera_matrix[i];
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradiance_cubemap, 0);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    }
 
-/*
 
     //===================================================================================================================================================================================================================
-    // pbr: create a pre-filter cubemap, and re-scale capture FBO to pre-filter scale
+    // create a pre-filter cubemap, and re-scale capture FBO to pre-filter scale
     //===================================================================================================================================================================================================================
+    const int PREFILTER_TEX_LEVELS = 8;
+    const int PREFILTER_TEX_RESOLUTION = 1 << (PREFILTER_TEX_LEVELS - 1);
+    
     GLuint prefilter_cubemap;
     glGenTextures(1, &prefilter_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_cubemap);
-    for (GLuint i = 0; i < 6; ++i)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, 0);
-
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, PREFILTER_TEX_LEVELS, GL_RGB16F, PREFILTER_TEX_RESOLUTION, PREFILTER_TEX_RESOLUTION);      
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // be sure to set minifcation filter to mip_linear 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
     //===================================================================================================================================================================================================================
-    // pbr: run a quasi monte-carlo simulation on the environment lighting to create a prefilter (cube)map.
+    // run a quasi monte-carlo simulation on the environment lighting to create prefilter cubemap
     //===================================================================================================================================================================================================================
-    glsl_program_t prefilterShader(cubemap_vertex, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/prefilter.fs"));
+    glsl_program_t prefilter(cubemap_vs, cubemap_gs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/prefilter.fs"));
 
-    prefilterShader.enable();
-    prefilterShader["environment_map"] = 0;
+    prefilter.enable();
+    prefilter["environment_map"] = 0;
+    uniform_t uni_pf_roughness = prefilter["roughness"];
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-    prefilterShader["projection_matrix"] = hdr_projection_matrix;
 
-    GLuint maxMipLevels = 5;
-    GLuint mipWidth = 128;
-    GLuint mipHeight = 128;
-    for (GLuint mip = 0; mip < maxMipLevels; ++mip)
+    GLuint mip_dim = PREFILTER_TEX_RESOLUTION;
+    for (GLuint level = 0; level < PREFILTER_TEX_LEVELS; ++level)
     {
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-        glViewport(0, 0, mipWidth, mipHeight);
-
-        float roughness = (float)mip / (float)(maxMipLevels - 1);
-        prefilterShader["roughness"] = roughness;
-        for (GLuint i = 0; i < 6; ++i)
-        {
-            prefilterShader["view_matrix"] = hdr_view_matrix[i];
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilter_cubemap, mip);
-
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderCube();
-        }
-        mipWidth >>= 1;
-        mipHeight >>= 1;
+        glViewport(0, 0, mip_dim, mip_dim);
+        float roughness = (float) level / (float)(PREFILTER_TEX_LEVELS - 1);
+        uni_pf_roughness = roughness;
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, prefilter_cubemap, level);
+        glDrawArrays(GL_POINTS, 0, 1);
+        mip_dim >>= 1;
     }
+
+/*
 
     //===================================================================================================================================================================================================================
     // pbr: generate a 2D LUT from the BRDF equations used.
@@ -455,6 +407,21 @@ int main(int argc, char *argv[])
 
     sphere_t sphere(64, 64);
 */
+
+    //===================================================================================================================================================================================================================
+    // environmant (skybox) shader initialization
+    // assumes SRGB input and does HDR tonemap and gamma correction
+    //===================================================================================================================================================================================================================
+    glsl_program_t env_shader(cubemap_vs,
+                              glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/cubemap_render.gs"),
+                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/cubemap_render.fs"));
+    env_shader.enable();
+    env_shader["environment_map"] = 0;
+    env_shader["projection_matrix"] = window.camera.projection_matrix;
+    uniform_t uni_env_view_matrix = env_shader["view_matrix"];
+    uniform_t uni_env_level = env_shader["level"];
+
+
     //===================================================================================================================================================================================================================
     // then before rendering, configure the viewport to the actual screen dimensions
     //===================================================================================================================================================================================================================
@@ -545,11 +512,11 @@ int main(int argc, char *argv[])
 
         env_shader.enable();
         uni_env_view_matrix = view_matrix3;
+        uni_env_level = (float) window.level;
         glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, window.env_map ? environment_cubemap : irradiance_cubemap); // display irradiance map
-        //glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_cubemap); // display prefilter map
-        renderCube();
+        glBindTexture(GL_TEXTURE_CUBE_MAP, (window.env_map == 0) ? environment_cubemap :
+                                           (window.env_map == 1) ? irradiance_cubemap : prefilter_cubemap); // display irradiance map
+        glDrawArrays(GL_POINTS, 0, 1);
 
         //===============================================================================================================================================================================================================
         // render BRDF map to screen
@@ -565,81 +532,6 @@ int main(int argc, char *argv[])
 
     glfw::terminate();
     return 0;
-}
-
-
-// RenderCube() Renders a 1x1 3D cube in NDC.
-GLuint cubeVAO = 0;
-GLuint cubeVBO = 0;
-void renderCube()
-{
-    // Initialize (if necessary)
-    if (cubeVAO == 0)
-    {
-        GLfloat vertices[] = {
-            // Back face
-            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // Bottom-left
-             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
-             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f,  // top-right
-            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f,  // bottom-left
-            -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f,// top-left
-            // Front face
-            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-             1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f,  // bottom-right
-             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f,  // top-right
-             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-            -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f,  // top-left
-            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f,  // bottom-left
-            // Left face
-            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-            -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
-            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f,  // bottom-left
-            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-            -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f,  // bottom-right
-            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-            // Right face
-             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
-             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f,  // bottom-right
-             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f,  // top-left
-             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
-            // Bottom face
-            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
-             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f,// bottom-left
-             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-            -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-            // Top face
-            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f,// top-left
-             1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
-             1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f,// top-left
-            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f // bottom-left        
-        };
-        glGenVertexArrays(1, &cubeVAO);
-        glGenBuffers(1, &cubeVBO);
-        // Fill buffer
-        glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        // Link vertex attributes
-        glBindVertexArray(cubeVAO);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(6 * sizeof(GLfloat)));
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-    }
-    // Render Cube
-    glBindVertexArray(cubeVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
 }
 
 // RenderQuad() Renders a 1x1 XY quad in NDC

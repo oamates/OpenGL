@@ -1,19 +1,21 @@
 #version 330 core
 
-layout (location = 0) in vec3 position_in;
+in vec3 ray;
 
-uniform mat4 projection_matrix;
-uniform mat3 view_matrix;
+uniform samplerCube environment_map;
+uniform float level;
 
-out vec3 position_ws;
+out vec4 FragmentColor;
 
 void main()
 {
-    position_ws = position_in;
-	vec4 position_clip = projection_matrix * vec4(view_matrix * position_in, 1.0f);
+    vec3 e = textureLod(environment_map, ray, level).rgb;
 
     //==========================================================================================================================================================
-    // Set fragment depth to projective infinity
+    // HDR tonemap and gamma correction
     //==========================================================================================================================================================    
-	gl_Position = position_clip.xyww;
+    e = e / (e + vec3(1.0f));
+    e = pow(e, vec3(1.0f / 2.2f));
+    
+    FragmentColor = vec4(e, 1.0f);
 }

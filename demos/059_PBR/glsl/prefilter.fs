@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec3 position_ws;
+in vec3 ray;
 
 uniform samplerCube environment_map;
 uniform float roughness;
@@ -77,7 +77,7 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 //==============================================================================================================================================================
 void main()
 {		
-    vec3 N = normalize(position_ws);
+    vec3 N = normalize(ray);
     
     //==========================================================================================================================================================
     // make the simplyfying assumption that V equals R equals the normal 

@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec3 view;
+in vec3 ray;
 
 uniform samplerCube environment_map;
 
@@ -17,7 +17,7 @@ const float delta = half_pi / Q;
 
 void main()
 {		
-    vec3 axis_z = normalize(view);
+    vec3 axis_z = normalize(ray);
     vec3 axis_x = normalize(cross(vec3(0.0f, 1.0f, 0.0f), axis_z));
     vec3 axis_y = cross(axis_z, axis_x);
 
@@ -66,5 +66,5 @@ void main()
 
     float inv_area = 0.25f / weight;
     FragmentColor = vec4(inv_area * irradiance, 1.0);
-    FragmentColor = texture(environment_map, view);
+    FragmentColor = texture(environment_map, ray);
 }
