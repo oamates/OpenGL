@@ -142,12 +142,13 @@ const int light_count = 4;
 
 glm::vec3 light_positions[light_count];
 
+const float luma = 96.0f;
 glm::vec3 light_colors[light_count] = 
 {
-    glm::vec3(96.0f, 96.0f,  0.0f),
-    glm::vec3( 0.0f,  0.0f, 96.0f),
-    glm::vec3( 0.0f, 96.0f,  0.0f),
-    glm::vec3(96.0f,  0.0f,  0.0f)
+    luma * glm::vec3(1.0f, 1.0f, 0.0f),
+    luma * glm::vec3(0.0f, 0.0f, 1.0f),
+    luma * glm::vec3(0.0f, 1.0f, 0.0f),
+    luma * glm::vec3(1.0f, 0.0f, 0.0f)
 };
 
 glm::vec2 uv0[light_count] = 
@@ -503,7 +504,7 @@ int main(int argc, char *argv[])
 
             light_positions[i] = glm::vec3((R + r * cos_2piu) * cos_2piv,
                                            (R + r * cos_2piu) * sin_2piv, r * sin_2piu);
-            uni_lr_color = light_colors[i];
+            uni_lr_color = light_colors[i] / luma;
             uni_lr_model_matrix = glm::scale(glm::translate(light_positions[i]), glm::vec3(0.225f));
             sphere.render();
         }
