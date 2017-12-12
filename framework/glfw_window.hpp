@@ -31,7 +31,7 @@ namespace glfw
 
 } // namespace glfw
 
-void APIENTRY debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
+void /* APIENTRY */ debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
 
 struct glfw_window_t
 {

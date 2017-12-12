@@ -30,8 +30,8 @@ void main()
         for(int v = 0; v < 4; ++v)
         {
             ray = cube_vertex[indices[idx++]];
-            vec4 position_clip = projection_matrix * vec4(view_matrix * ray, 1.0f);
-            gl_Position = position_clip.xyww;
+            vec4 position_clip = projection_matrix * vec4(view_matrix * ray, 0.0f);
+            gl_Position = position_clip;//.xyww;
             EmitVertex();
         }
         EndPrimitive();

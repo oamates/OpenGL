@@ -150,7 +150,7 @@ static void init()
 	createScene();
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     GLFWwindow* window = 0;
     

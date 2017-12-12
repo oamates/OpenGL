@@ -87,7 +87,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 vec2 IntegrateBRDF(float NdotV, float roughness)
 {
     vec3 V;
-    V.x = sqrt(1.0f - NdotV*NdotV);
+    V.x = sqrt(1.0f - NdotV * NdotV);
     V.y = 0.0f;
     V.z = NdotV;
 

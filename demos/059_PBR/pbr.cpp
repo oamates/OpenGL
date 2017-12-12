@@ -140,22 +140,31 @@ struct sphere_t
 //=======================================================================================================================================================================================================================
 const int light_count = 4;
 
-glm::vec3 light_positions[light_count] = 
-{
-    glm::vec3(-10.0f,  10.0f, 10.0f),
-    glm::vec3( 10.0f,  10.0f, 10.0f),
-    glm::vec3(-10.0f, -10.0f, 10.0f),
-    glm::vec3( 10.0f, -10.0f, 10.0f),
-};
+glm::vec3 light_positions[light_count];
 
 glm::vec3 light_colors[light_count] = 
 {
-    glm::vec3(300.0f, 300.0f,   0.0f),
-    glm::vec3(300.0f,   0.0f, 300.0f),
-    glm::vec3(  0.0f, 300.0f, 300.0f),
-    glm::vec3(300.0f, 300.0f,   0.0f)
+    glm::vec3(96.0f, 96.0f,  0.0f),
+    glm::vec3( 0.0f,  0.0f, 96.0f),
+    glm::vec3( 0.0f, 96.0f,  0.0f),
+    glm::vec3(96.0f,  0.0f,  0.0f)
 };
 
+glm::vec2 uv0[light_count] = 
+{
+    glm::vec2( 3.24182f,  1.23746f),
+    glm::vec2( 8.01346f, -9.18265f),
+    glm::vec2(-1.98346f, -7.20393f),
+    glm::vec2(-1.87934f,  9.87124f)
+};
+
+glm::vec2 uv1[light_count] = 
+{
+    glm::vec2(-0.12387f,  0.84136f),
+    glm::vec2( 0.44121f, -0.13718f),
+    glm::vec2( 0.19834f, -0.35836f),
+    glm::vec2(-0.21387f,  0.34725f)
+};
 
 
 //=======================================================================================================================================================================================================================
@@ -250,9 +259,9 @@ int main(int argc, char *argv[])
 //    stbi_set_flip_vertically_on_load(true);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/kiara_8_sunset_4k.hdr", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_CLAMP_TO_EDGE);
-//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     //===================================================================================================================================================================================================================
     // setup cubemap in unit 1 to render to and attach to framebuffer
@@ -264,7 +273,7 @@ int main(int argc, char *argv[])
     GLuint environment_cubemap;
     glGenTextures(1, &environment_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, ENV_TEX_LEVELS, GL_RGB16F, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);      
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, ENV_TEX_LEVELS, GL_RGBA32F, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);      
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -308,7 +317,7 @@ int main(int argc, char *argv[])
     GLuint irradiance_cubemap;
     glGenTextures(1, &irradiance_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_cubemap);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGB32F, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);      
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA32F, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);      
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -340,7 +349,7 @@ int main(int argc, char *argv[])
     GLuint prefilter_cubemap;
     glGenTextures(1, &prefilter_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_cubemap);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, PREFILTER_TEX_LEVELS, GL_RGB16F, PREFILTER_TEX_RESOLUTION, PREFILTER_TEX_RESOLUTION);      
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, PREFILTER_TEX_LEVELS, GL_RGBA32F, PREFILTER_TEX_RESOLUTION, PREFILTER_TEX_RESOLUTION);      
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -369,48 +378,50 @@ int main(int argc, char *argv[])
         mip_dim >>= 1;
     }
 
-/*
-
     //===================================================================================================================================================================================================================
     // pbr: generate a 2D LUT from the BRDF equations used.
     //===================================================================================================================================================================================================================
-    glsl_program_t brdfShader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/brdf.vs"),
-                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/brdf.fs"));
+    const int BRDF_TEXTURE_RESOLUTION = 512;
+    glsl_program_t brdf_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/brdf.vs"),
+                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/brdf.fs"));
 
     GLuint brdfLUTTexture;
     glGenTextures(1, &brdfLUTTexture);
     
     glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);                              // pre-allocate enough memory for the LUT texture.    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG32F, BRDF_TEXTURE_RESOLUTION, BRDF_TEXTURE_RESOLUTION);           // pre-allocate enough memory for the LUT texture.    
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);                                    // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // then re-configure capture framebuffer object and render screen-space quad with BRDF shader.
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, brdfLUTTexture, 0);
 
-    glViewport(0, 0, 512, 512);
-    brdfShader.enable();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    RenderQuad();
+    glViewport(0, 0, BRDF_TEXTURE_RESOLUTION, BRDF_TEXTURE_RESOLUTION);
+    brdf_shader.enable();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+    //===================================================================================================================================================================================================================
+    // light source rendering program
+    //===================================================================================================================================================================================================================
+    glsl_program_t light_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/light_renderer.vs"),
+                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/light_renderer.fs"));
 
+    uniform_t uni_lr_color        = light_renderer["color"];
+    uniform_t uni_lr_camera_ws    = light_renderer["camera_ws"];
+    uniform_t uni_lr_pv_matrix    = light_renderer["projection_view_matrix"];
+    uniform_t uni_lr_model_matrix = light_renderer["model_matrix"];
 
+    //===================================================================================================================================================================================================================
+    // helper shader program: renders texture onto screen
+    //===================================================================================================================================================================================================================
     glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
     quad_renderer["tex2d"] = 0;
 
-
-
-    sphere_t sphere(64, 64);
-*/
-
     //===================================================================================================================================================================================================================
-    // environmant (skybox) shader initialization
-    // assumes SRGB input and does HDR tonemap and gamma correction
+    // helper shader program: renders environmant (skybox), assumes SRGB input and does HDR tonemap and gamma correction
     //===================================================================================================================================================================================================================
     glsl_program_t env_shader(cubemap_vs,
                               glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/cubemap_render.gs"),
@@ -428,6 +439,27 @@ int main(int argc, char *argv[])
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, window.res_x, window.res_y);
 
+    sphere_t sphere(64, 64);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    glCullFace(GL_FRONT);
+
+    const float cs1 = 0.30901699437f;
+    const float sn1 = 0.95105651629f;
+    const float cs2 = 0.80901699437f;
+    const float sn2 = 0.58778525229f;
+
+    const glm::vec2 pentagon[5] = 
+    {
+        glm::vec2(1.0f, 0.0f),
+        glm::vec2( cs1,  sn1),
+        glm::vec2(-cs2,  sn2),
+        glm::vec2(-cs2, -sn2),
+        glm::vec2( cs1, -sn1)
+    };
+
+
     //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
@@ -435,19 +467,46 @@ int main(int argc, char *argv[])
     {
         window.new_frame();
 
-        GLfloat time = window.frame_ts;
+
         glm::vec3 camera_ws = window.camera.position();
         glm::mat4& view_matrix = window.camera.view_matrix;
         glm::mat3 view_matrix3 = glm::mat3(view_matrix);
         glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
-/*
+        //===============================================================================================================================================================================================================
+        // clear the colorbuffer: as we are rendering cubemap clearing color buffer is not necessary
+        //===============================================================================================================================================================================================================
+        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_CULL_FACE);
 
         //===============================================================================================================================================================================================================
-        // clear the colorbuffer
+        // render light sources as simple spheres
         //===============================================================================================================================================================================================================
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        light_renderer.enable();
+
+        uni_lr_camera_ws = camera_ws;
+        uni_lr_pv_matrix = projection_view_matrix;
+
+        const float R = 6.0f;
+        const float r = 3.5f;
+
+        for (GLuint i = 0; i < light_count; ++i)
+        {
+            float t = 1.75 * window.frame_ts;
+            glm::vec2 uv = uv0[i] + t * uv1[i];
+
+            float cos_2piu = glm::cos(uv.x);
+            float sin_2piu = glm::sin(uv.x);
+            float cos_2piv = glm::cos(uv.y);
+            float sin_2piv = glm::sin(uv.y);
+
+            light_positions[i] = glm::vec3((R + r * cos_2piu) * cos_2piv,
+                                           (R + r * cos_2piu) * sin_2piv, r * sin_2piu);
+            uni_lr_color = light_colors[i];
+            uni_lr_model_matrix = glm::scale(glm::translate(light_positions[i]), glm::vec3(0.225f));
+            sphere.render();
+        }
 
         //===============================================================================================================================================================================================================
         // render scene, supplying the convoluted irradiance map to the final shader
@@ -456,6 +515,7 @@ int main(int argc, char *argv[])
         glm::mat4 view = window.camera.view_matrix;
         uni_pbr_pv_matrix = projection_view_matrix;
         uni_pbr_camera_ws = camera_ws;
+        uni_pbr_light_positions = light_positions;
 
         //===============================================================================================================================================================================================================
         // bind pre-computed IBL data
@@ -467,16 +527,6 @@ int main(int argc, char *argv[])
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
 
-
-        glm::vec3 sphere_centers[] = 
-        {
-            glm::vec3(-5.0f, 0.0f, 2.0f),
-            glm::vec3(-3.0f, 0.0f, 2.0f),
-            glm::vec3(-1.0f, 0.0f, 2.0f),
-            glm::vec3( 1.0f, 0.0f, 2.0f),
-            glm::vec3( 3.0f, 0.0f, 2.0f)
-        };
-
         //===============================================================================================================================================================================================================
         // render 5 spheres with different material textures
         //===============================================================================================================================================================================================================
@@ -487,79 +537,36 @@ int main(int argc, char *argv[])
             glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].metallic_map);
             glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].roughness_map);
             glActiveTexture(GL_TEXTURE7); glBindTexture(GL_TEXTURE_2D, pbr_materials[m].ao_map);
-            uni_pbr_model_matrix = glm::translate(sphere_centers[m]);
+            uni_pbr_model_matrix = glm::translate(glm::vec3(6.0f * pentagon[m], 0.0f));
             sphere.render();
         }
 
-        //===============================================================================================================================================================================================================
-        // render light source (simply re-render sphere at light positions)
-        // this looks a bit off as we use the same shader, but it'll make their positions obvious and 
-        // keeps the codeprint small.
-        //===============================================================================================================================================================================================================
-        for (GLuint i = 0; i < light_count; ++i)
-        {
-            glm::vec3 new_position = light_positions[i] + glm::vec3(5.0f * sin(0.5f * time), 0.0f, 0.0f);
-            light_positions[i] = new_position;
-            uni_pbr_model_matrix = glm::scale(glm::translate(glm::mat4(1.0f), new_position), glm::vec3(0.5f));
-            sphere.render();
-        }
-        uni_pbr_light_positions = light_positions;
-*/
+
         //===============================================================================================================================================================================================================
         // render skybox (render as last to prevent overdraw)
         //===============================================================================================================================================================================================================
 
-
+        glDisable(GL_CULL_FACE);
+        glBindVertexArray(vao_id);
         env_shader.enable();
         uni_env_view_matrix = view_matrix3;
         uni_env_level = (float) window.level;
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, (window.env_map == 0) ? environment_cubemap :
-                                           (window.env_map == 1) ? irradiance_cubemap : prefilter_cubemap); // display irradiance map
+                                           (window.env_map == 1) ? irradiance_cubemap : prefilter_cubemap);
         glDrawArrays(GL_POINTS, 0, 1);
 
         //===============================================================================================================================================================================================================
         // render BRDF map to screen
-        // brdfShader.enable();
-        // RenderQuad();
         //===============================================================================================================================================================================================================
-
-        //brdfShader.enable();
-        //RenderQuad();
-
+/*
+        glBindVertexArray(vao_id);
+        brdf_shader.enable();
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+*/
         window.end_frame();
     }
 
     glfw::terminate();
     return 0;
-}
-
-// RenderQuad() Renders a 1x1 XY quad in NDC
-GLuint quadVAO = 0;
-GLuint quadVBO;
-void RenderQuad()
-{
-    if (quadVAO == 0)
-    {
-        GLfloat quadVertices[] = {
-            // Positions        // Texture Coords
-            -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-            1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-            1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-        };
-        // Setup plane VAO
-        glGenVertexArrays(1, &quadVAO);
-        glGenBuffers(1, &quadVBO);
-        glBindVertexArray(quadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-    }
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
 }
