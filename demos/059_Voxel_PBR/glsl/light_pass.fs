@@ -1,4 +1,4 @@
-#version 430
+#version 430 core
 
 layout(location = 0) out vec4 fragColor;
 
@@ -31,7 +31,8 @@ struct Attenuation
     float quadratic;
 };
 
-struct Light {
+struct Light
+{
     float angleInnerCone;
     float angleOuterCone;
 

@@ -16,8 +16,18 @@ struct DepthProgram : public ProgramShader
     oglplus::UniformSampler diffuseMap;
     oglplus::Uniform<float> alphaCutoff;
 
-    void ExtractUniforms() override;
-    DepthProgram();
-    ~DepthProgram();
-};
+    DepthProgram() {}
+    ~DepthProgram() override {}
 
+    void ExtractUniforms() override
+    {
+        matrices.modelViewProjection.Assign(program);
+        matrices.modelViewProjection.BindTo("matrices.modelViewProjection");
+        exponents.Assign(program);
+        exponents.BindTo("exponents");
+        diffuseMap.Assign(program);
+        alphaCutoff.Assign(program);
+        diffuseMap.BindTo("diffuseMap");
+        alphaCutoff.BindTo("alphaCutoff");
+    }
+};

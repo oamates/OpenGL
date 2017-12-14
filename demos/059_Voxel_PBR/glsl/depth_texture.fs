@@ -1,4 +1,4 @@
-#version 430
+#version 430 core
 
 layout(location = 0) out vec4 outColor;
 
@@ -15,16 +15,15 @@ vec2 WarpDepth(float depth)
     depth = 2.0 * depth - 1.0;
     float pos =  exp( exponents.x * depth);
     float neg = -exp(-exponents.y * depth);
-	
+    
     return vec2(pos, neg);
 }
 
 vec4 ShadowDepthToEVSM(float depth)
 {
-	vec2 moment1 = WarpDepth(depth);
-	vec2 moment2 = moment1 * moment1;
-
-	return vec4(moment1, moment2);
+    vec2 moment1 = WarpDepth(depth);
+    vec2 moment2 = moment1 * moment1;
+    return vec4(moment1, moment2);
 }
 
 void main()
@@ -33,5 +32,5 @@ void main()
 
     if (diffuseColor.a <= alphaCutoff) { discard; }
 
-	outColor = ShadowDepthToEVSM(gl_FragCoord.z);
+    outColor = ShadowDepthToEVSM(gl_FragCoord.z);
 }

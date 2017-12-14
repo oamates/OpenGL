@@ -1,4 +1,4 @@
-#version 430
+#version 430 core
 
 // receive voxels points position
 layout(points) in;

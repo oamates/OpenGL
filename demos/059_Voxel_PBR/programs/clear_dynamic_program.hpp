@@ -4,11 +4,9 @@
 #include <oglplus/uniform.hpp>
 #include <oglplus/interop/glm.hpp>
 
-class ClearDynamicProgram : public ProgramShader
+struct ClearDynamicProgram : public ProgramShader
 {
-    public:
-        void ExtractUniforms() override;
-        ClearDynamicProgram();
-        ~ClearDynamicProgram();
+    ClearDynamicProgram() {}
+    ~ClearDynamicProgram() {}
+    void ExtractUniforms() override {}
 };
-

@@ -16,65 +16,52 @@ bool UIMainMenu::drawGIOptions = false;
 bool UIMainMenu::drawSceneMaterials = false;
 bool UIMainMenu::drawSceneNodes = false;
 
-using namespace ImGui;
-
 void UIMainMenu::Draw()
 {
     static bool showAbout = false;
 
-    if (BeginMainMenuBar())
+    if (ImGui::BeginMainMenuBar())
     {
-        if (BeginMenu("View"))
+        if (ImGui::BeginMenu("View"))
         {
-            MenuItem("Scene Loader", nullptr, &drawSceneLoader);
-            MenuItem("Show Framerate", nullptr, &drawFramerate);
-            MenuItem("View Voxels", nullptr, &VoxelizerRenderer::ShowVoxels);
-            MenuItem("View Framebuffers", nullptr, &drawFramebuffers);
-            EndMenu();
+            ImGui::MenuItem("Scene Loader", nullptr, &drawSceneLoader);
+            ImGui::MenuItem("Show Framerate", nullptr, &drawFramerate);
+            ImGui::MenuItem("View Voxels", nullptr, &VoxelizerRenderer::ShowVoxels);
+            ImGui::MenuItem("View Framebuffers", nullptr, &drawFramebuffers);
+            ImGui::EndMenu();
         }
 
-        if (BeginMenu("Scene"))
+        if (ImGui::BeginMenu("Scene"))
         {
-            MenuItem("Cameras", nullptr, &drawSceneCameras);
-            MenuItem("Lights", nullptr, &drawSceneLights);
-            MenuItem("Materials", nullptr, &drawSceneMaterials);
-            MenuItem("Shapes", nullptr, &drawSceneNodes);
-            EndMenu();
+            ImGui::MenuItem("Cameras", nullptr, &drawSceneCameras);
+            ImGui::MenuItem("Lights", nullptr, &drawSceneLights);
+            ImGui::MenuItem("Materials", nullptr, &drawSceneMaterials);
+            ImGui::MenuItem("Shapes", nullptr, &drawSceneNodes);
+            ImGui::EndMenu();
         }
 
-        if (BeginMenu("Options"))
+        if (ImGui::BeginMenu("Options"))
         {
-            MenuItem("Shadows", nullptr, &drawShadowOptions);
-            MenuItem("Voxelization", nullptr, &drawVoxelizationOptions);
-            MenuItem("Global Illumination", nullptr, &drawGIOptions);
-            MenuItem("About", nullptr, &showAbout);
-            EndMenu();
+            ImGui::MenuItem("Shadows", nullptr, &drawShadowOptions);
+            ImGui::MenuItem("Voxelization", nullptr, &drawVoxelizationOptions);
+            ImGui::MenuItem("Global Illumination", nullptr, &drawGIOptions);
+            ImGui::MenuItem("About", nullptr, &showAbout);
+            ImGui::EndMenu();
         }
 
-        if(Button("Exit"))
-        {
+        if(ImGui::Button("Exit"))
             EngineBase::Instance()->Window().ShouldClose(true);
-        };
 
-        EndMainMenuBar();
+        ImGui::EndMainMenuBar();
     }
 
     if(showAbout)
     {
-        if (Begin("About...", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::Begin("About...", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
-            Text("Developer: Jose Villegas.");
-            Text("Email: villegasjose.gg@gmail.com");
+            ImGui::Text("Voxel PBR rendering.");
+            ImGui::Text("Email: afoksha@gmail.com");
         }
-
-        End();
+        ImGui::End();
     }
-}
-
-UIMainMenu::UIMainMenu()
-{
-}
-
-UIMainMenu::~UIMainMenu()
-{
 }

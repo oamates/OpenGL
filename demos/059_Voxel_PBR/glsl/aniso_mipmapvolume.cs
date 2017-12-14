@@ -1,4 +1,5 @@
-#version 430
+#version 430 core
+
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 layout(binding = 0, rgba8) uniform writeonly image3D voxelMipmapDst[6];

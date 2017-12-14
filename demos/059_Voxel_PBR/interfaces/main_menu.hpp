@@ -6,8 +6,8 @@ struct EngineBase;
 
 struct UIMainMenu : public Interface
 {
-	UIMainMenu();
-	~UIMainMenu() override;
+	UIMainMenu() {}
+	~UIMainMenu() override {}
 
 	void Draw() override;
 	static bool drawSceneLoader;

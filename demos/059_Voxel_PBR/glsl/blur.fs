@@ -47,14 +47,11 @@ vec4 blur9(sampler2D image, vec2 uv, vec2 direction) {
 }
 
 void main()
-{
-	
-	if(blurType == 1) 
-		outColor = blur5(source, texCoord, blurDirection);
+{	
+	if(blurType == 3) 
+		outColor = blur13(source, texCoord, blurDirection);
 	else if(blurType == 2) 
 		outColor = blur9(source, texCoord, blurDirection);
-	else if(blurType == 3) 
-		outColor = blur13(source, texCoord, blurDirection);
 	else 
 		outColor = blur5(source, texCoord, blurDirection);
 };

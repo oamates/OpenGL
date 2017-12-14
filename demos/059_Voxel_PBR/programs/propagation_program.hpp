@@ -6,12 +6,20 @@
 
 struct PropagationProgram : public ProgramShader
 {
-	PropagationProgram();
-	~PropagationProgram();
-
 	oglplus::Uniform<float> maxTracingDistanceGlobal;
 	oglplus::Uniform<int> volumeDimension;
 	oglplus::Uniform<unsigned int>  checkBoundaries;
-	void ExtractUniforms() override;
-};
 
+    PropagationProgram() {}
+    ~PropagationProgram() override {}
+
+	void ExtractUniforms() override
+    {
+        maxTracingDistanceGlobal.Assign(program);
+        maxTracingDistanceGlobal.BindTo("maxTracingDistanceGlobal");
+        volumeDimension.Assign(program);
+        volumeDimension.BindTo("volumeDimension");
+        checkBoundaries.Assign(program);
+        checkBoundaries.BindTo("checkBoundaries");
+    }
+};

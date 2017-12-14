@@ -18,36 +18,32 @@ struct RawTexture : public BaseObject
     unsigned int bitsPerPixel;
     std::unique_ptr<unsigned char> rawData;
 
-        enum TextureType
-        {
-            None,
-            Diffuse,
-            Specular,
-            Ambient,
-            Emissive,
-            Height,
-            Normals,
-            Shininess,
-            Opacity,
-            Displacement,
-            Lightmap,
-            Reflection,
-            Unknow,
-            TYPE_MAX
-        };
+    enum TextureType
+    {
+        None,
+        Diffuse,
+        Specular,
+        Ambient,
+        Emissive,
+        Height,
+        Normals,
+        Shininess,
+        Opacity,
+        Displacement,
+        Lightmap,
+        Reflection,
+        Unknow,
+        TYPE_MAX
+    };
         
-        bool IsType(TextureType type);                                  // Determines the texture is of the given type.
-        std::string GetFilepath() const;                                // Gets the texture filepath.
+    bool IsType(TextureType type);                                  // Determines the texture is of the given type.
+    std::string GetFilepath() const;                                // Gets the texture filepath.
+    std::set<TextureType> textureTypes;
 
-        std::set<TextureType> textureTypes;
-
-        RawTexture();
-        ~RawTexture();
-        RawTexture(RawTexture const &) = delete;
-        RawTexture &operator=(RawTexture const &) = delete;
-
-
-        friend class TextureImporter;
+    RawTexture();
+    ~RawTexture();
+    RawTexture(RawTexture const &) = delete;
+    RawTexture &operator=(RawTexture const &) = delete;
 };
 
 struct Texture2D : public RawTexture

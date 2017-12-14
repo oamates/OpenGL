@@ -5,22 +5,22 @@
 #include "segment.hpp"
 #include "raw_format.hpp"
 
-template<typename T, size_t _Count = 1> struct RawFormat::DataSegment : public Segment
+template<typename T, size_t _Count> struct RawFormat::DataSegment : public Segment
 {
-    T * pointer;
-    RawFormat * holder;
+    T* pointer;
+    RawFormat* holder;
 
     DataSegment &operator = (const DataSegment &) = delete;
-    T operator=(const T &value);
-    T * operator=(const std::array <T, _Count> &values);
+    T operator = (const T &value);
+    T * operator = (const std::array <T, _Count> &values);
 
-    explicit DataSegment(RawFormat * format, T * pointer = nullptr, size_t offset = 0);
+    explicit DataSegment(RawFormat* format, T* pointer = nullptr, size_t offset = 0);
     ~DataSegment();
     DataSegment(const DataSegment &other) = delete;
     DataSegment() = delete;
 };
 
-template <typename T, size_t _Count> RawFormat::DataSegment<T, _Count>::DataSegment(RawFormat * from, T * pointer, size_t offset) :
+template <typename T, size_t _Count> RawFormat::DataSegment<T, _Count>::DataSegment(RawFormat* from, T* pointer, size_t offset) :
     Segment(sizeof(T) * _Count, offset),
     holder(from)
 {

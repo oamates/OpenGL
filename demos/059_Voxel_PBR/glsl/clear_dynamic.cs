@@ -1,4 +1,5 @@
-#version 430
+#version 430 core
+
 #extension GL_ARB_shader_image_load_store : require
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
@@ -13,9 +14,7 @@ void main()
 {
     int volumeDimension = imageSize(voxelAlbedo).x;
 
-	if(gl_GlobalInvocationID.x >= volumeDimension ||
-		gl_GlobalInvocationID.y >= volumeDimension ||
-		gl_GlobalInvocationID.z >= volumeDimension) return;
+	if(gl_GlobalInvocationID.x >= volumeDimension || gl_GlobalInvocationID.y >= volumeDimension || gl_GlobalInvocationID.z >= volumeDimension) return;
 
     ivec3 writePos = ivec3(gl_GlobalInvocationID);
 
@@ -25,8 +24,7 @@ void main()
     // static flag is true
     if(texelFetch(staticVoxelFlag, writePos, 0).r > EPSILON) { return; }
 
-    // is a non-static voxel and the voxel in that position isn't empty
-    // clear the volumnes with 0,0,0,0
+    // is a non-static voxel and the voxel in that position isn't empty clear the volumnes with 0,0,0,0
     imageStore(voxelAlbedo, writePos, vec4(0.0));
     imageStore(voxelNormal, writePos, vec4(0.0));
     imageStore(voxelEmissive, writePos, vec4(0.0));

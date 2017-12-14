@@ -15,7 +15,7 @@ struct Camera : public SceneObject, public SingleActive<Camera>
 {
         void UpdateTransformMatrix() override;
 
-        enum class ProjectionMode
+        enum struct ProjectionMode
         {
             Perspective,
             Orthographic

@@ -4,21 +4,33 @@
 #include <oglplus/uniform.hpp>
 #include <glm/vec3.hpp>
 
-class MipmappingBaseProgram : public ProgramShader
+struct MipmappingBaseProgram : public ProgramShader
 {
-    public:
-        oglplus::Uniform<int> mipDimension;
-        void ExtractUniforms() override;
-        MipmappingBaseProgram();
-        ~MipmappingBaseProgram();
+    oglplus::Uniform<int> mipDimension;
+
+    MipmappingBaseProgram() {}
+    ~MipmappingBaseProgram() override {}
+
+    void ExtractUniforms() override
+    {
+        mipDimension.Assign(program);
+        mipDimension.BindTo("mipDimension");
+    }
 };
 
-class MipmappingVolumeProgram : public ProgramShader
+struct MipmappingVolumeProgram : public ProgramShader
 {
-    public:
-        oglplus::Uniform<glm::vec3> mipDimension;
-        oglplus::Uniform<int> mipLevel;
-        void ExtractUniforms() override;
-        MipmappingVolumeProgram();
-        ~MipmappingVolumeProgram();
+    oglplus::Uniform<glm::vec3> mipDimension;
+    oglplus::Uniform<int> mipLevel;
+
+    MipmappingVolumeProgram() {}
+    ~MipmappingVolumeProgram() override {}
+
+    void ExtractUniforms() override
+    {
+        mipDimension.Assign(program);
+        mipDimension.BindTo("mipDimension");
+        mipLevel.Assign(program);
+        mipLevel.BindTo("mipLevel");
+    }
 };

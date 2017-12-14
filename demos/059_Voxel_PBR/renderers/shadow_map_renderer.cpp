@@ -37,9 +37,7 @@ void ShadowMapRenderer::Render()
     auto camera = Camera::Active().get();
 
     if (!camera || !scene || !scene->IsLoaded() || !shadowCaster)
-    {
         return;
-    }
 
     // initially assign invalid direction
     static auto &changes = Transform::TransformChangedMap();
@@ -57,7 +55,8 @@ void ShadowMapRenderer::Render()
     }
 
     // shadow caster change
-    if (shadowCaster->TransformChanged()) { updateShadowMap = true; }
+    if (shadowCaster->TransformChanged())
+        updateShadowMap = true;
 
     // scene change
     if (scenePtr != scene.get())
@@ -66,7 +65,8 @@ void ShadowMapRenderer::Render()
         updateShadowMap = true;
     }
 
-    if (!updateShadowMap) { return; }
+    if (!updateShadowMap)
+        return;
 
     updateShadowMap = false;
     // update shadow map
@@ -108,9 +108,7 @@ void ShadowMapRenderer::Render()
 
     // blur the result evsm map
     if(blurScale > 0)
-    {
         BlurShadowMap();
-    }
 
     // recover
     DefaultFramebuffer().Bind(FramebufferTarget::Draw);
@@ -124,14 +122,10 @@ void ShadowMapRenderer::Render()
 }
 
 void ShadowMapRenderer::Caster(const Light * caster)
-{
-    shadowCaster = caster;
-}
+    { shadowCaster = caster; }
 
 const Light * ShadowMapRenderer::Caster() const
-{
-    return shadowCaster;
-}
+    { return shadowCaster; }
 
 const glm::mat4x4 &ShadowMapRenderer::LightSpaceMatrix()
 {
@@ -140,10 +134,8 @@ const glm::mat4x4 &ShadowMapRenderer::LightSpaceMatrix()
                                 0.0, 0.0, 0.5, 0.0,
                                 0.5, 0.5, 0.5, 1.0);
 
-    if(lightView.TransformChanged())
-    {
+    if (lightView.TransformChanged())
         return lightSpaceMatrix = biasMatrix * lightView.ViewProjectionMatrix();
-    }
 
     return lightSpaceMatrix;
 }
@@ -156,14 +148,10 @@ void ShadowMapRenderer::BindReading(unsigned unit) const
 
 
 const Camera &ShadowMapRenderer::LightCamera() const
-{
-    return lightView;
-}
+    { return lightView; }
 
 const oglplus::Texture &ShadowMapRenderer::ShadowMap() const
-{
-    return shadowMap;
-}
+    { return shadowMap; }
 
 ShadowMapRenderer::ShadowMapRenderer(RenderWindow &window) : Renderer(window),
     shadowCaster(nullptr)

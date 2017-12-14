@@ -17,7 +17,28 @@ struct VoxelDrawerProgram : public ProgramShader
 	oglplus::Uniform<float> voxelSize;
 	oglplus::Uniform<glm::vec3> worldMinPoint;
 	oglplus::Uniform<glm::vec4> colorChannels;
-	void ExtractUniforms() override;
-	VoxelDrawerProgram() = default;
-    virtual ~VoxelDrawerProgram();
+
+	VoxelDrawerProgram() {}
+    ~VoxelDrawerProgram() override {}
+
+    void ExtractUniforms() override
+    {        
+        volumeDimension.Assign(program);                                        // program owner
+        matrices.modelViewProjection.Assign(program);   
+        volumeDimension.BindTo("volumeDimension");                              // binding point
+        matrices.modelViewProjection.BindTo("matrices.modelViewProjection");
+
+        for(int i = 0; i < frustumPlanes.size(); i++)
+        {
+            frustumPlanes[i].Assign(program);
+            frustumPlanes[i].BindTo("frustumPlanes[" + std::to_string(i) + "]");
+        }
+
+        voxelSize.Assign(program);
+        voxelSize.BindTo("voxelSize");
+        worldMinPoint.Assign(program);
+        worldMinPoint.BindTo("worldMinPoint");
+        colorChannels.Assign(program);
+        colorChannels.BindTo("colorChannels");
+    }
 };
