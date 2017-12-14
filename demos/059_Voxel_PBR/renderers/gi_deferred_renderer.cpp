@@ -87,12 +87,10 @@ void GIDeferredRenderer::SetMatricesUniforms(const Node &node) const
     auto &prog = CurrentProgram<GeometryProgram>();
     static auto &camera = Camera::Active();
     prog.matrices.normal.Set(node.InverseTranspose());
-    prog.matrices.modelViewProjection.Set(camera->ViewProjectionMatrix() *
-                                          node.transform.Matrix());
+    prog.matrices.modelViewProjection.Set(camera->ViewProjectionMatrix() * node.transform.Matrix());
 }
 
-void GIDeferredRenderer::SetMaterialUniforms(const Material &material)
-const
+void GIDeferredRenderer::SetMaterialUniforms(const Material &material) const
 {
     using namespace oglplus;
     auto &prog = CurrentProgram<GeometryProgram>();
@@ -116,101 +114,62 @@ const
     material.BindTexture(RawTexture::Diffuse);
 }
 
-const std::array<oglplus::Texture, 5> &GIDeferredRenderer::BufferTextures()
-const
-{
-    return bufferTextures;
-}
+const std::array<oglplus::Texture, 5> &GIDeferredRenderer::BufferTextures() const
+    { return bufferTextures; }
 
 const float &GIDeferredRenderer::MaxTracingDistance() const
-{
-    return maxTracingDistance;
-}
+    { return maxTracingDistance; }
 
 void GIDeferredRenderer::MaxTracingDistance(const float &val)
-{
-    maxTracingDistance = val;
-}
+    { maxTracingDistance = val; }
 
 const float &GIDeferredRenderer::GlobalIlluminationStrength() const
-{
-    return globalIlluminationStrength;
-}
+    { return globalIlluminationStrength; }
 
 void GIDeferredRenderer::GlobalIlluminationStrength(const float &val)
-{
-    globalIlluminationStrength = val;
-}
+    { globalIlluminationStrength = val; }
 
 const float &GIDeferredRenderer::AmbientOclussionFalloff() const
-{
-    return ambientOcclusionFalloff;
-}
+    { return ambientOcclusionFalloff; }
 
 void GIDeferredRenderer::AmbientOclussionFalloff(const float &val)
-{
-    ambientOcclusionFalloff = val;
-}
+    { ambientOcclusionFalloff = val; }
 
 const float &GIDeferredRenderer::AmbientOclussionAlpha() const
-{
-    return ambientOcclusionAlpha;
-}
+    { return ambientOcclusionAlpha; }
 
 void GIDeferredRenderer::AmbientOclussionAlpha(const float &val)
-{
-    ambientOcclusionAlpha = val;
-}
+    { ambientOcclusionAlpha = val; }
 
 const unsigned &GIDeferredRenderer::RenderMode() const
-{
-    return renderMode;
-}
+    { return renderMode; }
 
 void GIDeferredRenderer::RenderMode(const unsigned &mode)
-{
-    renderMode = mode;
-}
+    { renderMode = mode; }
 
 bool GIDeferredRenderer::SampleVoxelShadowVolume() const
-{
-    return sampleVoxelShadowVolume;
-}
+    { return sampleVoxelShadowVolume; }
 
 void GIDeferredRenderer::SampleVoxelShadowVolume(bool val)
-{
-    sampleVoxelShadowVolume = val;
-}
+    { sampleVoxelShadowVolume = val; }
 
 void GIDeferredRenderer::SamplingFactor(const float &val)
-{
-    samplingFactor = val;
-}
+    { samplingFactor = val; }
 
 const float &GIDeferredRenderer::SamplingFactor() const
-{
-    return samplingFactor;
-}
+    { return samplingFactor; }
 
 const float &GIDeferredRenderer::ConeShadowTolerance() const
-{
-    return coneShadowTolerance;
-}
+    { return coneShadowTolerance; }
 
 void GIDeferredRenderer::ConeShadowTolerance(const float &val)
-{
-    coneShadowTolerance = val;
-}
+    { coneShadowTolerance = val; }
 
 float GIDeferredRenderer::ConeShadowAperture() const
-{
-    return coneShadowAperture;
-}
+    { return coneShadowAperture; }
 
 void GIDeferredRenderer::ConeShadowAperture(float val)
-{
-    coneShadowAperture = val;
-}
+    { coneShadowAperture = val; }
 
 void GIDeferredRenderer::SetLightPassUniforms() const
 {
@@ -335,85 +294,46 @@ void GIDeferredRenderer::SetLightPassUniforms() const
 GeometryProgram &GIDeferredRenderer::GeometryPass()
 {
     static auto &assets = AssetsManager::Instance();
-    static auto &prog = *static_cast<GeometryProgram *>
-                        (assets->programs["Geometry"].get());
+    static auto &prog = *static_cast<GeometryProgram *> (assets->programs["Geometry"].get());
     return prog;
 }
 
 LightingProgram &GIDeferredRenderer::LightingPass()
 {
     static auto &assets = AssetsManager::Instance();
-    static auto &prog = *static_cast<LightingProgram *>
-                        (assets->programs["Lighting"].get());
+    static auto &prog = *static_cast<LightingProgram *> (assets->programs["Lighting"].get());
     return prog;
 }
 
-void GIDeferredRenderer::SetupGeometryBuffer(unsigned windowWidth,
-        unsigned windowHeight)
+void GIDeferredRenderer::SetupGeometryBuffer(unsigned windowWidth, unsigned windowHeight)
 {
     using namespace oglplus;
     static Context gl;
-    // initialize geometry buffer
-    geometryBuffer.Bind(FramebufferTarget::Draw);
+    
+    geometryBuffer.Bind(FramebufferTarget::Draw);       // initialize geometry buffer
     // build textures -- normal
-    gl.Bound(TextureTarget::_2D, bufferTextures[0])
-    .Image2D(0, PixelDataInternalFormat::RGBA16F, windowWidth, windowHeight,
-             0, PixelDataFormat::RGB, PixelDataType::Float, nullptr)
-    .MinFilter(TextureMinFilter::Nearest)
-    .MagFilter(TextureMagFilter::Nearest);
-    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 0, bufferTextures[0],
-                                      0);
+    gl.Bound(TextureTarget::_2D, bufferTextures[0]).Image2D(0, PixelDataInternalFormat::RGBA16F, windowWidth, windowHeight, 0, PixelDataFormat::RGB, PixelDataType::Float, nullptr).MinFilter(TextureMinFilter::Nearest).MagFilter(TextureMagFilter::Nearest);
+    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 0, bufferTextures[0], 0);
     // build textures -- albedo
-    gl.Bound(TextureTarget::_2D, bufferTextures[1])
-    .Image2D(0, PixelDataInternalFormat::RGB8, windowWidth, windowHeight,
-             0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr)
-    .MinFilter(TextureMinFilter::Nearest)
-    .MagFilter(TextureMagFilter::Nearest);
-    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 1, bufferTextures[1],
-                                      0);
+    gl.Bound(TextureTarget::_2D, bufferTextures[1]).Image2D(0, PixelDataInternalFormat::RGB8, windowWidth, windowHeight, 0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr).MinFilter(TextureMinFilter::Nearest).MagFilter(TextureMagFilter::Nearest);
+    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 1, bufferTextures[1], 0);
     // build textures -- specular color and shininess
-    gl.Bound(TextureTarget::_2D, bufferTextures[2])
-    .Image2D(0, PixelDataInternalFormat::RGBA8, windowWidth, windowHeight,
-             0, PixelDataFormat::RGBA, PixelDataType::UnsignedByte, nullptr)
-    .MinFilter(TextureMinFilter::Nearest)
-    .MagFilter(TextureMagFilter::Nearest);
-    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 2, bufferTextures[2],
-                                      0);
+    gl.Bound(TextureTarget::_2D, bufferTextures[2]).Image2D(0, PixelDataInternalFormat::RGBA8, windowWidth, windowHeight, 0, PixelDataFormat::RGBA, PixelDataType::UnsignedByte, nullptr).MinFilter(TextureMinFilter::Nearest).MagFilter(TextureMagFilter::Nearest);
+    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 2, bufferTextures[2], 0);
     // emissivenes
-    gl.Bound(TextureTarget::_2D, bufferTextures[3])
-    .Image2D(0, PixelDataInternalFormat::RGB8, windowWidth, windowHeight,
-             0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr)
-    .MinFilter(TextureMinFilter::Nearest)
-    .MagFilter(TextureMagFilter::Nearest);
-    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 3, bufferTextures[3],
-                                      0);
+    gl.Bound(TextureTarget::_2D, bufferTextures[3]).Image2D(0, PixelDataInternalFormat::RGB8, windowWidth, windowHeight, 0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, nullptr).MinFilter(TextureMinFilter::Nearest).MagFilter(TextureMagFilter::Nearest);
+    geometryBuffer.AttachColorTexture(FramebufferTarget::Draw, 3, bufferTextures[3], 0);
     // attach depth texture for depth testing
-    gl.Bound(TextureTarget::_2D, bufferTextures[4])
-    .Image2D(0, PixelDataInternalFormat::DepthComponent24, windowWidth,
-             windowHeight, 0, PixelDataFormat::DepthComponent,
-             PixelDataType::Float, nullptr)
-    .MinFilter(TextureMinFilter::Nearest)
-    .MagFilter(TextureMagFilter::Nearest);
-    geometryBuffer.AttachTexture(FramebufferTarget::Draw,
-                                 FramebufferAttachment::Depth,
-                                 bufferTextures[4], 0);
-    // color textures
-    auto attachments = std::vector<Context::ColorBuffer>
-    {
-        FramebufferColorAttachment::_0 ,
-        FramebufferColorAttachment::_1,
-        FramebufferColorAttachment::_2,
-        FramebufferColorAttachment::_3
-    };
-    // set draw buffers
-    gl.DrawBuffers(attachments);
-
-    // check if success building frame buffer
-    if (!Framebuffer::IsComplete(FramebufferTarget::Draw))
+    gl.Bound(TextureTarget::_2D, bufferTextures[4]).Image2D(0, PixelDataInternalFormat::DepthComponent24, windowWidth, windowHeight, 0, PixelDataFormat::DepthComponent, PixelDataType::Float, nullptr).MinFilter(TextureMinFilter::Nearest).MagFilter(TextureMagFilter::Nearest);
+    geometryBuffer.AttachTexture(FramebufferTarget::Draw, FramebufferAttachment::Depth, bufferTextures[4], 0);
+    
+    auto attachments = std::vector<Context::ColorBuffer>        // color textures
+        { FramebufferColorAttachment::_0, FramebufferColorAttachment::_1, FramebufferColorAttachment::_2, FramebufferColorAttachment::_3 };
+    gl.DrawBuffers(attachments);                                // set draw buffers
+    if (!Framebuffer::IsComplete(FramebufferTarget::Draw))      // check if success building frame buffer
     {
         auto status = Framebuffer::Status(FramebufferTarget::Draw);
         Framebuffer::HandleIncompleteError(FramebufferTarget::Draw, status);
     }
-
     Framebuffer::Bind(Framebuffer::Target::Draw, FramebufferName(0));
 }

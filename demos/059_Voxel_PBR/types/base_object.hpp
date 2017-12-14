@@ -4,19 +4,11 @@
 #include <array>
 #include <vector>
 
-class BaseObject
+struct BaseObject
 {
-    public:
-        /// <summary>
-        /// The object name
-        /// </summary>
-        std::string name;
-        /// <summary>
-        /// The object flags
-        /// </summary>
-        std::array<std::bitset<32>, 64> mode;
-
-        BaseObject();
-        virtual ~BaseObject();
+    BaseObject() {}
+    virtual ~BaseObject() {}
+    std::string name;                           // The object name
+    std::array<std::bitset<32>, 64> mode;       // The object flags
 };
 

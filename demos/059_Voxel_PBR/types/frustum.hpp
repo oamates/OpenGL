@@ -4,58 +4,32 @@
 #include <glm/detail/type_mat4x4.hpp>
 #include <glm/detail/type_vec4.hpp>
 
-class BoundingBox;
-class BoundingSphere;
-class BoundingBox;
+struct BoundingBox;
+struct BoundingSphere;
+struct BoundingBox;
 
-/// <summary>
-/// A frustum formed by six planes
-/// </summary>
-class Frustum
+// A frustum formed by six planes
+struct Frustum
 {
-    public:
-        enum FrustumPlane
-        {
-            Left, Right,
-            Bottom, Top,
-            Near, Far,
-        };
-        /// <summary>
-        /// Extracts the frustum planes from the model view matrix
-        /// </summary>
-        /// <param name="mvMatrix">The model view matrix.</param>
-        /// <param name="normalize">if set to <c>true</c> [normalize].</param>
-        void ExtractPlanes(const glm::mat4x4 &modelView, bool normalize = true);
-        /// <summary>
-        /// Returns the plane from the give frustum face
-        /// </summary>
-        /// <param name="face">The face.</param>
-        /// <returns></returns>
-        const glm::vec4 &Plane(const FrustumPlane face) const;
-        /// <summary>
-        /// Returns the frustum planes
-        /// </summary>
-        /// <returns></returns>
-        const std::array<glm::vec4, 6> &Planes() const;
-    protected:
-        std::array<glm::vec4, 6> planes;
+    enum FrustumPlane
+    {
+        Left, Right,
+        Bottom, Top,
+        Near, Far,
+    };
+
+    std::array<glm::vec4, 6> planes;
+
+    void ExtractPlanes(const glm::mat4x4 &modelView, bool normalize = true);    // Extracts the frustum planes from the model view matrix
+    const glm::vec4 &Plane(const FrustumPlane face) const;                      // Returns the plane from the give frustum face
+    const std::array<glm::vec4, 6> &Planes() const;                             // Returns the frustum planes
 };
 
-/// <summary>
-/// Contains methods for frustum culling
-/// with its <see cref="Frustum" /> parameters.
-/// </summary>
-/// <seealso cref="Frustum" />
-class CullingFrustum : public Frustum
+// Contains methods for frustum culling with its Frustum parameters.
+struct CullingFrustum : public Frustum
 {
-    public:
-        /// <summary>
-        /// Determines if the given volume is inside the frustum
-        /// </summary>
-        /// <param name="volume">The volume.</param>
-        /// <returns></returns>
-        bool InFrustum(const BoundingBox &volume) const;
+    CullingFrustum();
+    virtual ~CullingFrustum();
 
-        CullingFrustum();
-        virtual ~CullingFrustum();
+    bool InFrustum(const BoundingBox &volume) const;                            // Determines if the given volume is inside the frustum
 };

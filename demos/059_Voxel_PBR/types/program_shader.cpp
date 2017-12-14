@@ -17,14 +17,12 @@ void ProgramShader::Link()
 inline std::string SourceFromFile(const std::string &filepath)
 {
     std::ifstream file(filepath);
-    std::string result((std::istreambuf_iterator<char>(file)),
-                       std::istreambuf_iterator<char>());
+    std::string result((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
     return result;
 }
 
-void ProgramShader::AttachShader(oglplus::ShaderType type,
-                                 const std::string &filepath)
+void ProgramShader::AttachShader(oglplus::ShaderType type, const std::string &filepath)
 {
     const auto &source = SourceFromFile(filepath);
     auto shader = std::make_unique<oglplus::Shader>(type, source);

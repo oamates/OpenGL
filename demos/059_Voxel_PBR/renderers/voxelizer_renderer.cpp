@@ -31,74 +31,60 @@ void VoxelizerRenderer::Render()
     static auto frameCount = 0;
     static auto &scene = Scene::Active();
 
-    if (!scene || !scene->IsLoaded()) { return; }
+    if (!scene || !scene->IsLoaded())
+        return;
 
-    // scene changed or loaded
-    if (previous != scene.get())
+    if (previous != scene.get())                                                    // scene changed or loaded
     {
         UpdateProjectionMatrices(scene->rootNode->boundaries);
-        // update voxelization
-        VoxelizeStaticScene();
+        VoxelizeStaticScene();                                                      // update voxelization
     }
 
-    // store current for next call
-    previous = scene.get();
+    
+    previous = scene.get();                                                         // store current for next call
     static auto &changes = Transform::TransformChangedMap();
 
     if (framestep == -1)
     {
         for (auto &c : changes)
         {
-            auto const * node = dynamic_cast<const Node *>(c.first);
-
-            if (node && node->TransformChanged())
+            auto const* node = dynamic_cast<const Node *>(c.first);
+            if (node && node->TransformChanged())                                   // update scene voxelization
             {
-                // update scene voxelization
                 VoxelizeDynamicScene(); break;
             }
-            
-            if(dynamic_cast<const Light *>(c.first))
+            if(dynamic_cast<const Light *>(c.first))                                // only radiance needs to be updated
             {
-                // only radiance needs to be updated
                 UpdateRadiance(); break;
             }
         }
     }
-    // dyanmic process voxelization will happen every framestep frame
-    else if (framestep >= 1 && frameCount % framestep == 0)
+    else if (framestep >= 1 && frameCount % framestep == 0)                         // dynamic process voxelization will happen every framestep frame
     {
         frameCount = 0;
-        // update voxelization
-        for (auto &c : changes)
+        for (auto &c : changes)                                                     // update voxelization
         {
             auto const * node = dynamic_cast<const Node *>(c.first);
-
-            if (node && node->TransformChanged())
+            if (node && node->TransformChanged())                                   // update scene voxelization
             {
-                // update scene voxelization
                 VoxelizeDynamicScene(); break;
             }
-            
-            if (dynamic_cast<const Light *>(c.first))
+            if (dynamic_cast<const Light *>(c.first))                               // only radiance needs to be updated
             {
-                // only radiance needs to be updated
                 UpdateRadiance(); break;
             }
-        };
+        }
     }
 
     if (ShowVoxels)
-    {
         DrawVoxels();
-    }
 
     frameCount++;
 }
 
 void VoxelizerRenderer::SetMatricesUniforms(const Node &node) const
 {
-    // no space matrices for voxelization pass during node rendering
-    auto &prog = CurrentProgram<VoxelizationProgram>();
+    auto &prog = CurrentProgram<VoxelizationProgram>();                             // no space matrices for voxelization pass during node rendering
     prog.matrices.model.Set(node.transform.Matrix());
     prog.matrices.normal.Set(node.InverseTranspose());
 }
@@ -109,8 +95,7 @@ void VoxelizerRenderer::SetMaterialUniforms(const Material &material) const
     auto &prog = CurrentProgram<VoxelizationProgram>();
     prog.material.diffuse.Set(material.Diffuse());
     prog.material.emissive.Set(material.Emissive());
-    // set textures
-    Texture::Active(4);
+    Texture::Active(4);                                                             // set textures
     material.BindTexture(RawTexture::Diffuse);
     Texture::Active(5);
     material.BindTexture(RawTexture::Opacity);
@@ -119,9 +104,7 @@ void VoxelizerRenderer::SetMaterialUniforms(const Material &material) const
 }
 
 void VoxelizerRenderer::SetUpdateFrequency(const int framestep)
-{
-    this->framestep = framestep;
-}
+    { this->framestep = framestep; }
 
 void VoxelizerRenderer::VoxelizeStaticScene()
 {
@@ -129,12 +112,11 @@ void VoxelizerRenderer::VoxelizeStaticScene()
     static auto &scene = Scene::Active();
     static float zero[] = { 0, 0, 0, 0 };
     static float sZero = 0.0f;
-    static auto shImage = oglplus::Bitfield<oglplus::MemoryBarrierBit>
-                          (oglplus::MemoryBarrierBit::ShaderImageAccess);
-    static auto texFetch = oglplus::Bitfield<oglplus::MemoryBarrierBit>
-                           (oglplus::MemoryBarrierBit::TextureFetch);
+    static auto shImage = oglplus::Bitfield<oglplus::MemoryBarrierBit> (oglplus::MemoryBarrierBit::ShaderImageAccess);
+    static auto texFetch = oglplus::Bitfield<oglplus::MemoryBarrierBit> (oglplus::MemoryBarrierBit::TextureFetch);
 
-    if (!scene || !scene->IsLoaded()) { return; }
+    if (!scene || !scene->IsLoaded())
+        return;
 
     auto &prog = VoxelizationPass();
     auto &sceneBox = scene->rootNode->boundaries;
@@ -286,12 +268,9 @@ void VoxelizerRenderer::InjectRadiance()
     // index of directional-point-spot lights
     auto typeIndex = glm::uvec3(0);
     // pass number of lights per type
-    prog.lightTypeCount[0].Set(static_cast<const unsigned int>
-                               (Light::Directionals().size()));
-    prog.lightTypeCount[1].Set(static_cast<const unsigned int>
-                               (Light::Points().size()));
-    prog.lightTypeCount[2].Set(static_cast<const unsigned int>
-                               (Light::Spots().size()));
+    prog.lightTypeCount[0].Set(static_cast<const unsigned int> (Light::Directionals().size()));
+    prog.lightTypeCount[1].Set(static_cast<const unsigned int> (Light::Points().size()));
+    prog.lightTypeCount[2].Set(static_cast<const unsigned int> (Light::Spots().size()));
 
     for (int i = 0; i < lights.size(); ++i)
     {

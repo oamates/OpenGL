@@ -62,12 +62,9 @@ struct InterfaceRenderer
     static void CreateDeviceObjects();
 
     static void RenderDrawList(ImDrawData * drawData);
-    static void MouseButtonCallback(GLFWwindow * window, int button,
-                                    int action, int mods);
-    static void ScrollCallback(GLFWwindow * window, double xoffset,
-                               double yoffset);
-    static void KeyCallback(GLFWwindow * window, int key, int scancode,
-                            int action, int mods);
+    static void MouseButtonCallback(GLFWwindow * window, int button, int action, int mods);
+    static void ScrollCallback(GLFWwindow * window, double xoffset, double yoffset);
+    static void KeyCallback(GLFWwindow * window, int key, int scancode, int action, int mods);
     static void CharCallback(GLFWwindow * window, unsigned int c);
 
     static void SetClipboardText(void* user_data, const char * text);

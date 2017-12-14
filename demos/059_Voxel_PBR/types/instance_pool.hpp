@@ -1,17 +1,18 @@
 #pragma once
+
 #include <vector>
 #include <map>
 
 // Stores all instaces of the inheriting class
 template<typename T> struct InstancePool
 {
-    static std::vector<T *> instances;                          // The instance pool        
-    static std::map<long long, long long> location;             // The location of each instance in the instances collection
+    static std::vector<T *> instances;                              // The instance pool        
+    static std::map<long long, long long> location;                 // The location of each instance in the instances collection
     unsigned long long instanceId;
     unsigned long long priorityIndex;
 
-    void Priority(const long long priority);                    // Sets this instance priority. Updating its position in the instances collection.
-    T &GetInstance(const long long id);                         // Gets the instance with the given identifier
+    void Priority(const long long priority);                        // Sets this instance priority. Updating its position in the instances collection.
+    T &GetInstance(const long long id);                             // Gets the instance with the given identifier
     InstancePool<T> &operator=(const InstancePool<T> &rhs);
     InstancePool();
     virtual ~InstancePool();
@@ -31,39 +32,24 @@ template <typename T> InstancePool<T>::InstancePool()
 
 template <typename T> InstancePool<T>::~InstancePool()
 {
-    // delete self from collections
-    auto index = location[instanceId];
+    auto index = location[instanceId];                              // delete self from collections
     location.erase(instanceId);
     instances.erase(instances.begin() + index);
-
-    // update locations
-    for (size_t i = 0; i < instances.size(); ++i)
-    {
+    
+    for (size_t i = 0; i < instances.size(); ++i)                   // update locations
         location[instances[i]->instanceId] = i;
-    }
 }
 
-template <typename T>
-void InstancePool<T>::Priority(const long long priority)
+template <typename T> void InstancePool<T>::Priority(const long long priority)
 {
-    // keep reference
-    auto &instance = instances[priorityIndex];
-    // remove from position
-    instances.erase(instances.begin() + priorityIndex);
-    // move to new place
-    instances.insert(priority, instance);
-    // update location
-    location[instanceId] = priority;
+    auto &instance = instances[priorityIndex];                      // keep reference
+    instances.erase(instances.begin() + priorityIndex);             // remove from position
+    instances.insert(priority, instance);                           // move to new place
+    location[instanceId] = priority;                                // update location
 }
 
-template <typename T>
-T &InstancePool<T>::GetInstance(const long long id)
-{
-    return instances[location[id]];
-}
+template <typename T> T& InstancePool<T>::GetInstance(const long long id)
+    { return instances[location[id]]; }
 
-template <typename T>
-InstancePool<T> &InstancePool<T>::operator=(const InstancePool<T> &rhs)
-{
-    return instanceId == rhs.instanceId;
-}
+template <typename T> InstancePool<T> &InstancePool<T>::operator=(const InstancePool<T> &rhs)
+    { return instanceId == rhs.instanceId; }

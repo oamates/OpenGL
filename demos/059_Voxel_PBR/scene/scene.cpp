@@ -10,59 +10,40 @@
 
 void Scene::SetAsActive()
 {
-    // previous active scene
-    auto previous = Active().get();
-
-    // no change
-    if (previous == this)
+    auto previous = Active().get();                                     // previous active scene
+    
+    if (previous == this)                                               // no change
 		return;
 
     if (previous != nullptr)
     {
-        // save current scene active camera index
-        previous->activeCamera = -1;
-
+        previous->activeCamera = -1;                                    // save current scene active camera index
         for (size_t i = 0; i < previous->cameras.size(); i++)
-        {
             if (previous->cameras[i]->IsActive())
-            {
                 previous->activeCamera = static_cast<int>(i);
-            }
-        }
     }
 
-    // call base method, now this instace is marked as active
-    SingleActive::SetAsActive();
-    // clean current light per type collections
-    Light::ResetCollections();
-
-    // add all the current scene lights to type collection
-    for (auto &light : lights)
-    {
+    SingleActive::SetAsActive();                                        // call base method, now this instace is marked as active
+    Light::ResetCollections();                                          // clean current light per type collections
+    
+    for (auto &light : lights)                                          // add all the current scene lights to type collection
         light->TypeCollection(light->Type());
-    }
 
-    // once changing scene previous active cameras
-    // from other scene shouldn't be active
-    if (activeCamera != -1 && activeCamera < cameras.size())
-    {
+    if (activeCamera != -1 && activeCamera < cameras.size())            // once changing scene previous active cameras from other scene shouldn't be active
         cameras[activeCamera]->SetAsActive();
-    }
     else
-    {
         Camera::ResetActive();
-    }
 }
 
 inline std::string GetDirectoryPath(const std::string &filePath)
 {
-    auto pos = filePath.find_last_of("\\/");
+    auto pos = filePath.find_last_of("/");
     return (std::string::npos == pos) ? "" : filePath.substr(0, pos);
 }
 
 
-Scene::Scene(std::string filepath): isLoaded(false), isImported(false),
-    activeCamera(0)
+Scene::Scene(std::string filepath)
+    : isLoaded(false), isImported(false), activeCamera(0)
 {
     this->filepath = filepath;
     this->directory = GetDirectoryPath(filepath);
@@ -73,18 +54,15 @@ Scene::~Scene()
 }
 
 const std::string &Scene::GetFilepath() const
-{
-    return filepath;
-}
+    { return filepath; }
 
 const std::string &Scene::GetDirectory() const
-{
-    return directory;
-}
+    { return directory; }
 
 void Scene::Import(unsigned int flags)
 {
-    if (isImported || isLoaded) { return; }
+    if (isImported || isLoaded)
+        return;
 
     SceneImporter::Import(filepath, this, flags);
     isImported = true;
@@ -108,30 +86,20 @@ void Scene::CleanImport(unsigned int flags)
 
 void Scene::Load()
 {
-    if (isLoaded || !isImported) { return; }
+    if (isLoaded || !isImported)
+        return;
 
     for (auto &mesh : meshes)
-    {
         mesh->Load();
-    }
 
     for (auto &texture : textures)
-    {
-        texture->Load
-        (
-            oglplus::TextureMinFilter::LinearMipmapLinear,
-            oglplus::TextureMagFilter::Linear,
-            oglplus::TextureWrap::Repeat,
-            oglplus::TextureWrap::Repeat
-        );
-    }
+        texture->Load(oglplus::TextureMinFilter::LinearMipmapLinear, oglplus::TextureMagFilter::Linear, oglplus::TextureWrap::Repeat, oglplus::TextureWrap::Repeat);
 
-    if (name.empty()) { name = rootNode->name; }
+    if (name.empty())
+        name = rootNode->name;
 
     isLoaded = true;
 }
 
 bool Scene::IsLoaded() const
-{
-    return isLoaded;
-}
+    { return isLoaded; }
