@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <chrono>
 #include <map>
 
@@ -45,6 +46,6 @@ template <typename T> void MetricsReport::Write(const std::string id, const Metr
 
 template <typename T> const T& MetricsReport::Read(const std::string id)
 {
-    static_assert(storage.find(id) != storage.end(), "Id not found");
+    assert(storage.find(id) != storage.end());
     return static_cast<Metric<T> *>(storage[id])->value;
 }

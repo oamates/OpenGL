@@ -69,6 +69,7 @@ struct InterfaceRenderer
     static void KeyCallback(GLFWwindow * window, int key, int scancode,
                             int action, int mods);
     static void CharCallback(GLFWwindow * window, unsigned int c);
-    static void SetClipboardText(const char * text);
-    static const char * GetClipboardText();
+
+    static void SetClipboardText(void* user_data, const char * text);
+    static const char* GetClipboardText(void* user_data);
 };

@@ -2,9 +2,11 @@
 #include <GLFW/glfw3.h>
 #include <oglplus/context.hpp>
 #include <oglplus/bound/texture.hpp>
-#include "texture.hpp"
-
 #include <glm/detail/type_vec3.hpp>
+
+#include "texture.hpp"
+#include "../make_unique.hpp"
+
 
 std::string RawTexture::GetFilepath() const
     { return filepath; }
@@ -43,11 +45,11 @@ void Texture2D::Load(oglplus::TextureMinFilter minFilter,
     this->oglTexture = std::make_unique<Texture>();
     unsigned int bytesPerPixel = this->bitsPerPixel / 8;
     // proper data format
-    pdf = bytesPerPixel == 3 ? PixelDataFormat::BGR : pdf;
+    pdf  = bytesPerPixel == 3 ? PixelDataFormat::BGR : pdf;
     pdif = bytesPerPixel == 3 ? PixelDataInternalFormat::RGB8 : pdif;
-    pdf = bytesPerPixel == 2 ? PixelDataFormat::RG : pdf;
+    pdf  = bytesPerPixel == 2 ? PixelDataFormat::RG : pdf;
     pdif = bytesPerPixel == 2 ? PixelDataInternalFormat::RG8 : pdif;
-    pdf = bytesPerPixel == 1 ? PixelDataFormat::Red : pdf;
+    pdf  = bytesPerPixel == 1 ? PixelDataFormat::Red : pdf;
     pdif = bytesPerPixel == 1 ? PixelDataInternalFormat::R8 : pdif;
     // create texture with raw data (upload to gpu)
     gl.Bound(TextureTarget::_2D, *this->oglTexture).Image2D(0, pdif, this->width, this->height, 0, pdf, PixelDataType::UnsignedByte, this->rawData.get());

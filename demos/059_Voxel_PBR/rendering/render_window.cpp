@@ -1,11 +1,11 @@
-#include "render_window.hpp"
 #include <iostream>
+#include <limits>
+
+#include "render_window.hpp"
 
 // Called when an error occurs using the GLFW window
-void RenderWindow::OnErrorCallback(int code, const char * description)
-{
-    throw std::runtime_error(description);
-}
+void RenderWindow::OnErrorCallback(int code, const char* description)
+    { throw std::runtime_error(description); }
 
 
 WindowInfo::WindowInfo() : WindowInfo(1280, 720, 0, 0, "Default") {}

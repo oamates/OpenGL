@@ -19,4 +19,4 @@ add_custom_command(TARGET voxel_pbr POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_
 add_custom_command(TARGET voxel_pbr POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/glsl ${CMAKE_CURRENT_BINARY_DIR}/glsl)
 add_custom_command(TARGET voxel_pbr POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/models ${CMAKE_CURRENT_BINARY_DIR}/models)
 
-target_link_libraries(voxel_pbr LINK_PUBLIC framework)
+target_link_libraries(voxel_pbr LINK_PUBLIC framework imgui assimp freeimage)

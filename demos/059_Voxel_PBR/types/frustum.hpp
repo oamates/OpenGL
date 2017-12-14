@@ -1,8 +1,8 @@
 #pragma once
 #include <array>
 
-#include <glm\detail\type_mat4x4.hpp>
-#include <glm\detail\type_vec4.hpp>
+#include <glm/detail/type_mat4x4.hpp>
+#include <glm/detail/type_vec4.hpp>
 
 class BoundingBox;
 class BoundingSphere;

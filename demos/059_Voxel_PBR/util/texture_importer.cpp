@@ -3,7 +3,7 @@
 #include <FreeImagePlus.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "scene/texture.hpp"
+#include "../scene/texture.hpp"
 
 // transforms picture to raw data and stores info in Texture class
 bool TextureImporter::ImportTexture2D(const std::string &sFilepath, RawTexture &outTexture)

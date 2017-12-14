@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include "program_shader.hpp"
+#include "../make_unique.hpp"
 
 void ProgramShader::Use() const
 {

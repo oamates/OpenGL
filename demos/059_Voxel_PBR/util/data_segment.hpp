@@ -1,4 +1,7 @@
 #pragma once
+
+#include <array>
+
 #include "segment.hpp"
 #include "raw_format.hpp"
 
@@ -7,7 +10,7 @@ template<typename T, size_t _Count = 1> struct RawFormat::DataSegment : public S
     T * pointer;
     RawFormat * holder;
 
-    DataSegment &operator=(const DataSegment &) = delete;
+    DataSegment &operator = (const DataSegment &) = delete;
     T operator=(const T &value);
     T * operator=(const std::array <T, _Count> &values);
 

@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "raw_format.hpp"
 #include "data_segment.hpp"
 
@@ -11,7 +13,7 @@ void * RawFormat::BuildRawData()
 
     while (!format.empty())
     {
-        auto segment = static_cast<DataSegment<unsigned char> *>(format.front());       // transfer data
+        auto segment = static_cast<DataSegment<unsigned char, 1> *>(format.front());       // transfer data
         data += segment->offset;
         if (segment->pointer)
         {

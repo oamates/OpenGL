@@ -456,13 +456,9 @@ void InterfaceRenderer::CharCallback(GLFWwindow * window, unsigned int c)
         io.AddInputCharacter(static_cast<unsigned short>(c));
 }
 
-void InterfaceRenderer::SetClipboardText(const char * text)
-{
-    glfwSetClipboardString(renderer->window, text);
-}
+void InterfaceRenderer::SetClipboardText(void* user_data, const char* text)
+    { glfwSetClipboardString((GLFWwindow*)user_data, text); }
 
-const char * InterfaceRenderer::GetClipboardText()
-{
-    return glfwGetClipboardString(renderer->window);
-}
+const char* InterfaceRenderer::GetClipboardText(void* user_data)
+    { return glfwGetClipboardString((GLFWwindow*) user_data); }
 
