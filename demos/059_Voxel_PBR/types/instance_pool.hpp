@@ -13,7 +13,7 @@ template<typename T> struct InstancePool
 
     void Priority(const long long priority);                        // Sets this instance priority. Updating its position in the instances collection.
     T &GetInstance(const long long id);                             // Gets the instance with the given identifier
-    InstancePool<T> &operator=(const InstancePool<T> &rhs);
+    InstancePool<T> &operator = (const InstancePool<T> &rhs);
     InstancePool();
     virtual ~InstancePool();
 };

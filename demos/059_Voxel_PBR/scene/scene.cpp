@@ -8,6 +8,10 @@
 #include "texture.hpp"
 #include "../util/scene_importer.hpp"
 
+std::vector<Light*> Light::directionals;
+std::vector<Light*> Light::points;
+std::vector<Light*> Light::spots;
+
 void Scene::SetAsActive()
 {
     auto previous = Active().get();                                     // previous active scene

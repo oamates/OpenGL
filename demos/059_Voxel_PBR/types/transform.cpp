@@ -1,24 +1,24 @@
-#include "transform.hpp"
-
-#include "../util/const_definitions.hpp"
-
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/orthonormalize.inl>
+
+#include "transform.hpp"
+
+const glm::vec3 X = glm::vec3(1.0f, 0.0f, 0.0f);
+const glm::vec3 Y = glm::vec3(0.0f, 1.0f, 0.0f);
+const glm::vec3 Z = glm::vec3(0.0f, 0.0f, 1.0f);
 
 // The transform change contains a unique set of transforms, on change bool is set to true
 std::unordered_map<const Transform *, bool> Transform::transformChange;
 
 Transform::Transform()
 {
-    position = Vector3::zero;
-    scale = Vector3::one;
-    rotation = glm::quat(Vector3::zero);
-    forward = Vector3::forward;
-    up = Vector3::up;
-    right = Vector3::right;
-    transformation = translate(position) *
-                     mat4_cast(rotation) *
-                     glm::scale(scale);
+    position = glm::vec3(0.0f);
+    scale = glm::vec3(1.0f);
+    rotation = glm::quat(glm::vec3(0.0f));
+    forward = Z;
+    up = Y;
+    right = X;
+    transformation = translate(position) * mat4_cast(rotation) * glm::scale(scale);
     UpdateCoordinates();
     RegisterChange(true);
 }
@@ -52,9 +52,9 @@ void Transform::Rotation(const glm::vec3 &angles)
     if(this->angles != angles)
     {
         this->angles = angles;
-        auto rotationX = angleAxis(angles.x, Vector3::right);
-        auto rotationY = angleAxis(angles.y, Vector3::up);
-        auto rotationZ = angleAxis(angles.z, Vector3::forward);
+        auto rotationX = angleAxis(angles.x, X);
+        auto rotationY = angleAxis(angles.y, Y);
+        auto rotationZ = angleAxis(angles.z, Z);
         rotation = normalize(rotationZ * rotationX * rotationY);                // final composite rotation
         UpdateCoordinates();                                                    // rotate direction vectors
         UpdateTransformMatrix();
@@ -80,9 +80,9 @@ const glm::quat &Transform::Rotation() const
 
 void Transform::UpdateCoordinates()
 {
-    up = normalize(Vector3::up * rotation);
-    right = normalize(Vector3::right * rotation);
-    forward = normalize(Vector3::forward * rotation);
+    up = normalize(Y * rotation);
+    right = normalize(X * rotation);
+    forward = normalize(Z * rotation);
 }
 
 void Transform::UpdateTransformMatrix()
