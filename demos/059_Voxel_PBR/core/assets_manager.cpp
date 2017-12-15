@@ -48,13 +48,12 @@ std::unique_ptr<AssetsManager> &AssetsManager::Instance()
 }
 
 void AssetsManager::Terminate()
-{
-    delete Instance().release();
-}
+    { delete Instance().release(); }
 
 AssetsManager::AssetsManager()
 {
-    auto &window = EngineBase::Instance()->Window();
+    auto& window = EngineBase::Instance()->Window();
+
     // instantiate scenes with their paths
     scenes["Crytek Sponza"]           = std::make_shared<Scene> ("models/crytek-sponza/sponza.obj");
     scenes["Crytek Sponza (No Flag)"] = std::make_shared<Scene> ("models/crytek-sponza-noflag/sponza.obj");
@@ -96,10 +95,12 @@ AssetsManager::AssetsManager()
     programs["MipmappingVolume"] = std::make_shared<MipmappingVolumeProgram>();
     programs["Blur"] = std::make_shared<BlurProgram>();
     programs["ClearDynamic"] = std::make_shared<ClearDynamicProgram>();
+
     // instantiate impleted renderers
     renderers["Shadowmapping"] = std::make_shared<ShadowMapRenderer>(window);
     renderers["Voxelizer"]     = std::make_shared<VoxelizerRenderer>(window);
     renderers["Deferred"]      = std::make_shared<GIDeferredRenderer>(window);
+
     // attach shaders, ej: programs[index]->AttachShader();
     programs["Geometry"]->AttachShader         (oglplus::ShaderType::Vertex,   "glsl/geometry_pass.vs");
     programs["Geometry"]->AttachShader         (oglplus::ShaderType::Fragment, "glsl/geometry_pass.fs");
@@ -121,28 +122,20 @@ AssetsManager::AssetsManager()
     programs["Blur"]->AttachShader             (oglplus::ShaderType::Fragment, "glsl/blur.fs");
     programs["ClearDynamic"]->AttachShader     (oglplus::ShaderType::Compute,  "glsl/clear_dynamic.cs");
 
-    // link and extract uniforms from shaders
-    for (auto &prog : programs)
+    for (auto &prog : programs)                                                 // link and extract uniforms from shaders
     {
         prog.second->Link();
         prog.second->ExtractUniforms();
     }
-
-    // utility default assets
-    Texture2D::GetDefaultTexture();
-
-    // shapes instancer
-    Shapes::Load();
+    Texture2D::GetDefaultTexture();                                             // utility default assets
+    Shapes::Load();                                                             // shapes instancer
 }
 
 
 AssetsManager::~AssetsManager()
 {
-    // early owner-ship release for static scope (no gl context)
-    auto dTexture = Texture2D::GetDefaultTexture().release();
-
-    if (dTexture != nullptr) { delete dTexture; }
-
-    // shape creator unload
-    Shapes::UnloadShapes();
+    auto dTexture = Texture2D::GetDefaultTexture().release();                   // early owner-ship release for static scope (no gl context)
+    if (dTexture != nullptr)
+        delete dTexture;
+    Shapes::UnloadShapes();                                                     // shape creator unload
 }

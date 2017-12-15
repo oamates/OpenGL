@@ -54,4 +54,4 @@ void main()
 		outColor = blur9(source, texCoord, blurDirection);
 	else 
 		outColor = blur5(source, texCoord, blurDirection);
-};
+}

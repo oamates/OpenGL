@@ -18,11 +18,10 @@
 
 GIDeferredRenderer::GIDeferredRenderer(RenderWindow &window) : Renderer(window)
 {
-    auto &info = Window().Info();
-    // create textures and attachments for framebuffer in deferredhandler
-    SetupGeometryBuffer(info.framebufferWidth, info.framebufferHeight);
-    // initial values
-    maxTracingDistance = 0.95f;
+    auto& info = Window().Info();
+    
+    SetupGeometryBuffer(info.framebufferWidth, info.framebufferHeight);             // create textures and attachments for framebuffer in deferredhandler
+    maxTracingDistance = 0.95f;                                                     // initial values
     globalIlluminationStrength = 2.0f;
     ambientOcclusionFalloff = 800.0f;
     ambientOcclusionAlpha = 0.0f;
@@ -47,39 +46,35 @@ void GIDeferredRenderer::Render()
     static auto &info = Window().Info();
 
     if (!camera || !scene || !scene->IsLoaded() || VoxelizerRenderer::ShowVoxels)
-    {
         return;
-    }
 
     SetAsActive();
-    // bind g buffer for writing
-    geometryBuffer.Bind(FramebufferTarget::Draw);
+    
+    geometryBuffer.Bind(FramebufferTarget::Draw);                                   // bind g buffer for writing
     gl.ColorMask(true, true, true, true);
     gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     gl.Viewport(info.framebufferWidth, info.framebufferHeight);
     gl.Clear().ColorBuffer().DepthBuffer();
-    // activate geometry pass shader program
-    CurrentProgram<GeometryProgram>(GeometryPass());
-    // rendering and GL flags
-    gl.ClearDepth(1.0f);
+    
+    CurrentProgram<GeometryProgram>(GeometryPass());                                // activate geometry pass shader program
+    
+    //glClearDepth(1.0f);
+    //glEnable(GL_DEPTH_TEST);
+    gl.ClearDepth(1.0f);                                                            // rendering and GL flags
     gl.Enable(Capability::DepthTest);
     gl.Disable(Capability::Blend);
     gl.Enable(Capability::CullFace);
     gl.FrontFace(FaceOrientation::CCW);
     gl.CullFace(Face::Back);
     camera->DoFrustumCulling(true);
-    // draw whole scene tree from root node
-    scene->rootNode->DrawList();
-    // start light pass
-    DefaultFramebuffer().Bind(FramebufferTarget::Draw);
+    scene->rootNode->DrawList();                                                    // draw whole scene tree from root node
+    DefaultFramebuffer().Bind(FramebufferTarget::Draw);                             // start light pass
     gl.ColorMask(true, true, true, true);
     gl.Viewport(info.framebufferWidth, info.framebufferHeight);
     gl.Clear().ColorBuffer().DepthBuffer();
     CurrentProgram<LightingProgram>(LightingPass());
-    // pass light info and texture locations for final light pass
-    SetLightPassUniforms();
-    // draw the result onto a fullscreen quad
-    fsQuad.DrawElements();
+    SetLightPassUniforms();                                                         // pass light info and texture locations for final light pass    
+    fsQuad.DrawElements();                                                          // draw the result onto a fullscreen quad
 }
 
 void GIDeferredRenderer::SetMatricesUniforms(const Node &node) const
@@ -94,12 +89,11 @@ void GIDeferredRenderer::SetMaterialUniforms(const Material &material) const
 {
     using namespace oglplus;
     auto &prog = CurrentProgram<GeometryProgram>();
-    prog.material.diffuse.Set(material.Diffuse());
-    prog.material.specular.Set(material.Specular());
-    prog.material.emissive.Set(material.Emissive());
+    prog.material.diffuse.Set(material.diffuse);
+    prog.material.specular.Set(material.specular);
+    prog.material.emissive.Set(material.emissive);
     // shininess curve, a bit smoother than linear
-    prog.material.shininess.Set(sin(pow(material.Shininess(),
-                                        3.0f) * glm::half_pi<float>()));
+    prog.material.shininess.Set(glm::sin(glm::pow(material.shininess_exponent, 3.0f) * glm::half_pi<float>()));
     prog.material.useNormalsMap.Set(material.HasTexture(RawTexture::Normals));
     // set textures
     Texture::Active(0);

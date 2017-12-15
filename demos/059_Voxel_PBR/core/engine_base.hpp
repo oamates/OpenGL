@@ -15,10 +15,10 @@ struct EngineBase
     virtual ~EngineBase();
     void MainLoop() const;                                              // Main rendering loop
     RenderWindow &Window() const;                                       // The active context window.
-    static std::unique_ptr<EngineBase> &Instance();                     // Returns the EngineBase singleton instance.
+    static std::unique_ptr<EngineBase>& Instance();                     // Returns the EngineBase singleton instance.
     static void Terminate();                                            // Terminates this instance.
     
     EngineBase(EngineBase const &r) = delete;                           // No copying, copy, move assignment allowed of this class or any derived class
     EngineBase(EngineBase const &&r) = delete;
-    EngineBase &operator=(EngineBase const &r) = delete;
+    EngineBase& operator = (EngineBase const &r) = delete;
 };

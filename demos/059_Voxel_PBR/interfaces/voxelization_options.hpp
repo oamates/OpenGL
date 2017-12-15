@@ -29,8 +29,8 @@ struct UIVoxelizationOptions : public Interface
             static auto texRes = 5;
             static std::vector<int> sizes = { 8, 16, 32, 64, 128, 256, 512 };
             static std::vector<const char *> sizesStr = { "8", "16", "32", "64", "128", "256", "512" };
-            // shadow map quality
-            ImGui::BeginGroup();
+            
+            ImGui::BeginGroup();                                                            // shadow map quality
             ImGui::Text("Volume Resolution");
     
             if(ImGui::Combo("Resolution: ", &texRes, sizesStr.data(), sizesStr.size()))
@@ -39,8 +39,8 @@ struct UIVoxelizationOptions : public Interface
                 voxel.RevoxelizeScene();
             }
     
-            static auto updateFrequency = 0;
-            static auto revoxOnNeed = true;
+            static int updateFrequency = 0;
+            static bool revoxOnNeed = true;
     
             if (ImGui::Checkbox("Update When Needed", &revoxOnNeed))
                 voxel.SetUpdateFrequency(-1);
@@ -53,8 +53,8 @@ struct UIVoxelizationOptions : public Interface
     
             ImGui::Separator();
             static auto mipLevel = 0, direction = 0;
-            static auto drawAlbedo = false;
-            static auto drawNormals = false;
+            static bool drawAlbedo = false;
+            static bool drawNormals = false;
             static auto colors = glm::vec4(1.0f);
             auto maxLevel = log2(voxel.VolumeDimension()) - 1;
     
@@ -68,7 +68,6 @@ struct UIVoxelizationOptions : public Interface
             }
     
             ImGui::SameLine();
-    
             if (ImGui::Checkbox("Draw Normal (Visibility)", &drawNormals))
             {
                 if (drawAlbedo && drawNormals) drawAlbedo = false;

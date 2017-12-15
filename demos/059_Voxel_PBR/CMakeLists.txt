@@ -1,11 +1,11 @@
 add_executable (voxel_pbr main.cpp
                           behaviors/free_camera.cpp 
-                          core/assets_manager.cpp core/behavior.cpp core/engine_base.cpp core/interface.cpp
+                          core/assets_manager.cpp core/behavior.cpp core/engine_base.cpp
                           interfaces/main_menu.cpp
                           primitives/fullscreen_quad.cpp primitives/shapes.cpp
                           renderers/gi_deferred_renderer.cpp renderers/shadow_map_renderer.cpp renderers/voxelizer_renderer.cpp 
                           rendering/interface_renderer.cpp rendering/render_window.cpp 
-                          scene/camera.cpp scene/light.cpp scene/material.cpp scene/mesh.cpp scene/node.cpp scene/scene.cpp scene/texture.cpp 
+                          scene/camera.cpp scene/light.cpp scene/node.cpp scene/scene.cpp scene/texture.cpp 
                           types/bounding_box.cpp types/frustum.cpp types/program_shader.cpp types/transform.cpp types/vertex.cpp 
                           util/const_definitions.cpp util/metrics_report.cpp util/raw_format.cpp util/scene_importer.cpp util/texture_importer.cpp)
 

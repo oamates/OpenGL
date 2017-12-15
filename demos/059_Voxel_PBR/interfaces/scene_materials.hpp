@@ -31,7 +31,7 @@ struct UISceneMaterials : public Interface
         static glm::vec3 specular;
         static glm::vec3 diffuse;
         static glm::vec3 emissive;
-        static float shininess;
+        static float shininess_exponent;
         static std::vector<char> name;
         
         if (scene != Scene::Active().get())                                                 // active scene changed
@@ -58,11 +58,11 @@ struct UISceneMaterials : public Interface
             {
                 selected = i;
                 material = current.get();
-                ambient = material->Ambient();
-                specular = material->Specular();
-                diffuse = material->Diffuse();
-                emissive = material->Emissive();
-                shininess = material->Shininess();            
+                ambient = material->ambient;
+                specular = material->specular;
+                diffuse = material->diffuse;
+                emissive = material->emissive;
+                shininess_exponent = material->shininess_exponent;
                 name.clear();                                                               // copy name to a standard vector
                 copy(material->name.begin(), material->name.end(), back_inserter(name));
                 name.push_back('\0');
@@ -79,24 +79,24 @@ struct UISceneMaterials : public Interface
             if (ImGui::InputText("Name", name.data(), name.size()))
                 material->name = std::string(name.data());
     
-            if (ImGui::ColorEdit3("Ambient", value_ptr(ambient)))
-                material->Ambient(ambient);
+            if (ImGui::ColorEdit3("Ambient", glm::value_ptr(ambient)))
+                material->ambient = ambient;
     
-            if (ImGui::ColorEdit3("Diffuse", value_ptr(diffuse)))
+            if (ImGui::ColorEdit3("Diffuse", glm::value_ptr(diffuse)))
             {
-                material->Diffuse(diffuse);
+                material->diffuse = diffuse;
                 voxel.RevoxelizeScene();
             }
     
-            if (ImGui::ColorEdit3("Specular", value_ptr(specular)))
-                material->Specular(specular);
+            if (ImGui::ColorEdit3("Specular", glm::value_ptr(specular)))
+                material->specular = specular;
     
-            if (ImGui::DragFloat("Glossiness", &shininess, 0.001f, 0.0f, 1.0f))
-                material->Shininess(shininess);
+            if (ImGui::DragFloat("Glossiness", &shininess_exponent, 0.001f, 0.0f, 1.0f))
+                material->shininess_exponent = shininess_exponent;
     
-            if (ImGui::ColorEdit3("Emissive", value_ptr(emissive)))
+            if (ImGui::ColorEdit3("Emissive", glm::value_ptr(emissive)))
             {
-                material->Emissive(emissive);
+                material->emissive = emissive;
                 voxel.RevoxelizeScene();
             }
         }
