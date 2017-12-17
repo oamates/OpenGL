@@ -5,16 +5,16 @@
 
 #include "../core/ui.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UIFramerate : public ui_t
 {
     UIFramerate() {}
     ~UIFramerate() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawFramerate)
-            return;
+        if (!main_ui_t::drawFramerate) return;
 
         static ImVec2 position = ImVec2(io->DisplaySize.x - 80 - 3, io->DisplaySize.y - 50 - 3);
         ImGui::SetNextWindowPos(position);

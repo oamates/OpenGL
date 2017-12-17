@@ -11,17 +11,17 @@
 #include "../renderers/shadow_map_renderer.hpp"
 #include "../scene/light.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UIShadowingOptions : public ui_t
 {
     UIShadowingOptions() {}
     ~UIShadowingOptions() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawShadowOptions)
-            return;
-    
+        if (!main_ui_t::drawShadowOptions) return;
+
         static auto &assets = AssetsManager::Instance();
         static auto &shadowRender = *static_cast<ShadowMapRenderer *> (assets->renderers["Shadowmapping"].get());
     

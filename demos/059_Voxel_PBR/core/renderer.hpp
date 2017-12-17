@@ -8,7 +8,7 @@
 
 #include "../make_unique.hpp"
 
-struct RenderWindow;
+struct render_window_t;
 struct ProgramShader;
 struct Material;
 struct Node;
@@ -16,18 +16,18 @@ struct Node;
 // A base class for renderers. All the rendering logic should reside in the abstract method Render
 struct Renderer : public SingleActive <Renderer>, public InstancePool<Renderer>
 {
-    std::unique_ptr<std::reference_wrapper<RenderWindow>> window;           // The rendering window associated to this renderer. Usually the main window where the context was created.
+    std::unique_ptr<std::reference_wrapper<render_window_t>> window;        // The rendering window associated to this renderer. Usually the main window where the context was created.
     ProgramShader* program;                                                 // A direct reference to an active program shader
     
     Renderer() : window(nullptr), program(nullptr) {}                       // Initializes a new instance of the Renderer class.
 
-    explicit Renderer(RenderWindow &window)
+    explicit Renderer(render_window_t &window)
         : program(nullptr)
-        { this->window = std::make_unique<std::reference_wrapper<RenderWindow>>(window); }
+        { this->window = std::make_unique<std::reference_wrapper<render_window_t>>(window); }
 
     virtual ~Renderer() {}                                                  // Finalizes an instance of the Renderer class.
 
-    RenderWindow& Window() const                                            // Returns the rendering window associated to this renderer. Usually the main window where the context was created.
+    render_window_t& Window() const                                         // Returns the rendering window associated to this renderer. Usually the main window where the context was created.
         { return *window; }
 
     // Sets this program as the current active program in this renderer.

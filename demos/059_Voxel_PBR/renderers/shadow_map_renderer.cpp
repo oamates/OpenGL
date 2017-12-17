@@ -153,7 +153,7 @@ const Camera &ShadowMapRenderer::LightCamera() const
 const oglplus::Texture &ShadowMapRenderer::ShadowMap() const
     { return shadowMap; }
 
-ShadowMapRenderer::ShadowMapRenderer(RenderWindow &window) : Renderer(window),
+ShadowMapRenderer::ShadowMapRenderer(render_window_t& window) : Renderer(window),
     shadowCaster(nullptr)
 {
     blurScale = 0.5f;

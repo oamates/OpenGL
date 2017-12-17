@@ -13,6 +13,8 @@
 #include "camera.hpp"
 #include "texture.hpp"
 
+#include "log.hpp"
+
 struct Material;
 
 inline std::string GetDirectoryPath(const std::string& filePath)
@@ -40,7 +42,10 @@ struct Scene : public BaseObject, public SingleActive<Scene>
 
     explicit Scene(std::string filepath)
         : isLoaded(false), isImported(false), activeCamera(0), filepath(filepath)
-        { directory = GetDirectoryPath(filepath); }
+    {
+        directory = GetDirectoryPath(filepath);
+        debug_msg("Added scene : %s. Directory = %s", filepath.c_str(), directory.c_str());
+    }
 
     ~Scene() {}
         

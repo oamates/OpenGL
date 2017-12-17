@@ -4,7 +4,9 @@
 #include "../core/assets_manager.hpp"
 #include "../renderers/gi_deferred_renderer.hpp"
 #include "../renderers/shadow_map_renderer.hpp"
+
 #include "main_ui.hpp"
+#include "log.hpp"
 
 inline void DrawBufferTexture(const oglplus::Texture &tex, const std::string &name)
 {
@@ -34,10 +36,9 @@ struct UIFramebuffers : public ui_t
     ~UIFramebuffers() override {}
     UIFramebuffers() {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawFramebuffers)
-            return;
+        if (!main_ui_t::drawFramebuffers) return;
 
         static auto& gbuffer = static_cast<GIDeferredRenderer *> (AssetsManager::Instance()->renderers["Deferred"].get())->BufferTextures();
         static auto& shadow = static_cast<ShadowMapRenderer *> (AssetsManager::Instance()->renderers["Shadowmapping"].get())->ShadowMap();

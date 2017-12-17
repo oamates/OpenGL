@@ -8,17 +8,17 @@
 #include "../scene/scene.hpp"
 #include "../scene/camera.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UISceneCameras : public ui_t
 {
     UISceneCameras() {}
     ~UISceneCameras() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawSceneCameras)
-            return;
-    
+        if (!main_ui_t::drawSceneCameras) return;
+
         static auto scene = static_cast<Scene *>(nullptr);
         static auto camera = static_cast<Camera *>(nullptr);
         

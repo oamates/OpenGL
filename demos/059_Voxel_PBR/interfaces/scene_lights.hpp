@@ -11,13 +11,14 @@
 #include "../scene/scene.hpp"
 #include "../scene/light.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UISceneLights : public ui_t
 {
     UISceneLights() {}
     ~UISceneLights() override {}
 
-    void Draw() override
+    void render() override
     {
         static auto &assets = AssetsManager::Instance();
         static auto shadowing = static_cast<ShadowMapRenderer *> (assets->renderers["Shadowmapping"].get());
@@ -43,8 +44,7 @@ struct UISceneLights : public ui_t
             selected = -1;
         }
     
-        if ((!scene) || (!main_ui_t::drawSceneLights))
-            return;
+        if ((!scene) || (!main_ui_t::drawSceneLights)) return;
         
         ImGui::Begin("Lights", &main_ui_t::drawSceneLights);                       // begin editor
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));

@@ -71,10 +71,10 @@ void imgui_key_callback(GLFWwindow* window, int key, int scancode, int action, i
         int cursor_mode = GLFW_CURSOR_DISABLED;
         if (imgui_window->imgui_active)
         {
-	        ImGuiIO& io = ImGui::GetIO();
-	        cursor_mode = io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL;
+            ImGuiIO& io = ImGui::GetIO();
+            cursor_mode = io.MouseDrawCursor ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL;
         }
-	    glfwSetInputMode(window, GLFW_CURSOR, cursor_mode);
+        glfwSetInputMode(window, GLFW_CURSOR, cursor_mode);
         return;
     }
 
@@ -387,9 +387,9 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
         "out vec4 color;\n"
         "void main()\n"
         "{\n"
-        "	uv = uv_in;\n"
-        "	color = color_in;\n"
-        "	gl_Position = projection_matrix * vec4(position_in, 0.0f, 1.0f);\n"
+        "   uv = uv_in;\n"
+        "   color = color_in;\n"
+        "   gl_Position = projection_matrix * vec4(position_in, 0.0f, 1.0f);\n"
         "}\n";
     
     const GLchar* fs_source =
@@ -400,7 +400,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
         "out vec4 FragmentColor;\n"
         "void main()\n"
         "{\n"
-        "	FragmentColor = color * texture(font_tex, uv);\n"
+        "   FragmentColor = color * texture(font_tex, uv);\n"
         "}\n";
     
     ui_program_id = glCreateProgram();

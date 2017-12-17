@@ -2,7 +2,12 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "engine.hpp"
+#include <oglplus/gl.hpp>
+#include <oglplus/context.hpp>
+
+#include <FreeImagePlus.h>
+#include <assimp/Importer.hpp>
+#include <assimp/version.h>
 
 #include "behavior.hpp"
 #include "ui.hpp"
@@ -10,28 +15,20 @@
 #include "assets_manager.hpp"
 #include "../rendering/render_window.hpp"
 #include "../types/transform.hpp"
-
-#include <oglplus/gl.hpp>
-#include <oglplus/context.hpp>
-#include <iostream>
-
-#include <FreeImagePlus.h>
-#include <assimp/Importer.hpp>
-#include <assimp/version.h>
-
 #include "../make_unique.hpp"
 
+#include "engine.hpp"
 #include "log.hpp"
 
 engine_t::engine_t()
 {
-    renderWindow = std::make_unique<RenderWindow>();
+    render_window = std::make_unique<render_window_t>();
 }
 
 engine_t::~engine_t()
 {
     // release reserved data early (context dependent)
-    ui_renderer_t::Terminate();
+    ui_renderer_t::terminate();
     AssetsManager::Terminate();
 }
 
@@ -51,68 +48,59 @@ void engine_t::terminate()
 void engine_t::mainloop() const
 {
     debug_msg("Entering main program loop");
-    static oglplus::Context gl;
     static bool enteredMainLoop = false;
 
     if (enteredMainLoop)
         return;
     
-    initialize();                                           // import assets and initialize ext libraries
-    enteredMainLoop = true;                                 // entered main loop, this function cannot be called again
+    initialize();                                               // import assets and initialize ext libraries
+    enteredMainLoop = true;                                     // entered main loop, this function cannot be called again
     
-    while (!renderWindow->ShouldClose())                    // main render loop
+    while (!render_window->ShouldClose())                       // main render loop
     {
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-        debug_msg("Processing events");
-        RenderWindow::Events();                             // poll window inputs
 
-        debug_msg("Updating user interface elements");
-        ui_renderer_t::NewFrame();                          // setup interface renderer for a new frame
-        ui_t::DrawAll();                                    // interfaces logic update
-        Behavior::UpdateAll();                              // behaviors update
-
-        debug_msg("Rendering main scene");
-        Renderer::RenderAll();                              // call renderers
-
-        debug_msg("Rendering UI");
-        ui_renderer_t::Render();                            // ui render over scene
-
-        debug_msg("Done. Calling SwapBuffers");
-        renderWindow->SwapBuffers();                        // finally swap current frame
-        Transform::CleanEventMap();                         // clean up
+        render_window_t::Events();                              // poll window inputs
+        ui_renderer_t::new_frame();                             // setup interface renderer for a new frame
+        ui_t::render_all();                                     // interfaces logic update
+        Behavior::UpdateAll();                                  // behaviors update
+        Renderer::RenderAll();                                  // call renderers
+        ui_renderer_t::render();                                // ui render over scene
+        render_window->SwapBuffers();                           // finally swap current frame
+        Transform::CleanEventMap();                             // clean up
     }
 }
 
-RenderWindow &engine_t::window() const
+render_window_t& engine_t::window() const
 {
-    return *renderWindow;
+    return *render_window;
 }
 
 void engine_t::initialize() const
 {
-    if(!renderWindow->IsOpen())
+    if(!render_window->IsOpen())
     {
         GLFWmonitor* monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-        renderWindow->WindowHint(FramebufferHints::RedBits, mode->redBits);         // open window
-        renderWindow->WindowHint(FramebufferHints::GreenBits, mode->greenBits);
-        renderWindow->WindowHint(FramebufferHints::BlueBits, mode->blueBits);
-        renderWindow->WindowHint(FramebufferHints::RefreshRate, mode->refreshRate);
-        renderWindow->WindowHint(FramebufferHints::DoubleBuffer, true);
-        renderWindow->WindowHint(WindowHints::AutoIconify, false);
-        renderWindow->WindowHint(WindowHints::Resizable, false);
-        renderWindow->WindowHint(ContextHints::ContextVersionMajor, 4);
-        renderWindow->WindowHint(ContextHints::ContextVersionMinor, 5);
-        renderWindow->WindowHint(ContextHints::OpenGLProfile, Hint::OpenGLCoreProfile);
-        renderWindow->WindowHint(ContextHints::OpenGLForwardCompatibility, Hint::False);
-        renderWindow->Open(WindowInfo(mode->width, mode->height, 0, 0, "Voxel Cone Tracing"), false, monitor, nullptr);
+        render_window->WindowHint(FramebufferHints::RedBits, mode->redBits);         // open window
+        render_window->WindowHint(FramebufferHints::GreenBits, mode->greenBits);
+        render_window->WindowHint(FramebufferHints::BlueBits, mode->blueBits);
+        render_window->WindowHint(FramebufferHints::RefreshRate, mode->refreshRate);
+        render_window->WindowHint(FramebufferHints::DoubleBuffer, true);
+        render_window->WindowHint(WindowHints::AutoIconify, false);
+        render_window->WindowHint(WindowHints::Resizable, false);
+        render_window->WindowHint(ContextHints::ContextVersionMajor, 4);
+        render_window->WindowHint(ContextHints::ContextVersionMinor, 5);
+        render_window->WindowHint(ContextHints::OpenGLProfile, Hint::OpenGLCoreProfile);
+        render_window->WindowHint(ContextHints::OpenGLForwardCompatibility, Hint::False);
+        render_window->WindowHint(ContextHints::OpenGLDebugContext, Hint::True);
+        render_window->Open(WindowInfo(mode->width, mode->height, 0, 0, "Voxel Cone Tracing"), false, monitor, nullptr);
     }
 
-    renderWindow->SetAsCurrentContext();                                            // and set window as rendering context
+    render_window->SetAsCurrentContext();                                            // and set window as rendering context
     oglplus::GLAPIInitializer();                                                    // initialize OpenGL API
-    ui_renderer_t::Initialize(*renderWindow);                                       // set interface to current renderwindow
+    ui_renderer_t::initialize(*render_window);                                       // set interface to current renderwindow
 
     /* print library versions information */
     debug_msg("GLFW : %s", glfwGetVersionString());

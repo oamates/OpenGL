@@ -14,6 +14,7 @@
 #include "../primitives/shapes.hpp"
 
 #include "main_ui.hpp"
+#include "log.hpp"
 
 inline bool ShapeName(void* data, int idx, const char** out_text)
 {
@@ -34,10 +35,9 @@ struct UIShapeCreator : public ui_t
     UIShapeCreator() {};
     ~UIShapeCreator() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawSceneNodes)
-            return;
+        if (!main_ui_t::drawSceneNodes) return;
     
         static auto &assets = AssetsManager::Instance();
         static auto &voxel = *static_cast<VoxelizerRenderer*> (assets->renderers["Voxelizer"].get());

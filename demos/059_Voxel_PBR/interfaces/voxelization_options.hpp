@@ -10,16 +10,16 @@
 #include "../core/assets_manager.hpp"
 #include "../renderers/voxelizer_renderer.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UIVoxelizationOptions : public ui_t
 {
     UIVoxelizationOptions() {}
     ~UIVoxelizationOptions() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawVoxelizationOptions)
-            return;
+        if (!main_ui_t::drawVoxelizationOptions) return;
     
         static auto &assets = AssetsManager::Instance();
         static auto &voxel = *static_cast<VoxelizerRenderer*> (assets->renderers["Voxelizer"].get());

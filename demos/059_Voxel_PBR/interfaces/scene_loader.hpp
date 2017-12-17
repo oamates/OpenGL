@@ -11,6 +11,7 @@
 #include "../scene/scene.hpp"
 #include "../scene/light.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct EngineBase;
 
@@ -33,10 +34,9 @@ struct UISceneLoader : public ui_t
     UISceneLoader() {}
     ~UISceneLoader() override {}
     
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawSceneLoader)
-            return;
+        if (!main_ui_t::drawSceneLoader) return;
     
         static auto &assets = AssetsManager::Instance();
         static auto &scene = Scene::Active();

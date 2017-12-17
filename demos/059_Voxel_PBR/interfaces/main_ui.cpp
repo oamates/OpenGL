@@ -5,6 +5,8 @@
 #include "../renderers/voxelizer_renderer.hpp"
 #include "../rendering/render_window.hpp"
 
+#include "log.hpp"
+
 bool main_ui_t::drawSceneLoader = true;
 bool main_ui_t::drawFramerate = false;
 bool main_ui_t::drawSceneCameras = false;
@@ -16,7 +18,7 @@ bool main_ui_t::drawGIOptions = false;
 bool main_ui_t::drawSceneMaterials = false;
 bool main_ui_t::drawSceneNodes = false;
 
-void main_ui_t::Draw()
+void main_ui_t::render()
 {
     static bool showAbout = false;
 

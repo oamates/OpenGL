@@ -3,7 +3,7 @@
 #include <memory>
 #include "imgui/imgui.h"
 
-struct RenderWindow;
+struct render_window_t;
 
 // Main class to implement custom interfaces setups IMGUI to render in the current context
 struct ui_renderer_t
@@ -12,11 +12,11 @@ struct ui_renderer_t
     virtual ~ui_renderer_t() {}
 
     // Setups the interface to render in the current rendering context
-    static void Initialize(const RenderWindow &activeWindow, bool instantCallbacks = true);
+    static void initialize(const render_window_t& active_window, bool instantCallbacks = true);
     
-    static void Terminate();                                // Deletes all rendering objects and UI data
-    static void Render();                                   // Renders the UI
-    static void NewFrame();                                 // Sets up the GUI for a new frame.
+    static void terminate();                                // Deletes all rendering objects and UI data
+    static void render();                                   // Renders the UI
+    static void new_frame();                                // Sets up the GUI for a new frame.
 
 	// Contains all the OpenGL objects names and useful fields for callback logic.
 

@@ -10,7 +10,7 @@ void FreeCamera::Update()
 {
     static bool enabled = false;
     ImGuiIO& io = ImGui::GetIO();
-    RenderWindow& window = engine_t::instance()->window();                                        // main render window
+    render_window_t& window = engine_t::instance()->window();                                        // main render window
 
     if(io.KeyShift && ImGui::IsKeyReleased(GLFW_KEY_F))
         enabled = !enabled;

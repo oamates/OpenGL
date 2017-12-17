@@ -42,10 +42,8 @@
 std::unique_ptr<AssetsManager> &AssetsManager::Instance()
 {
     static std::unique_ptr<AssetsManager> instance = 0;
-
     if (!instance)
         instance.reset(new AssetsManager());
-
     return instance;
 }
 
@@ -54,7 +52,7 @@ void AssetsManager::Terminate()
 
 AssetsManager::AssetsManager()
 {
-    RenderWindow& window = engine_t::instance()->window();
+    render_window_t& window = engine_t::instance()->window();
 
     debug_msg("Instantiating scenes with their paths ... ");
     scenes["Crytek Sponza"]           = std::make_shared<Scene> ("models/crytek-sponza/sponza.obj");

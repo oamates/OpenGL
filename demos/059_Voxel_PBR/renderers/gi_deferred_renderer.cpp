@@ -16,7 +16,7 @@
 #include <oglplus/bound/texture.hpp>
 #include <oglplus/context.hpp>
 
-GIDeferredRenderer::GIDeferredRenderer(RenderWindow &window) : Renderer(window)
+GIDeferredRenderer::GIDeferredRenderer(render_window_t& window) : Renderer(window)
 {
     auto& info = Window().Info();
     

@@ -24,14 +24,14 @@ struct ui_t : public ui_renderer_t, public InstancePool<ui_t>
 
     virtual ~ui_t() {}
 
-    virtual void Draw() = 0;                                // Called per frame, interface drawing logic resides on this method
+    virtual void render() = 0;                                // Called per frame, interface drawing logic resides on this method
 //    friend void EngineBase::MainLoop() const;
-    static void DrawAll()
+    static void render_all()
     {
         if (renderer->disabled)
             return;
 
         for (auto &ui : instances)
-            ui->Draw();
+            ui->render();
     }
 };

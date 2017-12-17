@@ -10,17 +10,17 @@
 #include "../scene/scene.hpp"
 #include "../scene/material.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UISceneMaterials : public ui_t
 {
     UISceneMaterials() {}
     ~UISceneMaterials() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawSceneMaterials)
-            return;
-    
+        if (!main_ui_t::drawSceneMaterials) return;
+
         static auto &assets = AssetsManager::Instance();
         static auto &voxel = *static_cast<VoxelizerRenderer*> (assets->renderers["Voxelizer"].get());
         static auto scene = static_cast<Scene *>(nullptr);

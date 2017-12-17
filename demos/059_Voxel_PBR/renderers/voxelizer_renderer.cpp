@@ -463,24 +463,19 @@ void VoxelizerRenderer::DrawVoxels()
     // pass voxel drawer uniforms
     if(drawDirection == 7)
     {
-        voxelNormal.BindImage(0, 0, true, 0, oglplus::AccessSpecifier::ReadOnly,
-                              oglplus::ImageUnitFormat::RGBA8);
+        voxelNormal.BindImage(0, 0, true, 0, oglplus::AccessSpecifier::ReadOnly, oglplus::ImageUnitFormat::RGBA8);
     }
     else if (drawDirection == 8)
     {
-        voxelAlbedo.BindImage(0, 0, true, 0, oglplus::AccessSpecifier::ReadOnly,
-                              oglplus::ImageUnitFormat::RGBA8);
+        voxelAlbedo.BindImage(0, 0, true, 0, oglplus::AccessSpecifier::ReadOnly,  oglplus::ImageUnitFormat::RGBA8);
     }
     else if(drawMipLevel == 0)
     {
-        voxelRadiance.BindImage(0, 0, true, 0, oglplus::AccessSpecifier::ReadOnly,
-                                oglplus::ImageUnitFormat::RGBA8);
+        voxelRadiance.BindImage(0, 0, true, 0, oglplus::AccessSpecifier::ReadOnly, oglplus::ImageUnitFormat::RGBA8);
     }
     else if(drawMipLevel > 0)
     {
-        voxelTexMipmap[drawDirection]
-        .BindImage(0, drawMipLevel - 1, true, 0, oglplus::AccessSpecifier::ReadOnly,
-                   oglplus::ImageUnitFormat::RGBA8);
+        voxelTexMipmap[drawDirection].BindImage(0, drawMipLevel - 1, true, 0, oglplus::AccessSpecifier::ReadOnly, oglplus::ImageUnitFormat::RGBA8);
     }
 
     auto model = translate(sceneBox.MinPoint()) * scale(glm::vec3(vSize));
@@ -522,7 +517,7 @@ void VoxelizerRenderer::UpdateProjectionMatrices(const bbox_t &sceneBox)
     }
 }
 
-VoxelizerRenderer::VoxelizerRenderer(RenderWindow &window) : Renderer(window)
+VoxelizerRenderer::VoxelizerRenderer(render_window_t& window) : Renderer(window)
 {
     injectFirstBounce = true;
     drawMipLevel = drawDirection = 0;
@@ -552,9 +547,7 @@ void VoxelizerRenderer::SetupVoxelVolumes(const unsigned int &dimension)
     voxelAlbedo.WrapR(TextureTarget::_3D, TextureWrap::ClampToEdge);
     voxelAlbedo.WrapS(TextureTarget::_3D, TextureWrap::ClampToEdge);
     voxelAlbedo.WrapT(TextureTarget::_3D, TextureWrap::ClampToEdge);
-    voxelAlbedo.Image3D(TextureTarget::_3D, 0, PixelDataInternalFormat::RGBA8,
-                        dimension, dimension, dimension, 0, PixelDataFormat::RGBA,
-                        PixelDataType::UnsignedByte, nullptr);
+    voxelAlbedo.Image3D(TextureTarget::_3D, 0, PixelDataInternalFormat::RGBA8, dimension, dimension, dimension, 0, PixelDataFormat::RGBA, PixelDataType::UnsignedByte, nullptr);
     // generate normal volume for radiance injection
     voxelNormal.Bind(TextureTarget::_3D);
     voxelNormal.MinFilter(TextureTarget::_3D, TextureMinFilter::Linear);
@@ -629,6 +622,7 @@ void VoxelizerRenderer::SetupDrawVoxels(const unsigned &level, const unsigned &d
 VoxelizerRenderer::~VoxelizerRenderer()
 {
 }
+
 const unsigned &VoxelizerRenderer::VolumeDimension() const
 {
     return volumeDimension;

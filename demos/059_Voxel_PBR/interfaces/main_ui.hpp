@@ -9,7 +9,8 @@ struct main_ui_t : public ui_t
 	main_ui_t() {}
 	~main_ui_t() override {}
 
-	void Draw() override;
+	void render() override;
+
 	static bool drawSceneLoader;
 	static bool drawFramerate;
 	static bool drawSceneCameras;

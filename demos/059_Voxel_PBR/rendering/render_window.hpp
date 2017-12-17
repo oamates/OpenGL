@@ -80,6 +80,7 @@ struct WindowInfo
     int x;
     int y;
     std::string title;
+
     WindowInfo();
     WindowInfo(const unsigned width, const unsigned height, const int x, const int y, const std::string& title);
     virtual ~WindowInfo() {};
@@ -87,7 +88,7 @@ struct WindowInfo
 
 // Handles the instancing for the rendering context using GLFW.
 // The rendering window settings such as size, position and hints can be set up with this class.
-struct RenderWindow
+struct render_window_t
 {
     static void WindowHint(const WindowHints &target, const int value);
     static void WindowHint(const FramebufferHints &target, const int value);
@@ -107,8 +108,8 @@ struct RenderWindow
     void SetAsCurrentContext() const;
     void SwapBuffers() const;
 
-    RenderWindow();
-    virtual ~RenderWindow();
+    render_window_t();
+    virtual ~render_window_t();
 
     GLFWwindow* Handler() const { return windowHandler; }
     const WindowInfo &Info() const { return windowInfo; }
@@ -120,7 +121,7 @@ struct RenderWindow
     static void OnErrorCallback(int code, const char * description);
 };
 
-template<typename T> void RenderWindow::WindowHint(T&& target, const Hint value)
+template<typename T> void render_window_t::WindowHint(T&& target, const Hint value)
 {
     WindowHint(std::forward<T>(target), static_cast<int>(value));
 }

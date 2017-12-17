@@ -11,17 +11,17 @@
 #include "../renderers/gi_deferred_renderer.hpp"
 #include "../renderers/voxelizer_renderer.hpp"
 #include "main_ui.hpp"
+#include "log.hpp"
 
 struct UIGlobalIllumination : public ui_t
 {
     UIGlobalIllumination() {}
     ~UIGlobalIllumination() override {}
 
-    void Draw() override
+    void render() override
     {
-        if (!main_ui_t::drawGIOptions)
-            return;
-    
+        if (!main_ui_t::drawGIOptions) return;
+
         static auto &assets = AssetsManager::Instance();
         static auto &deferred = *static_cast<GIDeferredRenderer *>
                                 (assets->renderers["Deferred"].get());

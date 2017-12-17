@@ -6,7 +6,7 @@
 #include "log.hpp"
 
 // Called when an error occurs using the GLFW window
-void RenderWindow::OnErrorCallback(int code, const char* description)
+void render_window_t::OnErrorCallback(int code, const char* description)
     { throw std::runtime_error(description); }
 
 
@@ -20,7 +20,7 @@ WindowInfo::WindowInfo(const unsigned width, const unsigned height, const int x,
 }
 
 // Sets WindowHints hint value. Has to be called before calling WindowInfoRenderWindow.Open
-void RenderWindow::WindowHint(const WindowHints &target, const int value)
+void render_window_t::WindowHint(const WindowHints &target, const int value)
 {
     if (static_cast<Hint>(value) == Hint::True || static_cast<Hint>(value) == Hint::False)
     {
@@ -29,7 +29,7 @@ void RenderWindow::WindowHint(const WindowHints &target, const int value)
 }
 
 // Sets FramebufferHints hint value. Has to be called before calling RenderWindow.Open()
-void RenderWindow::WindowHint(const FramebufferHints &target, const int value)
+void render_window_t::WindowHint(const FramebufferHints &target, const int value)
 {
     if (target == FramebufferHints::Stereo ||
             target == FramebufferHints::SRGBCapable ||
@@ -49,7 +49,7 @@ void RenderWindow::WindowHint(const FramebufferHints &target, const int value)
 }
 
 // Sets ContextHints hint value. Has to be called before calling RenderWindow.Open()
-void RenderWindow::WindowHint(const ContextHints &target, const int value)
+void render_window_t::WindowHint(const ContextHints &target, const int value)
 {
     if (target == ContextHints::ClientAPI)
     {
@@ -81,7 +81,7 @@ void RenderWindow::WindowHint(const ContextHints &target, const int value)
 }
 
 // Opens a GLFW window with the specified configuration.
-void RenderWindow::Open(const WindowInfo& windowConfig, bool setPosition, GLFWmonitor* monitor, GLFWwindow* share)
+void render_window_t::Open(const WindowInfo& windowConfig, bool setPosition, GLFWmonitor* monitor, GLFWwindow* share)
 {
     if (isOpen || !glfwInit())
         return;
@@ -115,36 +115,36 @@ void RenderWindow::Open(const WindowInfo& windowConfig, bool setPosition, GLFWmo
 }
 
 // Destroys the GLFW Window
-void RenderWindow::Destroy() const
+void render_window_t::Destroy() const
     { glfwDestroyWindow(windowHandler); }
 
-void RenderWindow::SetPosition(const int x, const int y)
+void render_window_t::SetPosition(const int x, const int y)
 {
     glfwSetWindowPos(windowHandler, x, y);
     windowInfo.x = x;
     windowInfo.y = y;
 }
 
-void RenderWindow::SetWindowSize(const int w, const int h)
+void render_window_t::SetWindowSize(const int w, const int h)
 {
     glfwSetWindowSize(windowHandler, w, h);
     windowInfo.displayWidth = w;
     windowInfo.displayHeight = h;
 }
 
-void RenderWindow::SetWindowTitle(const std::string &title)
+void render_window_t::SetWindowTitle(const std::string &title)
 {
     glfwSetWindowTitle(windowHandler, title.c_str());
     windowInfo.title = title;
 }
 
-void RenderWindow::SetAsCurrentContext() const
+void render_window_t::SetAsCurrentContext() const
 {
     glfwMakeContextCurrent(windowHandler);
 }
 
 // Looks up for input events.
-void RenderWindow::Events(EventMode mode)
+void render_window_t::Events(EventMode mode)
 {
     switch (mode)
     {
@@ -155,22 +155,22 @@ void RenderWindow::Events(EventMode mode)
 }
 
 // Indicates if the render window should close or sets it to be closed.
-int RenderWindow::ShouldClose(bool sendClose) const
+int render_window_t::ShouldClose(bool sendClose) const
 {
     if (sendClose)
         glfwSetWindowShouldClose(windowHandler, true);
     return glfwWindowShouldClose(windowHandler);
 }
 
-void RenderWindow::SwapBuffers() const
+void render_window_t::SwapBuffers() const
     { glfwSwapBuffers(windowHandler); }
 
-RenderWindow::RenderWindow() : windowHandler(nullptr), isOpen(false)
+render_window_t::render_window_t() : windowHandler(nullptr), isOpen(false)
 {
     glfwSetErrorCallback(OnErrorCallback);
     if (!glfwInit())
         debug_msg("Error initializing GLFW...");
 }
 
-RenderWindow::~RenderWindow()
+render_window_t::~render_window_t()
     { glfwDestroyWindow(windowHandler); }

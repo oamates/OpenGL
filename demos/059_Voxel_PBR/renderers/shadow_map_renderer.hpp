@@ -35,7 +35,7 @@ struct ShadowMapRenderer : public Renderer
 
     const Camera &LightCamera() const;
     const oglplus::Texture &ShadowMap() const;
-    explicit ShadowMapRenderer(RenderWindow &window);
+    explicit ShadowMapRenderer(render_window_t& window);
     ~ShadowMapRenderer();
 
 	static DepthProgram &DepthShader();
@@ -52,7 +52,7 @@ struct ShadowMapRenderer : public Renderer
 	glm::vec2 exponents;
 	float lightBleedingReduction;
 	Camera lightView;
-	const Light * shadowCaster;
+	const Light* shadowCaster;
 	glm::mat4x4 lightSpaceMatrix;
 	float blurScale;
 	int blurQuality;

@@ -39,17 +39,18 @@ struct VoxelizerRenderer : public Renderer
     unsigned int drawDirection;
     glm::vec4 drawColorChannels;
 
+    explicit VoxelizerRenderer(render_window_t& window);                            // Initializes a new instance of the VoxelRenderer class.
+    ~VoxelizerRenderer();                                                           // Finalizes an instance of the VoxelRenderer class.
+
     void Render() override;                                                         // Voxelizes the current scene. It can also be used to show the result volume.
     void SetMatricesUniforms(const Node &node) const override;                      // Sets the matrices uniforms.
     void SetMaterialUniforms(const Material &material) const override;              // Sets the material uniforms.
     void SetUpdateFrequency(const int framestep);                                   // Sets the voxelization update frequency, voxelize scene will be called every framestep number of frames.
     void VoxelizeStaticScene();
-    explicit VoxelizerRenderer(RenderWindow &window);                               // Initializes a new instance of the VoxelRenderer class.
     void SetupVoxelVolumes(const unsigned int &dimension);
     void RevoxelizeScene();
     void UpdateRadiance();
     void SetupDrawVoxels(const unsigned &level, const unsigned &direction, const glm::vec4 colors);        
-    ~VoxelizerRenderer();                                                           // Finalizes an instance of the VoxelRenderer class.
     const unsigned int &VolumeDimension() const;
     oglplus::Texture &VoxelRadiance();
     std::array<oglplus::Texture, 6> &VoxelTextureMipmap();
