@@ -3,14 +3,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../core/assets_manager.hpp"
 #include "../renderers/shadow_map_renderer.hpp"
 #include "../util/scene_importer.hpp"
 #include "../scene/camera.hpp"
 #include "../scene/scene.hpp"
 #include "../scene/light.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
 struct EngineBase;
 
@@ -28,14 +28,14 @@ inline bool SceneName(void* data, int idx, const char** out_text)
     return true;
 }
 
-struct UISceneLoader : public Interface
+struct UISceneLoader : public ui_t
 {
     UISceneLoader() {}
     ~UISceneLoader() override {}
     
     void Draw() override
     {
-        if (!UIMainMenu::drawSceneLoader)
+        if (!main_ui_t::drawSceneLoader)
             return;
     
         static auto &assets = AssetsManager::Instance();
@@ -44,7 +44,7 @@ struct UISceneLoader : public Interface
         static Scene * reloaded = nullptr;
         ImGui::SetNextWindowPosCenter();
     
-        if (ImGui::Begin("Load Scene", &UIMainMenu::drawSceneLoader))
+        if (ImGui::Begin("Load Scene", &main_ui_t::drawSceneLoader))
         {
             static auto advancedImport = false;
             static unsigned int flag = aiProcessPreset_TargetRealtime_Fast;
@@ -118,11 +118,11 @@ struct UISceneLoader : public Interface
                 reloaded = scenePtr;
             }
     
-            static int choosen = 1;
+            static int chosen = 1;
     
-            if (ImGui::Combo("Importing Preset", &choosen, "ToLeftHanded\0Fast\0Quality\0Max Quality", 4))
+            if (ImGui::Combo("Importing Preset", &chosen, "ToLeftHanded\0Fast\0Quality\0Max Quality", 4))
             {
-                switch (choosen)
+                switch (chosen)
                 {
                     case 0: flag = aiProcess_ConvertToLeftHanded; break;
                     case 1: flag = aiProcessPreset_TargetRealtime_Fast; break;
@@ -140,7 +140,7 @@ struct UISceneLoader : public Interface
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 ImGui::Columns(2);
     
-                for (auto i = 0; i < SceneImporter::FlagNames.size(); i++)
+                for (size_t i = 0; i < SceneImporter::FlagNames.size(); i++)
                 {
                     if (2 * i == SceneImporter::FlagNames.size())
                         ImGui::NextColumn();

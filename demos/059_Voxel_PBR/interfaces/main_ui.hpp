@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 
 struct EngineBase;
 
-struct UIMainMenu : public Interface
+struct main_ui_t : public ui_t
 {
-	UIMainMenu() {}
-	~UIMainMenu() override {}
+	main_ui_t() {}
+	~main_ui_t() override {}
 
 	void Draw() override;
 	static bool drawSceneLoader;

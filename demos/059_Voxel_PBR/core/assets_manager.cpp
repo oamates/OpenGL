@@ -21,7 +21,7 @@
 // include interfaces
 #include "../interfaces/scene_loader.hpp"
 #include "../interfaces/framerate.hpp"
-#include "../interfaces/main_menu.hpp"
+#include "../interfaces/main_ui.hpp"
 #include "../interfaces/scene_cameras.hpp"
 #include "../interfaces/scene_lights.hpp"
 #include "../interfaces/framebuffer_textures.hpp"
@@ -36,6 +36,8 @@
 #include "../renderers/voxelizer_renderer.hpp"
 #include "../renderers/gi_deferred_renderer.hpp"
 #include "../renderers/shadow_map_renderer.hpp"
+
+#include "log.hpp"
 
 std::unique_ptr<AssetsManager> &AssetsManager::Instance()
 {
@@ -52,9 +54,9 @@ void AssetsManager::Terminate()
 
 AssetsManager::AssetsManager()
 {
-    auto& window = EngineBase::Instance()->Window();
+    RenderWindow& window = engine_t::instance()->window();
 
-    // instantiate scenes with their paths
+    debug_msg("Instantiating scenes with their paths ... ");
     scenes["Crytek Sponza"]           = std::make_shared<Scene> ("models/crytek-sponza/sponza.obj");
     scenes["Crytek Sponza (No Flag)"] = std::make_shared<Scene> ("models/crytek-sponza-noflag/sponza.obj");
     scenes["Sibenik (Open Windows)"]  = std::make_shared<Scene> ("models/sibenik/sibenik.obj");
@@ -67,41 +69,40 @@ AssetsManager::AssetsManager()
     scenes["Lightbox"]                = std::make_shared<Scene> ("models/lightbox/LightBox01.obj");
     scenes["Test Plane"]              = std::make_shared<Scene> ("models/lightbox/TestPlane.obj");
 
-	// instantiate implemented interfaces
-    interfaces["SceneLoader"] = std::make_shared<UISceneLoader>();
-    interfaces["Framerate"] = std::make_shared<UIFramerate>();
-    interfaces["MainMenu"] = std::make_shared<UIMainMenu>();
-    interfaces["Cameras"] = std::make_shared<UISceneCameras>();
-    interfaces["Lights"] = std::make_shared<UISceneLights>();
-    interfaces["Materials"] = std::make_shared<UISceneMaterials>();
-    interfaces["Shapes"] = std::make_shared<UIShapeCreator>();
+    debug_msg("Instantiating ui interfaces ... ");
+    interfaces["SceneLoader"]  = std::make_shared<UISceneLoader>();
+    interfaces["Framerate"]    = std::make_shared<UIFramerate>();
+    interfaces["MainMenu"]     = std::make_shared<main_ui_t>();
+    interfaces["Cameras"]      = std::make_shared<UISceneCameras>();
+    interfaces["Lights"]       = std::make_shared<UISceneLights>();
+    interfaces["Materials"]    = std::make_shared<UISceneMaterials>();
+    interfaces["Shapes"]       = std::make_shared<UIShapeCreator>();
     interfaces["Framebuffers"] = std::make_shared<UIFramebuffers>();
-    interfaces["Shadowing"] = std::make_shared<UIShadowingOptions>();
+    interfaces["Shadowing"]    = std::make_shared<UIShadowingOptions>();
     interfaces["Voxelization"] = std::make_shared<UIVoxelizationOptions>();
-    interfaces["GIOptions"] = std::make_shared<UIGlobalIllumination>();
+    interfaces["GIOptions"]    = std::make_shared<UIGlobalIllumination>();
 
-	// instantiate implemented behaviors
+    debug_msg("Instantiating behaviors ... ");
     behaviors["FreeCamera"] = std::make_shared<FreeCamera>();
 
-	// instantiate implemented programs
-    programs["Geometry"] = std::make_shared<GeometryProgram>();
-    programs["Lighting"] = std::make_shared<LightingProgram>();
-    programs["Voxelization"] = std::make_shared<VoxelizationProgram>();
-    programs["VoxelDrawer"] = std::make_shared<VoxelDrawerProgram>();
-    programs["Depth"] = std::make_shared<DepthProgram>();
-    programs["InjectRadiance"] = std::make_shared<InjectRadianceProgram>();
+    debug_msg("Instantiating auxiliary shader programs ... ");
+    programs["Geometry"]          = std::make_shared<GeometryProgram>();
+    programs["Lighting"]          = std::make_shared<LightingProgram>();
+    programs["Voxelization"]      = std::make_shared<VoxelizationProgram>();
+    programs["VoxelDrawer"]       = std::make_shared<VoxelDrawerProgram>();
+    programs["Depth"]             = std::make_shared<DepthProgram>();
+    programs["InjectRadiance"]    = std::make_shared<InjectRadianceProgram>();
     programs["InjectPropagation"] = std::make_shared<PropagationProgram>();
-    programs["MipmappingBase"] = std::make_shared<MipmappingBaseProgram>();
-    programs["MipmappingVolume"] = std::make_shared<MipmappingVolumeProgram>();
-    programs["Blur"] = std::make_shared<BlurProgram>();
-    programs["ClearDynamic"] = std::make_shared<ClearDynamicProgram>();
+    programs["MipmappingBase"]    = std::make_shared<MipmappingBaseProgram>();
+    programs["MipmappingVolume"]  = std::make_shared<MipmappingVolumeProgram>();
+    programs["Blur"]              = std::make_shared<BlurProgram>();
+    programs["ClearDynamic"]      = std::make_shared<ClearDynamicProgram>();
 
-    // instantiate impleted renderers
+    debug_msg("Instantiating renderers ... ");
     renderers["Shadowmapping"] = std::make_shared<ShadowMapRenderer>(window);
     renderers["Voxelizer"]     = std::make_shared<VoxelizerRenderer>(window);
     renderers["Deferred"]      = std::make_shared<GIDeferredRenderer>(window);
 
-    // attach shaders, ej: programs[index]->AttachShader();
     programs["Geometry"]->AttachShader         (oglplus::ShaderType::Vertex,   "glsl/geometry_pass.vs");
     programs["Geometry"]->AttachShader         (oglplus::ShaderType::Fragment, "glsl/geometry_pass.fs");
     programs["Lighting"]->AttachShader         (oglplus::ShaderType::Vertex,   "glsl/fs_quad.vs");
@@ -122,12 +123,16 @@ AssetsManager::AssetsManager()
     programs["Blur"]->AttachShader             (oglplus::ShaderType::Fragment, "glsl/blur.fs");
     programs["ClearDynamic"]->AttachShader     (oglplus::ShaderType::Compute,  "glsl/clear_dynamic.cs");
 
-    for (auto &prog : programs)                                                 // link and extract uniforms from shaders
+    debug_msg("Linking shader programs ... ");
+    for (std::pair<std::string, std::shared_ptr<ProgramShader>> program : programs) // link and extract uniforms from shaders
     {
-        prog.second->Link();
-        prog.second->ExtractUniforms();
+        program.second->Link();
+        program.second->ExtractUniforms();
     }
+
     Texture2D::GetDefaultTexture();                                             // utility default assets
+
+    debug_msg("Loading shapes ... ");
     Shapes::Load();                                                             // shapes instancer
 }
 

@@ -6,27 +6,27 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../core/assets_manager.hpp"
 #include "../renderers/gi_deferred_renderer.hpp"
 #include "../renderers/voxelizer_renderer.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
-struct UIGlobalIllumination : public Interface
+struct UIGlobalIllumination : public ui_t
 {
     UIGlobalIllumination() {}
     ~UIGlobalIllumination() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawGIOptions)
+        if (!main_ui_t::drawGIOptions)
             return;
     
         static auto &assets = AssetsManager::Instance();
         static auto &deferred = *static_cast<GIDeferredRenderer *>
                                 (assets->renderers["Deferred"].get());
     
-        if (ImGui::Begin("Global Illumination", &UIMainMenu::drawGIOptions, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::Begin("Global Illumination", &main_ui_t::drawGIOptions, ImGuiWindowFlags_AlwaysAutoResize))
         {
             static auto &voxel = *static_cast<VoxelizerRenderer *> (assets->renderers["Voxelizer"].get());
             static auto maxTracingConeDistance = deferred.MaxTracingDistance();

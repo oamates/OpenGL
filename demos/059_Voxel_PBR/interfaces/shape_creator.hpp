@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../core/assets_manager.hpp"
 #include "../scene/scene.hpp"
 #include "../scene/material.hpp"
@@ -13,7 +13,7 @@
 #include "../renderers/shadow_map_renderer.hpp"
 #include "../primitives/shapes.hpp"
 
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
 inline bool ShapeName(void* data, int idx, const char** out_text)
 {
@@ -29,14 +29,14 @@ inline bool ShapeName(void* data, int idx, const char** out_text)
     return true;
 }
 
-struct UIShapeCreator : public Interface
+struct UIShapeCreator : public ui_t
 {
     UIShapeCreator() {};
     ~UIShapeCreator() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawSceneNodes)
+        if (!main_ui_t::drawSceneNodes)
             return;
     
         static auto &assets = AssetsManager::Instance();
@@ -73,7 +73,7 @@ struct UIShapeCreator : public Interface
         if (!scene)                                                                         // no active scene
             return;
     
-        ImGui::Begin("Objects", &UIMainMenu::drawSceneNodes);                               // begin editor
+        ImGui::Begin("Objects", &main_ui_t::drawSceneNodes);                               // begin editor
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
         ImGui::Columns(2);
         ImGui::Combo("", &shapeSelected, ShapeName, &shapesNames, static_cast<int>(shapesNames.size()));

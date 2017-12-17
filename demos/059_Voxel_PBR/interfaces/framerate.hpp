@@ -3,20 +3,20 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "../core/interface.hpp"
-#include "main_menu.hpp"
+#include "../core/ui.hpp"
+#include "main_ui.hpp"
 
-struct UIFramerate : public Interface
+struct UIFramerate : public ui_t
 {
     UIFramerate() {}
     ~UIFramerate() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawFramerate)
+        if (!main_ui_t::drawFramerate)
             return;
 
-        static auto position = ImVec2(io->DisplaySize.x - 80 - 3, io->DisplaySize.y - 50 - 3);
+        static ImVec2 position = ImVec2(io->DisplaySize.x - 80 - 3, io->DisplaySize.y - 50 - 3);
         ImGui::SetNextWindowPos(position);
 
         if (ImGui::Begin("Performance Window", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings))

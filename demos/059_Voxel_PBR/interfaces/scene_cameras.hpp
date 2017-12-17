@@ -4,19 +4,19 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../scene/scene.hpp"
 #include "../scene/camera.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
-struct UISceneCameras : public Interface
+struct UISceneCameras : public ui_t
 {
     UISceneCameras() {}
     ~UISceneCameras() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawSceneCameras)
+        if (!main_ui_t::drawSceneCameras)
             return;
     
         static auto scene = static_cast<Scene *>(nullptr);
@@ -38,7 +38,7 @@ struct UISceneCameras : public Interface
         if (!scene)                                                                 // no active scene
             return;
     
-        ImGui::Begin("Cameras", &UIMainMenu::drawSceneCameras);                     // begin editor
+        ImGui::Begin("Cameras", &main_ui_t::drawSceneCameras);                     // begin editor
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
         ImGui::Columns(2);
     

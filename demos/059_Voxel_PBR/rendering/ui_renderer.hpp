@@ -6,10 +6,10 @@
 struct RenderWindow;
 
 // Main class to implement custom interfaces setups IMGUI to render in the current context
-struct InterfaceRenderer
+struct ui_renderer_t
 {
-    InterfaceRenderer() {}
-    virtual ~InterfaceRenderer() {}
+    ui_renderer_t() {}
+    virtual ~ui_renderer_t() {}
 
     // Setups the interface to render in the current rendering context
     static void Initialize(const RenderWindow &activeWindow, bool instantCallbacks = true);
@@ -22,7 +22,7 @@ struct InterfaceRenderer
 
 	struct RendererData
     {
-        GLFWwindow * window;
+        GLFWwindow* window;
         double time;
         bool mousePressed[3];
         float mouseWheel;

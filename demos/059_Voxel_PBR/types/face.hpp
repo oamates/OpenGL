@@ -14,6 +14,6 @@ struct Face
     std::array<unsigned int, 3> indices;
     glm::vec3 normal;
 
-    Face() : normal(glm::vec3(0)) {};
-    virtual ~Face() {};
+    Face() : normal(glm::vec3(0.0f)) {}
+    virtual ~Face() {}
 };

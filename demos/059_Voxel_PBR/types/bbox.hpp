@@ -12,28 +12,30 @@
 struct bbox_t
 {
     std::array<glm::vec3, 2> boundaries;
+
     std::shared_ptr<bbox_t> original;
     glm::vec3 center;
     glm::vec3 extent;
 
-    bbox_t() : original(nullptr) { Reset(); }
+    bbox_t() : original(nullptr)
+        { Reset(); }
     virtual ~bbox_t() {}
 
-    void MinPoint(const glm::vec3 &val)             // Sets the minimum point only if value is smaller than the current minPoint
+    void MinPoint(const glm::vec3& val)             // Sets the minimum point only if value is smaller than the current minPoint
     {
-        this->boundaries[0] = min(this->boundaries[0], val);
-        this->center = (boundaries[1] + boundaries[0]) * 0.5f;
-        this->extent = (boundaries[1] - boundaries[0]) * 0.5f;
+        boundaries[0] = glm::min(boundaries[0], val);
+        center = 0.5f * (boundaries[1] + boundaries[0]);
+        extent = 0.5f * (boundaries[1] - boundaries[0]);
     }
 
     void MaxPoint(const glm::vec3 &val)             // Sets the maximum point only if value is bigger than the current maxPoint
     {
-        this->boundaries[1] = max(this->boundaries[1], val);
-        this->center = (boundaries[1] + boundaries[0]) * 0.5f;
-        this->extent = (boundaries[1] - boundaries[0]) * 0.5f;
+        boundaries[1] = glm::max(boundaries[1], val);
+        center = 0.5f * (boundaries[1] + boundaries[0]);
+        extent = 0.5f * (boundaries[1] - boundaries[0]);
     }
 
-    void Transform(const glm::mat4x4 &model)        // Updates the boundaries accordly with the given model matrix.
+    void Transform(const glm::mat4x4& model)        // Updates the boundaries accordly with the given model matrix.
     {
         if (!original)
             original = std::make_shared<bbox_t>(*this);
@@ -55,44 +57,44 @@ struct bbox_t
         for (int i = 0; i < 8; i++)
         {
             glm::vec3 transformed = glm::vec3(model * glm::vec4(corners[i], 1.0f));
-            this->boundaries[0] = glm::min(this->boundaries[0], transformed);
-            this->boundaries[1] = glm::max(this->boundaries[1], transformed);
+            boundaries[0] = glm::min(boundaries[0], transformed);
+            boundaries[1] = glm::max(boundaries[1], transformed);
         }
 
-        this->center = (boundaries[1] + boundaries[0]) * 0.5f;
-        this->extent = (boundaries[1] - boundaries[0]) * 0.5f;
+        center = 0.5f * (boundaries[1] + boundaries[0]);
+        extent = 0.5f * (boundaries[1] - boundaries[0]);
     }
 
     void Reset()                                    // Resets the boundaries, to be updated again with MaxPoint and MinPoint
     {
-        this->boundaries[1] = glm::vec3(std::numeric_limits<float>::lowest());
-        this->boundaries[0] = glm::vec3(std::numeric_limits<float>::infinity());
+        boundaries[1] = glm::vec3(std::numeric_limits<float>::lowest());
+        boundaries[0] = glm::vec3(std::numeric_limits<float>::infinity());
         if (original)
             original.reset();
     }
 
-    const glm::vec3 &MinPoint(bool transformed = false) const
+    const glm::vec3& MinPoint(bool transformed = false) const
     {
         if(transformed)
             return boundaries[0];
         return !original ? boundaries[0] : original->boundaries[0];
     }
 
-    const glm::vec3 &MaxPoint(bool transformed = false) const
+    const glm::vec3& MaxPoint(bool transformed = false) const
     {
         if (transformed)
             return boundaries[1];
         return !original ? boundaries[1] : original->boundaries[1];
     }
 
-    const glm::vec3 &Center(bool transformed = false) const
+    const glm::vec3& Center(bool transformed = false) const
     {
         if (transformed)
             return center;
         return !original ? center : original->center;
     }
 
-    const glm::vec3 &Extent(bool transformed = false) const
+    const glm::vec3& Extent(bool transformed = false) const
     {
         if (transformed)
             return extent;

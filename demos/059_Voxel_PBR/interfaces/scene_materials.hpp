@@ -4,21 +4,21 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../core/assets_manager.hpp"
 #include "../renderers/voxelizer_renderer.hpp"
 #include "../scene/scene.hpp"
 #include "../scene/material.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
-struct UISceneMaterials : public Interface
+struct UISceneMaterials : public ui_t
 {
     UISceneMaterials() {}
     ~UISceneMaterials() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawSceneMaterials)
+        if (!main_ui_t::drawSceneMaterials)
             return;
     
         static auto &assets = AssetsManager::Instance();
@@ -44,7 +44,7 @@ struct UISceneMaterials : public Interface
         if (!scene)                                                                         // no active scene
             return;
         
-        ImGui::Begin("Materials", &UIMainMenu::drawSceneMaterials);                         // begin editor
+        ImGui::Begin("Materials", &main_ui_t::drawSceneMaterials);                         // begin editor
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
         ImGui::Columns(2);
     

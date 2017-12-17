@@ -6,16 +6,17 @@
 // Stores all instaces of the inheriting class
 template<typename T> struct InstancePool
 {
-    static std::vector<T *> instances;                              // The instance pool        
+    static std::vector<T*> instances;                               // The instance pool        
     static std::map<long long, long long> location;                 // The location of each instance in the instances collection
     unsigned long long instanceId;
     unsigned long long priorityIndex;
 
-    void Priority(const long long priority);                        // Sets this instance priority. Updating its position in the instances collection.
-    T &GetInstance(const long long id);                             // Gets the instance with the given identifier
-    InstancePool<T> &operator = (const InstancePool<T> &rhs);
     InstancePool();
     virtual ~InstancePool();
+
+    void Priority(const long long priority);                        // Sets this instance priority. Updating its position in the instances collection.
+    T& GetInstance(const long long id);                             // Gets the instance with the given identifier
+    InstancePool<T>& operator = (const InstancePool<T> &rhs);
 };
 
 template<typename T> std::map<long long, long long> InstancePool<T>::location;

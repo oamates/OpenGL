@@ -8,7 +8,7 @@ const glm::vec3 Y = glm::vec3(0.0f, 1.0f, 0.0f);
 const glm::vec3 Z = glm::vec3(0.0f, 0.0f, 1.0f);
 
 // The transform change contains a unique set of transforms, on change bool is set to true
-std::unordered_map<const Transform *, bool> Transform::transformChange;
+std::unordered_map<const Transform*, bool> Transform::transformChange;
 
 Transform::Transform()
 {

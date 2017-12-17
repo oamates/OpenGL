@@ -130,18 +130,11 @@ void SceneImporter::ImportMaterial(aiMaterial* mMaterial, Material& material)
     material.refraction_index = refracti;
     material.shininess_exponent = ((log2(shininess) + 1.0f) / 11.0f);
     material.shininess_strength = shinStrength;
-    aiColor3D ambient(0.f), diffuse(0.f), specular(0.f);                                // get material properties
-    aiColor3D emissive(0.f), transparent(0.f);
-    mMaterial->Get(AI_MATKEY_COLOR_AMBIENT, ambient);
-    mMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
-    mMaterial->Get(AI_MATKEY_COLOR_SPECULAR, specular);
-    mMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, emissive);
-    mMaterial->Get(AI_MATKEY_COLOR_TRANSPARENT, transparent);
-    material.ambient = glm::vec3(ambient.r, ambient.g, ambient.b);
-    material.diffuse = glm::vec3(diffuse.r, diffuse.g, diffuse.b);
-    material.specular = glm::vec3(specular.r, specular.g, specular.b);
-    material.emissive = glm::vec3(emissive.r, emissive.g, emissive.b);
-    material.transparent = glm::vec3(transparent.r, transparent.g, transparent.b);
+    mMaterial->Get(AI_MATKEY_COLOR_AMBIENT, material.ambient);
+    mMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, material.diffuse);
+    mMaterial->Get(AI_MATKEY_COLOR_SPECULAR, material.specular);
+    mMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, material.emissive);
+    mMaterial->Get(AI_MATKEY_COLOR_TRANSPARENT, material.transparent);
 }
 
 void SceneImporter::ImportMesh(aiMesh * mMesh, Mesh &mesh)

@@ -7,25 +7,25 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "../core/assets_manager.hpp"
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../renderers/shadow_map_renderer.hpp"
 #include "../scene/light.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
-struct UIShadowingOptions : public Interface
+struct UIShadowingOptions : public ui_t
 {
     UIShadowingOptions() {}
     ~UIShadowingOptions() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawShadowOptions)
+        if (!main_ui_t::drawShadowOptions)
             return;
     
         static auto &assets = AssetsManager::Instance();
         static auto &shadowRender = *static_cast<ShadowMapRenderer *> (assets->renderers["Shadowmapping"].get());
     
-        if (ImGui::Begin("Shadows", &UIMainMenu::drawShadowOptions, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::Begin("Shadows", &main_ui_t::drawShadowOptions, ImGuiWindowFlags_AlwaysAutoResize))
         {
             static auto selectedH = 5, selectedW = 5;
             static std::vector<int> sizes = { 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };

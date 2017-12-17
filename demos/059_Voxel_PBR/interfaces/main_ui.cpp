@@ -1,22 +1,22 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
 #include "../renderers/voxelizer_renderer.hpp"
 #include "../rendering/render_window.hpp"
 
-bool UIMainMenu::drawSceneLoader = true;
-bool UIMainMenu::drawFramerate = false;
-bool UIMainMenu::drawSceneCameras = false;
-bool UIMainMenu::drawSceneLights = false;
-bool UIMainMenu::drawFramebuffers = false;
-bool UIMainMenu::drawShadowOptions = false;
-bool UIMainMenu::drawVoxelizationOptions = false;
-bool UIMainMenu::drawGIOptions = false;
-bool UIMainMenu::drawSceneMaterials = false;
-bool UIMainMenu::drawSceneNodes = false;
+bool main_ui_t::drawSceneLoader = true;
+bool main_ui_t::drawFramerate = false;
+bool main_ui_t::drawSceneCameras = false;
+bool main_ui_t::drawSceneLights = false;
+bool main_ui_t::drawFramebuffers = false;
+bool main_ui_t::drawShadowOptions = false;
+bool main_ui_t::drawVoxelizationOptions = false;
+bool main_ui_t::drawGIOptions = false;
+bool main_ui_t::drawSceneMaterials = false;
+bool main_ui_t::drawSceneNodes = false;
 
-void UIMainMenu::Draw()
+void main_ui_t::Draw()
 {
     static bool showAbout = false;
 
@@ -50,7 +50,7 @@ void UIMainMenu::Draw()
         }
 
         if(ImGui::Button("Exit"))
-            EngineBase::Instance()->Window().ShouldClose(true);
+            engine_t::instance()->window().ShouldClose(true);
 
         ImGui::EndMainMenuBar();
     }

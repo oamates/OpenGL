@@ -6,25 +6,25 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../core/assets_manager.hpp"
 #include "../renderers/voxelizer_renderer.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
-struct UIVoxelizationOptions : public Interface
+struct UIVoxelizationOptions : public ui_t
 {
     UIVoxelizationOptions() {}
     ~UIVoxelizationOptions() override {}
 
     void Draw() override
     {
-        if (!UIMainMenu::drawVoxelizationOptions)
+        if (!main_ui_t::drawVoxelizationOptions)
             return;
     
         static auto &assets = AssetsManager::Instance();
         static auto &voxel = *static_cast<VoxelizerRenderer*> (assets->renderers["Voxelizer"].get());
     
-        if (ImGui::Begin("Voxelization", &UIMainMenu::drawVoxelizationOptions, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::Begin("Voxelization", &main_ui_t::drawVoxelizationOptions, ImGuiWindowFlags_AlwaysAutoResize))
         {
             static auto texRes = 5;
             static std::vector<int> sizes = { 8, 16, 32, 64, 128, 256, 512 };

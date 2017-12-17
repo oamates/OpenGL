@@ -3,7 +3,7 @@
 #include "raw_format.hpp"
 #include "data_segment.hpp"
 
-void * RawFormat::BuildRawData()
+void* RawFormat::BuildRawData()
 {
     if (rawDataPointer)
         free(rawDataPointer);
@@ -27,7 +27,7 @@ void * RawFormat::BuildRawData()
     return rawDataPointer = begin;                                                      // return whole pointer
 }
 
-void * RawFormat::RawData()
+void* RawFormat::RawData()
 {
     if (rawDataPointer)
         return rawDataPointer;

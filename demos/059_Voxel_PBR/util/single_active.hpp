@@ -7,7 +7,7 @@ template<class T> struct SingleActive
     static void ResetActive();
     virtual void SetAsActive();                                 // Sets this instance as active.
     bool IsActive();                                            // Return whether this instance is the one marked as active.
-    static std::unique_ptr<T> &Active();                        // Returns the active instance
+    static std::unique_ptr<T>& Active();                        // Returns the active instance
     static std::unique_ptr<T> current;                          // The current instance marked as active
     ~SingleActive();
 };

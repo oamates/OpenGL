@@ -27,7 +27,7 @@ struct Camera : public SceneObject, public SingleActive<Camera>
     glm::mat4x4 viewProjectionMatrix;
     glm::mat4x4 inverseViewMatrix;
     glm::mat4x4 inverseProjectionMatrix;
-    CullingFrustum frustum;
+    frustum_t frustum;
 
     Camera()
         : clipPlaneFar(10000.0f), clipPlaneNear(0.3f),
@@ -147,7 +147,7 @@ struct Camera : public SceneObject, public SingleActive<Camera>
         return frustum.InFrustum(volume);
     }
 
-    const CullingFrustum &Frustum() const               // Returns the camera's frustum pyramid
+    const frustum_t& Frustum() const               // Returns the camera's frustum pyramid
         { return frustum; }
 
     void UpdateProjectionMatrix()

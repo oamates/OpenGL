@@ -80,7 +80,7 @@ struct Node : public SceneObject
     const glm::mat4& InverseTranspose() const                               // Node's inverse transpose matrix
         { return inverseTransposeModel; }
  
-    const std::vector<Node *> &DrawListNodes() const                        // The node's draw list
+    const std::vector<Node*>& DrawListNodes() const                         // The node's draw list
         { return drawList; }
 
     void BuildDrawList(std::vector<Node *> &base)                           // Builds the draw list.

@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "render_window.hpp"
+#include "log.hpp"
 
 // Called when an error occurs using the GLFW window
 void RenderWindow::OnErrorCallback(int code, const char* description)
@@ -52,54 +53,31 @@ void RenderWindow::WindowHint(const ContextHints &target, const int value)
 {
     if (target == ContextHints::ClientAPI)
     {
-        if (static_cast<Hint>(value) == Hint::OpenGLAPI ||
-                static_cast<Hint>(value) == Hint::OpenGLESAPI)
-        {
+        if (static_cast<Hint>(value) == Hint::OpenGLAPI || static_cast<Hint>(value) == Hint::OpenGLESAPI)
             glfwWindowHint(static_cast<int>(target), value);
-        }
     }
     else if (target == ContextHints::ContextRobustness)
     {
-        if (static_cast<Hint>(value) == Hint::NoRobustness ||
-                static_cast<Hint>(value) == Hint::NoResetNotification ||
-                static_cast<Hint>(value) == Hint::LoseContextOnReset)
-        {
+        if (static_cast<Hint>(value) == Hint::NoRobustness || static_cast<Hint>(value) == Hint::NoResetNotification || static_cast<Hint>(value) == Hint::LoseContextOnReset)
             glfwWindowHint(static_cast<int>(target), value);
-        }
     }
-    else if (target == ContextHints::OpenGLForwardCompatibility ||
-             target == ContextHints::OpenGLDebugContext)
+    else if (target == ContextHints::OpenGLForwardCompatibility || target == ContextHints::OpenGLDebugContext)
     {
-        if (static_cast<Hint>(value) == Hint::True ||
-                static_cast<Hint>(value) == Hint::False)
-        {
+        if (static_cast<Hint>(value) == Hint::True || static_cast<Hint>(value) == Hint::False)
             glfwWindowHint(static_cast<int>(target), value);
-        }
     }
     else if (target == ContextHints::OpenGLProfile)
     {
-        if (static_cast<Hint>(value) == Hint::OpenGLAnyProfile ||
-                static_cast<Hint>(value) == Hint::OpenGLCoreProfile ||
-                static_cast<Hint>(value) == Hint::OpenGLCompatibilityProfile)
-        {
+        if (static_cast<Hint>(value) == Hint::OpenGLAnyProfile || static_cast<Hint>(value) == Hint::OpenGLCoreProfile || static_cast<Hint>(value) == Hint::OpenGLCompatibilityProfile)
             glfwWindowHint(static_cast<int>(target), value);
-        }
     }
     else if (target == ContextHints::ContextReleaseBehavior)
     {
-        if (static_cast<Hint>(value) == Hint::AnyReleaseBehavior ||
-                static_cast<Hint>(value) == Hint::FlushReleaseBehavior ||
-                static_cast<Hint>(value) == Hint::NoneReleaseBehavior)
-        {
+        if (static_cast<Hint>(value) == Hint::AnyReleaseBehavior || static_cast<Hint>(value) == Hint::FlushReleaseBehavior || static_cast<Hint>(value) == Hint::NoneReleaseBehavior)
             glfwWindowHint(static_cast<int>(target), value);
-        }
     }
-    else if (target == ContextHints::ContextVersionMajor ||
-             target == ContextHints::ContextVersionMinor ||
-             target == ContextHints::ContextRevision)
-    {
+    else if (target == ContextHints::ContextVersionMajor || target == ContextHints::ContextVersionMinor || target == ContextHints::ContextRevision)
         glfwWindowHint(static_cast<int>(target), value);
-    }
 }
 
 // Opens a GLFW window with the specified configuration.
@@ -109,15 +87,12 @@ void RenderWindow::Open(const WindowInfo& windowConfig, bool setPosition, GLFWmo
         return;
 
     windowInfo = std::move(windowConfig);
-    windowHandler = glfwCreateWindow(windowInfo.displayWidth,
-                                     windowInfo.displayHeight,
-                                     windowInfo.title.c_str(), monitor, share);
+    windowHandler = glfwCreateWindow(windowInfo.displayWidth, windowInfo.displayHeight, windowInfo.title.c_str(), monitor, share);
 
     if (setPosition)
         glfwSetWindowPos(windowHandler, windowInfo.x, windowInfo.y);
 
-    glfwSetWindowSize(windowHandler, windowInfo.displayWidth,
-                      windowInfo.displayHeight);
+    glfwSetWindowSize(windowHandler, windowInfo.displayWidth, windowInfo.displayHeight);
     glfwSetWindowTitle(windowHandler, windowInfo.title.c_str());
     glfwGetWindowPos(windowHandler, &windowInfo.x, &windowInfo.y);
 
@@ -194,9 +169,7 @@ RenderWindow::RenderWindow() : windowHandler(nullptr), isOpen(false)
 {
     glfwSetErrorCallback(OnErrorCallback);
     if (!glfwInit())
-    {
-        std::cerr << "Error initializing GLFW..." << std::endl;
-    }
+        debug_msg("Error initializing GLFW...");
 }
 
 RenderWindow::~RenderWindow()

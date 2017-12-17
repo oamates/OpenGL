@@ -4,15 +4,15 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/interface.hpp"
+#include "../core/ui.hpp"
 #include "../core/assets_manager.hpp"
 #include "../renderers/shadow_map_renderer.hpp"
 #include "../renderers/voxelizer_renderer.hpp"
 #include "../scene/scene.hpp"
 #include "../scene/light.hpp"
-#include "main_menu.hpp"
+#include "main_ui.hpp"
 
-struct UISceneLights : public Interface
+struct UISceneLights : public ui_t
 {
     UISceneLights() {}
     ~UISceneLights() override {}
@@ -43,10 +43,10 @@ struct UISceneLights : public Interface
             selected = -1;
         }
     
-        if ((!scene) || (!UIMainMenu::drawSceneLights))
+        if ((!scene) || (!main_ui_t::drawSceneLights))
             return;
         
-        ImGui::Begin("Lights", &UIMainMenu::drawSceneLights);                       // begin editor
+        ImGui::Begin("Lights", &main_ui_t::drawSceneLights);                       // begin editor
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
         ImGui::Columns(2);
     

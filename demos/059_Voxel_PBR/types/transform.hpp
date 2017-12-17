@@ -1,9 +1,11 @@
 #pragma once
 
+#include <unordered_map>
+
 #include <glm/detail/type_vec3.hpp>
 #include <glm/gtc/quaternion.hpp>
+
 #include "base_object.hpp"
-#include <unordered_map>
 
 // Handles all transformation operations such  as scaling, rotating and translating
 struct Transform : public BaseObject
@@ -30,7 +32,7 @@ struct Transform : public BaseObject
     const glm::mat4x4 &Matrix() const;
 
     static std::unordered_map<const Transform*, bool> transformChange;
-    static const std::unordered_map<const Transform *, bool> &TransformChangedMap();    // Returns a map of bool associated with a transform that tells if the transform has changed
+    static const std::unordered_map<const Transform*, bool>& TransformChangedMap();    // Returns a map of bool associated with a transform that tells if the transform has changed
 
     static void CleanEventMap();                        // Clears the transform changed map
     void RegisterChange(bool val = true) const;         // Registers a change in the transform parameters onto the transform changed map

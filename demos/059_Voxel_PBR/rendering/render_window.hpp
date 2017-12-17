@@ -13,6 +13,7 @@ enum struct WindowHints
     AutoIconify = GLFW_AUTO_ICONIFY,
     Floating = GLFW_FLOATING
 };
+
 enum struct FramebufferHints
 {
     RedBits = GLFW_RED_BITS,
@@ -32,6 +33,7 @@ enum struct FramebufferHints
     SRGBCapable = GLFW_SRGB_CAPABLE,
     DoubleBuffer = GLFW_DOUBLEBUFFER
 };
+
 enum struct ContextHints
 {
     ClientAPI = GLFW_CLIENT_API,
@@ -44,6 +46,7 @@ enum struct ContextHints
     OpenGLProfile = GLFW_OPENGL_PROFILE,
     ContextReleaseBehavior = GLFW_CONTEXT_RELEASE_BEHAVIOR
 };
+
 enum struct Hint
 {
     True = GL_TRUE,
@@ -78,8 +81,7 @@ struct WindowInfo
     int y;
     std::string title;
     WindowInfo();
-    WindowInfo(const unsigned width, const unsigned height, const int x,
-               const int y, const std::string &title);
+    WindowInfo(const unsigned width, const unsigned height, const int x, const int y, const std::string& title);
     virtual ~WindowInfo() {};
 };
 
@@ -87,40 +89,38 @@ struct WindowInfo
 // The rendering window settings such as size, position and hints can be set up with this class.
 struct RenderWindow
 {
-        static void WindowHint(const WindowHints &target, const int value);
-        static void WindowHint(const FramebufferHints &target, const int value);
-        static void WindowHint(const ContextHints &target, const int value);
-        template<typename T> void WindowHint(T &&target, const Hint value);
+    static void WindowHint(const WindowHints &target, const int value);
+    static void WindowHint(const FramebufferHints &target, const int value);
+    static void WindowHint(const ContextHints &target, const int value);
+    template<typename T> void WindowHint(T &&target, const Hint value);
 
-        void Open(const WindowInfo &windowConfig,
-                  bool setPosition = true, GLFWmonitor * monitor = nullptr,
-                  GLFWwindow * share = nullptr);
-        void Destroy() const;
+    void Open(const WindowInfo &windowConfig, bool setPosition = true, GLFWmonitor* monitor = nullptr, GLFWwindow* share = nullptr);
+    void Destroy() const;
 
-        void SetPosition(const int x, const int y);
-        void SetWindowSize(const int w, const int h);
-        void SetWindowTitle(const std::string &title);
+    void SetPosition(const int x, const int y);
+    void SetWindowSize(const int w, const int h);
+    void SetWindowTitle(const std::string &title);
 
-        static void Events(EventMode mode = EventMode::Poll);
-        int ShouldClose(bool sendClose = false) const;
+    static void Events(EventMode mode = EventMode::Poll);
+    int ShouldClose(bool sendClose = false) const;
 
-        void SetAsCurrentContext() const;
-        void SwapBuffers() const;
+    void SetAsCurrentContext() const;
+    void SwapBuffers() const;
 
-        RenderWindow();
-        virtual ~RenderWindow();
+    RenderWindow();
+    virtual ~RenderWindow();
 
-        GLFWwindow * Handler() const { return windowHandler; }
-        const WindowInfo &Info() const { return windowInfo; }
-        bool IsOpen() const { return isOpen; }
+    GLFWwindow* Handler() const { return windowHandler; }
+    const WindowInfo &Info() const { return windowInfo; }
+    bool IsOpen() const { return isOpen; }
 
-		WindowInfo windowInfo;
-        GLFWwindow * windowHandler;
-        bool isOpen;
-        static void OnErrorCallback(int code, const char * description);
+	WindowInfo windowInfo;
+    GLFWwindow* windowHandler;
+    bool isOpen;
+    static void OnErrorCallback(int code, const char * description);
 };
 
-template<typename T> void RenderWindow::WindowHint(T &&target, const Hint value)
+template<typename T> void RenderWindow::WindowHint(T&& target, const Hint value)
 {
     WindowHint(std::forward<T>(target), static_cast<int>(value));
 }

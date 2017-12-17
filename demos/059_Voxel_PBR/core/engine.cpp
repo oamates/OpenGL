@@ -2,10 +2,10 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include "engine_base.hpp"
+#include "engine.hpp"
 
 #include "behavior.hpp"
-#include "interface.hpp"
+#include "ui.hpp"
 #include "renderer.hpp"
 #include "assets_manager.hpp"
 #include "../rendering/render_window.hpp"
@@ -23,66 +23,74 @@
 
 #include "log.hpp"
 
-EngineBase::EngineBase()
+engine_t::engine_t()
 {
     renderWindow = std::make_unique<RenderWindow>();
 }
 
-EngineBase::~EngineBase()
+engine_t::~engine_t()
 {
     // release reserved data early (context dependent)
-    InterfaceRenderer::Terminate();
+    ui_renderer_t::Terminate();
     AssetsManager::Terminate();
 }
 
-std::unique_ptr<EngineBase> &EngineBase::Instance()
+std::unique_ptr<engine_t>& engine_t::instance()
 {
-    static std::unique_ptr<EngineBase> instance = nullptr;
-
+    static std::unique_ptr<engine_t> instance = nullptr;
     if (!instance)
-        instance.reset(new EngineBase());
-
+        instance.reset(new engine_t());
     return instance;
 }
 
-void EngineBase::Terminate()
+void engine_t::terminate()
 {
-    delete Instance().release();
+    delete instance().release();
 }
 
-void EngineBase::MainLoop() const
+void engine_t::mainloop() const
 {
+    debug_msg("Entering main program loop");
     static oglplus::Context gl;
     static bool enteredMainLoop = false;
 
     if (enteredMainLoop)
         return;
     
-    this->Initialize();                                     // import assets and initialize ext libraries
+    initialize();                                           // import assets and initialize ext libraries
     enteredMainLoop = true;                                 // entered main loop, this function cannot be called again
     
     while (!renderWindow->ShouldClose())                    // main render loop
     {
-        gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        gl.Clear().ColorBuffer().DepthBuffer();
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        debug_msg("Processing events");
         RenderWindow::Events();                             // poll window inputs
-        InterfaceRenderer::NewFrame();                      // setup interface renderer for a new frame
-        Interface::DrawAll();                               // interfaces logic update
+
+        debug_msg("Updating user interface elements");
+        ui_renderer_t::NewFrame();                          // setup interface renderer for a new frame
+        ui_t::DrawAll();                                    // interfaces logic update
         Behavior::UpdateAll();                              // behaviors update
+
+        debug_msg("Rendering main scene");
         Renderer::RenderAll();                              // call renderers
-        InterfaceRenderer::Render();                        // ui render over scene
+
+        debug_msg("Rendering UI");
+        ui_renderer_t::Render();                            // ui render over scene
+
+        debug_msg("Done. Calling SwapBuffers");
         renderWindow->SwapBuffers();                        // finally swap current frame
         Transform::CleanEventMap();                         // clean up
     }
 }
 
-RenderWindow &EngineBase::Window() const
+RenderWindow &engine_t::window() const
 {
     return *renderWindow;
 }
 
-void EngineBase::Initialize() const
+void engine_t::initialize() const
 {
     if(!renderWindow->IsOpen())
     {
@@ -104,7 +112,7 @@ void EngineBase::Initialize() const
 
     renderWindow->SetAsCurrentContext();                                            // and set window as rendering context
     oglplus::GLAPIInitializer();                                                    // initialize OpenGL API
-    InterfaceRenderer::Initialize(*renderWindow);                                   // set interface to current renderwindow
+    ui_renderer_t::Initialize(*renderWindow);                                       // set interface to current renderwindow
 
     /* print library versions information */
     debug_msg("GLFW : %s", glfwGetVersionString());

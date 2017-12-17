@@ -16,21 +16,14 @@ struct Material;
 struct RenderWindow;
 
 /// The main renderer for the engine. Uses a deferred rendering path.
-/// Handles geometry pass and light pass logic, creates the necessary
-/// geometry buffer and handles uniform pass.
+/// Handles geometry pass and light pass logic, creates the necessary geometry buffer and handles uniform pass.
 struct GIDeferredRenderer : public Renderer
 {
-        /// Initializes a new instance of the <see cref="GIDeferredRenderer"/>
-        /// class.
-        explicit GIDeferredRenderer(RenderWindow &window);
-        /// Finalizes an instance of the <see cref="GIDeferredRenderer"/> class.
-        ~GIDeferredRenderer();
-        /// Renders a frame using deferred rendering
-        void Render() override;
-        /// Sets the matrices uniforms during geometry pass.
-        void SetMatricesUniforms(const Node &node) const override;
-        /// Sets the material uniforms during geometry pass.
-        void SetMaterialUniforms(const Material &material) const override;
+        explicit GIDeferredRenderer(RenderWindow &window);                              // Initializes a new instance of the GIDeferredRenderer class.
+        ~GIDeferredRenderer();                                                          // Finalizes an instance of the GIDeferredRenderer class.
+        void Render() override;                                                         // Renders a frame using deferred rendering
+        void SetMatricesUniforms(const Node &node) const override;                      // Sets the matrices uniforms during geometry pass.
+        void SetMaterialUniforms(const Material &material) const override;              // Sets the material uniforms during geometry pass.
         const std::array<oglplus::Texture, 5> &BufferTextures() const;
         const float &MaxTracingDistance() const;
         void MaxTracingDistance(const float &val);
@@ -51,16 +44,12 @@ struct GIDeferredRenderer : public Renderer
         float ConeShadowAperture() const;
         void ConeShadowAperture(float val);
 
-		FullscreenQuad fsQuad;
-        /// The geometry program shader.
-        static GeometryProgram &GeometryPass();
-        /// The light pass program shader.
-        static LightingProgram &LightingPass();
-        /// Sets the light pass uniforms.
-        void SetLightPassUniforms() const;
-        /// Setups the geometry buffer, initializes the render target
-        /// textures and attaches these textures to the
-        void SetupGeometryBuffer(unsigned int windowWidth, unsigned int windowHeight);
+        FullscreenQuad fsQuad;
+        
+        static GeometryProgram &GeometryPass();                                         // The geometry program shader.
+        static LightingProgram &LightingPass();                                         // The light pass program shader.
+        void SetLightPassUniforms() const;                                              // Sets the light pass uniforms.
+        void SetupGeometryBuffer(unsigned int windowWidth, unsigned int windowHeight);  // Setups the geometry buffer, initializes the render target textures and attaches these textures
 
         oglplus::Framebuffer geometryBuffer;
         oglplus::Renderbuffer depthBuffer;
