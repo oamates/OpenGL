@@ -2,7 +2,7 @@
 
 #include "frustum.hpp"
 
-#include "bounding_box.hpp"
+#include "bbox.hpp"
 #include <glm/gtc/matrix_access.hpp>
 
 CullingFrustum::CullingFrustum()
@@ -49,7 +49,7 @@ const std::array<glm::vec4, 6> &Frustum::Planes() const
     return planes;
 }
 
-bool CullingFrustum::InFrustum(const BoundingBox &volume) const
+bool CullingFrustum::InFrustum(const bbox_t& volume) const
 {
     glm::vec3 normal;
 

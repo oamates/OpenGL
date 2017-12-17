@@ -6,7 +6,6 @@
 #include "../util/single_active.hpp"
 #include "../types/instance_pool.hpp"
 
-#include "../scene/node.hpp"
 #include "../make_unique.hpp"
 
 struct RenderWindow;

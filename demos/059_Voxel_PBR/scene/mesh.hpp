@@ -12,7 +12,7 @@
 
 #include "../types/vertex.hpp"
 #include "../types/base_object.hpp"
-#include "../types/bounding_box.hpp"
+#include "../types/bbox.hpp"
 
 
 struct Material;
@@ -25,7 +25,7 @@ struct Mesh : public BaseObject
 
     ~Mesh() {}
 
-    BoundingBox boundaries;                     // The mesh's boundaries
+    bbox_t boundaries;                          // The mesh's boundaries
     std::vector<Vertex> vertices;               // The mesh's vertices
     std::vector<unsigned int> indices;          // The mesh's indices
     std::shared_ptr<Material> material;         // The mesh's material

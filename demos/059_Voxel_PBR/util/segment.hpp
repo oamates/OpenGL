@@ -10,6 +10,6 @@ struct RawFormat::Segment
         : size(size), offset(offset) 
         { }
 
-    Segment(const Segment &other) = delete;
+    Segment(const Segment& other) = delete;
     Segment() = delete;
 };

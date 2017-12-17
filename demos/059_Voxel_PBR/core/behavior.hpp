@@ -7,10 +7,14 @@
 // UpdateAll will call all implementations of Update from instances of classes inheriting from Behavior
 struct Behavior : public InstancePool<Behavior>
 {
-    Behavior();
-    virtual ~Behavior();
-    virtual void Update() = 0;                              // Called per frame, contains the behavior's logic
-    friend void EngineBase::MainLoop() const;
-    static void UpdateAll();
-};
+    Behavior() {}
+    virtual ~Behavior() {}
 
+    virtual void Update() = 0;                              // Called per frame, contains the behavior's logic
+
+    static void UpdateAll()
+    {
+        for (auto &behavior : instances)
+            behavior->Update();
+    }
+};

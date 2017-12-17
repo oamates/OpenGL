@@ -4,7 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "../util/single_active.hpp"
-#include "../types/bounding_box.hpp"
+#include "../types/bbox.hpp"
 #include "../types/frustum.hpp"
 #include "../types/scene_object.hpp"
 
@@ -140,7 +140,7 @@ struct Camera : public SceneObject, public SingleActive<Camera>
     const glm::mat4x4 &InverseProjectionMatrix() const
         { return inverseProjectionMatrix; }
         
-    bool InFrustum(const BoundingBox &volume) const     // Checks if the bounding volume is inside the camera frustum
+    bool InFrustum(const bbox_t& volume) const          // Checks if the bounding volume is inside the camera frustum
     {
         if (!doFrustumCulling)
             return true;

@@ -7,7 +7,7 @@ struct RawFormat
 
 	struct Segment;
 	bool isBuilt;
-	void * rawDataPointer;
+	void* rawDataPointer;
 	size_t wholeSize;
 	std::queue<Segment *> format;
 

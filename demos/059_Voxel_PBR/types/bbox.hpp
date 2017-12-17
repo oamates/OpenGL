@@ -9,15 +9,15 @@
 #include <glm/mat4x4.hpp>
 
 // Describes a volume box which contains anything inside be it a node or a mesh.
-struct BoundingBox
+struct bbox_t
 {
     std::array<glm::vec3, 2> boundaries;
-    std::shared_ptr<BoundingBox> original;
+    std::shared_ptr<bbox_t> original;
     glm::vec3 center;
     glm::vec3 extent;
 
-    BoundingBox() : original(nullptr) { Reset(); }
-    virtual ~BoundingBox() {}
+    bbox_t() : original(nullptr) { Reset(); }
+    virtual ~bbox_t() {}
 
     void MinPoint(const glm::vec3 &val)             // Sets the minimum point only if value is smaller than the current minPoint
     {
@@ -35,7 +35,8 @@ struct BoundingBox
 
     void Transform(const glm::mat4x4 &model)        // Updates the boundaries accordly with the given model matrix.
     {
-        if (!original) { original = std::make_shared<BoundingBox>(*this); }
+        if (!original)
+            original = std::make_shared<bbox_t>(*this);
 
         glm::vec3 min = original->boundaries[0];
         glm::vec3 max = original->boundaries[1];

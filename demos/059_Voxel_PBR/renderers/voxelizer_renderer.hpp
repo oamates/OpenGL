@@ -10,7 +10,7 @@ struct ClearDynamicProgram;
 struct MipmappingVolumeProgram;
 struct MipmappingBaseProgram;
 struct InjectRadianceProgram;
-struct BoundingBox;
+struct bbox_t;
 struct VoxelDrawerProgram;
 struct VoxelizationProgram;
 
@@ -71,7 +71,7 @@ struct VoxelizerRenderer : public Renderer
     static PropagationProgram& InjectPropagationShader();
     static MipmappingBaseProgram& MipMappingBaseShader();
     static MipmappingVolumeProgram& MipMappingVolumeShader();
-    void UpdateProjectionMatrices(const BoundingBox &sceneBox);                     // Creates the view projection matrices per x, y and z axis, depending on the voxel volume grid size.
+    void UpdateProjectionMatrices(const bbox_t &sceneBox);                          // Creates the view projection matrices per x, y and z axis, depending on the voxel volume grid size.
     void VoxelizeDynamicScene();                                                    // Voxelizes the scene.
     void InjectRadiance();
     void GenerateMipmap();

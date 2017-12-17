@@ -4,19 +4,13 @@
 #include <glm/detail/type_mat4x4.hpp>
 #include <glm/detail/type_vec4.hpp>
 
-struct BoundingBox;
 struct BoundingSphere;
-struct BoundingBox;
+struct bbox_t;
 
 // A frustum formed by six planes
 struct Frustum
 {
-    enum FrustumPlane
-    {
-        Left, Right,
-        Bottom, Top,
-        Near, Far,
-    };
+    enum FrustumPlane { Left, Right, Bottom, Top, Near, Far };
 
     std::array<glm::vec4, 6> planes;
 
@@ -31,5 +25,5 @@ struct CullingFrustum : public Frustum
     CullingFrustum();
     virtual ~CullingFrustum();
 
-    bool InFrustum(const BoundingBox &volume) const;                            // Determines if the given volume is inside the frustum
+    bool InFrustum(const bbox_t& volume) const;                                 // Determines if the given volume is inside the frustum
 };

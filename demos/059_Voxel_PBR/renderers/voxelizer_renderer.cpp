@@ -499,7 +499,8 @@ void VoxelizerRenderer::DrawVoxels()
     voxelDrawerArray.Bind();
     gl.DrawArrays(oglplus::PrimitiveType::Points, 0, voxelCount);
 }
-void VoxelizerRenderer::UpdateProjectionMatrices(const BoundingBox &sceneBox)
+
+void VoxelizerRenderer::UpdateProjectionMatrices(const bbox_t &sceneBox)
 {
     auto axisSize = sceneBox.Extent() * 2.0f;
     auto &center = sceneBox.Center();
