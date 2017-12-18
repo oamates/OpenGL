@@ -11,161 +11,184 @@
 #include "log.hpp"
 #include "hull3d.hpp"
 
+//std::vector<triangle_t> convex_hull(std::vector<glm::dvec3>& points);
+//std::vector<triangle_t> hull3d(std::vector<glm::dvec3>& points);
+
+
 //=======================================================================================================================================================================================================================
 // main function : builds convex hull of a set of points
 //=======================================================================================================================================================================================================================
 void solid::convex_hull(std::vector<glm::dvec3>& points)
 {
-	struct 
-	{
+    struct 
+    {
         bool operator () (const glm::dvec3& lhs, const glm::dvec3& rhs)
         {   
-			if (lhs.z < rhs.z) return true;
-		    if (lhs.z > rhs.z) return false;
-			if (lhs.y < rhs.y) return true;
-		    if (lhs.y > rhs.y) return false;
-			return lhs.x < rhs.x;
+            if (lhs.z < rhs.z) return true;
+            if (lhs.z > rhs.z) return false;
+            if (lhs.y < rhs.y) return true;
+            if (lhs.y > rhs.y) return false;
+            return lhs.x < rhs.x;
         }   
     } dvec3_lex;
 
-	std::sort(points.begin(), points.end(), dvec3_lex);
-	int cloud_size = (int) points.size();
+    std::sort(points.begin(), points.end(), dvec3_lex);
+    int cloud_size = (int) points.size();
 
-	// ==================================================================================================================================================================================================================
-	// the main call
-	// ==================================================================================================================================================================================================================
-	std::vector<Triangle> hull = hull3d(points);
-	unsigned int hull_size = hull.size();
+    // ==================================================================================================================================================================================================================
+    // the main call
+    // ==================================================================================================================================================================================================================
+    std::vector<hull3d::triangle_t> hull = hull3d::hull3d(points);
+    unsigned int hull_size = hull.size();
 
-	// ==================================================================================================================================================================================================================
-	// now just reindex both vertex and index buffers
-	// ==================================================================================================================================================================================================================
-	unsigned int* pindex = (unsigned int*) calloc (cloud_size, sizeof(unsigned int));
-	unsigned int* tindex = (unsigned int*) malloc (hull_size * sizeof(unsigned int));
-	
-	V = 0; F = 0;
+    // ==================================================================================================================================================================================================================
+    // now just reindex both vertex and index buffers
+    // ==================================================================================================================================================================================================================
+    unsigned int* pindex = (unsigned int*) calloc (cloud_size, sizeof(unsigned int));
+    unsigned int* tindex = (unsigned int*) malloc (hull_size * sizeof(unsigned int));
+    
+    V = 0; F = 0;
 
-	for(unsigned int i = 0; i < hull_size; ++i)
-		if(hull[i].state == USED)
-		{
-			tindex[i] = F++;
-			pindex[hull[i].vertices.x] = 1;
-			pindex[hull[i].vertices.y] = 1;
-			pindex[hull[i].vertices.z] = 1;
-		}
-		else
-			tindex[i] = -1;
+    for(unsigned int i = 0; i < hull_size; ++i)
+        if(hull[i].state == hull3d::USED)
+        {
+            tindex[i] = F++;
+            pindex[hull[i].vertices.x] = 1;
+            pindex[hull[i].vertices.y] = 1;
+            pindex[hull[i].vertices.z] = 1;
+        }
+        else
+            tindex[i] = -1;
 
-	for(int i = 0; i < cloud_size; ++i)
-		if (pindex[i]) pindex[i] = V++;
+    for(int i = 0; i < cloud_size; ++i)
+        if (pindex[i]) pindex[i] = V++;
 
-	// ==================================================================================================================================================================================================================
-	// Euler's Formula
-	// ==================================================================================================================================================================================================================
-	E = V + F - 2;
+    // ==================================================================================================================================================================================================================
+    // Euler's Formula
+    // ==================================================================================================================================================================================================================
+    E = V + F - 2;
 
-	// ==================================================================================================================================================================================================================
-	// copy vertices which are actually used in the convex hull  
-	// ==================================================================================================================================================================================================================
-	debug_msg("V = %d. E = %d. F = %d.", V, E, F);
-	
-	vertices.resize(V);
-	vertices[0] = points[0];
-	
-	debug_msg("vertex[0] = %s", glm::to_string(vertices[0]).c_str());
+    // ==================================================================================================================================================================================================================
+    // copy vertices which are actually used in the convex hull  
+    // ==================================================================================================================================================================================================================
+    debug_msg("V = %d. E = %d. F = %d.", V, E, F);
+    
+    vertices.resize(V);
+    vertices[0] = points[0];
+    
+    debug_msg("vertex[0] = %s", glm::to_string(vertices[0]).c_str());
 
-	for(int i = 1; i < cloud_size; ++i)
-		if (pindex[i]) 
-		{
-			vertices[pindex[i]] = points[i];
-			debug_msg("vertex[%d] = %s", pindex[i], glm::to_string(points[i]).c_str());
-		};
+    for(int i = 1; i < cloud_size; ++i)
+        if (pindex[i]) 
+        {
+            vertices[pindex[i]] = points[i];
+            debug_msg("vertex[%d] = %s", pindex[i], glm::to_string(points[i]).c_str());
+        };
 
-	// ==================================================================================================================================================================================================================
-	// initialize volume, center of mass and second-order momenta with zero values
-	// ==================================================================================================================================================================================================================
-	volume = 0.0;
-	mass_center = glm::dvec3(0.0);
-	mxx = mxy = mxz = myy = myz = mzz = 0.0;
+    // ==================================================================================================================================================================================================================
+    // initialize volume, center of mass and second-order momenta with zero values
+    // ==================================================================================================================================================================================================================
+    volume = 0.0;
+    mass_center = glm::dvec3(0.0);
+    mxx = mxy = mxz = myy = myz = mzz = 0.0;
 
-	// ==================================================================================================================================================================================================================
-	// set up normals, indices and adjacent triangles indices
-	// ==================================================================================================================================================================================================================
-	normals.resize(V);
-    triangles.resize(F); adjacency.resize(F);	
+    // ==================================================================================================================================================================================================================
+    // set up normals, indices and adjacent triangles indices
+    // ==================================================================================================================================================================================================================
+    normals.resize(V);
+    triangles.resize(F); adjacency.resize(F);   
     int f = 0;
-	for(unsigned int i = 0; i < hull_size; ++i) if(hull[i].state == USED)
-	{
-		int xi = pindex[hull[i].vertices.x];
-		int yi = pindex[hull[i].vertices.y];
-		int zi = pindex[hull[i].vertices.z];
-		int xa = tindex[hull[i].edges.x];
-		int ya = tindex[hull[i].edges.y];
-		int za = tindex[hull[i].edges.z];
+    for(unsigned int i = 0; i < hull_size; ++i) if(hull[i].state == hull3d::USED)
+    {
+        int xi = pindex[hull[i].vertices.x];
+        int yi = pindex[hull[i].vertices.y];
+        int zi = pindex[hull[i].vertices.z];
+        int xa = tindex[hull[i].edges.x];
+        int ya = tindex[hull[i].edges.y];
+        int za = tindex[hull[i].edges.z];
 
-   		triangles[f] = glm::ivec3(xi, yi, zi);
-   		adjacency[f] = glm::ivec3(xa, ya, za);
-
-		debug_msg("triangle[%d] Vertices : (%d, %d, %d). Edges : (%d, %d, %d).", f, xi, yi, zi, xa, ya, za);
+        triangles[f] = glm::ivec3(xi, yi, zi);
+        adjacency[f] = glm::ivec3(xa, ya, za);
 
 
-   		glm::dvec3 X = vertices[xi];
-   		glm::dvec3 Y = vertices[yi];
-   		glm::dvec3 Z = vertices[zi];
 
-		// ==============================================================================================================================================================================================================
-		// compute input of a face normal to the 3 triangle vertices, it is set proportional to the interior angle of that vertex
-		// ==============================================================================================================================================================================================================
-		glm::dvec3 XY = glm::normalize(vertices[yi] - vertices[xi]);
-		glm::dvec3 YZ = glm::normalize(vertices[zi] - vertices[yi]);
-		glm::dvec3 ZX = glm::normalize(vertices[xi] - vertices[zi]);
-		glm::dvec3 n = glm::normalize(glm::cross(XY, YZ));
+        glm::dvec3 X = vertices[xi];
+        glm::dvec3 Y = vertices[yi];
+        glm::dvec3 Z = vertices[zi];
 
-		static const double two_pi = 6.2831853071795864769253;
-		double angleX = glm::acos(glm::dot(ZX, XY)); 	
-		double angleY = glm::acos(glm::dot(XY, YZ)); 	
-		double angleZ = two_pi - angleX - angleY; 	
+        // ==============================================================================================================================================================================================================
+        // compute input of a face normal to the 3 triangle vertices, it is set proportional to the interior angle of that vertex
+        // ==============================================================================================================================================================================================================
+        glm::dvec3 XY = glm::normalize(vertices[yi] - vertices[xi]);
+        glm::dvec3 YZ = glm::normalize(vertices[zi] - vertices[yi]);
+        glm::dvec3 ZX = glm::normalize(vertices[xi] - vertices[zi]);
+        glm::dvec3 n = glm::normalize(glm::cross(XY, YZ));
 
-		normals[xi] += angleX * n;
-		normals[yi] += angleY * n;
-		normals[zi] += angleZ * n;
+        static const double two_pi = 6.2831853071795864769253;
+        double angleX = glm::acos(glm::dot(ZX, XY));    
+        double angleY = glm::acos(glm::dot(XY, YZ));    
+        double angleZ = two_pi - angleX - angleY;   
 
-		// ==============================================================================================================================================================================================================
-		// compute volume, center of mass and second-order momenta
-		// ==============================================================================================================================================================================================================
-		double delta = glm::determinant(glm::dmat3(vertices[xi], vertices[yi], vertices[zi]));
-		volume += delta;									// 1 / 3! is the factor
-		glm::dvec3 C = X + Y + Z;							// face center, not normalized
-		mass_center += delta * C;							// 1 / 4! is the factor
+        normals[xi] += angleX * n;
+        normals[yi] += angleY * n;
+        normals[zi] += angleZ * n;
 
-		// ==============================================================================================================================================================================================================
-		// |xA xB xC|   |2 1 1|   |xA yA zA|
-		// |yA yB yC| * |1 2 1| * |xB yB zB|
-		// |zA zB zC|   |1 1 2|   |xC yC zC|
-		// ==============================================================================================================================================================================================================
-		double lxx = C.x * C.x + glm::dot(X, X);			// inputs to global momenta from the pyramid OXYZ
-		double lxy = C.x * C.y + glm::dot(X, Y);			// has to be scaled by delta
-		double lxz = C.x * C.z + glm::dot(X, Z);			// 1 / 5! is the integration factor
-		double lyy = C.y * C.y + glm::dot(Y, Y);
-		double lyz = C.y * C.z + glm::dot(Y, Z);
-		double lzz = C.z * C.z + glm::dot(Z, Z);
+        // ==============================================================================================================================================================================================================
+        // compute volume, center of mass and second-order momenta
+        // ==============================================================================================================================================================================================================
+        double delta = glm::determinant(glm::dmat3(X, Y, Z));
+        volume += delta;                                    // elementary oriented simplex volume, not normalized --- (1 / 6) is the normalizing factor
+        glm::dvec3 C = X + Y + Z;                           // elementary simplex mass center, not normalized     --- (1 / 4) is the normalizing factor
+        mass_center += (delta * C);                         // 1 / 24 is the total factor
 
-		mxx += delta * lxx;									
-		mxy += delta * lxy;
-		mxz += delta * lxz;
-		myy += delta * lyy;
-		myz += delta * lyz;
-		mzz += delta * lzz;
-		++f;
-	};
+        debug_msg("triangle[%d] Vertices : (%d, %d, %d). Edges : (%d, %d, %d).", f, xi, yi, zi, xa, ya, za);
+        debug_msg("X = %s.", glm::to_string(X).c_str());
+        debug_msg("Y = %s.", glm::to_string(Y).c_str());
+        debug_msg("Z = %s.", glm::to_string(Z).c_str());
+        debug_msg("delta = %f.", delta / 6.0);
+        debug_msg("C = %s.", glm::to_string(C / 4.0).c_str());
+        debug_msg("delta * C = %s.", glm::to_string((delta * C) / 6.0).c_str());
+        debug_msg("mass_center = %s.", glm::to_string(mass_center / 24.0).c_str());
+        debug_msg("\n\n\n\n\n\n\n\n\n\n\n\n");
 
-	debug_msg("Volume = %f", volume / 6.0);
-	debug_msg("Center of mass = %s", glm::to_string(mass_center / 24.0).c_str());
-	glm::dmat3 momentum_matrix = glm::dmat3(mxx, mxy, mxz, mxy, myy, myz, mxz, myz, mzz) / 120.0;
-	debug_msg("Inertia matrix = %s", glm::to_string(momentum_matrix).c_str());
+        // ==============================================================================================================================================================================================================
+        // |xA xB xC|   |2 1 1|   |xA yA zA|
+        // |yA yB yC| * |1 2 1| * |xB yB zB|
+        // |zA zB zC|   |1 1 2|   |xC yC zC|
+        // ==============================================================================================================================================================================================================
+        double lxx = C.x * C.x + glm::dot(X, X);            // inputs to global momenta from the pyramid OXYZ
+        double lxy = C.x * C.y + glm::dot(X, Y);            // has to be scaled by delta
+        double lxz = C.x * C.z + glm::dot(X, Z);            // 1 / 5! is the integration factor
+        double lyy = C.y * C.y + glm::dot(Y, Y);
+        double lyz = C.y * C.z + glm::dot(Y, Z);
+        double lzz = C.z * C.z + glm::dot(Z, Z);
 
-	free(pindex);
-	free(tindex);
+
+        mxx += delta * lxx;                                 
+        mxy += delta * lxy;
+        mxz += delta * lxz;
+        myy += delta * lyy;
+        myz += delta * lyz;
+        mzz += delta * lzz;
+        ++f;
+    };
+
+    mass_center /= (4.0 * volume);
+    mxx = (mxx / (20.0 * volume)) - mass_center.x * mass_center.x;
+    mxy = (mxy / (20.0 * volume)) - mass_center.x * mass_center.y;
+    mxz = (mxz / (20.0 * volume)) - mass_center.x * mass_center.z;
+    myy = (myy / (20.0 * volume)) - mass_center.y * mass_center.y;
+    myz = (myz / (20.0 * volume)) - mass_center.y * mass_center.z;
+    mzz = (mzz / (20.0 * volume)) - mass_center.z * mass_center.z;
+    volume /= 6.0;
+
+    debug_msg("Volume = %f", volume);
+    debug_msg("Center of mass = %s", glm::to_string(mass_center).c_str());
+    glm::dmat3 momentum_matrix = glm::dmat3(mxx, mxy, mxz, mxy, myy, myz, mxz, myz, mzz);
+    debug_msg("Inertia matrix = %s", glm::to_string(momentum_matrix).c_str());
+
+    free(pindex);
+    free(tindex);
 
 
 };
@@ -175,18 +198,18 @@ void solid::convex_hull(std::vector<glm::dvec3>& points)
 //=======================================================================================================================================================================================================================
 double solid::support_bf(const glm::dvec3& direction, int& vertex_index)
 {
-	vertex_index = 0;
-	double max_value = glm::dot(vertices[0], direction);
-	for (unsigned int i = 1; i < V; ++i)
-	{
-		double value = glm::dot(vertices[i], direction);
-		if (value > max_value)
-		{
-			max_value = value;
-			vertex_index = i;
-		};
-	};
-	return max_value;
+    vertex_index = 0;
+    double max_value = glm::dot(vertices[0], direction);
+    for (unsigned int i = 1; i < V; ++i)
+    {
+        double value = glm::dot(vertices[i], direction);
+        if (value > max_value)
+        {
+            max_value = value;
+            vertex_index = i;
+        };
+    };
+    return max_value;
 };
 
 //=======================================================================================================================================================================================================================
@@ -195,80 +218,66 @@ double solid::support_bf(const glm::dvec3& direction, int& vertex_index)
 // when no such vertex can be found algorithm has found the maximal support value.
 // on entry vertex_index should contain a valid vertex index to start from and a triangle index that contains this initial vertex
 // vertex_index = 0 and triangle_index = 0 is always a valid combination on a first run, then the values computed at the previous step can be used 
-// this will speed up the routine even further
+// this will further speed up the routine in case of slow motion
 // ======================================================================================================================================================================================================================
 double solid::support_hc(const glm::dvec3& direction, int& vertex_index, int& triangle_index)
 {
-	int previous_index = triangle_index;	
-	double max_value = glm::dot(vertices[vertex_index], direction);
-
-	//===============================================================================================================================================================================================================
-	// loop over vertices adjacent to the current one
-	//===============================================================================================================================================================================================================
-
-	while(true)
-	{
-		debug_msg("vertex_index = %d. triangle_index = %d. previous_index = %d. max_value = %.16f.", vertex_index, triangle_index, previous_index, max_value);
-		glm::ivec3 triangle = triangles[triangle_index];
-		if (vertex_index == triangle.x)
-		{
-			debug_msg("checking vertex %d.", triangle.y);
-			double value = glm::dot(vertices[triangle.y], direction);
-			if (value > max_value)
-			{
-				debug_msg("XXXXX : The value at vertex %d is greater than the current value at vertex %d.", triangle.y, vertex_index);
-				max_value = value;
-				vertex_index = triangle.y;
-				previous_index = triangle_index;
-				debug_msg("XXXXX : previous index has changed to %d", previous_index);
-				triangle_index = adjacency[triangle_index].z;
-			}
-			else
-			{
-				triangle_index = adjacency[triangle_index].y;
-				if (triangle_index == previous_index) return max_value;
-			}
-			continue;
-		};
-
-		if (vertex_index == triangle.y)
-		{
-			debug_msg("checking vertex %d.", triangle.z);
-			double value = glm::dot(vertices[triangle.z], direction);
-			if (value > max_value)
-			{
-				debug_msg("YYYYY : The value at vertex %d is greater than the current value at vertex %d.", triangle.z, vertex_index);
-				max_value = value;
-				vertex_index = triangle.z;
-				previous_index = triangle_index;
-				debug_msg("YYYYY : previous index has changed to %d", previous_index);
-				triangle_index = adjacency[triangle_index].x;
-			}
-			else
-			{
-				triangle_index = adjacency[triangle_index].z;
-				if (triangle_index == previous_index) return max_value;
-			};
-			continue;
-		};
-		
-		double value = glm::dot(vertices[triangle.x], direction);								// vertex_index == triangle.z
-		debug_msg("checking vertex %d.", triangle.x);
-		if (value > max_value)
-		{
-			debug_msg("ZZZZZ : The value at vertex %d is greater than the current value at vertex %d.", triangle.x, vertex_index);
-			max_value = value;
-			vertex_index = triangle.x;
-			previous_index = triangle_index;
-			debug_msg("ZZZZZ : previous index has changed to %d", previous_index);
-			triangle_index = adjacency[triangle_index].y;
-		}
-		else
-		{
-			triangle_index = adjacency[triangle_index].x;
-			if (triangle_index == previous_index) return max_value;
-		};
-	};
+    int previous_index = triangle_index;    
+    double max_value = glm::dot(vertices[vertex_index], direction);
+    while(true)
+    {
+        glm::ivec3 triangle = triangles[triangle_index];
+        if (vertex_index == triangle.x)
+        {
+            double value = glm::dot(vertices[triangle.y], direction);
+            if (value > max_value)
+            {
+                max_value = value;
+                vertex_index = triangle.y;
+                previous_index = adjacency[triangle_index].z;
+                triangle_index = (vertex_index == triangles[previous_index].x) ? adjacency[previous_index].y : 
+                                 (vertex_index == triangles[previous_index].y) ? adjacency[previous_index].z : adjacency[previous_index].x;
+            }
+            else
+            {
+                triangle_index = adjacency[triangle_index].y;
+                if (triangle_index == previous_index) return max_value;
+            };
+            continue;
+        };
+        if (vertex_index == triangle.y)
+        {
+            double value = glm::dot(vertices[triangle.z], direction);
+            if (value > max_value)
+            {
+                max_value = value;
+                vertex_index = triangle.z;
+                previous_index = adjacency[triangle_index].x;
+                triangle_index = (vertex_index == triangles[previous_index].x) ? adjacency[previous_index].y : 
+                                 (vertex_index == triangles[previous_index].y) ? adjacency[previous_index].z : adjacency[previous_index].x;
+            }
+            else
+            {
+                triangle_index = adjacency[triangle_index].z;
+                if (triangle_index == previous_index) return max_value;
+            };
+            continue;
+        };
+        double value = glm::dot(vertices[triangle.x], direction);
+        if (value > max_value)
+        {
+            max_value = value;
+            vertex_index = triangle.x;
+            previous_index = adjacency[triangle_index].y;
+            triangle_index = (vertex_index == triangles[previous_index].x) ? adjacency[previous_index].y : 
+                             (vertex_index == triangles[previous_index].y) ? adjacency[previous_index].z : adjacency[previous_index].x;
+        }
+        else
+        {
+            triangle_index = adjacency[triangle_index].x;
+            if (triangle_index == previous_index) return max_value;
+        };
+    };
 };
 
 // ======================================================================================================================================================================================================================
@@ -276,45 +285,45 @@ double solid::support_hc(const glm::dvec3& direction, int& vertex_index, int& tr
 // ======================================================================================================================================================================================================================
 void solid::fill_buffers()
 {
-	// ==================================================================================================================================================================================================================
-	// single-precision data for openGL buffers
-	// ==================================================================================================================================================================================================================
-	glm::vec3* vertices_f = (glm::vec3*) malloc(V * sizeof(glm::vec3));
-	glm::vec3* normals_f = (glm::vec3*) malloc(V * sizeof(glm::vec3));
+    // ==================================================================================================================================================================================================================
+    // single-precision data for openGL buffers
+    // ==================================================================================================================================================================================================================
+    glm::vec3* vertices_f = (glm::vec3*) malloc(V * sizeof(glm::vec3));
+    glm::vec3* normals_f = (glm::vec3*) malloc(V * sizeof(glm::vec3));
 
-	for(unsigned int i = 0; i < V; ++i)
-	{
-		normals[i] = glm::normalize(normals[i]);
-		vertices_f[i] = glm::vec3(vertices[i]);
-		normals_f[i] = glm::vec3(normals[i]);
-	};
+    for(unsigned int i = 0; i < V; ++i)
+    {
+        normals[i] = glm::normalize(normals[i]);
+        vertices_f[i] = glm::vec3(vertices[i]);
+        normals_f[i] = glm::vec3(normals[i]);
+    };
 
-	// ==================================================================================================================================================================================================================
-	// fill buffers
-	// ==================================================================================================================================================================================================================
-	glGenVertexArrays(1, &vao_id);
-	glBindVertexArray(vao_id);
+    // ==================================================================================================================================================================================================================
+    // fill buffers
+    // ==================================================================================================================================================================================================================
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
 
-	glGenBuffers(1, &vbo_id);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-	glBufferData(GL_ARRAY_BUFFER, V * sizeof(glm::vec3), glm::value_ptr(vertices_f[0]), GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-
-	glGenBuffers(1, &nbo_id);
-	glBindBuffer(GL_ARRAY_BUFFER, nbo_id);
-	glBufferData(GL_ARRAY_BUFFER, V * sizeof(glm::vec3), glm::value_ptr(normals_f[0]), GL_STATIC_DRAW);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glGenBuffers(1, &vbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+    glBufferData(GL_ARRAY_BUFFER, V * sizeof(glm::vec3), glm::value_ptr(vertices_f[0]), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
 
-	glGenBuffers(1, &ibo_id);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, F * sizeof(glm::ivec3), glm::value_ptr(triangles[0]), GL_STATIC_DRAW);
+    glGenBuffers(1, &nbo_id);
+    glBindBuffer(GL_ARRAY_BUFFER, nbo_id);
+    glBufferData(GL_ARRAY_BUFFER, V * sizeof(glm::vec3), glm::value_ptr(normals_f[0]), GL_STATIC_DRAW);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-	free(vertices_f);
-	free(normals_f);
+
+    glGenBuffers(1, &ibo_id);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, F * sizeof(glm::ivec3), glm::value_ptr(triangles[0]), GL_STATIC_DRAW);
+
+    free(vertices_f);
+    free(normals_f);
 };
 
 
@@ -332,8 +341,8 @@ void solid::render()
 //=======================================================================================================================================================================================================================
 solid::~solid()
 {
-	glDeleteBuffers(1, &vbo_id);																				
-	glDeleteBuffers(1, &nbo_id);
-	glDeleteBuffers(1, &ibo_id);
-	glDeleteVertexArrays(1, &vao_id);
+    glDeleteBuffers(1, &vbo_id);                                                                                
+    glDeleteBuffers(1, &nbo_id);
+    glDeleteBuffers(1, &ibo_id);
+    glDeleteVertexArrays(1, &vao_id);
 };

@@ -1,10 +1,8 @@
 //========================================================================================================================================================================================================================
-// DEMO 070: Convex hull :: multiple solids
+// DEMO 070: Convex hull
 //========================================================================================================================================================================================================================
-#include <algorithm>
-#include <iostream>
 #include <random>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
@@ -22,7 +20,6 @@
 #include "camera.hpp"
 #include "hull3d.hpp"
 
-
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
@@ -30,7 +27,8 @@ struct demo_window_t : public glfw_window_t
     bool show_normals = false;
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, time */)
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, time */),
+          camera(8.0f, 0.5f, glm::lookAt(glm::vec3(7.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
@@ -71,18 +69,16 @@ int main(int argc, char *argv[])
     demo_window_t window("VAO Loader", 8, 3, 3, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
-    // init shader
+    // init shaders
     //===================================================================================================================================================================================================================
     glsl_program_t hull_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/convex_hull.vs"),
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/convex_hull.fs"));
     hull_shader.enable();
+    uniform_t uni_hs_pv_matrix    = hull_shader["projection_view_matrix"];
+    uniform_t uni_hs_model_matrix = hull_shader["model_matrix"];
+    uniform_t uni_hs_camera_ws    = hull_shader["camera_ws"];
+    uniform_t uni_hs_light_ws     = hull_shader["light_ws"];
 
-    uniform_t uni_hs_model_matrix      = hull_shader["model_matrix"];
-    uniform_t uni_hs_view_matrix       = hull_shader["view_matrix"];
-    uniform_t uni_hs_projection_matrix = hull_shader["projection_matrix"];
-    uniform_t uni_hs_light_position    = hull_shader["light_ws"];
-
-    uni_hs_projection_matrix = window.camera.projection_matrix;
     glm::mat4 model_matrix = glm::mat4(1.0f);
     uni_hs_model_matrix = model_matrix;
 
@@ -90,14 +86,9 @@ int main(int argc, char *argv[])
                                    glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/normals.gs"),
                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/normals.fs"));
     normal_renderer.enable();
-
-    uniform_t uni_nr_model_matrix      = normal_renderer["model_matrix"];
-    uniform_t uni_nr_view_matrix       = normal_renderer["view_matrix"];
-    uniform_t uni_nr_projection_matrix = normal_renderer["projection_matrix"];
-
-    uni_nr_projection_matrix = window.camera.projection_matrix;
+    uniform_t uni_nr_pv_matrix    = normal_renderer["projection_view_matrix"];
+    uniform_t uni_nr_model_matrix = normal_renderer["model_matrix"];
     uni_nr_model_matrix = model_matrix;
-
 
     //===================================================================================================================================================================================================================
     // create point cloud
@@ -131,25 +122,28 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        float time = window.frame_ts;
-        glm::vec4 light_ws = glm::vec4(70.0f * glm::cos(0.8f * time), 70.0f * glm::sin(0.8f * time), 0.0f, 1.0f);
+        float t = 0.8f * window.frame_ts;
+        glm::vec3 light_ws = 7.0f * glm::vec3(glm::cos(t), glm::sin(t), 0.0f);
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
+        glm::vec3 camera_ws = window.camera.position();
 
         hull_shader.enable();
-        uni_hs_view_matrix = window.camera.view_matrix;
-        uni_ls_light_ws = light_position;
+        uni_hs_pv_matrix = projection_view_matrix;
+        uni_hs_camera_ws = camera_ws;
+        uni_hs_light_ws = light_ws;
         stone1.render();
 
         if (window.show_normals)
         {
             normal_renderer.enable();
-            view_matrix_id_n = window.camera.view_matrix;
+            uni_nr_pv_matrix = projection_view_matrix;
             stone1.render();
         }
 
         //===============================================================================================================================================================================================================
         // show back buffer
         //===============================================================================================================================================================================================================
-        window.new_frame();
+        window.end_frame();
     }
 
     //===================================================================================================================================================================================================================
