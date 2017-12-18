@@ -1,4 +1,4 @@
-#ifndef _constants_included_345345927906782427572478245756856825659769792796724     
+#ifndef _constants_included_345345927906782427572478245756856825659769792796724
 #define _constants_included_345345927906782427572478245756856825659769792796724
 
 //========================================================================================================================================================================================================================
@@ -10,7 +10,7 @@ namespace constants
     const double sqrt2_d      = 1.41421356237309504880168872420969807857;
     const double sqrt3_d      = 1.73205080756887729352744634150587236694;
     const double sqrt5_d      = 2.23606797749978969640917366873127623544;
-    
+
     const double inv_sqrt2_d  = 0.70710678118654752440084436210484903928;
     const double inv_sqrt3_d  = 0.57735026918962576450914878050195745565;
     const double inv_sqrt5_d  = 0.44721359549995793928183473374625524709;
@@ -33,7 +33,7 @@ namespace constants
     const float sqrt2         = sqrt2_d;
     const float sqrt3         = sqrt3_d;
     const float sqrt5         = sqrt5_d;
-    
+
     const float inv_sqrt2     = inv_sqrt2_d;
     const float inv_sqrt3     = inv_sqrt3_d;
     const float inv_sqrt5     = inv_sqrt5_d;

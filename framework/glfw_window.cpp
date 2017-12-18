@@ -26,7 +26,7 @@ void poll_events()
     { glfwPollEvents(); }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{   
+{
     glfw_window_t* glfw_window = static_cast<glfw_window_t*> (glfwGetWindowUserPointer(window));
 
     //===================================================================================================================================================================================================================
@@ -36,16 +36,16 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     static char hex_digit[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
     static uint8_t* pixel_buffer = 0;
     static std::thread screenshot_thread;
-    static unsigned short shot = 0;    
+    static unsigned short shot = 0;
 
     if ((key == GLFW_KEY_PRINT_SCREEN) && (action == GLFW_RELEASE))
     {
         debug_msg("Saving screenshot #%d: %s.", shot, file_name);
 
-        int res_x = glfw_window->res_x; 
-        int res_y = glfw_window->res_y; 
+        int res_x = glfw_window->res_x;
+        int res_y = glfw_window->res_y;
 
-        if (pixel_buffer) 
+        if (pixel_buffer)
             screenshot_thread.join();
         else
             pixel_buffer = (unsigned char *) malloc (res_x * res_y * 3);
@@ -78,7 +78,7 @@ void mouse_move_callback(GLFWwindow* window, double x, double y)
     glfw_window->mouse = mouse_np;
     glfw_window->mouse_dt = t - glfw_window->mouse_ts;
     glfw_window->mouse_ts = t;
-    glfw_window->on_mouse_move();    
+    glfw_window->on_mouse_move();
 }
 
 void cursor_enter_callback(GLFWwindow* window, int enter)
@@ -99,8 +99,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     glfw_window->on_scroll(xoffset, yoffset);
 }
 
-void resize_callback(GLFWwindow* window, int width, int height) 
-{ 
+void resize_callback(GLFWwindow* window, int width, int height)
+{
     glfw_window_t* glfw_window = static_cast<glfw_window_t*> (glfwGetWindowUserPointer(window));
     glfw_window->on_resize(width, height);
 }
@@ -113,7 +113,7 @@ void /* APIENTRY */ debugCallback(GLenum source, GLenum type, GLuint id, GLenum 
 
     char *source_desc, *type_desc, *severity_desc;
 
-    switch (source) 
+    switch (source)
     {
         case GL_DEBUG_SOURCE_API             : source_desc = (char*) "API";             break;
         case GL_DEBUG_SOURCE_WINDOW_SYSTEM   : source_desc = (char*) "WINDOW_SYSTEM";   break;
@@ -125,31 +125,31 @@ void /* APIENTRY */ debugCallback(GLenum source, GLenum type, GLuint id, GLenum 
 
     switch (type)
     {
-        case GL_DEBUG_TYPE_ERROR               : type_desc = (char*) "ERROR";               break; 
-        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR : type_desc = (char*) "DEPRECATED_BEHAVIOR"; break; 
-        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR  : type_desc = (char*) "UNDEFINED_BEHAVIOR";  break; 
-        case GL_DEBUG_TYPE_PORTABILITY         : type_desc = (char*) "PORTABILITY";         break; 
-        case GL_DEBUG_TYPE_PERFORMANCE         : type_desc = (char*) "PERFORMANCE";         break; 
-        case GL_DEBUG_TYPE_MARKER              : type_desc = (char*) "MARKER";              break; 
-        case GL_DEBUG_TYPE_PUSH_GROUP          : type_desc = (char*) "PUSH_GROUP";          break; 
-        case GL_DEBUG_TYPE_POP_GROUP           : type_desc = (char*) "POP_GROUP";           break; 
+        case GL_DEBUG_TYPE_ERROR               : type_desc = (char*) "ERROR";               break;
+        case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR : type_desc = (char*) "DEPRECATED_BEHAVIOR"; break;
+        case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR  : type_desc = (char*) "UNDEFINED_BEHAVIOR";  break;
+        case GL_DEBUG_TYPE_PORTABILITY         : type_desc = (char*) "PORTABILITY";         break;
+        case GL_DEBUG_TYPE_PERFORMANCE         : type_desc = (char*) "PERFORMANCE";         break;
+        case GL_DEBUG_TYPE_MARKER              : type_desc = (char*) "MARKER";              break;
+        case GL_DEBUG_TYPE_PUSH_GROUP          : type_desc = (char*) "PUSH_GROUP";          break;
+        case GL_DEBUG_TYPE_POP_GROUP           : type_desc = (char*) "POP_GROUP";           break;
         default                                : type_desc = (char*) "OTHER";
-    }                                                         
-                                                              
-    switch (severity)                                         
+    }
+
+    switch (severity)
     {
-        case GL_DEBUG_SEVERITY_HIGH   : severity_desc = (char*) "HIGH";         break;      
+        case GL_DEBUG_SEVERITY_HIGH   : severity_desc = (char*) "HIGH";         break;
         case GL_DEBUG_SEVERITY_MEDIUM : severity_desc = (char*) "MEDIUM";       break;
         case GL_DEBUG_SEVERITY_LOW    : severity_desc = (char*) "LOW";          break;
         default                       : severity_desc = (char*) "NOTIFICATION";
-    }                                                        
-                                                         
+    }
+
     printf("OpenGL debug message : id = %u.\n\tSOURCE : %s.\n\tTYPE : %s.\n\tSEVERITY : %s.\n\tmessage : %s.\n\n", id, source_desc, type_desc, severity_desc, message);
 }
 
 //=======================================================================================================================================================================================================================
 // GLFW window constructor + GLEW library initialization
-// the application will be terminated if one of the library fails to initialize or 
+// the application will be terminated if one of the library fails to initialize or
 // requested context version is not supported by OpenGL driver
 //=======================================================================================================================================================================================================================
 glfw_window_t::glfw_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen, bool debug_context)
@@ -165,7 +165,7 @@ glfw_window_t::glfw_window_t(const char* title, int glfw_samples, int version_ma
     glfwWindowHint(GLFW_SAMPLES, glfw_samples);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, version_major);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, version_minor);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);                                                                    
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     if (debug_context)
@@ -174,7 +174,7 @@ glfw_window_t::glfw_window_t(const char* title, int glfw_samples, int version_ma
     //===============================================================================================================================================================================================================
     // Create window ...
     //===============================================================================================================================================================================================================
-    window = glfwCreateWindow(res_x, res_y, title, fullscreen ? glfwGetPrimaryMonitor() : 0, 0); 
+    window = glfwCreateWindow(res_x, res_y, title, fullscreen ? glfwGetPrimaryMonitor() : 0, 0);
     if(!window)
     {
         glfw::terminate();
@@ -190,9 +190,9 @@ glfw_window_t::glfw_window_t(const char* title, int glfw_samples, int version_ma
     //===============================================================================================================================================================================================================
     // GLEW library initialization
     //===============================================================================================================================================================================================================
-    glewExperimental = true;                                                                                                // needed in core profile 
+    glewExperimental = true;                                                                                                // needed in core profile
     GLenum result = glewInit();                                                                                             // initialise GLEW
-    if (result != GLEW_OK) 
+    if (result != GLEW_OK)
     {
         glfw::terminate();
         exit_msg("Failed to initialize GLEW : %s", glewGetErrorString(result));

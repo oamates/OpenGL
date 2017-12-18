@@ -1,16 +1,16 @@
-#define GLEW_STATIC
-#include <GL/glew.h>                      
-#include <GLFW/glfw3.h>                   
+//========================================================================================================================================================================================================================
+// DEMO 070: Convex hull :: multiple solids
+//========================================================================================================================================================================================================================
 #include <algorithm>
 #include <iostream>
 #include <random>
 #include <stdlib.h>
 
-#include <glm/glm.hpp>                    
-#include <glm/gtx/transform.hpp> 
-#include <glm/gtc/matrix_transform.hpp>   
+#include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/rotate_vector.hpp>
-#include <glm/ext.hpp> 
+#include <glm/ext.hpp>
 #include <glm/gtc/random.hpp>
 
 #include "log.hpp"
@@ -77,32 +77,31 @@ int main(int argc, char *argv[])
                                glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/convex_hull.fs"));
     hull_shader.enable();
 
-    uniform_t model_matrix_id = hull_shader["model_matrix"];
-    uniform_t view_matrix_id = hull_shader["view_matrix"];
-    uniform_t projection_matrix_id = hull_shader["projection_matrix"];
-    uniform_t light_position_id = hull_shader["light_position"];
+    uniform_t uni_hs_model_matrix      = hull_shader["model_matrix"];
+    uniform_t uni_hs_view_matrix       = hull_shader["view_matrix"];
+    uniform_t uni_hs_projection_matrix = hull_shader["projection_matrix"];
+    uniform_t uni_hs_light_position    = hull_shader["light_ws"];
 
-    projection_matrix_id = window.camera.projection_matrix;
+    uni_hs_projection_matrix = window.camera.projection_matrix;
     glm::mat4 model_matrix = glm::mat4(1.0f);
-    model_matrix_id = model_matrix;
+    uni_hs_model_matrix = model_matrix;
 
     glsl_program_t normal_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/normals.vs"),
                                    glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/normals.gs"),
                                    glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/normals.fs"));
     normal_renderer.enable();
 
-    uniform_t model_matrix_id_n = normal_renderer["model_matrix"];
-    uniform_t view_matrix_id_n = normal_renderer["view_matrix"];
-    uniform_t projection_matrix_id_n = normal_renderer["projection_matrix"];
+    uniform_t uni_nr_model_matrix      = normal_renderer["model_matrix"];
+    uniform_t uni_nr_view_matrix       = normal_renderer["view_matrix"];
+    uniform_t uni_nr_projection_matrix = normal_renderer["projection_matrix"];
 
-    projection_matrix_id_n = window.camera.projection_matrix;
-    model_matrix_id_n = model_matrix;
+    uni_nr_projection_matrix = window.camera.projection_matrix;
+    uni_nr_model_matrix = model_matrix;
 
 
     //===================================================================================================================================================================================================================
     // create point cloud
     //===================================================================================================================================================================================================================
-
     std::random_device rd;
     std::mt19937 randgen(rd());
     std::normal_distribution<double> gauss_dist;
@@ -111,14 +110,13 @@ int main(int argc, char *argv[])
     std::vector<glm::dvec3> points;
     points.resize(CLOUD_SIZE);
 
-    solid stone1;
-
     for(int i = 0; i < CLOUD_SIZE; ++i)
     {
         glm::dvec3 v = glm::dvec3(gauss_dist(randgen), gauss_dist(randgen), gauss_dist(randgen));
         points[i] = v;
     }
 
+    solid stone1;
     stone1.convex_hull(points);
     stone1.fill_buffers();
 
@@ -130,15 +128,15 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
         float time = window.frame_ts;
-        glm::vec4 light_position = glm::vec4(70.0f * glm::cos(0.8f * time), 70.0f * glm::sin(0.8f * time), 0.0f, 1.0f);
+        glm::vec4 light_ws = glm::vec4(70.0f * glm::cos(0.8f * time), 70.0f * glm::sin(0.8f * time), 0.0f, 1.0f);
 
         hull_shader.enable();
-        view_matrix_id = window.camera.view_matrix;
-        light_position_id = light_position;
+        uni_hs_view_matrix = window.camera.view_matrix;
+        uni_ls_light_ws = light_position;
         stone1.render();
 
         if (window.show_normals)

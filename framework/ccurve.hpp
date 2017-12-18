@@ -31,17 +31,17 @@ struct ccurve_t
         vertex_t* vertices = (vertex_t*) malloc(size * sizeof(vertex_t));
 
         double dt = constants::two_pi_d / size;
-        double cs = cos(dt); 
+        double cs = cos(dt);
         double sn = sin(dt);
-    
-        glm::dvec2 arg = glm::dvec2(1.0, 0.0); 
+
+        glm::dvec2 arg = glm::dvec2(1.0, 0.0);
         vertices[0] = func(glm::vec2(arg));
 
         for (int i = 1; i < size; ++i)
         {
             double arg_x = arg.x;
-            arg.x = arg.x * cs - arg.y * sn; 
-            arg.y = arg_x * sn + arg.y * cs;      
+            arg.x = arg.x * cs - arg.y * sn;
+            arg.y = arg_x * sn + arg.y * cs;
             vertices[i] = func(glm::vec2(arg));
         }
 
@@ -62,13 +62,13 @@ struct ccurve_t
 
         for (int i = 1; i <= size; ++i)
         {
-            glm::dvec3 f_p = func(glm::dvec2(glm::cos(i * dt), glm::sin(i * dt)));       
+            glm::dvec3 f_p = func(glm::dvec2(glm::cos(i * dt), glm::sin(i * dt)));
             glm::dvec3 df1 = f_p - f_0;
 
             glm::dvec3 t = glm::normalize(f_p - f_m);
             glm::dvec3 b = glm::normalize(glm::cross(df0, df1));
-            glm::dvec3 n = glm::cross(b, t);        
-        
+            glm::dvec3 n = glm::cross(b, t);
+
             vertices[i - 1] = vertex_pf_t(glm::vec3(f_0), glm::vec3(t), glm::vec3(n), glm::vec3(b));
 
             f_m = f_0;

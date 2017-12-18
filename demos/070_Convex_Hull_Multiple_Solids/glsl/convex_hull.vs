@@ -15,7 +15,5 @@ void main()
     position_ws = vec3(position_ws4);
 
     normal_ws = mat3(model_matrix) * normal_ms;
-	gl_Position = projection_view_matrix * position_ws4;
+    gl_Position = projection_view_matrix * position_ws4;
 }
-
-

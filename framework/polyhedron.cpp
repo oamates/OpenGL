@@ -50,7 +50,7 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
     // cube          ::  8  6 12  4
     // octahedron    ::  6  8 12  3
     // dodecahedron  :: 20 12 30  5
-    // icosahedron   :: 12 20 30  3 
+    // icosahedron   :: 12 20 30  3
     //===================================================================================================================================================================================================================
 
     debug_msg("V = %d. F = %d. Q = %d. vertex_count = %d", V, F, Q, vertex_count);
@@ -65,7 +65,7 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
         for (int i = 0; i < Q; ++i)
         {
             float alpha = (constants::two_pi * i) / Q;
-            polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha)); 
+            polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha));
         }
     }
     else
@@ -81,29 +81,29 @@ void polyhedron::regular_pft2_vao(int V, int F, const glm::vec3* positions, cons
     glm::mat2 uvs_basis = 0.25f * glm::mat2(polygon[0] - polygon[1], polygon[0] - polygon[2]);
     glm::mat2 uvs_basis_inv = glm::inverse(uvs_basis);
 
-    for (int i = 0; i < F; ++i) 
+    for (int i = 0; i < F; ++i)
     {
         glm::vec3 face_center = positions[faces[index]];
         for (int j = 1; j < Q; ++j) face_center += positions[faces[index + j]];
         face_center *= (scale / Q);
         glm::mat2x3 tangent_basis = glm::mat2x3(positions[faces[index + 0]] - positions[faces[index + 1]], positions[faces[index + 0]] - positions[faces[index + 2]]);
-        glm::mat2x3 tangent_xy = tangent_basis * uvs_basis_inv;    
+        glm::mat2x3 tangent_xy = tangent_basis * uvs_basis_inv;
         glm::vec3 normal = invert_normals ? -normals[i] : normals[i];
 
         for (int j = 0; j < Q; ++j)
         {
             if (invert_normals)
             {
-                vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);  
+                vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);
                 vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);
             }
             else
             {
-                vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);  
+                vertices[buffer_index++] = vertex_pft2_t(face_center, normal, tangent_xy[0], tangent_xy[1], square_center);
                 vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + j]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[j]);
             }
             int k = (j == Q - 1) ? 0 : j + 1;
-            vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + k]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[k]);  
+            vertices[buffer_index++] = vertex_pft2_t(scale * positions[faces[index + k]], normal, tangent_xy[0], tangent_xy[1], square_center + 0.5f * polygon[k]);
         }
         index += Q;
     }
@@ -135,7 +135,7 @@ void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, cons
         for (int i = 0; i < Q; ++i)
         {
             float alpha = (constants::two_pi * i) / Q;
-            polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha)); 
+            polygon[i] = glm::vec2(glm::cos(alpha), glm::sin(alpha));
         }
     }
     else
@@ -148,7 +148,7 @@ void polyhedron::regular_pnt2_vao(int V, int F, const glm::vec3* positions, cons
 
     int index = 0, buffer_index = 0;
 
-    for (int i = 0; i < F; ++i) 
+    for (int i = 0; i < F; ++i)
     {
         glm::vec3 face_center = positions[faces[index]];
         for (int j = 1; j < Q; ++j) face_center += positions[faces[index + j]];
@@ -192,7 +192,7 @@ void polyhedron::regular_pn_vao(int V, int F, const glm::vec3* positions, const 
 
     int index = 0, buffer_index = 0;
 
-    for (int i = 0; i < F; ++i) 
+    for (int i = 0; i < F; ++i)
     {
         glm::vec3 normal = invert_normals ? -normals[i] : normals[i];
         for (int j = 0; j < Q - 2; ++j)

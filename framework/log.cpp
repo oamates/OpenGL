@@ -1,5 +1,5 @@
 #define GLEW_STATIC
-#include <GL/glew.h> 
+#include <GL/glew.h>
 
 #include <cstdio>
 #include <cstdarg>
@@ -10,15 +10,15 @@
 #include "log.hpp"
 
 //========================================================================================================================================================================================================================
-// In C11 standard thread model the functions that operate on IO streams are thread safe : 
-//    - each stream has an associated lock that is used to prevent data races when multiple threads of execution access a stream, and to restrict the interleaving of stream operations performed by multiple threads  
+// In C11 standard thread model the functions that operate on IO streams are thread safe :
+//    - each stream has an associated lock that is used to prevent data races when multiple threads of execution access a stream, and to restrict the interleaving of stream operations performed by multiple threads
 //    - only one thread may hold this lock at a time
 //    - the lock is reentrant: a single thread may hold the lock multiple times at a given time
 //========================================================================================================================================================================================================================
 
 static std::hash<std::thread::id> hasher;
 
-struct logger_t 
+struct logger_t
 {
 
     static const unsigned int QUEUE_SIZE = 256;
@@ -37,15 +37,15 @@ struct logger_t
         buffer = (char*) malloc(BUFFER_SIZE);
         queue_head = 0;
         for(unsigned int i = 0; i < QUEUE_SIZE; ++i)
-            chunk_free[i] = true;    
+            chunk_free[i] = true;
 
         std::thread::id this_thread_id = std::this_thread::get_id();
         thread_id_hash = static_cast<uint32_t> (hasher(this_thread_id));
 
         fprintf(file, "[%08X] : Logging started .. \n", thread_id_hash);
     }
-    
-    ~logger_t() 
+
+    ~logger_t()
     {
         fprintf(file, "[%08X] : Logging done .. \n", thread_id_hash);
         free(buffer);
@@ -59,7 +59,7 @@ struct logger_t
             unsigned int head = queue_head++;
             head &= 0xFF;
             bool is_head_free = chunk_free[head].compare_exchange_weak(infinitely_true_value, false);
-            if (is_head_free) 
+            if (is_head_free)
                 return head;
         }
     }
@@ -141,7 +141,7 @@ void impl_gl_error_msg(const char* file_name, const char* function_name, int lin
     {
         switch(glErr)
         {
-        
+
             case GL_INVALID_ENUM:                  msg = "GL_INVALID_ENUM"; break;
             case GL_INVALID_VALUE:                 msg = "GL_INVALID_VALUE"; break;
             case GL_INVALID_OPERATION:             msg = "GL_INVALID_OPERATION"; break;

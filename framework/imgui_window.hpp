@@ -55,7 +55,7 @@ struct imgui_window_t
 
     //===================================================================================================================================================================================================================
     // GLFW window constructor + GLEW library initialization
-    // the application will be terminated if one of the library fails to initialize or 
+    // the application will be terminated if one of the library fails to initialize or
     // requested context version is not supported by OpenGL driver
     //===================================================================================================================================================================================================================
     imgui_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen, bool debug_context = false);
@@ -90,7 +90,7 @@ struct imgui_window_t
     int key_state(int key);
 
     glm::dvec2 cursor_position();
-    double fps();    
+    double fps();
 };
 
 #endif // _imgui_window_included_823715602756273652756108725634563735612873601239

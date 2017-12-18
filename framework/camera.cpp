@@ -2,8 +2,8 @@
 // Euclidean and hyperbolic 3d camera structure implementation
 //=======================================================================================================================================================================================================================
 
-#include <glm/gtx/transform.hpp> 
-#include <glm/gtc/matrix_transform.hpp>     
+#include <glm/gtx/transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "camera.hpp"
 
 //=======================================================================================================================================================================================================================
@@ -53,7 +53,7 @@ void camera_t::rotateXY(const glm::dvec2& direction, double dt)
     float sndy = sn * dy;
     float _1mcsdx = _1mcs * dx;
     float _1mcsdy = _1mcs * dy;
-    glm::mat4 rotation_matrix = glm::mat4 (1.0f - dx * _1mcsdx,      - dy * _1mcsdx,  sndx, 0.0f, 
+    glm::mat4 rotation_matrix = glm::mat4 (1.0f - dx * _1mcsdx,      - dy * _1mcsdx,  sndx, 0.0f,
                                                 - dx * _1mcsdy, 1.0f - dy * _1mcsdy,  sndy, 0.0f,
                                                         - sndx,              - sndy,    cs, 0.0f,
                                                           0.0f,                0.0f,  0.0f, 1.0f);
@@ -87,7 +87,7 @@ void hyperbolic_camera_t::translate(const glm::dvec3& shift) {}
 //=======================================================================================================================================================================================================================
 // hyperbolic translation along Z is equivalent to ZW - Lorentz rotation
 // | 1  0       0           0      |
-// | 0  1       0           0      |                        
+// | 0  1       0           0      |
 // | 0  0  cosh(theta) sinh(theta) |
 // | 0  0  sinh(theta) cosh(theta) |
 //=======================================================================================================================================================================================================================
@@ -96,26 +96,26 @@ void hyperbolic_camera_t::move_forward(double distance)
     double sh = sinh(distance);
     double ch = cosh(distance);
 
-    double m02 = view_matrix[0].z * ch + view_matrix[0].w * sh; 
-    double m03 = view_matrix[0].z * sh + view_matrix[0].w * ch; 
-    double m12 = view_matrix[1].z * ch + view_matrix[1].w * sh; 
-    double m13 = view_matrix[1].z * sh + view_matrix[1].w * ch; 
-    double m22 = view_matrix[2].z * ch + view_matrix[2].w * sh; 
+    double m02 = view_matrix[0].z * ch + view_matrix[0].w * sh;
+    double m03 = view_matrix[0].z * sh + view_matrix[0].w * ch;
+    double m12 = view_matrix[1].z * ch + view_matrix[1].w * sh;
+    double m13 = view_matrix[1].z * sh + view_matrix[1].w * ch;
+    double m22 = view_matrix[2].z * ch + view_matrix[2].w * sh;
     double m23 = view_matrix[2].z * sh + view_matrix[2].w * ch;
-    double m32 = view_matrix[3].z * ch + view_matrix[3].w * sh; 
+    double m32 = view_matrix[3].z * ch + view_matrix[3].w * sh;
     double m33 = view_matrix[3].z * sh + view_matrix[3].w * ch;
 
-    view_matrix[0].z = m02; 
-    view_matrix[0].w = m03; 
-    view_matrix[1].z = m12; 
-    view_matrix[1].w = m13; 
-    view_matrix[2].z = m22; 
+    view_matrix[0].z = m02;
+    view_matrix[0].w = m03;
+    view_matrix[1].z = m12;
+    view_matrix[1].w = m13;
+    view_matrix[2].z = m22;
     view_matrix[2].w = m23;
-    view_matrix[3].z = m32; 
+    view_matrix[3].z = m32;
     view_matrix[3].w = m33;
 }
 
-void hyperbolic_camera_t::move_backward(double distance) 
+void hyperbolic_camera_t::move_backward(double distance)
     { move_forward(-distance); }
 
 //=======================================================================================================================================================================================================================
@@ -130,23 +130,23 @@ void hyperbolic_camera_t::straight_left(double distance)
     double sh = sinh(distance);
     double ch = cosh(distance);
 
-    double m00 = view_matrix[0][0] * ch + view_matrix[0][3] * sh; 
-    double m03 = view_matrix[0][0] * sh + view_matrix[0][3] * ch; 
-    double m10 = view_matrix[1][0] * ch + view_matrix[1][3] * sh; 
-    double m13 = view_matrix[1][0] * sh + view_matrix[1][3] * ch; 
-    double m20 = view_matrix[2][0] * ch + view_matrix[2][3] * sh; 
+    double m00 = view_matrix[0][0] * ch + view_matrix[0][3] * sh;
+    double m03 = view_matrix[0][0] * sh + view_matrix[0][3] * ch;
+    double m10 = view_matrix[1][0] * ch + view_matrix[1][3] * sh;
+    double m13 = view_matrix[1][0] * sh + view_matrix[1][3] * ch;
+    double m20 = view_matrix[2][0] * ch + view_matrix[2][3] * sh;
     double m23 = view_matrix[2][0] * sh + view_matrix[2][3] * ch;
-    double m30 = view_matrix[3][0] * ch + view_matrix[3][3] * sh; 
-    double m33 = view_matrix[3][0] * sh + view_matrix[3][3] * ch; 
+    double m30 = view_matrix[3][0] * ch + view_matrix[3][3] * sh;
+    double m33 = view_matrix[3][0] * sh + view_matrix[3][3] * ch;
 
-    view_matrix[0][0] = m00; 
-    view_matrix[0][3] = m03; 
-    view_matrix[1][0] = m10; 
-    view_matrix[1][3] = m13; 
-    view_matrix[2][0] = m20; 
+    view_matrix[0][0] = m00;
+    view_matrix[0][3] = m03;
+    view_matrix[1][0] = m10;
+    view_matrix[1][3] = m13;
+    view_matrix[2][0] = m20;
     view_matrix[2][3] = m23;
-    view_matrix[3][0] = m30; 
-    view_matrix[3][3] = m33;    
+    view_matrix[3][0] = m30;
+    view_matrix[3][3] = m33;
 }
 
 void hyperbolic_camera_t::straight_right(double distance)
@@ -165,7 +165,7 @@ void hyperbolic_camera_t::rotateXY(const glm::dvec2& direction, double dt)
     double sndy = sn * dy;
     double _1mcsdx = _1mcs * dx;
     double _1mcsdy = _1mcs * dy;
-    glm::dmat4 rotation_matrix = glm::mat4 (1.0 - dx * _1mcsdx,     - dy * _1mcsdx,  sndx, 0.0, 
+    glm::dmat4 rotation_matrix = glm::mat4 (1.0 - dx * _1mcsdx,     - dy * _1mcsdx,  sndx, 0.0,
                                                 - dx * _1mcsdy, 1.0 - dy * _1mcsdy,  sndy, 0.0,
                                                         - sndx,             - sndy,    cs, 0.0,
                                                            0.0,                0.0,   0.0, 1.0);

@@ -1,5 +1,5 @@
 #include <thread>
-#include <glm/ext.hpp> 
+#include <glm/ext.hpp>
 
 #include "tess.hpp"
 #include "log.hpp"
@@ -11,16 +11,16 @@ namespace tess
 // Single-threaded tesselation function
 // V, E, F of any triangular subdivision satisfy : V - E + F = 2, 3F = 2E, F = 2V - 4, E = 3V - 6.
 //=======================================================================================================================================================================================================================
-template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices, GLuint V, 
-                                               const glm::uvec4* quads, GLuint Q, 
-                                               typename maps<vertex_t>::edge_tess_func edge_func, 
-                                               typename maps<vertex_t>::face_tess_func face_func, 
+template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices, GLuint V,
+                                               const glm::uvec4* quads, GLuint Q,
+                                               typename maps<vertex_t>::edge_tess_func edge_func,
+                                               typename maps<vertex_t>::face_tess_func face_func,
                                                GLuint level)
 {
     //===================================================================================================================================================================================================================
     // any mesh split into quads can be used as initial
     //===================================================================================================================================================================================================================
-    GLuint E = Q + Q;    
+    GLuint E = Q + Q;
 
     glm::uvec2* edges = (glm::uvec2*) malloc(E * sizeof(glm::uvec2));
     GLuint* edge_indices = (GLuint*) malloc(V * V * sizeof(GLuint));
@@ -41,7 +41,7 @@ template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices,
     for(GLuint a = 0; a < V * V; ++a) edge_indices[a] = -1;
 
     for(GLuint e = 0; e < E; ++e)
-    { 
+    {
         edge_indices[edges[e].y + V * edges[e].x] = e;
         edge_indices[edges[e].x + V * edges[e].y] = e;
     }
@@ -73,24 +73,24 @@ template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices,
     for (int e = 0; e < E; ++e)
     {
         GLuint A = edges[e].x;
-        GLuint B = edges[e].y; 
+        GLuint B = edges[e].y;
         for(int p = 1; p < level; ++p)
-        {   
+        {
             glm::vec2 uv = inv_level * glm::vec2(level - p, p);
             vertices[vbo_index++] = edge_func(vertices[A], vertices[B], uv);
-        }            
+        }
     }
 
     //===================================================================================================================================================================================================================
-    // compute new vertices inside quads : 
+    // compute new vertices inside quads :
     // every quad (ABCD) is split into two triangles by the internal edge AC
     //===================================================================================================================================================================================================================
     for (int q = 0; q < Q; ++q)
     {
-        GLuint A = quads[q].x; 
-        GLuint B = quads[q].y; 
-        GLuint C = quads[q].z; 
-        GLuint D = quads[q].w; 
+        GLuint A = quads[q].x;
+        GLuint B = quads[q].y;
+        GLuint C = quads[q].z;
+        GLuint D = quads[q].w;
 
         GLuint edge_index_AB = V + (level - 1) * edge_indices[A * V + B];
         GLuint edge_index_BC = V + (level - 1) * edge_indices[B * V + C];
@@ -117,7 +117,7 @@ template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices,
         vbo_index -= vertices_per_quad;
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge AB 
+        // triangle strip near the edge AB
         //===============================================================================================================================================================================================================
         indices[ibo_index++] = (A < D) ? edge_index_DA : edge_index_DA + level - 2;
         indices[ibo_index++] = A;
@@ -126,7 +126,7 @@ template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices,
         {
             indices[ibo_index++] = vbo_index + p - 1;
             indices[ibo_index++] = (A < B) ? edge_index_AB + p - 1: edge_index_AB + level - p - 1;
-        }      
+        }
 
         indices[ibo_index++] = (B < C) ? edge_index_BC : edge_index_BC + level - 2;
         indices[ibo_index++] = B;
@@ -144,15 +144,15 @@ template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices,
             {
                 indices[ibo_index++] = vbo_index + level - 1;
                 indices[ibo_index++] = vbo_index++;
-            }      
+            }
 
             indices[ibo_index++] = (B < C) ? edge_index_BC + p : edge_index_BC + level - 2 - p;
             indices[ibo_index++] = (B < C) ? edge_index_BC + p - 1 : edge_index_BC + level - p - 1;
             indices[ibo_index++] = -1;                                                                      // complete the strip with the primitive restart index
-        }      
+        }
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge CD 
+        // triangle strip near the edge CD
         //===============================================================================================================================================================================================================
         indices[ibo_index++] = D;
         indices[ibo_index++] = (A < D) ? edge_index_DA + level - 2 : edge_index_DA;
@@ -161,7 +161,7 @@ template<typename vertex_t> vao_t generate_vao(const vertex_t* initial_vertices,
         {
             indices[ibo_index++] = (C < D) ? edge_index_CD + level - p - 1 : edge_index_CD + p - 1;
             indices[ibo_index++] = vbo_index++;
-        }      
+        }
 
         indices[ibo_index++] = C;
         indices[ibo_index++] = (B < C) ? edge_index_BC + level - 2 : edge_index_BC;
@@ -186,15 +186,15 @@ template vao_t generate_vao<vertex_pn_t>  (const vertex_pn_t*,   GLuint, const g
 template vao_t generate_vao<vertex_pno_t> (const vertex_pno_t*,  GLuint, const glm::uvec4*, GLuint, typename maps<vertex_pno_t>::edge_tess_func,  typename maps<vertex_pno_t>::face_tess_func,  GLuint);
 template vao_t generate_vao<vertex_pnoh_t>(const vertex_pnoh_t*, GLuint, const glm::uvec4*, GLuint, typename maps<vertex_pnoh_t>::edge_tess_func, typename maps<vertex_pnoh_t>::face_tess_func, GLuint);
 
-                
+
 //=======================================================================================================================================================================================================================
 // Multithreaded mesh tesselation : provided functions should compute vertex attributes given barycentric coordinates on edges/faces respectively
 // V, E, F of any triangular subdivision satisfy : V - E + F = 2, 3F = 2E, F = 2V - 4, E = 3V - 6.
 //=======================================================================================================================================================================================================================
-template<typename vertex_t, int threads> vao_t generate_vao_mt(const vertex_t* initial_vertices, GLuint V, 
-                                               const glm::uvec4* quads, GLuint Q, 
-                                               typename maps<vertex_t>::edge_tess_func edge_func, 
-                                               typename maps<vertex_t>::face_tess_func face_func, 
+template<typename vertex_t, int threads> vao_t generate_vao_mt(const vertex_t* initial_vertices, GLuint V,
+                                               const glm::uvec4* quads, GLuint Q,
+                                               typename maps<vertex_t>::edge_tess_func edge_func,
+                                               typename maps<vertex_t>::face_tess_func face_func,
                                                GLuint level)
 {
     //===================================================================================================================================================================================================================
@@ -202,7 +202,7 @@ template<typename vertex_t, int threads> vao_t generate_vao_mt(const vertex_t* i
     //===================================================================================================================================================================================================================
     compute_data<vertex_t> data;
     data.level = level;
-    data.V = V;                                                                        
+    data.V = V;
     data.E = Q + Q;
     data.Q = Q;
     data.edges = (glm::uvec2*) malloc(data.E * sizeof(glm::uvec2));
@@ -212,7 +212,7 @@ template<typename vertex_t, int threads> vao_t generate_vao_mt(const vertex_t* i
     //===================================================================================================================================================================================================================
     // compute auxiliary edge data
     //===================================================================================================================================================================================================================
-    GLuint E = Q + Q;    
+    GLuint E = Q + Q;
     GLuint e = 0;
     for(GLuint q = 0; q < Q; ++q)
     {
@@ -228,7 +228,7 @@ template<typename vertex_t, int threads> vao_t generate_vao_mt(const vertex_t* i
 
     for(GLuint a = 0; a < V * V; ++a) data.edge_indices[a] = -1;
     for(GLuint e = 0; e < E; ++e)
-    { 
+    {
         data.edge_indices[data.edges[e].y + V * data.edges[e].x] = e;
         data.edge_indices[data.edges[e].x + V * data.edges[e].y] = e;
     }
@@ -282,7 +282,7 @@ template<typename vertex_t, int threads> vao_t generate_vao_mt(const vertex_t* i
     // this thread will do the last task and will wait for others to finish
     //===================================================================================================================================================================================================================
     debug_msg("Main thread #%u. Edges to compute : [%u, %u]. Faces to compute : [%u, %u]", threads - 1, edge_start, edge_start + edges_per_thread - 1, quad_start, quad_start + quads_per_thread - 1);
-    fill_vao_chunk<vertex_t>(data, edge_func, face_func, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);           
+    fill_vao_chunk<vertex_t>(data, edge_func, face_func, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);
 
     for (int thread_id = 0; thread_id < threads - 1; ++thread_id)
     {
@@ -314,7 +314,7 @@ template vao_t generate_vao_mt<vertex_pn_t>  (const vertex_pn_t*,   GLuint, cons
 template<typename vertex_t> void fill_vao_chunk(const compute_data<vertex_t>& data,
                                                 typename maps<vertex_t>::edge_tess_func edge_func,
                                                 typename maps<vertex_t>::face_tess_func face_func,
-                                                GLuint edge_start, GLuint edge_end, 
+                                                GLuint edge_start, GLuint edge_end,
                                                 GLuint quad_start, GLuint quad_end)
 {
     float inv_level = 1.0f / data.level;
@@ -342,9 +342,9 @@ template<typename vertex_t> void fill_vao_chunk(const compute_data<vertex_t>& da
 
     for (GLuint q = quad_start; q < quad_end; ++q)
     {
-        GLuint A = data.quads[q].x;  
-        GLuint B = data.quads[q].y;  
-        GLuint C = data.quads[q].z;  
+        GLuint A = data.quads[q].x;
+        GLuint B = data.quads[q].y;
+        GLuint C = data.quads[q].z;
         GLuint D = data.quads[q].w;
 
         GLuint edge_indexAB = data.V + (data.level - 1) * data.edge_indices[A * data.V + B];
@@ -374,7 +374,7 @@ template<typename vertex_t> void fill_vao_chunk(const compute_data<vertex_t>& da
         vbo_index -= data.vertices_per_quad;
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge AB 
+        // triangle strip near the edge AB
         //===============================================================================================================================================================================================================
         data.indices[ibo_index++] = (A < D) ? edge_indexDA : edge_indexDA + data.level - 2;
         data.indices[ibo_index++] = A;
@@ -383,7 +383,7 @@ template<typename vertex_t> void fill_vao_chunk(const compute_data<vertex_t>& da
         {
             data.indices[ibo_index++] = vbo_index + p - 1;
             data.indices[ibo_index++] = (A < B) ? edge_indexAB + p - 1: edge_indexAB + data.level - p - 1;
-        }      
+        }
 
         data.indices[ibo_index++] = (B < C) ? edge_indexBC : edge_indexBC + data.level - 2;
         data.indices[ibo_index++] = B;
@@ -406,10 +406,10 @@ template<typename vertex_t> void fill_vao_chunk(const compute_data<vertex_t>& da
             data.indices[ibo_index++] = (B < C) ? edge_indexBC + p : edge_indexBC + data.level - 2 - p;
             data.indices[ibo_index++] = (B < C) ? edge_indexBC + p - 1 : edge_indexBC + data.level - p - 1;
             data.indices[ibo_index++] = -1;                                                                     // complete the strip with the primitive restart index
-        }      
+        }
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge CD 
+        // triangle strip near the edge CD
         //===============================================================================================================================================================================================================
         data.indices[ibo_index++] = D;
         data.indices[ibo_index++] = (A < D) ? edge_indexDA + data.level - 2 : edge_indexDA;

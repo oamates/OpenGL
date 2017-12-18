@@ -54,7 +54,7 @@ bool VBObject::LoadFromVBM(const char * filename, int vertexIndex, int normalInd
 
     glBufferData(GL_ARRAY_BUFFER, total_data_size, raw_data, GL_STATIC_DRAW);
 
-    if (header->num_indices) 
+    if (header->num_indices)
     {
         glGenBuffers(1, &ibo_id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
@@ -72,7 +72,7 @@ void VBObject::Render(unsigned int frame_index, unsigned int instances)
     if (frame_index >= m_header.num_frames) return;
 
     glBindVertexArray(vao_id);
-    if (instances) 
+    if (instances)
     {
         if (m_header.num_indices)
             glDrawElementsInstanced(GL_TRIANGLES, m_frame[frame_index].count, GL_UNSIGNED_INT, (GLvoid *)(m_frame[frame_index].first * sizeof(GLuint)), instances);

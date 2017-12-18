@@ -55,7 +55,7 @@ struct VBObject
         { return index < m_header.num_attribs ? m_attrib[index].name : 0; };
 
     unsigned int GetVertexCount(unsigned int frame = 0)
-        { return frame < m_header.num_frames ? m_frame[frame].count : 0; };        
+        { return frame < m_header.num_frames ? m_frame[frame].count : 0; };
 
 };
 

@@ -1,8 +1,8 @@
 #ifndef _material_included_3146587093257805356845724634260498163745132451346135
 #define _material_included_3146587093257805356845724634260498163745132451346135
 
-#include <string> 
-#include <glm/glm.hpp>                                                      
+#include <string>
+#include <glm/glm.hpp>
 #include <glm/gtx/string_cast.hpp>
 
 #include "log.hpp"
@@ -27,7 +27,7 @@ struct material_t
     std::string map_Ks;                                                                     // "map_Ks" : specular reflectivity texture data file
     std::string map_Ns;                                                                     // "map_Ns" : single channel (!) texture file that contains shininess exponent
     std::string map_d;                                                                      // "map_d"  : dissolve/mask/alpha texture
-    std::string map_bump;                                                                   // "map_bump" or "bump" : single channel (!) texture that contains heightmap data 
+    std::string map_bump;                                                                   // "map_bump" or "bump" : single channel (!) texture that contains heightmap data
 
     unsigned int flags;                                                                     // logical OR of texture flags present in the material (for the shader to know which textures are actually bound)
 
@@ -46,7 +46,7 @@ struct material_t
 //=======================================================================================================================================================================================================================
 
 static void default_material(material_t& material)
-{                
+{
     material.name = "";
     material.Ka = glm::vec3(0.17f);
     material.Kd = glm::vec3(0.50f);
@@ -54,11 +54,11 @@ static void default_material(material_t& material)
     material.Ns = 20.0f;
     material.d = 1.0f;
     material.bm = 0.1f;
-    material.map_Ka = "";  
-    material.map_Kd = "";  
-    material.map_Ks = "";  
-    material.map_Ns = "";  
-    material.map_d = "";   
+    material.map_Ka = "";
+    material.map_Kd = "";
+    material.map_Ks = "";
+    material.map_Ns = "";
+    material.map_d = "";
     material.map_bump = "";
     material.flags = 0;
 }
@@ -81,4 +81,4 @@ static void print_material(const material_t& material)
     debug_msg("\tmaterial.texture_flags = %x", material.flags);
 }
 
-#endif  // _material_included_3146587093257805356845724634260498163745132451346135    
+#endif  // _material_included_3146587093257805356845724634260498163745132451346135

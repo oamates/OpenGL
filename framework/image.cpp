@@ -31,9 +31,9 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
         debug_msg("stbi :: failed to load image : %s", file_name);
         return 0;
     }
-    
+
     GLenum format = (bpp == 1) ? GL_RED :
-                    (bpp == 2) ? GL_RG : 
+                    (bpp == 2) ? GL_RG :
                     (bpp == 3) ? GL_RGB : GL_RGBA;
     if (channels) *channels = bpp;
 
@@ -45,7 +45,7 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
-    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) 
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR)
         glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(data);
@@ -54,7 +54,7 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
 
 GLuint hdr2d(const char* file_name, int* channels, GLint mag_filter, GLint min_filter, GLint wrap_mode)
 {
-    GLuint texture_id;    
+    GLuint texture_id;
     int width, height, bpp; // bytes per pixel
 
     float *data = stbi_loadf(file_name, &width, &height, &bpp, 0);
@@ -120,12 +120,12 @@ void write(const char * file_name, int width, int height, unsigned char* pixelbu
     header[15] = height >> 8;
     header[16] = 32;
 
-    fwrite (header, 1, 18, fp);    
+    fwrite (header, 1, 18, fp);
     fwrite (pixelbuffer, 4, width * height, fp);
     fclose(fp);
-}    
+}
 
-} 
+}
 namespace png {
 
 //===================================================================================================================================================================================================================
@@ -135,20 +135,20 @@ namespace png {
 GLuint random_rgb(GLuint size)
 {
     GLuint texture_id;
-    glGenTextures(1, &texture_id);    
+    glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
 
     unsigned int data_size = size * size * sizeof(glm::vec3);
     glm::vec3* random_data = (glm::vec3 *) malloc(data_size);
 
-    for (unsigned int i = 0 ; i < size * size ; i++) 
+    for (unsigned int i = 0 ; i < size * size ; i++)
         random_data[i] = glm::vec3(glm::linearRand (0.0f, 1.0f), glm::linearRand (0.0f, 1.0f), glm::linearRand (0.0f, 1.0f));
-    
+
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size, size, 0, GL_RGB, GL_FLOAT, glm::value_ptr(random_data[0]));
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);    
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);        
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glGenerateMipmap(GL_TEXTURE_2D);
     free(random_data);
     return texture_id;
@@ -157,7 +157,7 @@ GLuint random_rgb(GLuint size)
 GLuint random_rgba(GLuint size)
 {
     GLuint texture_id;
-    glGenTextures(1, &texture_id);    
+    glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
 
     unsigned int data_size = size * size * sizeof(glm::vec4);
@@ -165,12 +165,12 @@ GLuint random_rgba(GLuint size)
 
     for (unsigned int i = 0 ; i < size * size ; i++)
         random_data[i] = glm::vec4(glm::linearRand (0.0f, 1.0f), glm::linearRand (0.0f, 1.0f), glm::linearRand (0.0f, 1.0f), glm::linearRand (0.0f, 1.0f));
-    
+
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_FLOAT, glm::value_ptr(random_data[0]));
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);    
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);        
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glGenerateMipmap(GL_TEXTURE_2D);
     free(random_data);
     return texture_id;
@@ -184,7 +184,7 @@ GLuint cubemap(const char* file_names[6])
 {
     debug_msg("Loading Cubemap PNG texture.");
 
-    static const char * face_name[] = 
+    static const char * face_name[] =
     {
         "GL_TEXTURE_CUBE_MAP_POSITIVE_X",
         "GL_TEXTURE_CUBE_MAP_NEGATIVE_X",
@@ -203,7 +203,7 @@ GLuint cubemap(const char* file_names[6])
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    int bit_depth, color_type;                                                                                          
+    int bit_depth, color_type;
     png_uint_32 width, height;
     png_byte * image_data;
     png_byte ** row_pointers;
@@ -216,7 +216,7 @@ GLuint cubemap(const char* file_names[6])
 
         png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
         png_infop info_ptr = png_create_info_struct(png_ptr);
-        if (setjmp(png_jmpbuf(png_ptr))) 
+        if (setjmp(png_jmpbuf(png_ptr)))
         {
             png_destroy_read_struct(&png_ptr, &info_ptr, 0);
             debug_msg("Error from libpng.");
@@ -232,25 +232,25 @@ GLuint cubemap(const char* file_names[6])
         png_byte header[8];
         FILE * file = fopen(file_name, "rb");
         if ((0 == file) || (8 != fread(header, 1, 8, file)) || png_sig_cmp(header, 0, 8))
-        { 
+        {
             fclose(file);
             debug_msg("Failed to open %s file or invalid png format.", file_name);
             return 0;
         }
-        
+
         //===========================================================================================================================================================================================================
         // set up reading struct, image info struct and error callback point
         //===========================================================================================================================================================================================================
-        png_init_io(png_ptr, file);                                                                                         
-        png_set_sig_bytes(png_ptr, 8);                                                                                      
-        png_read_info(png_ptr, info_ptr);                                                                                   
-        
+        png_init_io(png_ptr, file);
+        png_set_sig_bytes(png_ptr, 8);
+        png_read_info(png_ptr, info_ptr);
+
         //===========================================================================================================================================================================================================
-        // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d 
+        // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d
         //===========================================================================================================================================================================================================
         if (0 == i)
         {
-            png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);                                 
+            png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);
             if ((bit_depth != 8) || (width != height) || ((PNG_COLOR_TYPE_RGB != color_type) && (PNG_COLOR_TYPE_RGB_ALPHA != color_type)))
             {
                 png_destroy_read_struct(&png_ptr, &info_ptr, 0);
@@ -259,13 +259,13 @@ GLuint cubemap(const char* file_names[6])
                 debug_msg("Invalid bit depth (%d) or color type (%d) or image is not rectangular (%d x %d).", bit_depth, color_type, width, height);
                 return 0;
             }
-            png_read_update_info(png_ptr, info_ptr);                                                                            
+            png_read_update_info(png_ptr, info_ptr);
 
             format = (PNG_COLOR_TYPE_RGB == color_type) ? GL_RGB : GL_RGBA;
-            rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;                                              
-            image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));                     
-            row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));                                       
-        
+            rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;
+            image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));
+            row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));
+
             if ((0 == image_data) || (0 == row_pointers))
             {
                 free(image_data);
@@ -276,14 +276,14 @@ GLuint cubemap(const char* file_names[6])
                 debug_msg("Error: could not allocate memory for png image data or row pointers\n");
                 return 0;
             }
-            for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;                 
+            for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;
         }
         else
         {
-            int bit_depth0, color_type0;                                                                                            
+            int bit_depth0, color_type0;
             png_uint_32 width0, height0;
             png_get_IHDR(png_ptr, info_ptr, &width0, &height0, &bit_depth0, &color_type0, 0, 0, 0);
-            png_read_update_info(png_ptr, info_ptr);                                                                            
+            png_read_update_info(png_ptr, info_ptr);
 
             if ((bit_depth0 != bit_depth) || (color_type0 != color_type) || (width0 != width) || (height0 != height))
             {
@@ -299,7 +299,7 @@ GLuint cubemap(const char* file_names[6])
         //===========================================================================================================================================================================================================
         // read the image data and fill the corresponding cubemap face
         //===========================================================================================================================================================================================================
-        png_read_image(png_ptr, row_pointers);                                                                              
+        png_read_image(png_ptr, row_pointers);
         glTexImage2D(face, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, image_data);
         fclose(file);
 
@@ -332,7 +332,7 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    int bit_depth, color_type;                                                                                          
+    int bit_depth, color_type;
     png_uint_32 width, height;
     png_byte * image_data;
     png_byte ** row_pointers;
@@ -344,7 +344,7 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
 
         png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
         png_infop info_ptr = png_create_info_struct(png_ptr);
-        if (setjmp(png_jmpbuf(png_ptr))) 
+        if (setjmp(png_jmpbuf(png_ptr)))
         {
             png_destroy_read_struct(&png_ptr, &info_ptr, 0);
             debug_msg("Error from libpng.");
@@ -359,25 +359,25 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
         png_byte header[8];
         FILE * file = fopen(file_name, "rb");
         if ((0 == file) || (8 != fread(header, 1, 8, file)) || png_sig_cmp(header, 0, 8))
-        { 
+        {
             fclose(file);
             debug_msg("Failed to open %s file or invalid png format.", file_name);
             return 0;
         }
-        
+
         //===========================================================================================================================================================================================================
         // set up reading struct, image info struct and error callback point
         //===========================================================================================================================================================================================================
-        png_init_io(png_ptr, file);                                                                                         
-        png_set_sig_bytes(png_ptr, 8);                                                                                      
-        png_read_info(png_ptr, info_ptr);                                                                                   
-        
+        png_init_io(png_ptr, file);
+        png_set_sig_bytes(png_ptr, 8);
+        png_read_info(png_ptr, info_ptr);
+
         //===========================================================================================================================================================================================================
-        // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d 
+        // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d
         //===========================================================================================================================================================================================================
         if (0 == i)
         {
-            png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);                                 
+            png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);
             if ((bit_depth != 8) || ((PNG_COLOR_TYPE_RGB != color_type) && (PNG_COLOR_TYPE_RGB_ALPHA != color_type)))
             {
                 png_destroy_read_struct(&png_ptr, &info_ptr, 0);
@@ -386,7 +386,7 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
                 debug_msg("Invalid bit depth (%d) or color type (%d).", bit_depth, color_type);
                 return 0;
             }
-            png_read_update_info(png_ptr, info_ptr);                                                                            
+            png_read_update_info(png_ptr, info_ptr);
 
             if (PNG_COLOR_TYPE_RGB == color_type)
             {
@@ -399,10 +399,10 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
                 format = GL_RGBA;
             }
 
-            rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;                                              
-            image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));                     
-            row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));                                       
-        
+            rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;
+            image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));
+            row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));
+
             if ((0 == image_data) || (0 == row_pointers))
             {
                 free(image_data);
@@ -419,17 +419,17 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
             int m = (width > height) ? width : height;
             while (m)
             {
-                m >>= 1; 
-                ++l; 
+                m >>= 1;
+                ++l;
             }
             glTexStorage3D(GL_TEXTURE_2D_ARRAY, l, internal_format, width, height, layers);
         }
         else
         {
-            int bit_depth0, color_type0;                                                                                            
+            int bit_depth0, color_type0;
             png_uint_32 width0, height0;
             png_get_IHDR(png_ptr, info_ptr, &width0, &height0, &bit_depth0, &color_type0, 0, 0, 0);
-            png_read_update_info(png_ptr, info_ptr);                                                                            
+            png_read_update_info(png_ptr, info_ptr);
 
             if ((bit_depth0 != bit_depth) || (color_type0 != color_type) || (width0 != width) || (height0 != height))
             {
@@ -447,8 +447,8 @@ GLuint texture2d_array(const char* file_name_pattern, int layers)
         //===========================================================================================================================================================================================================
         // read the image data and fill the corresponding cubemap face
         //===========================================================================================================================================================================================================
-        png_read_image(png_ptr, row_pointers);                                                                              
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, format, GL_UNSIGNED_BYTE, image_data); 
+        png_read_image(png_ptr, row_pointers);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, format, GL_UNSIGNED_BYTE, image_data);
 
         fclose(file);
 
@@ -476,7 +476,7 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     png_byte header[8];
     FILE * file = fopen(file_name, "rb");
     if ((0 == file) || (8 != fread(header, 1, 8, file)) || png_sig_cmp(header, 0, 8))
-    { 
+    {
         fclose(file);
         debug_msg("Failed to open %s or invalid png format.", file_name);
         return 0;
@@ -487,19 +487,19 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     //===============================================================================================================================================================================================================
     png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     png_infop info_ptr = png_create_info_struct(png_ptr);
-    if (setjmp(png_jmpbuf(png_ptr))) 
+    if (setjmp(png_jmpbuf(png_ptr)))
     {
         png_destroy_read_struct(&png_ptr, &info_ptr, 0);
         debug_msg("Error from libpng.");
         return 0;
     }
 
-    png_init_io(png_ptr, file);                                                                                         
-    png_set_sig_bytes(png_ptr, 8);                                                                                      
-    png_read_info(png_ptr, info_ptr);                                                                                   
-    int bit_depth, color_type;                                                                                          
+    png_init_io(png_ptr, file);
+    png_set_sig_bytes(png_ptr, 8);
+    png_read_info(png_ptr, info_ptr);
+    int bit_depth, color_type;
     png_uint_32 width, height;
-    png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);                                 
+    png_get_IHDR(png_ptr, info_ptr, &width, &height, &bit_depth, &color_type, 0, 0, 0);
 
     if ((color_type == PNG_COLOR_TYPE_PALETTE) || ((color_type == PNG_COLOR_TYPE_GRAY) && (bit_depth < 8)) || png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
         png_set_expand(png_ptr);
@@ -513,38 +513,38 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     {
         case PNG_COLOR_TYPE_GRAY: debug_msg("Image color type : PNG_COLOR_TYPE_GRAY");
             format = GL_RED;
-            internal_format = float_texture ? GL_R32F : GL_RED;             
-            if (channels) 
-                *channels = 1; 
+            internal_format = float_texture ? GL_R32F : GL_RED;
+            if (channels)
+                *channels = 1;
             break;
         case PNG_COLOR_TYPE_GRAY_ALPHA : debug_msg("Image color type : PNG_COLOR_TYPE_GRAY_ALPHA");
             format = GL_RG;
-            internal_format = float_texture ? GL_RG32F : GL_RG;             
-            if (channels) 
-                *channels = 2; 
+            internal_format = float_texture ? GL_RG32F : GL_RG;
+            if (channels)
+                *channels = 2;
             break;
         case PNG_COLOR_TYPE_RGB_ALPHA : debug_msg("Image color type : PNG_COLOR_TYPE_RGB_ALPHA");
             format = GL_RGBA;
             internal_format = float_texture ? GL_RGBA32F : GL_RGBA;
-            if (channels) 
-                *channels = 4; 
+            if (channels)
+                *channels = 4;
             break;
         default : // we have either an RGB image or a paletted image, that was converted to RGB
             debug_msg("Image color type : %s", (color_type == PNG_COLOR_TYPE_RGB ? "PNG_COLOR_TYPE_RGB" : "PNG_COLOR_TYPE_PALETTE"));
             format = GL_RGB;
             internal_format = float_texture ? GL_RGB32F : GL_RGB;
-            if (channels) 
-                *channels = 3; 
+            if (channels)
+                *channels = 3;
     }
 
-    png_read_update_info(png_ptr, info_ptr);                                                                            
+    png_read_update_info(png_ptr, info_ptr);
 
     //===============================================================================================================================================================================================================
-    // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d 
+    // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d
     //===============================================================================================================================================================================================================
-    int rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;                                              
-    png_byte * image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));                      
-    png_byte ** row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));                                       
+    int rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;
+    png_byte * image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));
+    png_byte ** row_pointers = (png_byte **) malloc(height * sizeof(png_byte *));
 
     if ((0 == image_data) || (0 == row_pointers))
     {
@@ -555,13 +555,13 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
         debug_msg("Error: could not allocate memory for PNG image data or row pointers\n");
         return 0;
     }
-    
-    for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;                 
+
+    for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;
 
     //===============================================================================================================================================================================================================
     // finally, read the image data, create a texture and supply it with the data
     //===============================================================================================================================================================================================================
-    png_read_image(png_ptr, row_pointers);                                                                              
+    png_read_image(png_ptr, row_pointers);
 
     GLuint texture_id;
     glGenTextures(1, &texture_id);
@@ -571,7 +571,7 @@ GLuint texture2d(const char* file_name, int* channels, GLint mag_filter, GLint m
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter); 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
     if (min_filter == GL_LINEAR_MIPMAP_LINEAR) glGenerateMipmap(GL_TEXTURE_2D);
 
     //===============================================================================================================================================================================================================
@@ -598,7 +598,7 @@ GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GL
     png_byte header[8];
     FILE * file = fopen(file_name, "rb");
     if ((0 == file) || (8 != fread(header, 1, 8, file)) || png_sig_cmp(header, 0, 8))
-    { 
+    {
         fclose(file);
         debug_msg("Failed to open %s or invalid png format.", file_name);
         return 0;
@@ -609,7 +609,7 @@ GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GL
     //===============================================================================================================================================================================================================
     png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     png_infop info_ptr = png_create_info_struct(png_ptr);
-    if (setjmp(png_jmpbuf(png_ptr))) 
+    if (setjmp(png_jmpbuf(png_ptr)))
     {
         png_destroy_read_struct(&png_ptr, &info_ptr, 0);
         debug_msg("Error from libpng.");
@@ -636,13 +636,13 @@ GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GL
 
     format = GL_RGBA;
     internal_format = float_texture ? GL_RGBA32F : GL_RGBA;
-    if (channels) 
+    if (channels)
         *channels = 3;
 
     png_read_update_info(png_ptr, info_ptr);
 
     //===============================================================================================================================================================================================================
-    // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d 
+    // calculate the space needed and allocate it, row size in bytes should be aligned to the next 4-byte boundary as required (by default) by glTexImage2d
     //===============================================================================================================================================================================================================
     int rowbytes = (png_get_rowbytes(png_ptr, info_ptr) + 3) & 0xFFFFFFFC;
     png_byte * image_data = (png_byte *) malloc(rowbytes * height * sizeof(png_byte));
@@ -657,7 +657,7 @@ GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GL
         debug_msg("Error: could not allocate memory for PNG image data or row pointers\n");
         return 0;
     }
-    
+
     for (unsigned int i = 0; i < height; i++) row_pointers[height - 1 - i] = image_data + i * rowbytes;
 
     //===============================================================================================================================================================================================================
@@ -683,7 +683,7 @@ GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GL
             luma_image_data[idx++] = r | (g << 8) | (b << 16) | (l << 24);
         }
 
-    
+
     GLuint texture_id;
     glGenTextures(1, &texture_id);
     glBindTexture(GL_TEXTURE_2D, texture_id);
@@ -692,8 +692,8 @@ GLuint texture2d_luma(const char* file_name, int* channels, GLint mag_filter, GL
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter); 
-    if (min_filter == GL_LINEAR_MIPMAP_LINEAR) 
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+    if (min_filter == GL_LINEAR_MIPMAP_LINEAR)
         glGenerateMipmap(GL_TEXTURE_2D);
 
     //===============================================================================================================================================================================================================
@@ -733,8 +733,8 @@ bool write(const char * file_name, int width, int height, unsigned char* pixelbu
 
     png_set_IHDR (png_ptr, info_ptr, width, height, 8, color_type, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
     png_bytepp row_pointers = (png_bytepp) malloc (height * sizeof (png_bytep));
-    
-    int pixel_size = (color_type == PNG_COLOR_TYPE_GRAY) ? 1 : 
+
+    int pixel_size = (color_type == PNG_COLOR_TYPE_GRAY) ? 1 :
                      (color_type == PNG_COLOR_TYPE_GRAY_ALPHA) ? 2 :
                      (color_type == PNG_COLOR_TYPE_RGB) ? 3 : 4;
 
@@ -752,4 +752,3 @@ bool write(const char * file_name, int width, int height, unsigned char* pixelbu
 
 } // namespace png
 } // namespace texture
-    

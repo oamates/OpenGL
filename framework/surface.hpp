@@ -14,7 +14,7 @@ struct surface_t
     vao_t vao;
 
      surface_t() {};
-    ~surface_t() {} 
+    ~surface_t() {}
 
     //===================================================================================================================================================================================================================
     // Construct 2d surface (function graph) mesh given a full generating function --- which generates the whole vertex_pft/vertex_pnt structure

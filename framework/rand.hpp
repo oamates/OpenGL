@@ -24,26 +24,26 @@ struct generator_t
     {
         static const uint64_t C1 = 0xFF51AFD7ED558CCDULL;
         static const uint64_t C2 = 0xC4CEB9FE1A85EC53ULL;
-        
+
         x += y;
         y += x;
-        
+
         uint64_t seed_x = 0x9368E53C2F6AF274ULL ^ x;
         uint64_t seed_y = 0x586DCD208F7CD3FDULL ^ y;
-        
+
         seed_x *= C1;
         seed_x ^= seed_x >> 33;
         seed_x *= C2;
         seed_x ^= seed_x >> 33;
-        
+
         seed_y *= C1;
         seed_y ^= seed_y >> 33;
         seed_y *= C2;
         seed_y ^= seed_y >> 33;
-        
+
         seq_x = seed_x;
         seq_y = seed_y;
-        
+
         seq_x = (uint64_t)0xFFFD21A7 * (uint32_t)seq_x + (uint32_t)(seq_x >> 32);
         seq_y = (uint64_t)0xFFFD1361 * (uint32_t)seq_y + (uint32_t)(seq_y >> 32);
     }
@@ -107,7 +107,7 @@ struct generator_t
     glm::dvec2 normal_rand2d()
     {
         glm::dvec2 v;
-        double r = ball_rand2d(v);                           // Apply radial transform to get normal 2d distribution 
+        double r = ball_rand2d(v);                           // Apply radial transform to get normal 2d distribution
                                                                     // x, y components are normally distributed
         double f = sqrt(-2 * log(r) / r);
         return f * v;
@@ -120,7 +120,7 @@ struct generator_t
     {
         glm::dvec2 v;
         double inv_r = 1.0 / ball_rand2d(v);
-        return inv_r * v; 
+        return inv_r * v;
     }
 
     //===================================================================================================================================================================================================================

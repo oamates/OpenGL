@@ -8,32 +8,32 @@ namespace utils {
 char* file_read(const char* file_name)
 {
     FILE* input = fopen(file_name, "rb");
-    if (!input) 
+    if (!input)
     {
         debug_msg("File %s failed to open.", file_name);
         return 0;
     };
-    if (fseek(input, 0, SEEK_END) == -1) 
+    if (fseek(input, 0, SEEK_END) == -1)
     {
         debug_msg("End of the file %s not found.", file_name);
         return 0;
     };
     long int size = ftell(input);
-    if (size == -1) 
+    if (size == -1)
     {
         debug_msg("File %s is empty.", file_name);
         return 0;
     };
 
-    if (fseek(input, 0, SEEK_SET) == -1) 
+    if (fseek(input, 0, SEEK_SET) == -1)
     {
         debug_msg("File %s reading error.", file_name);
         return 0;
     };
-    
+
     char* content = (char*) malloc ((size_t) size + 2);
     fread(content, 1, (size_t)size, input);
-    if (ferror(input)) 
+    if (ferror(input))
     {
         debug_msg("File %s reading error.", file_name);
         free(content);
@@ -46,7 +46,7 @@ char* file_read(const char* file_name)
 }
 
 #define GLEW_STATIC
-#include <GL/glew.h> 
+#include <GL/glew.h>
 
 void printErrorsGL(const char *func, int line)
 {
@@ -56,7 +56,7 @@ void printErrorsGL(const char *func, int line)
         printf("%s:%i :\n",func,line);
         switch(glErr)
         {
-        
+
             case GL_INVALID_ENUM: debug_msg("glError: GL_INVALID_OPERATION \n"); break;
             case GL_INVALID_VALUE: printf("glError: GL_INVALID_VALUE\n"); break;
             case GL_INVALID_OPERATION: printf("glError: Invalid operation \n"); break;
@@ -143,7 +143,7 @@ uint64_t ns()
     QueryPerformanceCounter(&now);
     return (uint64_t) ((1e9 * now.QuadPart)  / win_frequency.QuadPart);
 #endif
-} 
+}
 
 } // namespace timer
 

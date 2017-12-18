@@ -13,7 +13,7 @@
 // real_t should be either float or double
 //========================================================================================================================================================================================================================
 
-template<typename real_t> 
+template<typename real_t>
 glm::dquat diagonalizer(const glm::tmat3x3<real_t>& A)
 {
     glm::dquat q(1.0, 0.0, 0.0, 0.0);
@@ -24,8 +24,8 @@ glm::dquat diagonalizer(const glm::tmat3x3<real_t>& A)
         glm::dmat3 Q = mat3_cast(q);
         glm::dmat3 D = Q * M * glm::transpose(Q);                                       // A = tr(Q) * D * Q
 
-        double abs0 = glm::abs(D[1][2]), 
-               abs1 = glm::abs(D[2][0]), 
+        double abs0 = glm::abs(D[1][2]),
+               abs1 = glm::abs(D[2][0]),
                abs2 = glm::abs(D[0][1]);                                                // magnitudes of non-diagonal elements
 
         double theta;
@@ -54,21 +54,21 @@ glm::dquat diagonalizer(const glm::tmat3x3<real_t>& A)
         if (theta > 0.0)
         {
             double t =  1.0 / ( theta + glm::sqrt(theta * theta + 1.0));                // sign(t) / (abs(t) + sqrt(t * t + 1))
-            double c = glm::inversesqrt(t * t + 1.0);                                   // c = 1 / (t * t + 1), t = s / c 
+            double c = glm::inversesqrt(t * t + 1.0);                                   // c = 1 / (t * t + 1), t = s / c
             jacobi[k] = -glm::sqrt(0.5 - 0.5 * c);                                      // using identity sin(alpha / 2) = sqrt((1 - cos(a)) / 2)
         }
         else
         {
             double t = -1.0 / (-theta + glm::sqrt(theta * theta + 1.0)) ;               // sign(t) / (abs(t) + sqrt(t * t + 1))
-            double c = glm::inversesqrt(t * t + 1.0);                                   // c = 1 / (t * t + 1), t = s / c 
+            double c = glm::inversesqrt(t * t + 1.0);                                   // c = 1 / (t * t + 1), t = s / c
             jacobi[k] =  glm::sqrt(0.5 - 0.5 * c);                                      // using identity sin(alpha / 2) = sqrt((1 - cos(a)) / 2)
         }
 
         jacobi.w = glm::sqrt(1.0 - jacobi[k] * jacobi[k]);
         if (jacobi.w == 1.0) break;                                                     // ... reached machine precision
-        q = jacobi * q;  
+        q = jacobi * q;
         q = glm::normalize(q);
-    } 
+    }
     return q;
 }
 
@@ -79,7 +79,7 @@ namespace momenta
 // Calculates 1st and second order momenta of a point cloud
 //========================================================================================================================================================================================================================
 
-template<typename vertex_t> 
+template<typename vertex_t>
 void calculate(const vertex_t* vertices, int N, glm::dvec3& mass_center, glm::dmat3& covariance_matrix)
 {
     mass_center = glm::dvec3(0.0);
@@ -90,7 +90,7 @@ void calculate(const vertex_t* vertices, int N, glm::dvec3& mass_center, glm::dm
     {
         glm::dvec3 position = glm::dvec3(vertices[i].position);
         mass_center += position;
-        
+
         sxx += position.x * position.x;
         sxy += position.x * position.y;
         sxz += position.x * position.z;
@@ -100,7 +100,7 @@ void calculate(const vertex_t* vertices, int N, glm::dvec3& mass_center, glm::dm
     }
 
     double inv_n = 1.0 / N;
-    
+
     mass_center *= inv_n;
 
     double mxx = inv_n * sxx - mass_center.x * mass_center.x;
@@ -109,14 +109,14 @@ void calculate(const vertex_t* vertices, int N, glm::dvec3& mass_center, glm::dm
     double myy = inv_n * syy - mass_center.y * mass_center.y;
     double myz = inv_n * syz - mass_center.y * mass_center.z;
     double mzz = inv_n * szz - mass_center.z * mass_center.z;
-    
+
     covariance_matrix = glm::dmat3(mxx, mxy, mxz,
                                    mxy, myy, myz,
                                    mxz, myz, mzz);
 
 }
 
-template<> 
+template<>
 void calculate<glm::dvec3>(const glm::dvec3* vertices, int N, glm::dvec3& mass_center, glm::dmat3& covariance_matrix)
 {
     mass_center = glm::dvec3(0.0);
@@ -127,7 +127,7 @@ void calculate<glm::dvec3>(const glm::dvec3* vertices, int N, glm::dvec3& mass_c
     {
         glm::dvec3 position = vertices[i];
         mass_center += position;
-        
+
         sxx += position.x * position.x;
         sxy += position.x * position.y;
         sxz += position.x * position.z;
@@ -137,7 +137,7 @@ void calculate<glm::dvec3>(const glm::dvec3* vertices, int N, glm::dvec3& mass_c
     }
 
     double inv_n = 1.0 / N;
-    
+
     mass_center *= inv_n;
 
     double mxx = inv_n * sxx - mass_center.x * mass_center.x;
@@ -146,21 +146,21 @@ void calculate<glm::dvec3>(const glm::dvec3* vertices, int N, glm::dvec3& mass_c
     double myy = inv_n * syy - mass_center.y * mass_center.y;
     double myz = inv_n * syz - mass_center.y * mass_center.z;
     double mzz = inv_n * szz - mass_center.z * mass_center.z;
-    
+
     covariance_matrix = glm::dmat3(mxx, mxy, mxz,
                                    mxy, myy, myz,
                                    mxz, myz, mzz);
 
 }
 
-template<typename vertex_t> 
+template<typename vertex_t>
 void calculate(const std::vector<vertex_t>& points, glm::dvec3& mass_center, glm::dmat3& covariance_matrix)
 {
     calculate(points.data(), static_cast<int>(points.size()), mass_center, covariance_matrix);
 }
 
 //========================================================================================================================================================================================================================
-// Function that normalizes the point cloud to have center of mass at origin and principal momenta axes  
+// Function that normalizes the point cloud to have center of mass at origin and principal momenta axes
 //========================================================================================================================================================================================================================
 
 template<typename real_t>
@@ -170,18 +170,18 @@ void axis_align(glm::tvec3<real_t>* points, int N)
     glm::dmat3 covariance_matrix;
 
     calculate(points, N, mass_center, covariance_matrix);
-    
+
     glm::dquat q = diagonalizer(covariance_matrix);
     glm::dmat3 Q = mat3_cast(q);
-    
+
     for (int i = 0; i < N; ++i)
     {
-        glm::dvec3& point = points[i];        
+        glm::dvec3& point = points[i];
         points[i] = glm::tvec3<real_t>(Q * (point - mass_center));
     }
 }
 
-template<typename real_t> 
+template<typename real_t>
 void axis_align(std::vector<glm::tvec3<real_t>>& points)
 {
     axis_align(points.data(), static_cast<int>(points.size()));

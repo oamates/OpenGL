@@ -9,14 +9,14 @@
 
 struct bin_packer_t
 {
-    // rects : array containing dimensions each input rect in sequence, i.e. [w0][h0][w1][h1][w2][h2]... 
+    // rects : array containing dimensions each input rect in sequence, i.e. [w0][h0][w1][h1][w2][h2]...
     // The IDs for the rects are derived from the order in which they appear in the array.
-    
+
     // packs : After packing, the outer array contains the packs (therefore the number of packs is packs.size()). Each inner array contains a
     // sequence of sets of 4 ints. Each set represents a rectangle in the pack. The elements in the set are 1) the rect ID, 2) the x position
-    // of the rect with respect to the pack, 3) the y position of the rect with respect to the pack, and 4) whether the rect was rotated (1) or not (0). 
+    // of the rect with respect to the pack, 3) the y position of the rect with respect to the pack, and 4) whether the rect was rotated (1) or not (0).
     // The widths and heights of the rects are not included, as it's assumed they are stored on the caller's side (they were after all the input to the function).
-    
+
     // allowRotation : when true (the default value), the packer is allowed the option of rotating the rects in the process of trying to fit them
     // into the current working area.
 
@@ -40,10 +40,10 @@ struct bin_packer_t
             children[0] = -1;
             children[1] = -1;
         }
-        
-        int area() const 
+
+        int area() const
             { return w * h; }
-        
+
         bool operator < (const rect_t& rect) const
             { return area() < rect.area(); }
 
@@ -63,7 +63,7 @@ struct bin_packer_t
         { return rect1.w <= rect2.w && rect1.h <= rect2.h; }
 
     void AddPackToArray(int pack, std::vector<int>& array) const;
-    
+
 };
 
 #endif // _binpacker_included_079681724572468292136864860873127746970731463113417

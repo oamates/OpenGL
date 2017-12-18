@@ -48,78 +48,78 @@ template<typename T> void quick_sort(T* arr, const int length)
 {
     const unsigned int STACK_SIZE = 32;                                                         // variables to emulate stack of sorting requests
 
-    struct                                                                                                                                                                                                                
-    {                                                                                                                                                                                                                     
-        T* l;                                                                                   // left index of the sub-array that needs to be sorted                                                                    
-        T* r;                                                                                   // right index of the sub-array to sort                                                                                   
-    } _stack[STACK_SIZE];                                                                                                                                                                                                 
-                                                                                                                                                                                                                          
-    int sp = 0;                                                                                 // stack pointer, stack grows up not down                                                                                 
-    _stack[sp].l = arr;                                                                                                                                                                                                 
-    _stack[sp].r = arr + length - 1;                                                                                                                                                                                         
-                                                                                                                                                                                                                          
-    do                                                                                                                                                                                                                    
-    {                                                                                                                                                                                                                     
+    struct
+    {
+        T* l;                                                                                   // left index of the sub-array that needs to be sorted
+        T* r;                                                                                   // right index of the sub-array to sort
+    } _stack[STACK_SIZE];
+
+    int sp = 0;                                                                                 // stack pointer, stack grows up not down
+    _stack[sp].l = arr;
+    _stack[sp].r = arr + length - 1;
+
+    do
+    {
         //================================================================================================================================================================================================================
         // take the next subarray
         //================================================================================================================================================================================================================
-        T* l = _stack[sp].l;                                                                                                                                                                                
-        T* r = _stack[sp].r;                                                                                                                                                                                
-        --sp;                                                                                                                                                                                                             
-        do                                                                                                                                                                                                                
-        {                                                                                                                                                                                                                 
+        T* l = _stack[sp].l;
+        T* r = _stack[sp].r;
+        --sp;
+        do
+        {
             //============================================================================================================================================================================================================
             // split it into 2 parts with elements less than m, and elements greater than m
             //============================================================================================================================================================================================================
-            T* i = l;                                                                                                                                                                                       
-            T* j = r;                                                                                                                                                                                       
-            T* m = i + (j - i) / 2;                                                                                                                                                                         
-            do                                                                                                                                                                                                            
-            {                                                                                                                                                                                                             
+            T* i = l;
+            T* j = r;
+            T* m = i + (j - i) / 2;
+            do
+            {
                 while (*i < *m) i++;
                 while (*j > *m) j--;
-                                                                                                                                                                                                                          
-                if (i <= j)                                                                                                                                                                                               
-                {                                                                                                                                                                                                         
-                    std::swap(*i, *j);                                                                                                                                                                                
-                    i++;                                                                                                                                                                                                  
-                    j--;                                                                                                                                                                                                  
-                }                                                                                                                                                                                                         
-            }                                                                                                                                                                                                             
-            while (i <= j);                                                                                                                                                                                               
+
+                if (i <= j)
+                {
+                    std::swap(*i, *j);
+                    i++;
+                    j--;
+                }
+            }
+            while (i <= j);
 
             //============================================================================================================================================================================================================
             // push the larger interval to stack and continue sorting the smaller one
             // this way we will never need more than log2(length) stack entries
             //============================================================================================================================================================================================================
-            if (j - l < r - i)                                                                  
-            {                                                                                                                                                                                                             
-                if (i < r)                                                                                                                                                                                                
-                {                                                                                                                                                                                                         
-                    ++sp;                                                                                                                                                                                                 
-                    _stack[sp].l = i;                                                                                                                                                                                     
-                    _stack[sp].r = r;                                                                                                                                                                                     
-                }                                                                                                                                                                                                         
-                r = j;                                                                                                                                                                                                    
-            }                                                                                                                                                                                                             
-            else                                                                                                                                                                                                          
-            {                                                                                                                                                                                                             
-                if (l < j)                                                                                                                                                                                                
-                {                                                                                                                                                                                                         
-                    ++sp;                                                                                                                                                                                                 
-                    _stack[sp].l = l;                                                                                                                                                                                     
-                    _stack[sp].r = j;                                                                                                                                                                                     
-                }                                                                                                                                                                                                         
-                l = i;                                                                                                                                                                                                    
-            }                                                                                                                                                                                                             
-        }                                                                                                                                                                                                                 
-        while(l < r);                                                                                                                                                                                                     
+            if (j - l < r - i)
+            {
+                if (i < r)
+                {
+                    ++sp;
+                    _stack[sp].l = i;
+                    _stack[sp].r = r;
+                }
+                r = j;
+            }
+            else
+            {
+                if (l < j)
+                {
+                    ++sp;
+                    _stack[sp].l = l;
+                    _stack[sp].r = j;
+                }
+                l = i;
+            }
+        }
+        while(l < r);
 
         //================================================================================================================================================================================================================
         // check if anything in the stack is there to be sorted
         //================================================================================================================================================================================================================
-    }                                                                                                                                                                                                                     
-    while (sp >= 0);                                                                                                                                                                                                      
+    }
+    while (sp >= 0);
 }
 
 #endif // _sort_included_89463518764305861580768371659037837620358761203857618203

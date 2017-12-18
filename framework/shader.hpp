@@ -1,4 +1,4 @@
-#ifndef _shader_included_245196303876410928396854735684527895739527664352362354 
+#ifndef _shader_included_245196303876410928396854735684527895739527664352362354
 #define _shader_included_245196303876410928396854735684527895739527664352362354
 
 #define GLEW_STATIC
@@ -28,7 +28,7 @@ struct glsl_shader_t
     ~glsl_shader_t();
 
     static GLint compile_from_string(GLenum shader_type, const char* source_code);
-};   
+};
 
 //=======================================================================================================================================================================================================================
 // GLSL program structure
@@ -68,7 +68,7 @@ struct glsl_program_t
     void link(const glsl_shader_t& vs, const glsl_shader_t& tcs, const glsl_shader_t& tes, const glsl_shader_t& fs);
     void link(const glsl_shader_t& vs, const glsl_shader_t& tcs, const glsl_shader_t& tes, const glsl_shader_t& gs, const glsl_shader_t& fs);
 
-    ~glsl_program_t(); 
+    ~glsl_program_t();
 
     uniform_t operator[] (const char* name) const;
     GLint uniform_id(const char * name) const;
@@ -79,7 +79,7 @@ struct glsl_program_t
 
     void enable();
     void disable();
-    
+
     GLint get_param(GLint param_name);
     void dump_param(GLint param_name, const char* description);
     void dump_info();

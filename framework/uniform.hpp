@@ -21,8 +21,8 @@ struct uniform_t
     uniform_t() {};
     uniform_t(const glsl_program_t* program, const char* name);
     ~uniform_t() {}
-    
-    operator GLint() const 
+
+    operator GLint() const
         { return location; }
 
     static void subroutine(GLenum shadertype, const GLuint* indices)
@@ -34,7 +34,7 @@ struct uniform_t
     // integral vectors
     //===================================================================================================================================================================================================================
     void operator = (const GLint arg)
-        { glUniform1i(location, arg); }    
+        { glUniform1i(location, arg); }
     void operator = (const glm::ivec2& arg)
         { glUniform2iv(location, 1, glm::value_ptr(arg)); }
     void operator = (const glm::ivec3& arg)
@@ -45,13 +45,13 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // arrays of integral vectors
     //===================================================================================================================================================================================================================
-    template <size_t S> void operator = (const GLint (&arg) [S]) 
+    template <size_t S> void operator = (const GLint (&arg) [S])
         { glUniform1iv(location, S, &arg); }
-    template <size_t S> void operator = (const glm::ivec2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::ivec2 (&arg) [S])
         { glUniform2iv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::ivec3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::ivec3 (&arg) [S])
         { glUniform3iv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::ivec4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::ivec4 (&arg) [S])
         { glUniform4iv(location, S, glm::value_ptr(arg[0])); }
 
 
@@ -72,13 +72,13 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // arrays of unsigned integral vectors
     //===================================================================================================================================================================================================================
-    template <size_t S> void operator = (const GLuint (&arg) [S]) 
+    template <size_t S> void operator = (const GLuint (&arg) [S])
         { glUniform1uiv(location, S, &arg); }
-    template <size_t S> void operator = (const glm::uvec2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::uvec2 (&arg) [S])
         { glUniform2uiv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::uvec3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::uvec3 (&arg) [S])
         { glUniform3uiv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::uvec4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::uvec4 (&arg) [S])
         { glUniform4uiv(location, S, glm::value_ptr(arg[0])); }
 
 
@@ -99,13 +99,13 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // arrays of floating point single-precision vectors
     //===================================================================================================================================================================================================================
-    template <size_t S> void operator = (const float (&arg) [S]) 
+    template <size_t S> void operator = (const float (&arg) [S])
         { glUniform1fv(location, S, (const GLfloat*) &arg); }
-    template <size_t S> void operator = (const glm::vec2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::vec2 (&arg) [S])
         { glUniform2fv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::vec3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::vec3 (&arg) [S])
         { glUniform3fv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::vec4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::vec4 (&arg) [S])
         { glUniform4fv(location, S, glm::value_ptr(arg[0])); }
 
 
@@ -126,13 +126,13 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // arrays of floating point double-precision vectors
     //===================================================================================================================================================================================================================
-    template <size_t S> void operator = (const double (&arg) [S]) 
+    template <size_t S> void operator = (const double (&arg) [S])
         { glUniform1dv(location, S, &arg); }
-    template <size_t S> void operator = (const glm::dvec2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dvec2 (&arg) [S])
         { glUniform2dv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dvec3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dvec3 (&arg) [S])
         { glUniform3dv(location, S, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dvec4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dvec4 (&arg) [S])
         { glUniform4dv(location, S, glm::value_ptr(arg[0])); }
 
 
@@ -165,25 +165,25 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // arrays of floating point single-precision matrices
     //===================================================================================================================================================================================================================
-    template <size_t S> void operator = (const glm::mat2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat2 (&arg) [S])
         { glUniformMatrix2fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::mat2x3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat2x3 (&arg) [S])
         { glUniformMatrix2x3fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::mat2x4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat2x4 (&arg) [S])
         { glUniformMatrix2x4fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
 
-    template <size_t S> void operator = (const glm::mat3x2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat3x2 (&arg) [S])
         { glUniformMatrix3x2fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::mat3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat3 (&arg) [S])
         { glUniformMatrix3fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::mat3x4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat3x4 (&arg) [S])
         { glUniformMatrix3x4fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
 
-    template <size_t S> void operator = (const glm::mat4x2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat4x2 (&arg) [S])
         { glUniformMatrix4x2fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::mat4x3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat4x3 (&arg) [S])
         { glUniformMatrix4x3fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::mat4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::mat4 (&arg) [S])
         { glUniformMatrix4fv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
 
     //===================================================================================================================================================================================================================
@@ -213,25 +213,25 @@ struct uniform_t
     //===================================================================================================================================================================================================================
     // arrays of floating point double-precision matrices
     //===================================================================================================================================================================================================================
-    template <size_t S> void operator = (const glm::dmat2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat2 (&arg) [S])
         { glUniformMatrix2dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dmat2x3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat2x3 (&arg) [S])
         { glUniformMatrix2x3dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dmat2x4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat2x4 (&arg) [S])
         { glUniformMatrix2x4dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
 
-    template <size_t S> void operator = (const glm::dmat3x2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat3x2 (&arg) [S])
         { glUniformMatrix3x2dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dmat3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat3 (&arg) [S])
         { glUniformMatrix3dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dmat3x4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat3x4 (&arg) [S])
         { glUniformMatrix3x4dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
 
-    template <size_t S> void operator = (const glm::dmat4x2 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat4x2 (&arg) [S])
         { glUniformMatrix4x2dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dmat4x3 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat4x3 (&arg) [S])
         { glUniformMatrix4x3dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
-    template <size_t S> void operator = (const glm::dmat4 (&arg) [S]) 
+    template <size_t S> void operator = (const glm::dmat4 (&arg) [S])
         { glUniformMatrix4dv(location, S, GL_FALSE, glm::value_ptr(arg[0])); }
 
 };

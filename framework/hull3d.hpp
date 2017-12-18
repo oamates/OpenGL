@@ -30,7 +30,7 @@ struct Snork
     int a, b;
 };
 
-inline bool operator < (const glm::dvec3& lhs, const glm::dvec3& rhs) 
+inline bool operator < (const glm::dvec3& lhs, const glm::dvec3& rhs)
 {
     if (lhs.z < rhs.z) return true;
     if (lhs.z > rhs.z) return false;
@@ -39,10 +39,10 @@ inline bool operator < (const glm::dvec3& lhs, const glm::dvec3& rhs)
     return lhs.x < rhs.x;
 }
 
-inline bool operator < (const Snork& lhs, const Snork& rhs) 
+inline bool operator < (const Snork& lhs, const Snork& rhs)
 {
-    if (lhs.a < rhs.a) return true; 
-    if (lhs.a > rhs.a) return false; 
+    if (lhs.a < rhs.a) return true;
+    if (lhs.a > rhs.a) return false;
     return lhs.b < rhs.b;
 }
 

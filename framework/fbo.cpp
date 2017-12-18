@@ -8,20 +8,20 @@
 
 //=======================================================================================================================================================================================================================
 // fbo_color : FBO with just color attachments of type [target]
-// [target] should be one of the :: GL_TEXTURE_1D, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_1D_ARRAY, GL_TEXTURE_2D_ARRAY, 
-//                                  GL_TEXTURE_RECTANGLE, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_BUFFER, 
+// [target] should be one of the :: GL_TEXTURE_1D, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_1D_ARRAY, GL_TEXTURE_2D_ARRAY,
+//                                  GL_TEXTURE_RECTANGLE, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_BUFFER,
 //                                  GL_TEXTURE_2D_MULTISAMPLE or GL_TEXTURE_2D_MULTISAMPLE_ARRAY.
 // [color_attachments] is the number of the color attachments.
 //=======================================================================================================================================================================================================================
 
-template<GLenum target, unsigned int color_attachments> 
+template<GLenum target, unsigned int color_attachments>
 fbo_color_t<target, color_attachments>::fbo_color_t() : id(0)
 {
-    for(unsigned int attachment = 0; attachment < color_attachments; ++attachment) 
+    for(unsigned int attachment = 0; attachment < color_attachments; ++attachment)
         texture_id[attachment] = 0;
 }
 
-template<GLenum target, unsigned int color_attachments> 
+template<GLenum target, unsigned int color_attachments>
 fbo_color_t<target, color_attachments>::fbo_color_t(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode)
 {
 	debug_msg("Creating color FBO with (%d x %d) attachment. Target :: %u, internal format :: %u", res_x, res_y, target, internal_format);
@@ -31,11 +31,11 @@ fbo_color_t<target, color_attachments>::fbo_color_t(GLsizei res_x, GLsizei res_y
 	glGenFramebuffers(1, &id);
 	glBindFramebuffer(GL_FRAMEBUFFER, id);
 
-    
+
 	glGenTextures(color_attachments, texture_id);
-    
+
     GLenum buffers[color_attachments];
-    for(unsigned int attachment = 0; attachment < color_attachments; ++attachment) 
+    for(unsigned int attachment = 0; attachment < color_attachments; ++attachment)
     {
     	glBindTexture(target, texture_id[attachment]);
 	    glTexStorage2D(target, 1, internal_format, res_x, res_y);
@@ -48,24 +48,24 @@ fbo_color_t<target, color_attachments>::fbo_color_t(GLsizei res_x, GLsizei res_y
         buffers[attachment] = GL_COLOR_ATTACHMENT0 + attachment;
     }
 
-    glDrawBuffers(color_attachments, buffers); 
+    glDrawBuffers(color_attachments, buffers);
     check_status();
 
 	glViewport(0, 0, res_x, res_y);
 	debug_msg("Color FBO created. id = %d.", id);
 }
 
-template<GLenum target, unsigned int color_attachments> 
+template<GLenum target, unsigned int color_attachments>
 void fbo_color_t<target, color_attachments>::reset_textures(GLsizei res_x, GLsizei res_y, GLenum internal_format, GLint wrap_mode)
 {
 	debug_msg("Resetting textures for color FBO %d with (%d x %d) attachment. Target :: %u, internal format :: %u", id, res_x, res_y, target, internal_format);
 
 	fbo_color_t::res_x = res_x;
 	fbo_color_t::res_y = res_y;
-    
+
 	glGenTextures(color_attachments, texture_id);
-    
-    for(unsigned int attachment = 0; attachment < color_attachments; ++attachment) 
+
+    for(unsigned int attachment = 0; attachment < color_attachments; ++attachment)
     {
     	glBindTexture(target, texture_id[attachment]);
 	    glTexStorage2D(target, 1, internal_format, res_x, res_y);
@@ -82,19 +82,19 @@ void fbo_color_t<target, color_attachments>::reset_textures(GLsizei res_x, GLsiz
 	debug_msg("Color FBO reset successful. id = %d.", id);
 }
 
-template<GLenum target, unsigned int color_attachments> 
+template<GLenum target, unsigned int color_attachments>
 void fbo_color_t<target, color_attachments>::bind()
     { glBindFramebuffer(GL_FRAMEBUFFER, id); }
 
-template<GLenum target, unsigned int color_attachments> 
+template<GLenum target, unsigned int color_attachments>
 void fbo_color_t<target, color_attachments>::bind_texture(GLenum texture_unit, GLenum attachment)
 {
 	glActiveTexture(texture_unit);
 	glBindTexture(GL_TEXTURE_2D, texture_id[attachment]);
 }
 
-template<GLenum target, unsigned int color_attachments> 
-fbo_color_t<target, color_attachments>::~fbo_color_t() 
+template<GLenum target, unsigned int color_attachments>
+fbo_color_t<target, color_attachments>::~fbo_color_t()
 {
 	glDeleteTextures(color_attachments, texture_id);
 	glDeleteFramebuffers(1, &id);
@@ -165,7 +165,7 @@ void check_status()
         return;
     }
 
-	const char * msg;	
+	const char * msg;
 	switch (status)
 	{
 		case GL_FRAMEBUFFER_UNDEFINED:                     msg = "GL_FRAMEBUFFER_UNDEFINED."; break;

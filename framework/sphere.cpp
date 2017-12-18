@@ -1,5 +1,5 @@
 #include <thread>
-#include <glm/ext.hpp> 
+#include <glm/ext.hpp>
 
 #include "sphere.hpp"
 #include "log.hpp"
@@ -18,7 +18,7 @@ void sphere_t::fractal_surface(spheric_landscape_func func, int level)
     //===================================================================================================================================================================================================================
     // icosahedron has similar structures defined and can be used instead of cube
     //===================================================================================================================================================================================================================
-    int V = plato::icosahedron::V;                                                                     
+    int V = plato::icosahedron::V;
     int E = plato::cube::E;
     int Q = plato::cube::Q;
     const glm::ivec2* edges = plato::cube::edges;
@@ -27,7 +27,7 @@ void sphere_t::fractal_surface(spheric_landscape_func func, int level)
     const glm::vec3* initial_vertices = plato::cube::vertices;
 
 
-    
+
 }
 */
 
@@ -41,8 +41,8 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
     //===================================================================================================================================================================================================================
     // either icosahedron or cube can be used for initial subdivision of sphere
     //===================================================================================================================================================================================================================
-  #ifndef ICOSAHEDRAL_SUBDIVISION 
-    int V = plato::cube::V;                                                                     
+  #ifndef ICOSAHEDRAL_SUBDIVISION
+    int V = plato::cube::V;
     int E = plato::cube::E;
     int Q = plato::cube::Q;
     const glm::ivec2* edges = plato::cube::edges;
@@ -50,7 +50,7 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
     const glm::ivec4* quads = plato::cube::quads;
     const glm::vec3* initial_vertices = plato::cube::vertices;
   #else
-    int V = plato::icosahedron::V;                                                                     
+    int V = plato::icosahedron::V;
     int E = plato::icosahedron::E;
     int Q = plato::icosahedron::Q;
     const glm::ivec2* edges = plato::icosahedron::edges;
@@ -85,26 +85,26 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
     for (int e = 0; e < E; ++e)
     {
         int A = edges[e].x;
-        int B = edges[e].y; 
+        int B = edges[e].y;
         glm::vec3 direction = vertices[A].uvw;
         glm::vec3 delta = level_inv * (vertices[B].uvw - vertices[A].uvw);
         for(int p = 1; p < level; ++p)
-        {           
+        {
             direction += delta;
             vertices[vbo_index++] = func(direction);
         }
     }
 
     //===================================================================================================================================================================================================================
-    // compute new vertices inside quads : 
+    // compute new vertices inside quads :
     // every quad (ABCD) is split into two triangles by the internal edge AC
     //===================================================================================================================================================================================================================
     for (int q = 0; q < Q; ++q)
     {
-        int A = quads[q].x; 
-        int B = quads[q].y; 
-        int C = quads[q].z; 
-        int D = quads[q].w; 
+        int A = quads[q].x;
+        int B = quads[q].y;
+        int C = quads[q].z;
+        int D = quads[q].w;
 
         glm::vec3 vertex_A = vertices[A].uvw;
         glm::vec3 vertex_B = vertices[B].uvw;
@@ -129,7 +129,7 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
         vbo_index -= vertices_per_quad;
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge AB 
+        // triangle strip near the edge AB
         //===============================================================================================================================================================================================================
         indices[ibo_index++] = (A < D) ? edge_index_DA : edge_index_DA + level - 2;
         indices[ibo_index++] = A;
@@ -138,7 +138,7 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
         {
             indices[ibo_index++] = vbo_index + p - 1;
             indices[ibo_index++] = (A < B) ? edge_index_AB + p - 1: edge_index_AB + level - p - 1;
-        }      
+        }
 
         indices[ibo_index++] = (B < C) ? edge_index_BC : edge_index_BC + level - 2;
         indices[ibo_index++] = B;
@@ -156,15 +156,15 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
             {
                 indices[ibo_index++] = vbo_index + level - 1;
                 indices[ibo_index++] = vbo_index++;
-            }      
+            }
 
             indices[ibo_index++] = (B < C) ? edge_index_BC + p : edge_index_BC + level - 2 - p;
             indices[ibo_index++] = (B < C) ? edge_index_BC + p - 1 : edge_index_BC + level - p - 1;
             indices[ibo_index++] = -1;                                                                      // complete the strip with the primitive restart index
-        }      
+        }
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge CD 
+        // triangle strip near the edge CD
         //===============================================================================================================================================================================================================
         indices[ibo_index++] = D;
         indices[ibo_index++] = (A < D) ? edge_index_DA + level - 2 : edge_index_DA;
@@ -173,7 +173,7 @@ template<typename vertex_t> void sphere_t::generate_vao(typename maps<vertex_t>:
         {
             indices[ibo_index++] = (C < D) ? edge_index_CD + level - p - 1 : edge_index_CD + p - 1;
             indices[ibo_index++] = vbo_index++;
-        }      
+        }
 
         indices[ibo_index++] = C;
         indices[ibo_index++] = (B < C) ? edge_index_BC + level - 2 : edge_index_BC;
@@ -205,7 +205,7 @@ template<typename vertex_t, int threads> void sphere_t::generate_vao_mt(typename
     // icosahedron has similar structures defined and can be used instead of cube
     //===================================================================================================================================================================================================================
   #ifndef ICOSAHEDRAL_SUBDIVISION
-    data.V = plato::cube::V;                                                                        
+    data.V = plato::cube::V;
     data.E = plato::cube::E;
     data.Q = plato::cube::Q;
     data.edges = plato::cube::edges;
@@ -213,14 +213,14 @@ template<typename vertex_t, int threads> void sphere_t::generate_vao_mt(typename
     data.quads = plato::cube::quads;
     const glm::vec3* initial_vertices = plato::cube::vertices;
   #else
-    data.V = plato::icosahedron::V;                                                                        
+    data.V = plato::icosahedron::V;
     data.E = plato::icosahedron::E;
     data.Q = plato::icosahedron::Q;
     data.edges = plato::icosahedron::edges;
     data.edge_indices = plato::icosahedron::edge_indices;
     data.quads = plato::icosahedron::quads;
     const glm::vec3* initial_vertices = plato::icosahedron::vertices;
-  #endif 
+  #endif
 
     //===================================================================================================================================================================================================================
     // compute this elementary combinatorial part here to avoid recalculating the same stuff by all threads
@@ -270,7 +270,7 @@ template<typename vertex_t, int threads> void sphere_t::generate_vao_mt(typename
     // this thread will do the last task and will wait for others to finish
     //===================================================================================================================================================================================================================
     debug_msg("Main thread #%u. Edges to compute : [%u, %u]. Faces to compute : [%u, %u]", threads - 1, edge_start, edge_start + edges_per_thread - 1, quad_start, quad_start + quads_per_thread - 1);
-    fill_vao_chunk<vertex_t>(func, data, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);           
+    fill_vao_chunk<vertex_t>(func, data, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);
 
     for (int thread_id = 0; thread_id < threads - 1; ++thread_id)
     {
@@ -305,7 +305,7 @@ template<typename vertex_t, int threads> void sphere_t::generate_quads_mt(typena
     // icosahedron has similar structures defined and can be used instead of cube
     //===================================================================================================================================================================================================================
   #ifndef ICOSAHEDRAL_SUBDIVISION
-    data.V = plato::cube::V;                                                                        
+    data.V = plato::cube::V;
     data.E = plato::cube::E;
     data.Q = plato::cube::Q;
     data.edges = plato::cube::edges;
@@ -313,14 +313,14 @@ template<typename vertex_t, int threads> void sphere_t::generate_quads_mt(typena
     data.quads = plato::cube::quads;
     const glm::vec3* initial_vertices = plato::cube::vertices;
   #else
-    data.V = plato::icosahedron::V;                                                                        
+    data.V = plato::icosahedron::V;
     data.E = plato::icosahedron::E;
     data.Q = plato::icosahedron::Q;
     data.edges = plato::icosahedron::edges;
     data.edge_indices = plato::icosahedron::edge_indices;
     data.quads = plato::icosahedron::quads;
     const glm::vec3* initial_vertices = plato::icosahedron::vertices;
-  #endif 
+  #endif
 
     //===================================================================================================================================================================================================================
     // compute this elementary combinatorial part here to avoid recalculating the same stuff by all threads
@@ -370,7 +370,7 @@ template<typename vertex_t, int threads> void sphere_t::generate_quads_mt(typena
     // this thread will do the last task and will wait for others to finish
     //===================================================================================================================================================================================================================
     debug_msg("Main thread #%u. Edges to compute : [%u, %u]. Faces to compute : [%u, %u]", threads - 1, edge_start, edge_start + edges_per_thread - 1, quad_start, quad_start + quads_per_thread - 1);
-    fill_quad_chunk<vertex_t>(func, data, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);           
+    fill_quad_chunk<vertex_t>(func, data, edge_start, edge_start + edges_per_thread, quad_start, quad_start + quads_per_thread);
 
     for (int thread_id = 0; thread_id < threads - 1; ++thread_id)
     {
@@ -416,7 +416,7 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
     {
         GLuint A = data.edges[e].x;
         GLuint B = data.edges[e].y;
-    
+
         glm::vec3 direction = data.vertices[A].uvw;
         glm::vec3 delta = (data.vertices[B].uvw - data.vertices[A].uvw) / data.level;
 
@@ -436,10 +436,10 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
 
     for (GLuint q = quad_start; q < quad_end; ++q)
     {
-        GLint A = data.quads[q].x;  
-        GLint B = data.quads[q].y;  
-        GLint C = data.quads[q].z;  
-        GLint D = data.quads[q].w;  
+        GLint A = data.quads[q].x;
+        GLint B = data.quads[q].y;
+        GLint C = data.quads[q].z;
+        GLint D = data.quads[q].w;
 
         glm::vec3 vertexA = data.vertices[A].uvw;
         glm::vec3 vertexB = data.vertices[B].uvw;
@@ -464,7 +464,7 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
         vbo_index -= data.vertices_per_quad;
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge AB 
+        // triangle strip near the edge AB
         //===============================================================================================================================================================================================================
         data.indices[ibo_index++] = (A < D) ? edge_indexDA : edge_indexDA + data.level - 2;
         data.indices[ibo_index++] = A;
@@ -473,7 +473,7 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
         {
             data.indices[ibo_index++] = vbo_index + p - 1;
             data.indices[ibo_index++] = (A < B) ? edge_indexAB + p - 1: edge_indexAB + data.level - p - 1;
-        }      
+        }
 
         data.indices[ibo_index++] = (B < C) ? edge_indexBC : edge_indexBC + data.level - 2;
         data.indices[ibo_index++] = B;
@@ -496,10 +496,10 @@ template<typename vertex_t> void sphere_t::fill_vao_chunk(typename maps<vertex_t
             data.indices[ibo_index++] = (B < C) ? edge_indexBC + p : edge_indexBC + data.level - 2 - p;
             data.indices[ibo_index++] = (B < C) ? edge_indexBC + p - 1 : edge_indexBC + data.level - p - 1;
             data.indices[ibo_index++] = -1;                                                                     // complete the strip with the primitive restart index
-        }      
+        }
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge CD 
+        // triangle strip near the edge CD
         //===============================================================================================================================================================================================================
         data.indices[ibo_index++] = D;
         data.indices[ibo_index++] = (A < D) ? edge_indexDA + data.level - 2 : edge_indexDA;
@@ -530,7 +530,7 @@ template<typename vertex_t> void sphere_t::fill_quad_chunk(typename maps<vertex_
     {
         GLuint A = data.edges[e].x;
         GLuint B = data.edges[e].y;
-    
+
         glm::vec3 direction = data.vertices[A].uvw;
         glm::vec3 delta = (data.vertices[B].uvw - data.vertices[A].uvw) / data.level;
 
@@ -550,10 +550,10 @@ template<typename vertex_t> void sphere_t::fill_quad_chunk(typename maps<vertex_
 
     for (GLuint q = quad_start; q < quad_end; ++q)
     {
-        GLint A = data.quads[q].x;  
-        GLint B = data.quads[q].y;  
-        GLint C = data.quads[q].z;  
-        GLint D = data.quads[q].w;  
+        GLint A = data.quads[q].x;
+        GLint B = data.quads[q].y;
+        GLint C = data.quads[q].z;
+        GLint D = data.quads[q].w;
 
         glm::vec3 vertexA = data.vertices[A].uvw;
         glm::vec3 vertexB = data.vertices[B].uvw;
@@ -578,7 +578,7 @@ template<typename vertex_t> void sphere_t::fill_quad_chunk(typename maps<vertex_
         vbo_index -= data.vertices_per_quad;
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge AB 
+        // triangle strip near the edge AB
         //===============================================================================================================================================================================================================
         data.indices[ibo_index++] = (A < D) ? edge_indexDA : edge_indexDA + data.level - 2;
         data.indices[ibo_index++] = A;
@@ -591,7 +591,7 @@ template<typename vertex_t> void sphere_t::fill_quad_chunk(typename maps<vertex_
             data.indices[ibo_index++] = T;
             data.indices[ibo_index++] = T;
             data.indices[ibo_index++] = S;
-        }      
+        }
 
         data.indices[ibo_index++] = B;
         data.indices[ibo_index++] = (B < C) ? edge_indexBC : edge_indexBC + data.level - 2;
@@ -617,10 +617,10 @@ template<typename vertex_t> void sphere_t::fill_quad_chunk(typename maps<vertex_
 
             data.indices[ibo_index++] = (B < C) ? edge_indexBC + p - 1 : edge_indexBC + data.level - p - 1;
             data.indices[ibo_index++] = (B < C) ? edge_indexBC + p : edge_indexBC + data.level - 2 - p;
-        }      
+        }
 
         //===============================================================================================================================================================================================================
-        // triangle strip near the edge CD 
+        // triangle strip near the edge CD
         //===============================================================================================================================================================================================================
         data.indices[ibo_index++] = D;
         data.indices[ibo_index++] = (A < D) ? edge_indexDA + data.level - 2 : edge_indexDA;
@@ -646,14 +646,14 @@ template void sphere_t::fill_quad_chunk(typename maps<vertex_t3_t>::spheric_func
 //=======================================================================================================================================================================================================================
 // Sphere is iteratively subdivided beginning from one of the regular plato solids, e.g. icosahedron.
 // V,E,F of any triangular subdivision satisfy : V - E + F = 2, 3F = 2E, F = 2V - 4, E = 3V - 6.
-// After n subdivision iterations V(n), E(n), F(n) take values : 
+// After n subdivision iterations V(n), E(n), F(n) take values :
 // Fn = 4^n * F, En = 4^n * E, Vn = 4^n * (V - 2) + 2
 
 //=======================================================================================================================================================================================================================
 /*
 
 void sphere_pnti::generate_landscape_vao(spherical_landscape_func func_l, int level)
-{ 
+{
     GLuint deg4 = 1 << (2 * level);
     GLuint V = deg4 * (plato::icosahedron::V - 2) + 2;
     GLuint E = deg4 * (plato::icosahedron::E);
@@ -697,16 +697,16 @@ void sphere_pnti::generate_landscape_vao(spherical_landscape_func func_l, int le
             uvec2_lex QR = (Q < R) ? uvec2_lex(Q, R) : uvec2_lex(R, Q);
             uvec2_lex RP = (R < P) ? uvec2_lex(R, P) : uvec2_lex(P, R);
 
-            std::map<uvec2_lex, GLuint>::iterator it = center_index.find(PQ); 
+            std::map<uvec2_lex, GLuint>::iterator it = center_index.find(PQ);
             if (it != center_index.end()) S = it->second;
             else
             {
                 S = v++;
                 center_index[PQ] = S;
                 vertices[S] = func(uvs[S] = glm::normalize(uvs[P] + uvs[Q]));
-                
+
             }
-            it = center_index.find(QR); 
+            it = center_index.find(QR);
             if (it != center_index.end()) T = it->second;
             else
             {
@@ -714,9 +714,9 @@ void sphere_pnti::generate_landscape_vao(spherical_landscape_func func_l, int le
                 center_index[QR] = T;
                 vertices[T] = func(uvs[T] = glm::normalize(uvs[Q] + uvs[R]));
 
-                
+
             }
-            it = center_index.find(RP); 
+            it = center_index.find(RP);
             if (it != center_index.end()) U = it->second;
             else
             {

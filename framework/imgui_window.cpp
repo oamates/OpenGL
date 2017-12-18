@@ -1,7 +1,7 @@
 //=======================================================================================================================================================================================================================
 // GLFW + ImGui based application window structure
 //=======================================================================================================================================================================================================================
-#include <thread> 
+#include <thread>
 #include <glm/gtc/type_ptr.hpp>
 
 #include "glfw_window.hpp"
@@ -23,7 +23,7 @@
 namespace glfw {
 
 void imgui_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{   
+{
     (void) mods;
     imgui_window_t* imgui_window = static_cast<imgui_window_t*> (glfwGetWindowUserPointer(window));
 
@@ -34,16 +34,16 @@ void imgui_key_callback(GLFWwindow* window, int key, int scancode, int action, i
     static char hex_digit[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
     static uint8_t* pixel_buffer = 0;
     static std::thread screenshot_thread;
-    static unsigned short shot = 0;    
+    static unsigned short shot = 0;
 
     if ((key == GLFW_KEY_PRINT_SCREEN) && (action == GLFW_RELEASE))
     {
         debug_msg("Saving screenshot #%d: %s.", shot, file_name);
 
-        int res_x = imgui_window->res_x; 
-        int res_y = imgui_window->res_y; 
+        int res_x = imgui_window->res_x;
+        int res_y = imgui_window->res_y;
 
-        if (pixel_buffer) 
+        if (pixel_buffer)
             screenshot_thread.join();
         else
             pixel_buffer = (unsigned char *) malloc (res_x * res_y * 3);
@@ -95,7 +95,7 @@ void imgui_key_callback(GLFWwindow* window, int key, int scancode, int action, i
         io.KeyShift = io.KeysDown[GLFW_KEY_LEFT_SHIFT]   || io.KeysDown[GLFW_KEY_RIGHT_SHIFT];
         io.KeyAlt   = io.KeysDown[GLFW_KEY_LEFT_ALT]     || io.KeysDown[GLFW_KEY_RIGHT_ALT];
         io.KeySuper = io.KeysDown[GLFW_KEY_LEFT_SUPER]   || io.KeysDown[GLFW_KEY_RIGHT_SUPER];
-        return;            
+        return;
     }
     //===================================================================================================================================================================================================================
     // handle key input to application
@@ -181,8 +181,8 @@ void imgui_scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     imgui_window->on_scroll(xoffset, yoffset);
 }
 
-void imgui_resize_callback(GLFWwindow* window, int width, int height) 
-{ 
+void imgui_resize_callback(GLFWwindow* window, int width, int height)
+{
     imgui_window_t* imgui_window = static_cast<imgui_window_t*> (glfwGetWindowUserPointer(window));
     imgui_window->on_resize(width, height);
 }
@@ -195,10 +195,10 @@ void SetClipboardText(void* user_data, const char* text)
 
 //=======================================================================================================================================================================================================================
 // This is the main rendering function that is provided to ImGui via setting RenderDrawListsFn field in the ImGuiIO structure
-// It alters :: 
-//  - GL_CULL_FACE, GL_DEPTH_TEST settings 
-//  - GL_BLEND settings, glBlendEquation and glBlendFunc 
-//  - GL_SCISSOR_TEST is disabled on function exit  
+// It alters ::
+//  - GL_CULL_FACE, GL_DEPTH_TEST settings
+//  - GL_BLEND settings, glBlendEquation and glBlendFunc
+//  - GL_SCISSOR_TEST is disabled on function exit
 //=======================================================================================================================================================================================================================
 static void RenderDrawLists(ImDrawData* draw_data)
 {
@@ -212,12 +212,12 @@ static void RenderDrawLists(ImDrawData* draw_data)
     draw_data->ScaleClipRects(io.DisplayFramebufferScale);
 
     // glActiveTexture(GL_TEXTURE0);
-        
+
     //===================================================================================================================================================================================================================
     // Setup viewport
     //===================================================================================================================================================================================================================
     glViewport(0, 0, (GLsizei)fb_width, (GLsizei)fb_height);
-    
+
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
         const ImDrawList* cmd_list = draw_data->CmdLists[n];
@@ -225,7 +225,7 @@ static void RenderDrawLists(ImDrawData* draw_data)
 
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)cmd_list->VtxBuffer.Size * sizeof(ImDrawVert), (const GLvoid*)cmd_list->VtxBuffer.Data, GL_STREAM_DRAW);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)cmd_list->IdxBuffer.Size * sizeof(ImDrawIdx), (const GLvoid*)cmd_list->IdxBuffer.Data, GL_STREAM_DRAW);
-    
+
         for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
         {
             const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
@@ -241,7 +241,7 @@ static void RenderDrawLists(ImDrawData* draw_data)
             }
             idx_buffer_offset += pcmd->ElemCount;
         }
-    }    
+    }
 }
 
 } // namespace glfw
@@ -250,7 +250,7 @@ static void RenderDrawLists(ImDrawData* draw_data)
 
 //=======================================================================================================================================================================================================================
 // GLFW + ImGui window constructor + GLEW library initialization
-// the application will be terminated if one of the library fails to initialize or 
+// the application will be terminated if one of the library fails to initialize or
 // requested context version is not supported by OpenGL driver
 //=======================================================================================================================================================================================================================
 imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen, bool debug_context)
@@ -263,7 +263,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glfwWindowHint(GLFW_SAMPLES, glfw_samples);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, version_major);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, version_minor);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);                                                                    
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     if (debug_context)
@@ -272,7 +272,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     //===================================================================================================================================================================================================================
     // Create window ...
     //===================================================================================================================================================================================================================
-    window = glfwCreateWindow(res_x, res_y, title, fullscreen ? glfwGetPrimaryMonitor() : 0, 0); 
+    window = glfwCreateWindow(res_x, res_y, title, fullscreen ? glfwGetPrimaryMonitor() : 0, 0);
     if(!window)
     {
         glfw::terminate();
@@ -288,9 +288,9 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     //===================================================================================================================================================================================================================
     // GLEW library initialization
     //===================================================================================================================================================================================================================
-    glewExperimental = true;                                                                                                // needed in core profile 
+    glewExperimental = true;                                                                                                // needed in core profile
     GLenum result = glewInit();                                                                                             // initialise GLEW
-    if (result != GLEW_OK) 
+    if (result != GLEW_OK)
     {
         glfw::terminate();
         exit_msg("Failed to initialize GLEW : %s", glewGetErrorString(result));
@@ -351,7 +351,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     io.KeyMap[ImGuiKey_X] = GLFW_KEY_X;
     io.KeyMap[ImGuiKey_Y] = GLFW_KEY_Y;
     io.KeyMap[ImGuiKey_Z] = GLFW_KEY_Z;
-    
+
     io.RenderDrawListsFn = glfw::RenderDrawLists;       // Alternatively you can set this to NULL and call ImGui::GetDrawData() after ImGui::Render() to get the same ImDrawData pointer.
     io.SetClipboardTextFn = glfw::SetClipboardText;
     io.GetClipboardTextFn = glfw::GetClipboardText;
@@ -391,7 +391,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
         "   color = color_in;\n"
         "   gl_Position = projection_matrix * vec4(position_in, 0.0f, 1.0f);\n"
         "}\n";
-    
+
     const GLchar* fs_source =
         "#version 330 core\n"
         "uniform sampler2D font_tex;\n"
@@ -402,7 +402,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
         "{\n"
         "   FragmentColor = color * texture(font_tex, uv);\n"
         "}\n";
-    
+
     ui_program_id = glCreateProgram();
     ui_vs_id = glCreateShader(GL_VERTEX_SHADER);
     ui_fs_id = glCreateShader(GL_FRAGMENT_SHADER);
@@ -413,19 +413,19 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glAttachShader(ui_program_id, ui_vs_id);
     glAttachShader(ui_program_id, ui_fs_id);
     glLinkProgram(ui_program_id);
-    
+
     glUseProgram(ui_program_id);
     glUniform1i(glGetUniformLocation(ui_program_id, "font_tex"), texture_unit_max_index);
     uni_projection_matrix_id = glGetUniformLocation(ui_program_id, "projection_matrix");
 
-    
+
     glGenVertexArrays(1, &ui_vao_id);
     glBindVertexArray(ui_vao_id);
     glGenBuffers(1, &ui_vbo_id);
     glBindBuffer(GL_ARRAY_BUFFER, ui_vbo_id);
     glGenBuffers(1, &ui_ibo_id);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ui_ibo_id);
-    
+
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
@@ -448,7 +448,7 @@ imgui_window_t::imgui_window_t(const char* title, int glfw_samples, int version_
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    
+
     io.Fonts->TexID = (void*)(intptr_t)ui_font_tex_id;
     imgui_active = false;
 
@@ -488,11 +488,11 @@ void imgui_window_t::new_frame()
         //  - mouse position in screen coordinates (set to -1,-1 if no mouse / window is not in focus)
         //  - if a mouse press event came, always pass it as if mouse held this frame, so we don't miss click-release events that are shorter than 1 frame
         //===============================================================================================================================================================================================================
-        io.MousePos = (glfwGetWindowAttrib(window, GLFW_FOCUSED)) ? ImVec2((float)mouse.x, (float)mouse.y) : ImVec2(-1.0f, -1.0f);  // 
+        io.MousePos = (glfwGetWindowAttrib(window, GLFW_FOCUSED)) ? ImVec2((float)mouse.x, (float)mouse.y) : ImVec2(-1.0f, -1.0f);  //
 
         for (int i = 0; i < 3; i++)
         {
-            io.MouseDown[i] = mouse_pressed[i] || (glfwGetMouseButton(window, i) != 0);    
+            io.MouseDown[i] = mouse_pressed[i] || (glfwGetMouseButton(window, i) != 0);
             mouse_pressed[i] = false;
         }
 
@@ -501,7 +501,7 @@ void imgui_window_t::new_frame()
 
         ImGui::NewFrame();
         update_ui();
-    }    
+    }
 }
 
 void imgui_window_t::end_frame()
@@ -511,7 +511,7 @@ void imgui_window_t::end_frame()
         ImGuiIO& io = ImGui::GetIO();
 
         //===============================================================================================================================================================================================================
-        // Setup render state :: alpha-blending enabled, no face culling, no depth testing, scissor enabled :: we do not care restoring these settings 
+        // Setup render state :: alpha-blending enabled, no face culling, no depth testing, scissor enabled :: we do not care restoring these settings
         //===============================================================================================================================================================================================================
         glEnable(GL_BLEND);
         glBlendEquation(GL_FUNC_ADD);
@@ -533,7 +533,7 @@ void imgui_window_t::end_frame()
             glm::vec4( 0.0f,                    0.0f,                    -1.0f, 0.0f),
             glm::vec4(-1.0f,                    1.0f,                     0.0f, 1.0f)
         );
-    
+
         glUseProgram(ui_program_id);
         glUniformMatrix4fv(uni_projection_matrix_id, 1, GL_FALSE, glm::value_ptr(projection_matrix));
 

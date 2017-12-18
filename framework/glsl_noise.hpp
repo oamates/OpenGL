@@ -19,7 +19,7 @@ namespace glsl_noise {
 GLuint permutation_texture();
 
 //=======================================================================================================================================================================================================================
-// gradient_texture - creates and loads a 2D texture for a 4D gradient lookup table 
+// gradient_texture - creates and loads a 2D texture for a 4D gradient lookup table
 // used for 4D noise only
 //=======================================================================================================================================================================================================================
 GLuint gradient_texture();
@@ -34,4 +34,4 @@ GLuint randomRGBA_shift_tex256x256(glm::ivec2 shift);
 } // namespace glsl_noise
 
 
-#endif // _glsl_noise_included_09676046823467347516537456016571651934563763187457 
+#endif // _glsl_noise_included_09676046823467347516537456016571651934563763187457

@@ -12,7 +12,7 @@ struct tex3d_header_t
     GLenum format;
     GLenum type;
     glm::ivec3 size;
-    GLuint data_size;    
+    GLuint data_size;
 };
 
 struct bbox_t
@@ -43,7 +43,7 @@ struct texture3d_t
 
         FILE* f = fopen(file_name, "rb");
         assert(f);
-        
+
         fread(&header, sizeof(tex3d_header_t), 1, f);
 
         size = header.size;
@@ -113,8 +113,8 @@ struct texture3d_t
     }
 
     texture3d_t(const glm::ivec3& size, GLenum texture_unit, GLenum internal_format)
-        : size(size), 
-          texture_unit(texture_unit), 
+        : size(size),
+          texture_unit(texture_unit),
           internal_format(internal_format)
     {
         glActiveTexture(texture_unit);
@@ -153,7 +153,7 @@ struct texture3d_t
 
         FILE* f = fopen(file_name, "rb");
         assert(f);
-        
+
         fread(&header, sizeof(tex3d_header_t), 1, f);
 
         texture.size = header.size;

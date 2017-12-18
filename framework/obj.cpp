@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <iomanip>
-    
+
 #include "obj.hpp"
 #include "log.hpp"
 #include "vertex.hpp"
@@ -64,25 +64,25 @@ std::istream& operator >> (std::istream& is, glm::vec2& v)
 
 //===================================================================================================================================================================================================================
 // The function tries to read index triple from a given input stream, converts relative (= negative) indices to absolute,
-// and checks that the triple does not break pnt_max boundary. 
+// and checks that the triple does not break pnt_max boundary.
 // Note: only position attribute index is absolutely required, texture coordinate and normal index can be omitted. Value -1 indicates this case.
 //===================================================================================================================================================================================================================
 
-bool read_pnt_index(std::stringstream& is, pnt_index& index, const pnt_index& pnt_max)                
-{           
-    index.n = -1;                                                           // Valid index triples are (no spaces or tabs is allowed)  
-    index.t = -1;                                                           // 1. p     --- just a position                            
-                                                                            // 2. p//n  --- position + normal index                    
-                                                                            // 3. p/t   --- position + texture coordinate              
-                                                                            // 4. p/t/n --- complete index triple                      
+bool read_pnt_index(std::stringstream& is, pnt_index& index, const pnt_index& pnt_max)
+{
+    index.n = -1;                                                           // Valid index triples are (no spaces or tabs is allowed)
+    index.t = -1;                                                           // 1. p     --- just a position
+                                                                            // 2. p//n  --- position + normal index
+                                                                            // 3. p/t   --- position + texture coordinate
+                                                                            // 4. p/t/n --- complete index triple
     if (!(is >> index.p) || (index.p == 0)) return false;                   // indices in obj-file begin from 1, 0 is invalid value
     if (index.p > 0)
         index.p--;
     else
         index.p = pnt_max.p + index.p;                                      // negative indices are relative to the current array length
 
-    if ((index.p < 0) || (index.p >= pnt_max.p)) return false;                                         
-                                                                            
+    if ((index.p < 0) || (index.p >= pnt_max.p)) return false;
+
     int slash = is.get();
 
     if (slash != '/') return true;                                          // we got only position index : p, triple successfully read (case 1)
@@ -94,11 +94,11 @@ bool read_pnt_index(std::stringstream& is, pnt_index& index, const pnt_index& pn
         if (index.t > 0)                                                    // convert texture coordinate index
             index.t--;
         else
-            index.t = pnt_max.t + index.t;                                  
+            index.t = pnt_max.t + index.t;
 
         if ((index.t < 0) || (index.t >= pnt_max.t)) return false;          // and check that it lies withing the boundaries
 
-        slash = is.get(); 
+        slash = is.get();
         if (slash != '/') return true;                                      // triple successfully read (case 3)
     }
     else                                                                    // two slashes in a row, so the input must be of the form p//n
@@ -109,11 +109,11 @@ bool read_pnt_index(std::stringstream& is, pnt_index& index, const pnt_index& pn
     if (index.n > 0)                                                        // convert normal index
         index.n--;
     else
-        index.n = pnt_max.n + index.n;                                  
+        index.n = pnt_max.n + index.n;
 
     if ((index.n < 0) || (index.n >= pnt_max.n)) return false;              // and check that it lies withing the boundaries
     return true;                                                            // triple successfully read (case 2 or case 4)
-                                                                            // hooray, it is done 
+                                                                            // hooray, it is done
 }
 
 
@@ -124,10 +124,10 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
         exit_msg("Cannot open object file %s.", filename.c_str());
 
     std::map<std::string, int> material_map;
-    
-    std::vector<glm::vec3> positions;                                       
-    std::vector<glm::vec3> normals;                                         
-    std::vector<glm::vec2> uvs;                                             
+
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> uvs;
 
     std::vector<pnt_index> triangles;                                       // triangles, polygonal faces are triangulated on the fly as triangle fans
 
@@ -137,12 +137,12 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
     GLuint last_material_index = 0;
 
     for (std::string buffer; getline(input_stream, buffer); ++l)
-    {        
+    {
         if (buffer.empty()) continue;
         std::stringstream line(buffer);
         std::string token;
         line >> token;
-                                                                            
+
         if (token == "v")                                                   // got new vertex position
         {
             glm::vec3 position;
@@ -174,9 +174,9 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
                 continue;
             }
             else
-                exit_msg("Error parsing texture coordinate at line %d.", l);        
+                exit_msg("Error parsing texture coordinate at line %d.", l);
         }
-        
+
         if (token == "f")                                                   // new polygonal face begin
         {
             pnt_index pnt_max = pnt_index(positions.size(), normals.size(), uvs.size());
@@ -200,7 +200,7 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
                 B = C;
                 line >> std::ws;
             }
-            while(!line.eof());        
+            while(!line.eof());
 
             continue;
         }
@@ -214,12 +214,12 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
                 exit_msg("Error loading material file %s.", mtl_file_name.c_str());
             continue;
         }
-    
+
         if (token == "usemtl")
-        {   
+        {
             std::string material_name;
             line >> material_name;
-            std::map<std::string, int>::iterator it = material_map.find(material_name); 
+            std::map<std::string, int>::iterator it = material_map.find(material_name);
             if (it == material_map.end())
                 exit_msg("Error : Referenced material (%s) not found.", material_name.c_str());
 
@@ -277,7 +277,7 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
         std::vector<vertex_pnt2_t> vertices;
 
         unsigned int vindex = 0;
-        for (size_t i = 0; i < triangles.size(); ++i)                       
+        for (size_t i = 0; i < triangles.size(); ++i)
         {
             pnt_index& v = triangles[i];
 
@@ -308,7 +308,7 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
         std::vector<vertex_pn_t> vertices;
 
         unsigned int vindex = 0;
-        for (size_t i = 0; i < triangles.size(); ++i)                       
+        for (size_t i = 0; i < triangles.size(); ++i)
         {
             pn_index v = pn_index(triangles[i].p, triangles[i].n);
 
@@ -334,7 +334,7 @@ model::model(const std::string& filename, const std::string& dir) : textured(fal
     }
 
     load_textures(dir);
-}; 
+};
 
 bool model::load_mtl(std::map<std::string, int>& material_map, const std::string& mtl_file_name)
 {
@@ -342,13 +342,13 @@ bool model::load_mtl(std::map<std::string, int>& material_map, const std::string
     if (!input_stream)
         exit_msg("Error : referenced material file %s not found.", mtl_file_name.c_str());
 
-    material_t material;                                                    
+    material_t material;
     default_material(material);
 
     int l = 0;
 
     for (std::string buffer; getline(input_stream, buffer); ++l)
-    {      
+    {
         if (buffer.empty()) continue;
         std::stringstream line(buffer);
         std::string token;
@@ -368,7 +368,7 @@ bool model::load_mtl(std::map<std::string, int>& material_map, const std::string
         }
 
       #define CHECK_TOKEN(name, dest) if (token == name) { if (line >> dest) continue; else debug_msg("Error parsing material file at line %d. token = %s", l, token.c_str()); }
-                                                                                                                                
+
         CHECK_TOKEN("Ka", material.Ka);
         CHECK_TOKEN("Kd", material.Kd);
         CHECK_TOKEN("Ks", material.Ks);
@@ -387,7 +387,7 @@ bool model::load_mtl(std::map<std::string, int>& material_map, const std::string
         {
             if (line >> material.map_bump)
             {
-                line >> token; 
+                line >> token;
                 if (token == "-bm")
                 {
                     if (line >> material.bm)
@@ -395,14 +395,14 @@ bool model::load_mtl(std::map<std::string, int>& material_map, const std::string
                     else
                         debug_msg("Error parsing material file at line %d.", l);
                 }
-                continue; 
+                continue;
             }
             else
                 debug_msg("Error parsing material file at line %d.", l);
         }
     }
-    
-    material_map.insert(std::pair<std::string, int>(material.name, static_cast<int>(materials.size())));        
+
+    material_map.insert(std::pair<std::string, int>(material.name, static_cast<int>(materials.size())));
     materials.push_back(material);                                          // flush last material
     return true;
 }
@@ -412,7 +412,7 @@ void model::load_textures(const std::string& dir)
     for (size_t i = 0; i < materials.size(); ++i)
     {
         material_t& material = materials[i];
-        
+
         if (!material.map_Ka.empty())                                       // ambient texture load
         {
             if (!textures.count(material.map_Ka))
@@ -435,14 +435,14 @@ void model::load_textures(const std::string& dir)
 
         if (!material.map_Ks.empty())                                       // specular texture load
         {
-            if (!textures.count(material.map_Ks)) 
+            if (!textures.count(material.map_Ks))
             {
                 std::string path = dir + material.map_Ks;
                 textures[material.map_Ks] = image::png::texture2d(path.c_str());
             }
             material.flags |= SPECULAR_TEXTURE_FLAG;
         }
-        
+
         if (!material.map_Ns.empty())                                       // shininess texture load
         {
             if (!textures.count(material.map_Ns))

@@ -29,12 +29,12 @@ double point_triangle_distance(const glm::dvec3& P, const glm::dvec3& A, const g
     //===================================================================================================================================================================================================================
     // first find barycentric coordinates of closest point on infinite plane
     //===================================================================================================================================================================================================================
-    glm::dvec3 CA = A - C, 
-    	       CB = B - C, 
+    glm::dvec3 CA = A - C,
+    	       CB = B - C,
     	       CP = P - C;
 
-    double m13 = glm::length2(CA), 
-           m23 = glm::length2(CB), 
+    double m13 = glm::length2(CA),
+           m23 = glm::length2(CB),
            d = glm::dot(CA, CB);
 
     double invdet = 1.0 / glm::max(m13 * m23 - d * d, 1e-30);
@@ -52,7 +52,7 @@ double point_triangle_distance(const glm::dvec3& P, const glm::dvec3& A, const g
     // if we're inside the triangle
     //===================================================================================================================================================================================================================
     if (w23 >= 0 && w31 >= 0 && w12 >= 0)
-        return glm::length(P - (w23 * A + w31 * B + w12 * C)); 
+        return glm::length(P - (w23 * A + w31 * B + w12 * C));
 
     //===================================================================================================================================================================================================================
     // clamping to one of the edges
@@ -179,7 +179,7 @@ array3d<double> make_level_set3(const std::vector<glm::uvec3>& faces, const std:
 
     array3d<int> closest_tri(size.x, size.y, size.z, -1);
     array3d<int> intersection_count(size.x, size.y, size.z, 0);
-    const double inv_delta = 1.0 / delta; 
+    const double inv_delta = 1.0 / delta;
 
     //===================================================================================================================================================================================================================
     // intersection_count(i,j,k) is # of tri intersections in (i-1,i] x {j} x {k}
@@ -188,7 +188,7 @@ array3d<double> make_level_set3(const std::vector<glm::uvec3>& faces, const std:
 
     for(unsigned int t = 0; t < faces.size(); ++t)
     {
-        unsigned int p = faces[t].x, q = faces[t].y, r = faces[t].z; 
+        unsigned int p = faces[t].x, q = faces[t].y, r = faces[t].z;
 
         //===============================================================================================================================================================================================================
         // coordinates in grid to high precision
@@ -234,9 +234,9 @@ array3d<double> make_level_set3(const std::vector<glm::uvec3>& faces, const std:
                 {
                     double x = barycentric.x * P.x + barycentric.y * Q.x + barycentric.z * R.x;
                     int ix = int(std::ceil(x));
-                    if(ix < 0) 
+                    if(ix < 0)
                         ++intersection_count[glm::ivec3(0, j, k)];
-                    else if(ix < size.x) 
+                    else if(ix < size.x)
                         ++intersection_count[glm::ivec3(ix, j, k)];
                 }
             }

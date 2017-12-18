@@ -15,16 +15,16 @@ std::vector<triangle_t> convex_hull(std::vector<glm::dvec3>& points)
     // to sort points in a lexicographic order, this structure has to be passed to std::sort call
     // () is supposed to mimic comparison < operator
     //===================================================================================================================================================================================================================
-    struct 
+    struct
     {
-        bool operator()(const glm::dvec3& lhs, const glm::dvec3& rhs)
-        {   
+        bool operator () (const glm::dvec3& lhs, const glm::dvec3& rhs)
+        {
             if (lhs.z < rhs.z) return true;
             if (lhs.z > rhs.z) return false;
             if (lhs.y < rhs.y) return true;
             if (lhs.y > rhs.y) return false;
             return lhs.x < rhs.x;
-        }   
+        }
     } dvec3_lex;
     std::sort(points.begin(), points.end(), dvec3_lex);
 
@@ -87,7 +87,7 @@ inline void attach_edge(triangle_t& triangle, int p, int q, int id)
 }
 
 //=======================================================================================================================================================================================================================
-// the main working routine : produces a vector of triangular faces of the hull 
+// the main working routine : produces a vector of triangular faces of the hull
 // many of them are marked as not used, but are not cleaned out from the vector
 // assumes that the input vector is sorted lexicografically
 //=======================================================================================================================================================================================================================

@@ -14,10 +14,10 @@ struct model
 
     std::vector<std::pair<int, GLuint>> material_index;                     // vector of <material_id, index at which material with this id is used>
     std::vector<material_t> materials;                                      // array of materials used to render the model
-    std::map<std::string, GLuint> textures;    
+    std::map<std::string, GLuint> textures;
 
     //===============================================================================================================================================================================================================
-    // Constructor that parses the object file and creates OpenGL vertex array object from it 
+    // Constructor that parses the object file and creates OpenGL vertex array object from it
     // together with some auxiliary information needed to render the model
     //===============================================================================================================================================================================================================
     model(const std::string& filename, const std::string& dir);

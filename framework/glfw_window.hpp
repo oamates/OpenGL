@@ -5,7 +5,7 @@
 // GLFW based application window structure
 //=======================================================================================================================================================================================================================
 #define GLEW_STATIC
-#include <GL/glew.h> 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
@@ -51,7 +51,7 @@ struct glfw_window_t
 
     //===================================================================================================================================================================================================================
     // GLFW window constructor + GLEW library initialization
-    // the application will be terminated if one of the library fails to initialize or 
+    // the application will be terminated if one of the library fails to initialize or
     // requested context version is not supported by OpenGL driver
     //===================================================================================================================================================================================================================
     glfw_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen, bool debug_context = false);

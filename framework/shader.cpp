@@ -29,7 +29,7 @@ glsl_shader_t::glsl_shader_t(const char* shader_source, GLenum shader_type)
 }
 
 glsl_shader_t::~glsl_shader_t()
-    { glDeleteShader(id); } 
+    { glDeleteShader(id); }
 
 GLint glsl_shader_t::compile_from_string(GLenum shader_type, const char* source_code)
 {
@@ -42,7 +42,7 @@ GLint glsl_shader_t::compile_from_string(GLenum shader_type, const char* source_
     GLint compile_status;
     glGetShaderiv(shader_id, GL_COMPILE_STATUS, &compile_status);
 
-    if (GL_TRUE == compile_status) 
+    if (GL_TRUE == compile_status)
     {
         debug_msg("Shader id#%d of type %d successfully compiled.", shader_id, shader_type);
         GLint error_msg_length;
@@ -63,7 +63,7 @@ GLint glsl_shader_t::compile_from_string(GLenum shader_type, const char* source_
     debug_msg("Error compiling shader id#%d, type = %d", shader_id, shader_type);
     GLint error_msg_length;
     glGetShaderiv(shader_id, GL_INFO_LOG_LENGTH, &error_msg_length);
-    
+
     if (error_msg_length)
     {
         char* error_msg = static_cast<char*> (malloc((size_t) error_msg_length));
@@ -136,7 +136,7 @@ void glsl_program_t::link()
     glLinkProgram(id);
     GLint linkage_status;
     glGetProgramiv(id, GL_LINK_STATUS, &linkage_status);
-    if (GL_TRUE == linkage_status) 
+    if (GL_TRUE == linkage_status)
     {
         debug_msg("Program [%d] successfully linked.", id);
         return;
@@ -157,7 +157,7 @@ void glsl_program_t::link()
     exit_msg("Aborting program ...");
 }
 
-glsl_program_t::~glsl_program_t() 
+glsl_program_t::~glsl_program_t()
     { glDeleteProgram(id); }
 
 uniform_t glsl_program_t::operator[] (const char* name) const
@@ -205,7 +205,7 @@ void glsl_program_t::dump_param(GLint param_name, const char* description)
 }
 
 void glsl_program_t::dump_info()
-{   
+{
     dump_param(GL_DELETE_STATUS,                         "Program flagged for deletion");
     dump_param(GL_LINK_STATUS,                           "Last link operation");
     dump_param(GL_VALIDATE_STATUS,                       "Last validation operation");
@@ -261,7 +261,7 @@ glGetProgramBinary(program, binary_size, NULL, &binary_format, program_binary);
 /*
 void glsl_program_t::dump_interface()
 {
-    std::cout << "--------------------" << name << " Interface------------------------" << std::endl; 
+    std::cout << "--------------------" << name << " Interface------------------------" << std::endl;
     GLint outputs = 0;
     glGetProgramInterfaceiv(program, GL_PROGRAM_INPUT,  GL_ACTIVE_RESOURCES, &outputs);
     static const GLenum props[] = {GL_TYPE, GL_LOCATION};
@@ -295,7 +295,7 @@ void glsl_program_t::dump_interface()
         //std::cout << "Index " << i << std::endl;
         std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
     }
-    
+
     glGetProgramInterfaceiv(program, GL_UNIFORM_BLOCK,  GL_ACTIVE_RESOURCES, &outputs);
     if (outputs > 0)
       std::cout << "------Uniform Block-------" << std::endl;

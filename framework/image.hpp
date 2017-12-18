@@ -1,4 +1,4 @@
-#ifndef _texture_included_34875624975643765623801675657843657846387563487562354 
+#ifndef _texture_included_34875624975643765623801675657843657846387563487562354
 #define _texture_included_34875624975643765623801675657843657846387563487562354
 
 #define GLEW_STATIC
@@ -61,7 +61,7 @@ namespace dds {
 //=======================================================================================================================================================================================================================
 // Each texture image data structure contains an array of MAX_TEXTURE_MIPS of these mipmap structures. The structure represents the mipmap data for all slices at that level.
 //=======================================================================================================================================================================================================================
-struct mip_t                                    // vglImageMipData 
+struct mip_t                                    // vglImageMipData
 {
     GLsizei width;                              // Width of this mipmap level
     GLsizei height;                             // Height of this mipmap level

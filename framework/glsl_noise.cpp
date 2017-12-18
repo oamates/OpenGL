@@ -1,5 +1,5 @@
 #include <memory>
-#include <random> 
+#include <random>
 
 #include "glsl_noise.hpp"
 
@@ -23,8 +23,8 @@ GLuint permutation_texture()
 {
     int grad3[16][3] = {{ 0, 1, 1}, { 0, 1,-1}, { 0,-1, 1}, { 0,-1,-1},
                         { 1, 0, 1}, { 1, 0,-1}, {-1, 0, 1}, {-1, 0,-1},
-                        { 1, 1, 0}, { 1,-1, 0}, {-1, 1, 0}, {-1,-1, 0},  
-                        { 1, 0,-1}, {-1, 0,-1}, { 0,-1, 1}, { 0, 1, 1}}; 
+                        { 1, 1, 0}, { 1,-1, 0}, {-1, 1, 0}, {-1,-1, 0},
+                        { 1, 0,-1}, {-1, 0,-1}, { 0,-1, 1}, { 0, 1, 1}};
 
     char* pixels = (char*) malloc(256 * 256 * 4);
     int offset = 0;
@@ -37,7 +37,7 @@ GLuint permutation_texture()
         pixels[offset + 0x3] = value;                              // Permuted index
         offset += 4;
     }
-  
+
     GLuint tex_id;
     glGenTextures(1, &tex_id);
     glBindTexture(GL_TEXTURE_2D, tex_id);
@@ -64,7 +64,7 @@ GLuint gradient_texture()
                        {-1, 1, 0, 1}, {-1, 1, 0,-1}, {-1,-1, 0, 1}, {-1,-1, 0,-1},
                        { 1, 1, 1, 0}, { 1, 1,-1, 0}, { 1,-1, 1, 0}, { 1,-1,-1, 0},
                        {-1, 1, 1, 0}, {-1, 1,-1, 0}, {-1,-1, 1, 0}, {-1,-1,-1, 0}};
-                                  
+
     char* pixels = (char*) malloc(256 * 256 * 4);
     int offset = 0;
     for(int i = 0; i < 256; i++) for(int j = 0; j < 256; j++)
@@ -76,7 +76,7 @@ GLuint gradient_texture()
         pixels[offset + 0x3] = grad4[value & 0x1F][3] * 64 + 64; // Gradient w
         offset += 2;
     }
-  
+
     GLuint tex_id;
     glGenTextures(1, &tex_id);
     glBindTexture(GL_TEXTURE_2D, tex_id);
@@ -108,7 +108,7 @@ GLuint randomRG_shift_tex256x256(glm::ivec2 shift)
         index += 2;
     }
 
-    index = 0;    
+    index = 0;
     for (int y = shift.y; y < 256 + shift.y; y++) for (int x = shift.x; x < 256 + shift.x; x++)
     {
         unsigned int index_s = ((y & 0xFF) << 8) | (x & 0xFF);
@@ -131,7 +131,7 @@ GLuint randomRG_shift_tex256x256(glm::ivec2 shift)
 
 GLuint randomRGBA_shift_tex256x256(glm::ivec2 shift)
 {
-    std::random_device rd;    
+    std::random_device rd;
     std::mt19937 engine(rd());
 
     unsigned char* pixels = (unsigned char*) malloc (256 * 256 * 4);
@@ -145,7 +145,7 @@ GLuint randomRGBA_shift_tex256x256(glm::ivec2 shift)
         index += 4;
     }
 
-    index = 0;    
+    index = 0;
     for (int y = shift.y; y < 256 + shift.y; y++) for (int x = shift.x; x < 256 + shift.x; x++)
     {
         unsigned int index_s = ((y & 0xFF) << 8) | (x & 0xFF);
@@ -169,5 +169,4 @@ GLuint randomRGBA_shift_tex256x256(glm::ivec2 shift)
 
 
 } // namespace glsl_noise
- 
- 
+

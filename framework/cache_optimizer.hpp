@@ -21,7 +21,7 @@
 //-----------------------------------------------------------------------------
 template<class T> class FaceOptimizer
 {
-  
+
     static const unsigned int kMaxVertexCacheSize = 64;                                                 // The maximum allowed cache size.
     static const unsigned int kMaxPrecomputedVertexValenceScores = 64;                                  // The maximum amount of vertex valence scores.
     float s_vertexCacheScores[kMaxVertexCacheSize+1][kMaxVertexCacheSize];                              // A precalculated 2D array used to store vertex cache scores.
@@ -142,7 +142,7 @@ template<class T> class FaceOptimizer
     }
 
     // A object that stores all the relevant data for optimising the vertex data.
-    struct OptimizeVertexData 
+    struct OptimizeVertexData
     {
         float score;                                        // The total score (including both valency and cache position and cache size scores).
         unsigned int activeFaceListStart;                   // The starting index for the face list.
@@ -155,7 +155,7 @@ template<class T> class FaceOptimizer
 
 public:
 
-    FaceOptimizer() 
+    FaceOptimizer()
     {
         s_vertexScoresComputed = ComputeVertexScores();
     }
@@ -190,7 +190,7 @@ public:
         {
             // allocate face list per vertex
             unsigned int curActiveFaceListPos = 0;
-            for (unsigned int i = 0; i < vertexCount; ++i) 
+            for (unsigned int i = 0; i < vertexCount; ++i)
             {
                 OptimizeVertexData& vertexData = vertexDataList[i];
                 vertexData.cachePos0 = kEvictedCacheIndex;
@@ -229,11 +229,11 @@ public:
 
         for (unsigned int i = 0; i < indexCount; i += 3)
         {
-            if (bestScore < 0.f) 
+            if (bestScore < 0.f)
             {
                 // no verts in the cache are used by any unprocessed faces so
                 // search all unprocessed faces for a new starting point
-                for (unsigned int j = 0; j < indexCount; j += 3) 
+                for (unsigned int j = 0; j < indexCount; j += 3)
                 {
                     if (processedFaceList[j] == 0)
                     {

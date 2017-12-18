@@ -8,7 +8,7 @@
 #include "image.hpp"
 #include "log.hpp"
 
-namespace image { 
+namespace image {
 namespace dds {
 
 enum DDS_FORMAT
@@ -310,25 +310,25 @@ static const DDS_FORMAT_GL_INFO gl_info_table[] =
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO,  16  },      // DDS_FORMAT_R8G8_B8G8_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO,  16  },      // DDS_FORMAT_G8R8_G8B8_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC1_TYPELESS
-#if defined GL_EXT_texture_compression_s3tc                                         
+#if defined GL_EXT_texture_compression_s3tc
     { GL_COMPRESSED_RGB_S3TC_DXT1_EXT,           GL_NONE,                           GL_COMPRESSED_RGB_S3TC_DXT1_EXT,           GL_RED,   GL_GREEN, GL_BLUE,  GL_ONE        },      // DDS_FORMAT_BC1_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC1_UNORM_SRGB
-#else                                                                                                                          
+#else
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC1_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC1_UNORM_SRGB
-#endif                                                                                                                         
+#endif
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC2_TYPELESS
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC2_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC2_UNORM_SRGB
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC3_TYPELESS
-#if defined GL_EXT_texture_compression_s3tc                                         
+#if defined GL_EXT_texture_compression_s3tc
 //  { GL_COMPRESSED_RGB_S3TC_DXT3_EXT,           GL_NONE,                           GL_COMPRESSED_RGB_S3TC_DXT3_EXT,           GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC3_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC3_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC3_UNORM_SRGB
-#else                                                                                                                          
+#else
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC3_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC3_UNORM_SRGB
-#endif                                                                              
+#endif
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC4_TYPELESS
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC4_UNORM
     { GL_NONE,                                   GL_NONE,                           GL_NONE,                                   GL_ZERO,  GL_ZERO,  GL_ZERO,  GL_ZERO       },      // DDS_FORMAT_BC4_SNORM
@@ -582,7 +582,7 @@ static GLenum dds_header_to_target(const DDS_FILE_HEADER& header)
                 if (header.dxt10_header.array_size > 1)
                     return GL_TEXTURE_1D_ARRAY;
                 return GL_TEXTURE_1D;
-            
+
             case DDS_RESOURCE_DIMENSION_TEXTURE2D:                                              // 2D means 2D, 2D array, cubemap or cubemap array
                 if (header.dxt10_header.misc_flag & DDS_RESOURCE_MISC_TEXTURECUBE)
                 {
@@ -598,10 +598,10 @@ static GLenum dds_header_to_target(const DDS_FILE_HEADER& header)
         }
         return GL_NONE;
     }
-    
+
     if (header.std_header.caps2 & DDSCAPS2_VOLUME)                                              // No DX10 header. Check volume texture flag
-        return GL_TEXTURE_3D;        
-    
+        return GL_TEXTURE_3D;
+
     if (header.std_header.caps2 & DDSCAPS2_CUBEMAP)                                             // Could be a cubemap
     {
         if (header.dxt10_header.array_size > 1)                                                 // This shouldn't happen if the DX10 header is present
@@ -609,7 +609,7 @@ static GLenum dds_header_to_target(const DDS_FILE_HEADER& header)
         else
             return GL_TEXTURE_CUBE_MAP;
     }
-    
+
     if (header.std_header.height <= 1)                                                          // Alright, if there's no height, guess 1D
         return GL_TEXTURE_1D;
 
@@ -643,7 +643,7 @@ void dump_dds_file_header_info(const DDS_FILE_HEADER& header)
         debug_msg("\tdxt10_header.flags = %u", header.dxt10_header.dimension);
         debug_msg("\tdxt10_header.height = %u", header.dxt10_header.misc_flag);
         debug_msg("\tdxt10_header.width = %u\n", header.dxt10_header.array_size);
-    }    
+    }
 }
 
 void load(const char* filename, image_t* image)

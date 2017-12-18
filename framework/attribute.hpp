@@ -21,7 +21,7 @@ template<typename vertex_t, typename index_t = GLuint, GLenum mode = GL_TRIANGLE
 
     attribute_data_t(GLuint V, GLuint I, vertex_t* vertices, index_t* indices) : V(V), I(I), vertices(vertices), indices(indices) {}
 
-    attribute_data_t(attribute_data_t&& other) : V(other.V), I(other.I), vertices(other.vertices), indices(other.indices) 
+    attribute_data_t(attribute_data_t&& other) : V(other.V), I(other.I), vertices(other.vertices), indices(other.indices)
     {
         other.vertices = 0;
         other.indices = 0;
@@ -50,7 +50,7 @@ template<typename vertex_t, typename index_t = GLuint, GLenum mode = GL_TRIANGLE
 
     void destroy()
     {
-        V = 0; 
+        V = 0;
         I = 0;
         free(vertices);
         free(indices);
@@ -121,7 +121,7 @@ template<typename vertex_t, typename index_t> glm::vec3* calculate_normals(attri
             {
                 normals[a] -= n;
                 normals[b] -= n;
-                normals[c] -= n;                
+                normals[c] -= n;
             }
             right_handed = !right_handed;
 
@@ -178,15 +178,15 @@ template<typename index_t> struct unsorted_vertex_triples<index_t, GL_TRIANGLE_S
     static glm::tvec3<index_t>* build(index_t* indices, GLuint I, GLuint& E)
     {
         GLuint strips = 0;
-        for(GLuint i = 0; i < I; ++i) 
+        for(GLuint i = 0; i < I; ++i)
             if (indices[i] == -1) ++strips;
         GLuint F = I - strips;
         E = F + F + F;
         glm::tvec3<index_t>* vertex_adjacency = malloc(E * sizeof(glm::tvec3<index_t>));
-    
+
         GLuint va = 0;
         index_t i = 2;
-    
+
         while(i < I)
         {
             index_t a = indices[i - 2];
@@ -195,7 +195,7 @@ template<typename index_t> struct unsorted_vertex_triples<index_t, GL_TRIANGLE_S
             do
             {
                 index_t c = indices[i];
-                if (!right_handed) 
+                if (!right_handed)
                 {
                     vertex_adjacency[va++] = glm::tvec3<index_t>(a, b, c);
                     vertex_adjacency[va++] = glm::tvec3<index_t>(b, c, a);
@@ -208,14 +208,14 @@ template<typename index_t> struct unsorted_vertex_triples<index_t, GL_TRIANGLE_S
                     vertex_adjacency[va++] = glm::tvec3<index_t>(c, b, a);
                 }
                 right_handed = !right_handed;
-    
+
                 a = b;
                 b = c;
                 ++i;
             }
             while (indices[i] != -1);
             i += 3;
-        }    
+        }
         return vertex_adjacency;
     }
 };
@@ -233,72 +233,72 @@ template<typename vertex_t, typename index_t, GLenum mode> float* calculate_vert
 
     //====================================================================================================================================================================================================================
     // quick sort edges lexicographically so that the first component increases
-    //====================================================================================================================================================================================================================                                                                                                                                                                                                                              
+    //====================================================================================================================================================================================================================
     const unsigned int STACK_SIZE = 32;                                                         // variables to emulate stack of sorting requests
 
-    struct                                                                                                                                                                                                                
-    {                                                                                                                                                                                                                     
-        glm::tvec3<index_t>* l;                                                                 // left index of the sub-array that needs to be sorted                                                                    
-        glm::tvec3<index_t>* r;                                                                 // right index of the sub-array to sort                                                                                   
-    } _stack[STACK_SIZE];                                                                                                                                                                                                 
-                                                                                                                                                                                                                          
-    int sp = 0;                                                                                 // stack pointer, stack grows up, not down                                                                                 
-    _stack[sp].l = vertex_adjacency;                                                                                                                                                                                                 
-    _stack[sp].r = vertex_adjacency + E - 1;                                                                                                                                                                                         
-                                                                                                                                                                                                                          
-    do                                                                                                                                                                                                                    
-    {                                                                                                                                                                                                                     
-        glm::tvec3<index_t>* l = _stack[sp].l;                                                                                                                                                                                
-        glm::tvec3<index_t>* r = _stack[sp].r;                                                                                                                                                                                
-        --sp;                                                                                                                                                                                                             
-        do                                                                                                                                                                                                                
-        {                                                                                                                                                                                                                 
-            glm::tvec3<index_t>* i = l;                                                                                                                                                                                       
-            glm::tvec3<index_t>* j = r;                                                                                                                                                                                       
-            glm::tvec3<index_t>* m = i + (j - i) / 2;                                                                                                                                                                         
-            index_t x = m->x;                                                                                                                                                                                             
-            do                                                                                                                                                                                                            
-            {                                                                                                                                                                                                             
-                while (i->x < x) i++;                                                           // lexicographic compare and proceed forward if less                                                                      
-                while (j->x > x) j--;                                                           // lexicographic compare and proceed backward if less                                                                     
-                                                                                                                                                                                                                          
-                if (i <= j)                                                                                                                                                                                               
-                {                                                                                                                                                                                                         
-                    std::swap(*i, *j);                                                                                                                                                                                
-                    i++;                                                                                                                                                                                                  
-                    j--;                                                                                                                                                                                                  
-                }                                                                                                                                                                                                         
-            }                                                                                                                                                                                                             
-            while (i <= j);                                                                                                                                                                                               
-                                                                                                                                                                                                                          
-            if (j - l < r - i)                                                                  // push the larger interval to stack and continue sorting the smaller one                                                      
-            {                                                                                                                                                                                                             
-                if (i < r)                                                                                                                                                                                                
-                {                                                                                                                                                                                                         
-                    ++sp;                                                                                                                                                                                                 
-                    _stack[sp].l = i;                                                                                                                                                                                     
-                    _stack[sp].r = r;                                                                                                                                                                                     
-                }                                                                                                                                                                                                         
-                r = j;                                                                                                                                                                                                    
-            }                                                                                                                                                                                                             
-            else                                                                                                                                                                                                          
-            {                                                                                                                                                                                                             
-                if (l < j)                                                                                                                                                                                                
-                {                                                                                                                                                                                                         
-                    ++sp;                                                                                                                                                                                                 
-                    _stack[sp].l = l;                                                                                                                                                                                     
-                    _stack[sp].r = j;                                                                                                                                                                                     
-                }                                                                                                                                                                                                         
-                l = i;                                                                                                                                                                                                    
-            }                                                                                                                                                                                                             
-        }                                                                                                                                                                                                                 
-        while(l < r);                                                                                                                                                                                                     
-    }                                                                                                                                                                                                                     
-    while (sp >= 0);                                                                                                                                                                                                      
+    struct
+    {
+        glm::tvec3<index_t>* l;                                                                 // left index of the sub-array that needs to be sorted
+        glm::tvec3<index_t>* r;                                                                 // right index of the sub-array to sort
+    } _stack[STACK_SIZE];
+
+    int sp = 0;                                                                                 // stack pointer, stack grows up, not down
+    _stack[sp].l = vertex_adjacency;
+    _stack[sp].r = vertex_adjacency + E - 1;
+
+    do
+    {
+        glm::tvec3<index_t>* l = _stack[sp].l;
+        glm::tvec3<index_t>* r = _stack[sp].r;
+        --sp;
+        do
+        {
+            glm::tvec3<index_t>* i = l;
+            glm::tvec3<index_t>* j = r;
+            glm::tvec3<index_t>* m = i + (j - i) / 2;
+            index_t x = m->x;
+            do
+            {
+                while (i->x < x) i++;                                                           // lexicographic compare and proceed forward if less
+                while (j->x > x) j--;                                                           // lexicographic compare and proceed backward if less
+
+                if (i <= j)
+                {
+                    std::swap(*i, *j);
+                    i++;
+                    j--;
+                }
+            }
+            while (i <= j);
+
+            if (j - l < r - i)                                                                  // push the larger interval to stack and continue sorting the smaller one
+            {
+                if (i < r)
+                {
+                    ++sp;
+                    _stack[sp].l = i;
+                    _stack[sp].r = r;
+                }
+                r = j;
+            }
+            else
+            {
+                if (l < j)
+                {
+                    ++sp;
+                    _stack[sp].l = l;
+                    _stack[sp].r = j;
+                }
+                l = i;
+            }
+        }
+        while(l < r);
+    }
+    while (sp >= 0);
 
     //====================================================================================================================================================================================================================
     // occlusion calculaton
-    //====================================================================================================================================================================================================================                                                                                                                                                                                                                                  
+    //====================================================================================================================================================================================================================
     float* occlusions = (float*) malloc(data.V * sizeof(float));
 
     GLuint e = 0;
@@ -346,7 +346,7 @@ template<typename vertex_t, typename index_t, GLenum mode> float* calculate_vert
 }
 
 //=======================================================================================================================================================================================================================
-// calculates vertex occlusion in place 
+// calculates vertex occlusion in place
 // vertex_t structure must have occlusion field
 //=======================================================================================================================================================================================================================
 template<typename vertex_t, typename index_t, GLenum mode> void calculate_vertex_occlusion_in_place(attribute_data_t<vertex_t, index_t, mode>& data)
@@ -359,72 +359,72 @@ template<typename vertex_t, typename index_t, GLenum mode> void calculate_vertex
 
     //====================================================================================================================================================================================================================
     // quick sort edges lexicographically so that the first component increases
-    //====================================================================================================================================================================================================================                                                                                                                                                                                                                              
+    //====================================================================================================================================================================================================================
     const unsigned int STACK_SIZE = 32;                                                         // variables to emulate stack of sorting requests
 
-    struct                                                                                                                                                                                                                
-    {                                                                                                                                                                                                                     
-        glm::tvec3<index_t>* l;                                                                 // left index of the sub-array that needs to be sorted                                                                    
-        glm::tvec3<index_t>* r;                                                                 // right index of the sub-array to sort                                                                                   
-    } _stack[STACK_SIZE];                                                                                                                                                                                                 
-                                                                                                                                                                                                                          
-    int sp = 0;                                                                                 // stack pointer, stack grows up, not down                                                                                 
-    _stack[sp].l = vertex_adjacency;                                                                                                                                                                                                 
-    _stack[sp].r = vertex_adjacency + E - 1;                                                                                                                                                                                         
-                                                                                                                                                                                                                          
-    do                                                                                                                                                                                                                    
-    {                                                                                                                                                                                                                     
-        glm::tvec3<index_t>* l = _stack[sp].l;                                                                                                                                                                                
-        glm::tvec3<index_t>* r = _stack[sp].r;                                                                                                                                                                                
-        --sp;                                                                                                                                                                                                             
-        do                                                                                                                                                                                                                
-        {                                                                                                                                                                                                                 
-            glm::tvec3<index_t>* i = l;                                                                                                                                                                                       
-            glm::tvec3<index_t>* j = r;                                                                                                                                                                                       
-            glm::tvec3<index_t>* m = i + (j - i) / 2;                                                                                                                                                                         
-            index_t x = m->x;                                                                                                                                                                                             
-            do                                                                                                                                                                                                            
-            {                                                                                                                                                                                                             
-                while (i->x < x) i++;                                                           // lexicographic compare and proceed forward if less                                                                      
-                while (j->x > x) j--;                                                           // lexicographic compare and proceed backward if less                                                                     
-                                                                                                                                                                                                                          
-                if (i <= j)                                                                                                                                                                                               
-                {                                                                                                                                                                                                         
-                    std::swap(*i, *j);                                                                                                                                                                                
-                    i++;                                                                                                                                                                                                  
-                    j--;                                                                                                                                                                                                  
-                }                                                                                                                                                                                                         
-            }                                                                                                                                                                                                             
-            while (i <= j);                                                                                                                                                                                               
-                                                                                                                                                                                                                          
-            if (j - l < r - i)                                                                  // push the larger interval to stack and continue sorting the smaller one                                                      
-            {                                                                                                                                                                                                             
-                if (i < r)                                                                                                                                                                                                
-                {                                                                                                                                                                                                         
-                    ++sp;                                                                                                                                                                                                 
-                    _stack[sp].l = i;                                                                                                                                                                                     
-                    _stack[sp].r = r;                                                                                                                                                                                     
-                }                                                                                                                                                                                                         
-                r = j;                                                                                                                                                                                                    
-            }                                                                                                                                                                                                             
-            else                                                                                                                                                                                                          
-            {                                                                                                                                                                                                             
-                if (l < j)                                                                                                                                                                                                
-                {                                                                                                                                                                                                         
-                    ++sp;                                                                                                                                                                                                 
-                    _stack[sp].l = l;                                                                                                                                                                                     
-                    _stack[sp].r = j;                                                                                                                                                                                     
-                }                                                                                                                                                                                                         
-                l = i;                                                                                                                                                                                                    
-            }                                                                                                                                                                                                             
-        }                                                                                                                                                                                                                 
-        while(l < r);                                                                                                                                                                                                     
-    }                                                                                                                                                                                                                     
-    while (sp >= 0);                                                                                                                                                                                                      
+    struct
+    {
+        glm::tvec3<index_t>* l;                                                                 // left index of the sub-array that needs to be sorted
+        glm::tvec3<index_t>* r;                                                                 // right index of the sub-array to sort
+    } _stack[STACK_SIZE];
+
+    int sp = 0;                                                                                 // stack pointer, stack grows up, not down
+    _stack[sp].l = vertex_adjacency;
+    _stack[sp].r = vertex_adjacency + E - 1;
+
+    do
+    {
+        glm::tvec3<index_t>* l = _stack[sp].l;
+        glm::tvec3<index_t>* r = _stack[sp].r;
+        --sp;
+        do
+        {
+            glm::tvec3<index_t>* i = l;
+            glm::tvec3<index_t>* j = r;
+            glm::tvec3<index_t>* m = i + (j - i) / 2;
+            index_t x = m->x;
+            do
+            {
+                while (i->x < x) i++;                                                           // lexicographic compare and proceed forward if less
+                while (j->x > x) j--;                                                           // lexicographic compare and proceed backward if less
+
+                if (i <= j)
+                {
+                    std::swap(*i, *j);
+                    i++;
+                    j--;
+                }
+            }
+            while (i <= j);
+
+            if (j - l < r - i)                                                                  // push the larger interval to stack and continue sorting the smaller one
+            {
+                if (i < r)
+                {
+                    ++sp;
+                    _stack[sp].l = i;
+                    _stack[sp].r = r;
+                }
+                r = j;
+            }
+            else
+            {
+                if (l < j)
+                {
+                    ++sp;
+                    _stack[sp].l = l;
+                    _stack[sp].r = j;
+                }
+                l = i;
+            }
+        }
+        while(l < r);
+    }
+    while (sp >= 0);
 
     //====================================================================================================================================================================================================================
     // occlusion calculaton
-    //====================================================================================================================================================================================================================                                                                                                                                                                                                                                  
+    //====================================================================================================================================================================================================================
     GLuint e = 0;
     for(GLuint v = 0; v < data.V; ++v)
     {

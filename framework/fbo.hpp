@@ -31,7 +31,7 @@ struct fbo_depth_t
 
     GLuint id;
     GLuint texture_id;
-    
+
     fbo_depth_t(GLsizei res_x, GLsizei res_y, GLenum texture_unit, GLenum internal_format, GLint filtering_mode, GLint wrap_mode)
         : res_x(res_x), res_y(res_y)
     {
@@ -43,7 +43,7 @@ struct fbo_depth_t
         glActiveTexture(texture_unit);
         glGenTextures(1, &texture_id);
         glBindTexture(GL_TEXTURE_2D, texture_id);
-    
+
         glTexStorage2D(GL_TEXTURE_2D, 1, internal_format, res_x, res_y);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
@@ -55,14 +55,14 @@ struct fbo_depth_t
 
         check_status();
     }
-    
+
     //===================================================================================================================================================================================================================
     // target should be one of GL_FRAMEBUFFER, GL_DRAW_FRAMEBUFFER, GL_READ_FRAMEBUFFER
     //===================================================================================================================================================================================================================
     void bind(GLenum target)
         { glBindFramebuffer(target, id); }
-    
-    ~fbo_depth_t() 
+
+    ~fbo_depth_t()
     {
         glDeleteTextures(1, &texture_id);
         glDeleteFramebuffers(1, &id);
@@ -71,8 +71,8 @@ struct fbo_depth_t
 
 //=======================================================================================================================================================================================================================
 // fbo_color : FBO with just color attachments of type [target]
-// [target] should be one of the :: GL_TEXTURE_1D, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_1D_ARRAY, GL_TEXTURE_2D_ARRAY, 
-//                                  GL_TEXTURE_RECTANGLE, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_BUFFER, 
+// [target] should be one of the :: GL_TEXTURE_1D, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TEXTURE_1D_ARRAY, GL_TEXTURE_2D_ARRAY,
+//                                  GL_TEXTURE_RECTANGLE, GL_TEXTURE_CUBE_MAP, GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_BUFFER,
 //                                  GL_TEXTURE_2D_MULTISAMPLE or GL_TEXTURE_2D_MULTISAMPLE_ARRAY.
 // [color_attachments] is the number of the color attachments.
 //=======================================================================================================================================================================================================================
@@ -131,7 +131,7 @@ struct fbo_color_cubemap
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 	 	glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture_id, 0);
-		glDrawBuffer(GL_COLOR_ATTACHMENT0);	
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 		viewport(0, 0, texture_size, texture_size);
 
 		//================================================================================================================================================================================================================
@@ -147,7 +147,7 @@ struct fbo_color_cubemap
 	void bind()
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, id);
-		glClear(GL_COLOR_BUFFER_BIT);		
+		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
 	void bind_texture(GLenum texture_unit)
@@ -156,11 +156,11 @@ struct fbo_color_cubemap
         glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
 	}
 
-	~fbo_color_cubemap() 
+	~fbo_color_cubemap()
 	{
 		glDeleteTextures(1, &texture_id);
 		glDeleteFramebuffers(1, &id);
-	}	
+	}
 };
 
 struct fbo_depth_cubemap
@@ -204,7 +204,7 @@ struct fbo_depth_cubemap
     }
 
 	static void viewport(GLint x, GLint y, GLsizei width, GLsizei height)
-		{ glViewport(x, y, width, height); }    
+		{ glViewport(x, y, width, height); }
 
     void bind()
     {
@@ -221,7 +221,7 @@ struct fbo_depth_cubemap
     ~fbo_depth_cubemap()
     {
 		glDeleteTextures(1, &texture_id);
-	    glDeleteFramebuffers(1, &id);    	
+	    glDeleteFramebuffers(1, &id);
     }
 };
 

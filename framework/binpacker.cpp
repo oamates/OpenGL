@@ -11,16 +11,16 @@ void bin_packer_t::pack(const std::vector<int>& rects, std::vector<std::vector<i
     m_roots.clear();
 
     m_packSize = packSize;
-    
+
     for (size_t i = 0; i < rects.size(); i += 2)                                                // Add rects to member array, and check to make sure none is too big
     {
         if (rects[i] > m_packSize || rects[i + 1] > m_packSize)
             assert(!"All rect dimensions must be <= the pack size");
         m_rects.push_back(rect_t(0, 0, rects[i], rects[i + 1], i >> 1));
     }
-    
+
     std::sort(m_rects.rbegin(), m_rects.rend());                                                // Sort from greatest to least area
-    
+
     while (m_numPacked < (int)m_rects.size())                                                   // Pack
     {
         int i = m_packs.size();
@@ -28,14 +28,14 @@ void bin_packer_t::pack(const std::vector<int>& rects, std::vector<std::vector<i
         m_roots.push_back(i);
         fill(i);
     }
-    
+
     packs.resize(m_roots.size());                                                               // Write out
     for (size_t i = 0; i < m_roots.size(); ++i)
     {
         packs[i].clear();
         AddPackToArray(m_roots[i], packs[i]);
     }
-    
+
     for (size_t i = 0; i < m_rects.size(); ++i)                                                 // Check and make sure all rects were packed
         if (!m_rects[i].packed) assert(!"Not all rects were packed");
 }

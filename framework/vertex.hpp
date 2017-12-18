@@ -6,22 +6,22 @@
 #include <glm/glm.hpp>
 
 //===================================================================================================================================================================================================================
-// Bitmask that encodes sizes of consecutive vertex attributes. 
+// Bitmask that encodes sizes of consecutive vertex attributes.
 // Attribute sizes acceptable by OpenGL are 1, 2, 3 or 4, so each attribute size is stored to occupy 4 bits
 //===================================================================================================================================================================================================================
-constexpr GLuint BUFFER_LAYOUT(GLuint a0)                                             
+constexpr GLuint BUFFER_LAYOUT(GLuint a0)
     { return a0; }
 
-constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1)                                  
+constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1)
     { return a0 + a1 * 0x10; }
 
-constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1, GLuint a2)                       
+constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1, GLuint a2)
     { return a0 + a1 * 0x10 + a2 * 0x100; }
 
-constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1, GLuint a2, GLuint a3)            
+constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1, GLuint a2, GLuint a3)
     { return a0 + a1 * 0x10 + a2 * 0x100 + a3 * 0x1000; }
 
-constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1, GLuint a2, GLuint a3, GLuint a4) 
+constexpr GLuint BUFFER_LAYOUT(GLuint a0, GLuint a1, GLuint a2, GLuint a3, GLuint a4)
     { return a0 + a1 * 0x10 + a2 * 0x100 + a3 * 0x1000 + a4 * 0x10000; }
 
 //===================================================================================================================================================================================================================
@@ -51,7 +51,7 @@ struct vertex_pft3_t
     glm::vec3 uvw;
 
     vertex_pft3_t() {};
-    vertex_pft3_t(const glm::vec3& position, const glm::vec3& normal, const glm::vec3& tangent_x, const glm::vec3& tangent_y, const glm::vec3& uvw) 
+    vertex_pft3_t(const glm::vec3& position, const glm::vec3& normal, const glm::vec3& tangent_x, const glm::vec3& tangent_y, const glm::vec3& uvw)
         : position(position), normal(normal), tangent_x(tangent_x), tangent_y(tangent_y), uvw(uvw) {};
 
     vertex_pft3_t& operator = (const vertex_pft3_t&) = default;
@@ -71,7 +71,7 @@ struct vertex_pft2_t
     glm::vec2 uv;
 
     vertex_pft2_t() {};
-    vertex_pft2_t(const glm::vec3& position, const glm::vec3& normal, const glm::vec3& tangent_x, const glm::vec3& tangent_y, const glm::vec2& uv) 
+    vertex_pft2_t(const glm::vec3& position, const glm::vec3& normal, const glm::vec3& tangent_x, const glm::vec3& tangent_y, const glm::vec2& uv)
         : position(position), normal(normal), tangent_x(tangent_x), tangent_y(tangent_y), uv(uv) {};
     vertex_pft2_t& operator = (const vertex_pft2_t&) = default;
 
@@ -89,7 +89,7 @@ struct vertex_pf_t
     glm::vec3 tangent_y;
 
     vertex_pf_t() {};
-    vertex_pf_t(const glm::vec3& position, const glm::vec3& normal, const glm::vec3& tangent_x, const glm::vec3& tangent_y) 
+    vertex_pf_t(const glm::vec3& position, const glm::vec3& normal, const glm::vec3& tangent_x, const glm::vec3& tangent_y)
         : position(position), normal(normal), tangent_x(tangent_x), tangent_y(tangent_y) {};
     vertex_pf_t& operator = (const vertex_pf_t&) = default;
 
@@ -276,7 +276,7 @@ template<typename vertex_t> struct maps
     typedef vertex_t (*surface_func)   (const glm::vec2& uv);                  // (u, v) will run over the unit square, the function must be double periodic
     typedef vertex_t (*spheric_func)   (const glm::vec3& uvw);                 // (u, v, w) will run over the unit sphere
     typedef vertex_t (*curve_func)     (const glm::vec2& uv);                  // (u, v) will parameterize the unit circle, u = cos(theta), v = sin(theta)
-                                       
+
     typedef vertex_t (*toral_dfunc)    (const glm::dvec2& uv);                 // (u, v) will run over the unit square
     typedef vertex_t (*surface_dfunc)  (const glm::dvec2& uv);                 // (u, v) will run over the unit square, the function must be double periodic
     typedef vertex_t (*spheric_dfunc)  (const glm::dvec3& uvw);                // (u, v, w) will run over the unit sphere

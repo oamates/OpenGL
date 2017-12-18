@@ -36,7 +36,7 @@ template<typename real_t> real_t triangle_udf(const glm::tvec3<real_t>& P, const
             glm::min(
                 glm::length2(AB * glm::clamp(glm::dot(AB, AP) / glm::length2(AB), zero, one) - AP),
                 glm::length2(BC * glm::clamp(glm::dot(BC, BP) / glm::length2(BC), zero, one) - BP)
-            ), 
+            ),
             glm::length2(CA * glm::clamp(glm::dot(CA, CP) / glm::length2(CA), zero, one) - CP)
         )
     );
@@ -192,7 +192,7 @@ template<typename index_t> struct sdf_compute_t
         const double diameter = 3.464101615137754587054892683011744734;         // = 2sqrt(3)
 
         //===============================================================================================================================================================================================================
-        // to avoid dealing with std::atomic<double>, to gain some speed and to save some space 
+        // to avoid dealing with std::atomic<double>, to gain some speed and to save some space
         // the distance field values (bounded by the length of the [-1, 1] 3d-cube diagonal) are scaled and result is stored in an integer atomic array
         //===============================================================================================================================================================================================================
 
@@ -243,7 +243,7 @@ template<typename index_t> struct sdf_compute_t
 
         if (file_name)
         {
-            tex3d_header_t header 
+            tex3d_header_t header
             {
                 .target = GL_TEXTURE_3D,
                 .internal_format = GL_R32F,
@@ -257,7 +257,7 @@ template<typename index_t> struct sdf_compute_t
             fwrite(&header, sizeof(tex3d_header_t), 1, f);
             fwrite(texture_data, header.data_size, 1, f);
             fclose(f);
-        }        
+        }
 
 
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, p2, p2, p2, 0, GL_RED, GL_FLOAT, texture_data);
@@ -275,7 +275,7 @@ template<typename index_t> struct sdf_compute_t
     //===================================================================================================================================================================================================================
     // computes approximate signed distance function from a triangle mesh to a discrete lattice in 3D-space
     // the function runs multiple threads executing the main unsigned distance function computation algorithm
-    // on both external and internal layers of the model 
+    // on both external and internal layers of the model
     // no modification is necessary to increase the amount of threads -- so let it be equal to the number of processor (logical) cores
     // the implementation will work for distance textures up to 1024 x 1024 x 1024 dimension
     //===================================================================================================================================================================================================================
@@ -387,7 +387,7 @@ template<typename index_t> struct sdf_compute_t
 
         if (file_name)
         {
-            tex3d_header_t header 
+            tex3d_header_t header
             {
                 .target = GL_TEXTURE_3D,
                 .internal_format = GL_R32F,
@@ -395,7 +395,7 @@ template<typename index_t> struct sdf_compute_t
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
                 .data_size = (uint32_t) texture_size * sizeof(float)
-            };  
+            };
 
 
             FILE* f = fopen(file_name, "wb");
@@ -418,7 +418,7 @@ template<typename index_t> struct sdf_compute_t
 
         if (file_name)
         {
-            tex3d_header_t header 
+            tex3d_header_t header
             {
                 .target = GL_TEXTURE_3D,
                 .internal_format = GL_RG32F,
@@ -426,7 +426,7 @@ template<typename index_t> struct sdf_compute_t
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
                 .data_size = (uint32_t) texture_size * sizeof(glm::vec2)
-            };  
+            };
 
 
             FILE* f = fopen(file_name, "wb");
@@ -477,7 +477,7 @@ template<typename index_t> struct sdf_compute_t
 
         const unsigned int diameter = 929887697;        // = 2^28 * 2sqrt(3)
         //===============================================================================================================================================================================================================
-        // to avoid dealing with std::atomic<double>, to gain some speed and to save some space 
+        // to avoid dealing with std::atomic<double>, to gain some speed and to save some space
         // the distance field values (bounded by the length of the [-1, 1] 3d-cube diagonal) are scaled and result is stored in an integer atomic array
         //===============================================================================================================================================================================================================
 
@@ -537,7 +537,7 @@ template<typename index_t> struct sdf_compute_t
 
     //===================================================================================================================================================================================================================
     // computes (approximate) signed distance function from a triangle mesh to a discrete lattice in 3D-space
-    // the function generates two point clouds (external and internal), computes two unsigned distance fields and by simple analysis 
+    // the function generates two point clouds (external and internal), computes two unsigned distance fields and by simple analysis
     // decides whether the given lattice point lies inside or outside of the distance mesh and computes the distance
     //===================================================================================================================================================================================================================
     template<int threads> GLuint pnt_sdf_compute(int max_level, GLenum texture_unit, const char* file_name = 0)
@@ -675,7 +675,7 @@ template<typename index_t> struct sdf_compute_t
         //=======================================================================================================================================================================================================
         if (file_name)
         {
-            tex3d_header_t header 
+            tex3d_header_t header
             {
                 .target = GL_TEXTURE_3D,
                 .internal_format = GL_R32F,
@@ -683,7 +683,7 @@ template<typename index_t> struct sdf_compute_t
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
                 .data_size = (uint32_t) texture_size * sizeof(GLfloat)
-            };  
+            };
 
 
             FILE* f = fopen(file_name, "wb");
@@ -706,7 +706,7 @@ template<typename index_t> struct sdf_compute_t
     //===================================================================================================================================================================================================================
     // implementation of the main algorithm for unsigned distance function computation ::
     // the function takes a triangle and traverses (simultaneously modifying it) distance octree avoiding octree branches
-    // that distances to this particular triangle will certainly not modify and updating releveant ones using atomic minimum operation 
+    // that distances to this particular triangle will certainly not modify and updating releveant ones using atomic minimum operation
     //===================================================================================================================================================================================================================
     static void tri_udf_compute_thread(tri_udf_compute_data_t* compute_data)
     {
@@ -718,7 +718,7 @@ template<typename index_t> struct sdf_compute_t
         double cube_diameter = 2.0 * constants::sqrt3_d;
 
         //===============================================================================================================================================================================================================
-        // get the index of the triangle this invocation will work on 
+        // get the index of the triangle this invocation will work on
         //===============================================================================================================================================================================================================
         unsigned int f = compute_data->triangle_index++;
 
@@ -782,13 +782,13 @@ template<typename index_t> struct sdf_compute_t
 
                 double q = glm::sign(glm::dot(glm::cross(BA, normal), pA)) + glm::sign(glm::dot(glm::cross(CB, normal), pB)) + glm::sign(glm::dot(glm::cross(AC, normal), pC));
 
-                double distance_to_node = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) : 
+                double distance_to_node = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) :
                     glm::sqrt(
                         glm::min(
                             glm::min(
                                 glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
                                 glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
-                            ), 
+                            ),
                                 glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
                         )
                     );
@@ -830,20 +830,20 @@ template<typename index_t> struct sdf_compute_t
                         {
                             glm::dvec3 leaf_position = leaf_node + inv_p2 * shift[v];
                             glm::ivec3 uvw = glm::ivec3(glm::floor(p2m1 + p2m1 * leaf_position));
-                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x; 
+                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x;
 
                             glm::dvec3 pA = leaf_position - vA;
                             glm::dvec3 pB = leaf_position - vB;
                             glm::dvec3 pC = leaf_position - vC;
 
                             double q = glm::sign(glm::dot(glm::cross(BA, normal), pA)) + glm::sign(glm::dot(glm::cross(CB, normal), pB)) + glm::sign(glm::dot(glm::cross(AC, normal), pC));
-                            double distance_to_leaf = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) : 
+                            double distance_to_leaf = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) :
                                 glm::sqrt(
                                     glm::min(
                                         glm::min(
                                             glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
                                             glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
-                                        ), 
+                                        ),
                                             glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
                                     )
                                 );
@@ -861,7 +861,7 @@ template<typename index_t> struct sdf_compute_t
                         }
                         octree_digit[level]++;
                         node_index++;
-                    }   
+                    }
                     else
                     {
                         //===============================================================================================================================================================================================
@@ -884,7 +884,7 @@ template<typename index_t> struct sdf_compute_t
     //===================================================================================================================================================================================================================
     // implementation of the main algorithm for unsigned distance function computation ::
     // the function takes a triangle and traverses (simultaneously modifying it) distance octree avoiding octree branches
-    // that distances to this particular triangle will certainly not modify and updating releveant ones using atomic minimum operation 
+    // that distances to this particular triangle will certainly not modify and updating releveant ones using atomic minimum operation
     //===================================================================================================================================================================================================================
     static void pnt_udf_compute_thread(pnt_udf_compute_data_t* compute_data)
     {
@@ -896,7 +896,7 @@ template<typename index_t> struct sdf_compute_t
         double cube_diameter = 2.0 * constants::sqrt3_d;
 
         //===============================================================================================================================================================================================================
-        // get the index of the triangle this invocation will work on 
+        // get the index of the triangle this invocation will work on
         //===============================================================================================================================================================================================================
         unsigned int point = compute_data->point_index++;
 
@@ -974,7 +974,7 @@ template<typename index_t> struct sdf_compute_t
                         {
                             glm::dvec3 leaf_position = leaf_node + inv_p2 * shift[v];
                             glm::ivec3 uvw = glm::ivec3(glm::floor(p2m1 + p2m1 * leaf_position));
-                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x; 
+                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x;
                             double distance_to_leaf = glm::length(position - leaf_node);
                             unsigned int idistance_to_leaf = (unsigned int)(distance_to_leaf * INTEGRAL_SCALE);
                             atomic_min(compute_data->udf_texture[tex3d_index], idistance_to_leaf);
@@ -990,7 +990,7 @@ template<typename index_t> struct sdf_compute_t
                         }
                         octree_digit[level]++;
                         node_index++;
-                    }   
+                    }
                     else
                     {
                         //===============================================================================================================================================================================================
@@ -1166,9 +1166,9 @@ template<typename index_t> struct sdf_compute_t
 
                     glm::dvec4 g = tri_closest_point(position, A, B, C);
 
-                    double inv_length = 1.0 / g.w; 
+                    double inv_length = 1.0 / g.w;
                     glm::dvec3 n = inv_length * glm::dvec3(g);
-                    glm::dvec4 q = glm::dvec4(n, g.w - glm::dot(n, position)); 
+                    glm::dvec4 q = glm::dvec4(n, g.w - glm::dot(n, position));
 
                     if (external_udf[index] > udf[index]) q = -q;
 
@@ -1179,7 +1179,7 @@ template<typename index_t> struct sdf_compute_t
 
         if (file_name)
         {
-            tex3d_header_t header 
+            tex3d_header_t header
             {
                 .target = GL_TEXTURE_3D,
                 .internal_format = GL_RGBA32F,
@@ -1187,7 +1187,7 @@ template<typename index_t> struct sdf_compute_t
                 .type = GL_FLOAT,
                 .size = glm::ivec3(p2, p2, p2),
                 .data_size = (uint32_t) texture_size * sizeof(glm::vec4)
-            };  
+            };
 
 
             FILE* f = fopen(file_name, "wb");
@@ -1213,7 +1213,7 @@ template<typename index_t> struct sdf_compute_t
     // that distances to this particular triangle will certainly not modify and updating relevant ones using atomic minimum operation
     // for the leaves (texture elements) the algorithm also saves the index of the closest triangle
     // to be later used for finding not just the value of the distance function but also its gradient
-    // and storing linearized part of the distance function in a texel  
+    // and storing linearized part of the distance function in a texel
     //===================================================================================================================================================================================================================
 
     static void tri_eudf_compute_thread(tri_eudf_compute_data_t* ext_compute_data, int thread_id)
@@ -1234,7 +1234,7 @@ template<typename index_t> struct sdf_compute_t
             field[i] = diameter;
 
         //===============================================================================================================================================================================================================
-        // get the index of the triangle this invocation will work on 
+        // get the index of the triangle this invocation will work on
         //===============================================================================================================================================================================================================
         unsigned int f = ext_compute_data->triangle_index++;
 
@@ -1298,13 +1298,13 @@ template<typename index_t> struct sdf_compute_t
 
                 double q = glm::sign(glm::dot(glm::cross(BA, normal), pA)) + glm::sign(glm::dot(glm::cross(CB, normal), pB)) + glm::sign(glm::dot(glm::cross(AC, normal), pC));
 
-                double distance_to_node = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) : 
+                double distance_to_node = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) :
                     glm::sqrt(
                         glm::min(
                             glm::min(
                                 glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
                                 glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
-                            ), 
+                            ),
                                 glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
                         )
                     );
@@ -1346,20 +1346,20 @@ template<typename index_t> struct sdf_compute_t
                         {
                             glm::dvec3 leaf_position = leaf_node + inv_p2 * shift[v];
                             glm::ivec3 uvw = glm::ivec3(glm::floor(p2m1 + p2m1 * leaf_position));
-                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x; 
+                            unsigned int tex3d_index = (uvw.z << (max_level + max_level)) + (uvw.y << max_level) + uvw.x;
 
                             glm::dvec3 pA = leaf_position - vA;
                             glm::dvec3 pB = leaf_position - vB;
                             glm::dvec3 pC = leaf_position - vC;
 
                             double q = glm::sign(glm::dot(glm::cross(BA, normal), pA)) + glm::sign(glm::dot(glm::cross(CB, normal), pB)) + glm::sign(glm::dot(glm::cross(AC, normal), pC));
-                            double distance_to_leaf = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) : 
+                            double distance_to_leaf = (q >= 2.0f) ? inv_area * glm::abs(glm::dot(normal, pA)) :
                                 glm::sqrt(
                                     glm::min(
                                         glm::min(
                                             glm::length2(glm::clamp(glm::dot(BA, pA) * inv_dBA, 0.0, 1.0) * BA - pA),
                                             glm::length2(glm::clamp(glm::dot(CB, pB) * inv_dCB, 0.0, 1.0) * CB - pB)
-                                        ), 
+                                        ),
                                             glm::length2(glm::clamp(glm::dot(AC, pC) * inv_dAC, 0.0, 1.0) * AC - pC)
                                     )
                                 );
@@ -1385,7 +1385,7 @@ template<typename index_t> struct sdf_compute_t
                         }
                         octree_digit[level]++;
                         node_index++;
-                    }   
+                    }
                     else
                     {
                         //===============================================================================================================================================================================================

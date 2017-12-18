@@ -1,4 +1,4 @@
-#ifndef __torus_included_019371234523712712947321224513980696703855102481925496          
+#ifndef __torus_included_019371234523712712947321224513980696703855102481925496
 #define __torus_included_019371234523712712947321224513980696703855102481925496
 
 #define GLEW_STATIC
@@ -19,7 +19,7 @@ typedef float (*toral_landscape_func) (const glm::vec2& uv, int level);
 struct torus_t
 {
     vao_t vao;
-    
+
      torus_t() {};
     ~torus_t() {};
 
@@ -59,7 +59,7 @@ struct torus_t
         //===============================================================================================================================================================================================================
         int size_x, size_y;
         float delta_x, delta_y;
-        int strips_per_thread, vertices_per_thread, indices_per_thread; 
+        int strips_per_thread, vertices_per_thread, indices_per_thread;
 
         //===============================================================================================================================================================================================================
         // dynamically allocated attribute and index buffers for the functions below to fill

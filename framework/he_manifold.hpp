@@ -1,9 +1,9 @@
 #ifndef _he_manifold_included_1239578625162570986120359786072682457131370489856
 #define _he_manifold_included_1239578625162570986120359786072682457131370489856
 
-#define GLM_FORCE_RADIANS 
+#define GLM_FORCE_RADIANS
 #define GLM_FORCE_NO_CTOR_INIT
- 
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
@@ -59,7 +59,7 @@ template<typename index_t> struct he_manifold_t
         edges = (halfedge_t<index_t>*) malloc(E * sizeof(halfedge_t<index_t>));
 
         //================================================================================================================================================================================================================
-        // create half-edge structure array from the input data                                                                                                                                                                    
+        // create half-edge structure array from the input data
         //================================================================================================================================================================================================================
         for (uint32_t e = 0, f = 0; f < F; ++f)
         {
@@ -139,7 +139,7 @@ template<typename index_t> struct he_manifold_t
                 }
                 while (i <= j);
 
-                if (j - l < r - i)                                                                  // push the larger interval to stack and continue sorting the smaller one                                                      
+                if (j - l < r - i)                                                                  // push the larger interval to stack and continue sorting the smaller one
                 {
                     if (i < r)
                     {
@@ -165,7 +165,7 @@ template<typename index_t> struct he_manifold_t
         while (sp >= 0);
 
         //============================================================================================================================================================================================================
-        // fill opposite edge indices, -1 will indicate boundary edges                                                                                                                                                        
+        // fill opposite edge indices, -1 will indicate boundary edges
         //============================================================================================================================================================================================================
         for (uint32_t e = 0; e < E; ++e)
         {
@@ -210,7 +210,7 @@ template<typename index_t> struct he_manifold_t
             bool next_face_test = (edges[edges[e].next].a == edges[e].b);
 
             bool opposite_edge_test = (o != e) &&
-                                      (edges[o].a == edges[e].b) && 
+                                      (edges[o].a == edges[e].b) &&
                                       (edges[o].b == edges[e].a) &&
                                       (edges[o].opposite == e);
 
@@ -218,7 +218,7 @@ template<typename index_t> struct he_manifold_t
                     y = faces[edges[e].face].y,
                     z = faces[edges[e].face].z;
 
-            bool face_test = ((edges[e].a == x) && (edges[e].b == y)) || 
+            bool face_test = ((edges[e].a == x) && (edges[e].b == y)) ||
                              ((edges[e].a == y) && (edges[e].b == z)) ||
                              ((edges[e].a == z) && (edges[e].b == x));
 
@@ -252,7 +252,7 @@ template<typename index_t> struct he_manifold_t
                 return false;
             }
             return true;
-        }        
+        }
     }
 
     //================================================================================================================================================================================================================
@@ -343,7 +343,7 @@ template<typename index_t> struct he_manifold_t
         }
     }
 
-    
+
     void find_folded_edges(double threshold)
     {
         debug_msg("Searching folded edges :: ");
@@ -435,8 +435,8 @@ template<typename index_t> struct he_manifold_t
                 }
             }
         }
-        debug_msg("Done. #folded_flippable_edges = %u, #non_flippable_folded_edges = %u, total = %u", 
-            flippable_folded, non_flippable_folded, flippable_folded + non_flippable_folded);        
+        debug_msg("Done. #folded_flippable_edges = %u, #non_flippable_folded_edges = %u, total = %u",
+            flippable_folded, non_flippable_folded, flippable_folded + non_flippable_folded);
     }
 
     void flip_folded_edges(double threshold)
@@ -523,7 +523,7 @@ template<typename index_t> struct he_manifold_t
 
         for(GLuint e = 0; e < E; ++e)
         {
-            uint32_t o = edges[e].opposite;            
+            uint32_t o = edges[e].opposite;
             uint32_t a = edges[e].a;
             uint32_t b = edges[e].b;
             uint32_t c = edges[edges[e].next].b;
@@ -546,7 +546,7 @@ template<typename index_t> struct he_manifold_t
                 }
             }
         }
-        debug_msg("Done. #degenerate flippable edges = %u, #degenerate non-flippable edges = %u, total = %u", 
+        debug_msg("Done. #degenerate flippable edges = %u, #degenerate non-flippable edges = %u, total = %u",
             flippable_degenerate, non_flippable_degenerate, flippable_degenerate + non_flippable_degenerate);
     }
 

@@ -17,8 +17,8 @@ static constexpr const char* const short_path(const char * const str, const char
                                              short_path(str + 1, last_slash);
 }
 
-static constexpr const char * const short_path(const char * const str) 
-{ 
+static constexpr const char * const short_path(const char * const str)
+{
     return short_path(str, str);
 }
 
@@ -32,7 +32,7 @@ static constexpr const char * const short_path(const char * const str)
     #define DEBUG_GREEN_COLOR
     #define DEBUG_ORANGE_COLOR
     #define DEBUG_DEFAULT_COLOR
-#endif                            
+#endif
 
 //=======================================================================================================================================================================================================================
 // the interface :)

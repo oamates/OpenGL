@@ -132,7 +132,7 @@ struct vbo_t
     {
         vbo_t::size = size;
         vbo_t::layout = vertex_t::layout;
-    
+
         glGenBuffers(1, &id);
         glBindBuffer(GL_ARRAY_BUFFER, id);
         glBufferData(GL_ARRAY_BUFFER, size * sizeof(vertex_t), data, GL_STATIC_DRAW);
@@ -195,7 +195,7 @@ struct vao_t
     vao_t(const char* file_name)
         { init(file_name); }
 
-    vao_t(vao_t&& other) : id(other.id), vbo(std::move(other.vbo)), ibo(std::move(other.ibo)) 
+    vao_t(vao_t&& other) : id(other.id), vbo(std::move(other.vbo)), ibo(std::move(other.ibo))
         { other.id = 0; }
 
     vao_t& operator = (vao_t&& other)
@@ -221,7 +221,7 @@ struct vao_t
 
         glGenVertexArrays(1, &id);
         glBindVertexArray(id);
-        
+
         //================================================================================================================================================================================================================
         // calculate attribute stride size in memory
         //================================================================================================================================================================================================================
@@ -229,17 +229,17 @@ struct vao_t
         vbo.layout = header.layout;
         glGenBuffers(1, &vbo.id);
         glBindBuffer(GL_ARRAY_BUFFER, vbo.id);
-        GLsizei stride = 0;        
+        GLsizei stride = 0;
         for(GLuint layout = header.layout; layout; layout >>= 4)
             stride += layout & 0xF;
         stride *= sizeof(GLfloat);
-        
+
         //================================================================================================================================================================================================================
         // set up vertex attributes layout in buffer
         //================================================================================================================================================================================================================
         GLuint attr_id = 0;
         float* offset = 0;
-        
+
         for(GLuint layout = header.layout; layout; layout >>= 4)
         {
             glEnableVertexAttribArray(attr_id);
@@ -248,7 +248,7 @@ struct vao_t
             offset += attr_size;
             attr_id++;
         }
-        
+
         GLvoid* buf_ptr;
         //================================================================================================================================================================================================================
         // map attribute buffer to memory and read file data directly to the address provided by OpenGL
@@ -257,14 +257,14 @@ struct vao_t
         buf_ptr = vbo_t::map(GL_WRITE_ONLY);
         fread(buf_ptr, stride, header.vbo_size, f);
         vbo_t::unmap();
-        
+
         //================================================================================================================================================================================================================
         // map index buffer to memory and read file data directly to it
         //================================================================================================================================================================================================================
         ibo.size = header.ibo_size;
         ibo.mode = header.mode;
         ibo.type = header.type;
-        unsigned int index_size = (header.type == GL_UNSIGNED_INT) ? sizeof(GLuint) : (header.type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);    
+        unsigned int index_size = (header.type == GL_UNSIGNED_INT) ? sizeof(GLuint) : (header.type == GL_UNSIGNED_SHORT) ? sizeof(GLushort) : sizeof(GLubyte);
         glGenBuffers(1, &ibo.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo.id);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_size * header.ibo_size, 0, GL_STATIC_DRAW);
@@ -272,32 +272,32 @@ struct vao_t
         buf_ptr = ibo_t::map(GL_WRITE_ONLY);
         fread(buf_ptr, index_size, header.ibo_size, f);
         ibo_t::unmap();
-                
+
         fclose(f);
     }
 
-    template <typename vertex_t, typename index_t> 
+    template <typename vertex_t, typename index_t>
     vao_t(GLenum mode, const vertex_t* vertex_data, unsigned int vertex_count, const index_t* index_data, unsigned int index_count)
         { init(mode, vertex_data, vertex_count, index_data, index_count); }
 
-    template <typename vertex_t, typename index_t> 
+    template <typename vertex_t, typename index_t>
     void init(GLenum mode, const vertex_t* vertex_data, unsigned int vertex_count, const index_t* index_data, unsigned int index_count)
     {
         glGenVertexArrays(1, &id);
-        glBindVertexArray(id);    
+        glBindVertexArray(id);
         vbo.init<vertex_t>(vertex_data, vertex_count);
-        ibo.init<index_t>(mode, index_data, index_count);    
+        ibo.init<index_t>(mode, index_data, index_count);
     }
-    
-    template <typename vertex_t, typename index_t> 
+
+    template <typename vertex_t, typename index_t>
     void init(GLenum mode, const std::vector<vertex_t>& vertex_data, const std::vector<index_t>& index_data)
         { init(mode, vertex_data.data(), vertex_data.size(), index_data.data(), index_data.size()); }
-    
-    template <typename vertex_t, typename index_t> 
+
+    template <typename vertex_t, typename index_t>
     static void store(const char* file_name, GLenum mode, const vertex_t* vertex_data, unsigned int vertex_count, const index_t* index_data, unsigned int index_count)
     {
         FILE* f = fopen(file_name, "wb");
-    
+
         header_t header;
         header.layout = vertex_t::layout;
         header.vbo_size = vertex_count;
@@ -310,7 +310,7 @@ struct vao_t
         fwrite(index_data, sizeof(index_t), index_count, f);
         fclose(f);
     }
-    
+
     ~vao_t()
         { if (id) glDeleteVertexArrays(1, &id); };
 
@@ -364,7 +364,7 @@ struct adjacency_vao_t
     GLuint id;
     ibo_t ibo;
      adjacency_vao_t() : id(0) {};
-    ~adjacency_vao_t() 
+    ~adjacency_vao_t()
         { glDeleteVertexArrays(1, &id); }
 
     void render()

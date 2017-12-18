@@ -1,4 +1,4 @@
-#ifndef _sphere_included_235872365354939851234963462099846368123698345924091252              
+#ifndef _sphere_included_235872365354939851234963462099846368123698345924091252
 #define _sphere_included_235872365354939851234963462099846368123698345924091252
 
 #define GLEW_STATIC
@@ -62,11 +62,11 @@ struct sphere_t
         int level;                                                      // the level of barycentric subdivision
         int V, E, Q;                                                    // the number of vertices, edges and quads in the initial mesh
         const glm::uvec2* edges;                                        // array of edges (vertex-vertex pairs)
-        const GLuint* edge_indices;                                     // edge (vertex-vertex pair) to edge index array 
+        const GLuint* edge_indices;                                     // edge (vertex-vertex pair) to edge index array
         const glm::uvec4* quads;                                        // array of quads in the initial mesh
         int vertices_per_quad;                                          // the number of new vertices inside a quad, the number of new vertices on any edge is simply = level - 1
-        int indices_per_quad;                                         
-        int quad_vertices_base_index;                                   
+        int indices_per_quad;
+        int quad_vertices_base_index;
 
         //===========================================================================================================================================================================================================
         // dynamically allocated attribute and index buffers for the functions below to fill
