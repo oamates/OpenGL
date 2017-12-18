@@ -5,7 +5,6 @@
 #include <oglplus/gl.hpp>
 #include <oglplus/context.hpp>
 
-#include <FreeImagePlus.h>
 #include <assimp/Importer.hpp>
 #include <assimp/version.h>
 
@@ -105,7 +104,6 @@ void engine_t::initialize() const
     /* print library versions information */
     debug_msg("GLFW : %s", glfwGetVersionString());
     debug_msg("Assimp : %u.%u.%u", aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionRevision());
-    debug_msg("FreeImage : %s", FreeImage_GetVersion());
     debug_msg("OpenGL : %s", glGetString(GL_VERSION));
     debug_msg("GLSL : %s", glGetString(GL_SHADING_LANGUAGE_VERSION));
     debug_msg("GLEW : %s", glewGetString(GLEW_VERSION));

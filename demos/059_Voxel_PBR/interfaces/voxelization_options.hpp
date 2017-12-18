@@ -28,7 +28,7 @@ struct UIVoxelizationOptions : public ui_t
         {
             static auto texRes = 5;
             static std::vector<int> sizes = { 8, 16, 32, 64, 128, 256, 512 };
-            static std::vector<const char *> sizesStr = { "8", "16", "32", "64", "128", "256", "512" };
+            static std::vector<const char*> sizesStr = { "8", "16", "32", "64", "128", "256", "512" };
             
             ImGui::BeginGroup();                                                            // shadow map quality
             ImGui::Text("Volume Resolution");

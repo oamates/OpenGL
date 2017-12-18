@@ -10,8 +10,6 @@
 
 inline void DrawBufferTexture(const oglplus::Texture &tex, const std::string &name)
 {
-    using namespace oglplus;
-
     static ImVec2 size = ImVec2(160, 90);
     static ImVec2 uv1 = ImVec2(-1,  0);
     static ImVec2 uv2 = ImVec2( 0, -1);

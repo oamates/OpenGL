@@ -83,12 +83,12 @@ struct Texture2D : public RawTexture
             return;
     
         using namespace oglplus;
-        auto pdf = PixelDataFormat::RGBA;
+        auto pdf = PixelDataFormat::BGRA;
         auto pdif = PixelDataInternalFormat::RGBA8;
         this->oglTexture = std::make_unique<Texture>();
         unsigned int bytesPerPixel = this->bitsPerPixel / 8;
 
-        pdf  = bytesPerPixel == 3 ? PixelDataFormat::RGB : pdf;
+        pdf  = bytesPerPixel == 3 ? PixelDataFormat::BGR : pdf;
         pdif = bytesPerPixel == 3 ? PixelDataInternalFormat::RGB8 : pdif;
         pdf  = bytesPerPixel == 2 ? PixelDataFormat::RG : pdf;
         pdif = bytesPerPixel == 2 ? PixelDataInternalFormat::RG8 : pdif;
