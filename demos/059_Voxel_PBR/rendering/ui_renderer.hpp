@@ -20,7 +20,7 @@ struct ui_renderer_t
 
 	// Contains all the OpenGL objects names and useful fields for callback logic.
 
-	struct RendererData
+	struct render_data_t
     {
         GLFWwindow* window;
         double time;
@@ -32,15 +32,12 @@ struct ui_renderer_t
         int fragHandle;
         int attribLocationTex;
         int attribLocationProjMtx;
-        int attribLocationPosition;
-        int attribLocationUV;
-        int attribLocationColor;
-        unsigned int vboHandle;
-        unsigned int vaoHandle;
-        unsigned int elementsHandle;
+        unsigned int vao_id;
+        unsigned int vbo_id;
+        unsigned int ibo_id;
         bool disabled;
 
-        RendererData()
+        render_data_t()
         {
             window = nullptr;
             time = 0.0f;
@@ -49,23 +46,21 @@ struct ui_renderer_t
             fontTexture = 0;
             shaderHandle = 0, vertHandle = 0, fragHandle = 0;
             attribLocationTex = 0, attribLocationProjMtx = 0;
-            attribLocationPosition = 0, attribLocationUV = 0,
-            attribLocationColor = 0;
-            vboHandle = 0, vaoHandle = 0, elementsHandle = 0;
+            vao_id = 0, vbo_id = 0, ibo_id = 0;
             disabled = false;
         }
     };
 
-    static std::unique_ptr<RendererData> renderer;
+    static std::unique_ptr<render_data_t> render_data;
     static void InvalidateDeviceObjects();
     static void CreateFontsTexture();
     static void CreateDeviceObjects();
 
-    static void RenderDrawList(ImDrawData * drawData);
-    static void MouseButtonCallback(GLFWwindow * window, int button, int action, int mods);
-    static void ScrollCallback(GLFWwindow * window, double xoffset, double yoffset);
-    static void KeyCallback(GLFWwindow * window, int key, int scancode, int action, int mods);
-    static void CharCallback(GLFWwindow * window, unsigned int c);
+    static void RenderDrawList(ImDrawData* drawData);
+    static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+    static void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+    static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+    static void CharCallback(GLFWwindow* window, unsigned int c);
 
     static void SetClipboardText(void* user_data, const char * text);
     static const char* GetClipboardText(void* user_data);
