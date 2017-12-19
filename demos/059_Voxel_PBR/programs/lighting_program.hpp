@@ -67,7 +67,6 @@ struct LightingProgram : public ProgramShader
 
     void ExtractUniforms() override
     {
-        using namespace oglplus;
         // assign program
         inverseProjectionView.Assign(program);
         lightViewProjection.Assign(program);

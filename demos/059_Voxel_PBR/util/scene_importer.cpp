@@ -1,17 +1,20 @@
-#include "scene_importer.hpp"
+#include <memory>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/quaternion.hpp>
+
+#include "scene_importer.hpp"
+
 #include "texture_importer.hpp"
 #include "../scene/scene.hpp"
 #include "../scene/material.hpp"
 #include "../scene/mesh.hpp"
 #include "../scene/camera.hpp"
 #include "../scene/light.hpp"
-#include "../types/vertex.hpp"
 
-#include <memory>
-#include <glm/gtc/quaternion.hpp>
+#include "vertex.hpp"
+
 
 bool SceneImporter::Import(const std::string &filepath, Scene * scene, unsigned flags)
 {
@@ -145,23 +148,30 @@ void SceneImporter::ImportMesh(aiMesh * mMesh, Mesh &mesh)
     {
         for (unsigned int i = 0; i < mMesh->mNumVertices; i++)
         {
-            Vertex vertex;                                                              // store mesh data
+            vertex_pft3_t vertex;                                                                   // store mesh data
             vertex.position = glm::vec3(mMesh->mVertices[i].x, mMesh->mVertices[i].y, mMesh->mVertices[i].z);
             vertex.normal = glm::vec3(mMesh->mNormals[i].x, mMesh->mNormals[i].y, mMesh->mNormals[i].z);
-
-            if (mMesh->HasTextureCoords(0))
-                vertex.uv = glm::vec3(mMesh->mTextureCoords[0][i].x, mMesh->mTextureCoords[0][i].y, mMesh->mTextureCoords[0][i].z);
+            vertex.uvw = (mMesh->HasTextureCoords(0)) ? glm::vec3(mMesh->mTextureCoords[0][i].x, mMesh->mTextureCoords[0][i].y, mMesh->mTextureCoords[0][i].z) : 
+                                                        glm::vec3(0.0f);
 
             if (mMesh->HasTangentsAndBitangents())
             {
-                vertex.tangent = glm::vec3(mMesh->mTangents[i].x, mMesh->mTangents[i].y, mMesh->mTangents[i].z);
-                vertex.bitangent = glm::vec3(mMesh->mBitangents[i].x, mMesh->mBitangents[i].y, mMesh->mBitangents[i].z);
+                vertex.tangent_x = glm::vec3(mMesh->mTangents[i].x, mMesh->mTangents[i].y, mMesh->mTangents[i].z);
+                vertex.tangent_y = glm::vec3(mMesh->mBitangents[i].x, mMesh->mBitangents[i].y, mMesh->mBitangents[i].z);
             }
+            else
+                vertex.tangent_x = vertex.tangent_y = glm::vec3(0.0f);
             
-            mesh.boundaries.MinPoint(vertex.position);                                  // update boundaries with current position
+            mesh.boundaries.MinPoint(vertex.position);                                              // update boundaries with current position
             mesh.boundaries.MaxPoint(vertex.position);
-            vertex.Orthonormalize();                                                    // gram-schmidt orthonormalization
-            mesh.vertices.push_back(std::move(vertex));                                 // new vertex to raw mesh data
+            vertex.normal = glm::normalize(vertex.normal);                                          // gram-schmidt orthonormalization
+            vertex.tangent_x = vertex.tangent_x - glm::dot(vertex.tangent_x, vertex.normal) * vertex.normal;
+            vertex.tangent_x = glm::normalize(vertex.tangent_x);
+            vertex.tangent_y = vertex.tangent_y - glm::dot(vertex.tangent_y, vertex.normal) * vertex.normal;
+            vertex.tangent_y = glm::normalize(vertex.tangent_y);
+            if (glm::dot(glm::cross(vertex.normal, vertex.tangent_x), vertex.tangent_y) < 0.0f)     // secure handedness
+                vertex.tangent_x = -vertex.tangent_x;
+            mesh.vertices.push_back(vertex);                                                        // new vertex to raw mesh data
         }
     }
 

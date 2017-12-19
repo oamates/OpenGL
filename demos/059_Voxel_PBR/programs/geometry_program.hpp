@@ -33,8 +33,6 @@ struct GeometryProgram : public ProgramShader
 
     void ExtractUniforms() override
     {
-        //using namespace oglplus;
-        
         material.diffuse.Assign(program);                           // assign program
         material.specular.Assign(program);
         material.shininess.Assign(program);

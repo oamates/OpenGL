@@ -39,8 +39,7 @@ GIDeferredRenderer::~GIDeferredRenderer()
 
 void GIDeferredRenderer::Render()
 {
-    using namespace oglplus;
-    static Context gl;
+    static oglplus::Context gl;
     static auto &camera = Camera::Active();
     static auto &scene = Scene::Active();
     static auto &info = Window().Info();
@@ -50,28 +49,27 @@ void GIDeferredRenderer::Render()
 
     SetAsActive();
     
-    geometryBuffer.Bind(FramebufferTarget::Draw);                                   // bind g buffer for writing
-    gl.ColorMask(true, true, true, true);
-    gl.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    gl.Viewport(info.framebufferWidth, info.framebufferHeight);
-    gl.Clear().ColorBuffer().DepthBuffer();
+    geometryBuffer.Bind(oglplus::FramebufferTarget::Draw);                                   // bind g buffer for writing
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glViewport(0, 0, info.framebufferWidth, info.framebufferHeight);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     CurrentProgram<GeometryProgram>(GeometryPass());                                // activate geometry pass shader program
     
-    //glClearDepth(1.0f);
-    //glEnable(GL_DEPTH_TEST);
-    gl.ClearDepth(1.0f);                                                            // rendering and GL flags
-    gl.Enable(Capability::DepthTest);
-    gl.Disable(Capability::Blend);
-    gl.Enable(Capability::CullFace);
-    gl.FrontFace(FaceOrientation::CCW);
-    gl.CullFace(Face::Back);
+    glClearDepth(1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
+    glCullFace(GL_BACK);
     camera->DoFrustumCulling(true);
     scene->rootNode->DrawList();                                                    // draw whole scene tree from root node
-    DefaultFramebuffer().Bind(FramebufferTarget::Draw);                             // start light pass
-    gl.ColorMask(true, true, true, true);
-    gl.Viewport(info.framebufferWidth, info.framebufferHeight);
-    gl.Clear().ColorBuffer().DepthBuffer();
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glViewport(0, 0, info.framebufferWidth, info.framebufferHeight);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     CurrentProgram<LightingProgram>(LightingPass());
     SetLightPassUniforms();                                                         // pass light info and texture locations for final light pass    
     fsQuad.DrawElements();                                                          // draw the result onto a fullscreen quad
@@ -96,15 +94,15 @@ void GIDeferredRenderer::SetMaterialUniforms(const Material &material) const
     prog.material.shininess.Set(glm::sin(glm::pow(material.shininess_exponent, 3.0f) * glm::half_pi<float>()));
     prog.material.useNormalsMap.Set(material.HasTexture(RawTexture::Normals));
     // set textures
-    Texture::Active(0);
+    glActiveTexture(GL_TEXTURE0);
     material.BindTexture(RawTexture::Diffuse);
-    Texture::Active(1);
+    glActiveTexture(GL_TEXTURE1);
     material.BindTexture(RawTexture::Specular);
-    Texture::Active(2);
+    glActiveTexture(GL_TEXTURE2);
     material.BindTexture(RawTexture::Normals);
-    Texture::Active(3);
+    glActiveTexture(GL_TEXTURE3);
     material.BindTexture(RawTexture::Opacity);
-    Texture::Active(4);
+    glActiveTexture(GL_TEXTURE4);
     material.BindTexture(RawTexture::Diffuse);
 }
 
@@ -188,12 +186,9 @@ void GIDeferredRenderer::SetLightPassUniforms() const
     // index of directional-point-spot lights
     auto typeIndex = glm::uvec3(0);
     // pass number of lights per type
-    prog.lightTypeCount[0].Set(static_cast<const unsigned int>
-                               (Light::Directionals().size()));
-    prog.lightTypeCount[1].Set(static_cast<const unsigned int>
-                               (Light::Points().size()));
-    prog.lightTypeCount[2].Set(static_cast<const unsigned int>
-                               (Light::Spots().size()));
+    prog.lightTypeCount[0].Set(static_cast<const unsigned int> (Light::Directionals().size()));
+    prog.lightTypeCount[1].Set(static_cast<const unsigned int> (Light::Points().size()));
+    prog.lightTypeCount[2].Set(static_cast<const unsigned int> (Light::Spots().size()));
 
     for (int i = 0; i < lights.size(); ++i)
     {
@@ -239,9 +234,7 @@ void GIDeferredRenderer::SetLightPassUniforms() const
     }
 
     // pass shadowing parameters
-    static auto &shadowing = *static_cast<ShadowMapRenderer *>
-                             (AssetsManager::Instance()
-                              ->renderers["Shadowmapping"].get());
+    static auto &shadowing = *static_cast<ShadowMapRenderer *> (AssetsManager::Instance()->renderers["Shadowmapping"].get());
 
     if(shadowing.Caster() != nullptr)
     {
@@ -251,8 +244,7 @@ void GIDeferredRenderer::SetLightPassUniforms() const
         prog.lightBleedingReduction.Set(shadowing.LightBleedingReduction());
     }
 
-    static auto &voxel = *static_cast<VoxelizerRenderer *>(AssetsManager::Instance()
-                         ->renderers["Voxelizer"].get());
+    static auto &voxel = *static_cast<VoxelizerRenderer *>(AssetsManager::Instance()->renderers["Voxelizer"].get());
     prog.volumeDimension.Set(voxel.VolumeDimension());
     prog.voxelScale.Set(1.0f / voxel.VolumeGridSize());
     prog.worldMinPoint.Set(scene->rootNode->boundaries.MinPoint());

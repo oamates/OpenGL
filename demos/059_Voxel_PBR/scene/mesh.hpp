@@ -10,9 +10,10 @@
 #include <oglplus/vertex_array.hpp>
 #include <oglplus/vertex_attrib.hpp>
 
-#include "../types/vertex.hpp"
 #include "../types/base_object.hpp"
 #include "../types/bbox.hpp"
+
+#include "vertex.hpp"
 
 
 struct Material;
@@ -26,7 +27,7 @@ struct Mesh : public BaseObject
     ~Mesh() {}
 
     bbox_t boundaries;                          // The mesh's boundaries
-    std::vector<Vertex> vertices;               // The mesh's vertices
+    std::vector<vertex_pft3_t> vertices;               // The mesh's vertices
     std::vector<unsigned int> indices;          // The mesh's indices
     std::shared_ptr<Material> material;         // The mesh's material
 };
@@ -59,41 +60,37 @@ struct MeshDrawer : public Mesh
     
     virtual void Load()                                                         // Initializes the mesh's vertex buffer, element buffers and vertex array object with the associated mesh data
     {
-        if (loaded)
-            return;
+        if (loaded) return;
     
-        using namespace oglplus;
-        
-        this->vertexArray = std::make_shared<VertexArray>();                    // create vao
+        this->vertexArray = std::make_shared<oglplus::VertexArray>();                    // create vao
         vertexArray->Bind();
         
-        vertexBuffer = std::make_shared<Buffer>();                              // create vertex buffer object and upload vertex data
-        vertexBuffer->Bind(BufferTarget::Array);
-        Buffer::Data(BufferTarget::Array, this->vertices);
+        vertexBuffer = std::make_shared<oglplus::Buffer>();                              // create vertex buffer object and upload vertex data
+        vertexBuffer->Bind(oglplus::BufferTarget::Array);
+        oglplus::Buffer::Data(oglplus::BufferTarget::Array, this->vertices);
 
-        VertexArrayAttrib(VertexAttribSlot(0)).Enable().Pointer(3, DataType::Float, false, sizeof(Vertex), reinterpret_cast<const GLvoid *>( 0));
-        VertexArrayAttrib(VertexAttribSlot(1)).Enable().Pointer(3, DataType::Float, false, sizeof(Vertex), reinterpret_cast<const GLvoid *>(12));
-        VertexArrayAttrib(VertexAttribSlot(2)).Enable().Pointer(3, DataType::Float, false, sizeof(Vertex), reinterpret_cast<const GLvoid *>(24));
-        VertexArrayAttrib(VertexAttribSlot(3)).Enable().Pointer(3, DataType::Float, false, sizeof(Vertex), reinterpret_cast<const GLvoid *>(36));
-        VertexArrayAttrib(VertexAttribSlot(4)).Enable().Pointer(3, DataType::Float, false, sizeof(Vertex), reinterpret_cast<const GLvoid *>(48));
-        
-        elementBuffer = std::make_shared<Buffer>();                             // create element (indices) buffer object and upload data
-        elementBuffer->Bind(BufferTarget::ElementArray);
-        Buffer::Data(BufferTarget::ElementArray, this->indices);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft3_t), (const GLvoid *) offsetof(vertex_pft3_t, position));
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft3_t), (const GLvoid *) offsetof(vertex_pft3_t, uvw));
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft3_t), (const GLvoid *) offsetof(vertex_pft3_t, normal));
+        glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft3_t), (const GLvoid *) offsetof(vertex_pft3_t, tangent_x));
+        glEnableVertexAttribArray(4); glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft3_t), (const GLvoid *) offsetof(vertex_pft3_t, tangent_y));
+
+        elementBuffer = std::make_shared<oglplus::Buffer>();                             // create element (indices) buffer object and upload data
+        elementBuffer->Bind(oglplus::BufferTarget::ElementArray);
+        oglplus::Buffer::Data(oglplus::BufferTarget::ElementArray, this->indices);
         
         this->indicesCount = static_cast<unsigned int>(this->indices.size());   // save number of faces and vertices for rendering
         this->vertexCount = static_cast<unsigned int>(this->vertices.size());
         this->vertices.clear();
         this->indices.clear();
         
-        NoVertexArray().Bind();                                                 // unbind vao
+        glBindVertexArray(0);
         loaded = true;
     }
 
     virtual void DrawElements() const                                           // Binds the vertex array object and makes a draw call for the elements buffer
     {
-        static oglplus::Context gl;
-        this->vertexArray->Bind(); 
-        gl.DrawElements(oglplus::PrimitiveType::Triangles, indicesCount, oglplus::DataType::UnsignedInt);
+        this->vertexArray->Bind();
+        glDrawElements(GL_TRIANGLES, indicesCount, GL_UNSIGNED_INT, 0);
     }
 };

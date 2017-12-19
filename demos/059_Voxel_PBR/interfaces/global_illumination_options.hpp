@@ -23,8 +23,7 @@ struct UIGlobalIllumination : public ui_t
         if (!main_ui_t::drawGIOptions) return;
 
         static auto &assets = AssetsManager::Instance();
-        static auto &deferred = *static_cast<GIDeferredRenderer *>
-                                (assets->renderers["Deferred"].get());
+        static auto &deferred = *static_cast<GIDeferredRenderer *> (assets->renderers["Deferred"].get());
     
         if (ImGui::Begin("Global Illumination", &main_ui_t::drawGIOptions, ImGuiWindowFlags_AlwaysAutoResize))
         {
@@ -34,8 +33,6 @@ struct UIGlobalIllumination : public ui_t
             static auto aoFalloff = deferred.AmbientOclussionFalloff();
             static auto aoAlpha = deferred.AmbientOclussionAlpha();
             static auto mode = 0;
-            static auto modes = "Direct + Indirect + Occlusion\0Direct + Indirec" \
-                                "t\0Direct\0Indirect\0Ambient Occlusion";
             static auto firstB = voxel.InjectFirstBounce();
             static auto conesS = voxel.TraceShadowCones();
             static auto samplingFact = deferred.SamplingFactor();
@@ -98,7 +95,7 @@ struct UIGlobalIllumination : public ui_t
                 ImGui::Unindent();
             }
     
-            if(ImGui::Combo("Render Mode", &mode, modes))
+            if(ImGui::Combo("Render Mode", &mode, "Direct + Indirect + Occlusion\0Direct + Indirect\0Direct\0Indirect\0Ambient Occlusion\0"))
                 deferred.RenderMode(mode);
     
             ImGui::Text("Ambient Occlusion");

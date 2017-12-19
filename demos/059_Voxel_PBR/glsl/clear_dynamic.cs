@@ -17,15 +17,15 @@ void main()
 	if(gl_GlobalInvocationID.x >= volumeDimension || gl_GlobalInvocationID.y >= volumeDimension || gl_GlobalInvocationID.z >= volumeDimension) return;
 
     ivec3 writePos = ivec3(gl_GlobalInvocationID);
-
-    // empty voxel
-    if(imageLoad(voxelAlbedo, writePos).a < EPSILON) { return; }
-
-    // static flag is true
-    if(texelFetch(staticVoxelFlag, writePos, 0).r > EPSILON) { return; }
+    
+    if (imageLoad(voxelAlbedo, writePos).a < EPSILON)                                   // empty voxel
+        return;
+    
+    if (texelFetch(staticVoxelFlag, writePos, 0).r > EPSILON)                           // static flag is true
+        return;
 
     // is a non-static voxel and the voxel in that position isn't empty clear the volumnes with 0,0,0,0
-    imageStore(voxelAlbedo, writePos, vec4(0.0));
-    imageStore(voxelNormal, writePos, vec4(0.0));
-    imageStore(voxelEmissive, writePos, vec4(0.0));
+    imageStore(voxelAlbedo,   writePos, vec4(0.0f));
+    imageStore(voxelNormal,   writePos, vec4(0.0f));
+    imageStore(voxelEmissive, writePos, vec4(0.0f));
 }
