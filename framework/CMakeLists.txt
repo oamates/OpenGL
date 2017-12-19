@@ -2,8 +2,8 @@
 # framework static library
 #------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 add_library (framework STATIC
-    binpacker.cpp camera.cpp dds.cpp fbo.cpp font.cpp glfw_window.cpp glsl_noise.cpp image.cpp imgui_window.cpp hull3d.cpp log.cpp obj.cpp polyhedron.cpp 
-    shader.cpp surface.cpp sphere.cpp tess.cpp torus.cpp uniform.cpp utils.cpp vbm.cpp vertex.cpp)
+    binpacker.cpp camera.cpp dds.cpp fbo.cpp font.cpp glfw_window.cpp glsl_noise.cpp image.cpp imgui_window.cpp hull3d.cpp log.cpp obj.cpp polyhedron.cpp
+    shader.cpp shader_program.cpp surface.cpp sphere.cpp tess.cpp torus.cpp uniform.cpp utils.cpp vbm.cpp vertex.cpp)
 
 if(WIN32)
     set(ADDITIONAL_LIBRARIES opengl32)

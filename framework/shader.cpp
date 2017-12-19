@@ -140,7 +140,7 @@ void glsl_program_t::link()
     {
         debug_msg("Program [%d] successfully linked.", id);
         return;
-    };
+    }
     GLint error_msg_length;
     glGetProgramiv (id, GL_INFO_LOG_LENGTH, &error_msg_length);
 

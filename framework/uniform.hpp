@@ -5,8 +5,13 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "shader.hpp"
+#include "shader_program.hpp"
+
+
+#include "log.hpp"
 
 struct glsl_program_t;
+struct glsl_shader_program_t;
 
 //=======================================================================================================================================================================================================================
 // structure representing OpenGL uniform variable
@@ -14,13 +19,14 @@ struct glsl_program_t;
 
 struct uniform_t
 {
-    const glsl_program_t* program;
     const char* name;
     GLint location;
 
-    uniform_t() {};
-    uniform_t(const glsl_program_t* program, const char* name);
+    uniform_t() {}
     ~uniform_t() {}
+
+    uniform_t(const glsl_program_t* program, const char* name);
+    uniform_t(const glsl_shader_program_t* shader_program, const char* name);
 
     operator GLint() const
         { return location; }
