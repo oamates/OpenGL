@@ -1,6 +1,6 @@
 #version 330 core
 
-in vec4 Position;
+layout(location = 0) in vec3 Position;
 
 uniform mat4 LightMatrix;
 uniform mat4 ModelMatrix;
@@ -13,8 +13,8 @@ out vec3 vertViewDir;
 
 void main()
 {
-   gl_Position = ModelMatrix * Position;
-   vertDepthCoord = LightMatrix * gl_Position;
-   vertLightDir = LightPosition - gl_Position.xyz;
-   vertViewDir = CameraPosition - gl_Position.xyz;
+    gl_Position = ModelMatrix * vec4(Position, 1.0f);
+    vertDepthCoord = LightMatrix * gl_Position;
+    vertLightDir = LightPosition - gl_Position.xyz;
+    vertViewDir = CameraPosition - gl_Position.xyz;
 }

@@ -12,7 +12,7 @@ uniform vec2 DepthOffs[32];
 const int DepthSamples = 32;
 const float InvDepthSamples = 1.0 / DepthSamples;
 
-out vec3 FragmentColor;
+out vec4 FragmentColor;
 
 void main(void)
 {
@@ -33,7 +33,7 @@ void main(void)
         float Sample = texture(DepthMap, SampleCoord).r;
         if(Sample < 0.95)
             Depth += Sample;
-        else Depth += 0.5;"
+        else Depth += 0.5;
     }
 
     Depth *= InvDepthSamples;
@@ -41,7 +41,7 @@ void main(void)
     float BkLt = (dot(-LightDir, ViewDir) + 3.0) * 0.25;
     float SuSS = pow(abs(Depth-LightDist), 2.0) * BkLt * 1.2;
     float Shdw = min(pow(abs(Depth-LightDist)*2.0, 8.0), 1.0);
-    float Diff  = sqrt(max(dot(LightDir, Normal)+0.1, 0.0))*0.4;
+    float Diff  = sqrt(max(dot(LightDir, Normal) + 0.1, 0.0)) * 0.4;
     float Spec  = pow(max(dot(LightRefl, ViewDir), 0.0), 64.0);
     vec3 Color = vec3(0.2, 0.9, 0.7);
     vec3 fragColor = (Ambi + Shdw * Diff + SuSS) * Color;

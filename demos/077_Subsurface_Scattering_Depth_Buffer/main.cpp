@@ -4,6 +4,9 @@
 #include <random>
 #include <cstdlib>
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_NO_CTOR_INIT
+
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -17,16 +20,15 @@
 #include "glfw_window.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
+#include "fbo.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
 
-    bool show_normals = false;
-
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
-        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, time */),
-          camera(32.0f, 0.5f, glm::lookAt(glm::vec3(7.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
+        : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
+          camera(8.0f, 0.5f, glm::lookAt(glm::vec3(4.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
@@ -42,9 +44,6 @@ struct demo_window_t : public glfw_window_t
         else if ((key == GLFW_KEY_DOWN)  || (key == GLFW_KEY_S)) camera.move_backward(frame_dt);
         else if ((key == GLFW_KEY_RIGHT) || (key == GLFW_KEY_D)) camera.straight_right(frame_dt);
         else if ((key == GLFW_KEY_LEFT)  || (key == GLFW_KEY_A)) camera.straight_left(frame_dt);
-
-        if ((key == GLFW_KEY_ENTER) && (action == GLFW_RELEASE))
-            show_normals = !show_normals;
     }
 
     void on_mouse_move() override
@@ -71,12 +70,13 @@ struct depth_fbo_t
         glBindTexture(GL_TEXTURE_2D, tex_id);
         glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32, tex_res, tex_res);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, tex_id, 0);
+        check_status();
     }
 
     void viewport()
@@ -98,8 +98,6 @@ struct simple_model_t
     std::vector<glm::vec3> positions;
     std::vector<glm::uvec3> faces;
 
-    glm::vec3 bbox_min;
-    glm::vec3 bbox_max;
     glm::vec3 center;
     float radius;
 
@@ -143,10 +141,10 @@ struct simple_model_t
         }
         fclose(file);
 
-        debug_msg("File %s parsed : vertices = %u, faces = %u", file_name, V, F);
-
         V = positions.size();
         F = faces.size();
+
+        debug_msg("File %s parsed : vertices = %u, faces = %u", file_name, V, F);
 
         c *= (1.0 / V);
         center = glm::vec3(c);
@@ -161,6 +159,7 @@ struct simple_model_t
 
         radius = glm::sqrt(radius);
 
+        debug_msg("Model mass center :: %s. Radius = %f", glm::to_string(center).c_str(), radius);
 
         glGenVertexArrays(1, &vao_id);
         glBindVertexArray(vao_id);
@@ -173,7 +172,7 @@ struct simple_model_t
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), 0);
 
         glGenBuffers(1, &ibo_id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_id);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_id);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(glm::uvec3) * F, faces.data(), GL_STATIC_DRAW);
     }
 
@@ -211,7 +210,6 @@ int main(int argc, char *argv[])
     uniform_t uni_dp_camera_matrix = depth_pass["CameraMatrix"];
     uniform_t uni_dp_model_matrix  = depth_pass["ModelMatrix"];
 
-
     glsl_program_t light_pass(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/shape.vs"),
                               glsl_shader_t(GL_GEOMETRY_SHADER, "glsl/shape.gs"),
                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/shape.fs"));
@@ -237,7 +235,6 @@ int main(int argc, char *argv[])
     uni_lp_depth_offset = depth_offset;
     light_pass["DepthMap"] = 0;
 
-
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
@@ -252,11 +249,10 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        float t0 = 0.811f * window.frame_ts;
-        float t1 = 0.673f * window.frame_ts;
+        float t0 = 0.28913f * window.frame_ts;
+        float t1 = 0.16735f * window.frame_ts;
 
         float cs0 = glm::cos(t0);
         float sn0 = glm::sin(t0);
@@ -274,7 +270,6 @@ int main(int argc, char *argv[])
         glm::mat4 projection_view_matrix = projection_matrix * view_matrix;
 
         glm::mat4 model_matrix = glm::mat4(1.0f);
-
 
         //===============================================================================================================================================================================================================
         // depth pass
