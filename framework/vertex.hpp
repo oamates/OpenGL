@@ -212,6 +212,21 @@ struct vertex_pc_t
     static constexpr GLuint layout = BUFFER_LAYOUT(3, 3);
 };
 
+struct vertex_pt2_t
+{
+    glm::vec3 position;
+    glm::vec2 uv;
+
+    vertex_pt2_t() {};
+    vertex_pt2_t(const glm::vec3& position, const glm::vec2& uv) : position(position), uv(uv) {};
+    vertex_pt2_t& operator = (const vertex_pt2_t&) = default;
+
+    static constexpr GLuint dimensions[] = {3, 2};
+    static constexpr GLuint attributes = sizeof(dimensions) / sizeof(GLuint);
+    static constexpr GLuint total_dimension = 5;
+    static constexpr GLuint layout = BUFFER_LAYOUT(3, 2);
+};
+
 struct vertex_p_t
 {
     glm::vec3 position;

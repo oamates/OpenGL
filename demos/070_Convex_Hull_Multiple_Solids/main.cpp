@@ -100,13 +100,13 @@ int main(int argc, char *argv[])
     std::mt19937 randgen(215387276);
     std::normal_distribution<double> gauss_dist;
 
-    const int CLOUD_SIZE = 32;
+    const int CLOUD_SIZE = 256;
     std::vector<glm::dvec3> points;
     points.resize(CLOUD_SIZE);
 
     for(int i = 0; i < CLOUD_SIZE; ++i)
     {
-        glm::dvec3 v = 5.0 * glm::normalize(glm::dvec3(gauss_dist(randgen), gauss_dist(randgen), gauss_dist(randgen)));
+        glm::dvec3 v = glm::dvec3(2.0, 3.0, 5.0) * glm::normalize(glm::dvec3(gauss_dist(randgen), gauss_dist(randgen), gauss_dist(randgen)));
         points[i] = v;
     };
 

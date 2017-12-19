@@ -23,17 +23,16 @@ void main()
     vec3 l = light / distance;
     float cos_theta = clamp(dot(n, l), 0.0f, 1.0f);
 
-    vec3 r = reflect(l, n);
-    float cos_alpha = clamp(dot(r, v), 0.0f, 1.0f);
+    vec3 h = normalize(l + v);
+    float cos_alpha = cos_theta * clamp(dot(n, h), 0.0f, 1.0f);
 
-    vec3 ambient_color = vec4(0.271f, 0.309f, 0.043f);
-    vec3 diffuse_color = ambient_color;
+    vec3 diffuse_color = vec3(0.771f, 0.919f, 0.243f);
+    vec3 ambient_color = 0.215f * diffuse_color;
     vec3 specular_color = vec3(1.0f);
 
-    float diffuse_distance_factor = 1.0f / distance;
-    float specular_distance_factor = diffuse_distance_factor;
+    float diffuse_factor = 1.0f / (1.0 + distance);
+    float specular_factor = 0.0625f * diffuse_factor;
 
-    FragmentColor =  ambient_color +
-                     diffuse_color * light_intensity * cos_theta * diffuse_distance_factor +
-                    specular_color * light_intensity * pow(cos_alpha, 40.0f) * specular_distance_factor;
+    FragmentColor.rgb =  ambient_color + cos_theta * diffuse_factor * diffuse_color + cos_alpha * specular_factor * specular_color;
+    FragmentColor.w = 1.0f;
 }

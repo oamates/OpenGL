@@ -2,7 +2,7 @@ add_executable (voxel_pbr main.cpp
                           behaviors/free_camera.cpp 
                           core/assets_manager.cpp core/engine.cpp
                           interfaces/main_ui.cpp
-                          primitives/fullscreen_quad.cpp primitives/shapes.cpp
+                          primitives/shapes.cpp
                           renderers/gi_deferred_renderer.cpp renderers/shadow_map_renderer.cpp renderers/voxelizer_renderer.cpp 
                           rendering/ui_renderer.cpp rendering/render_window.cpp 
                           scene/scene.cpp

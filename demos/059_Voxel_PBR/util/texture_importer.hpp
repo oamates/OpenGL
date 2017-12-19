@@ -7,7 +7,9 @@
 
 #include "../scene/texture.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "image/stb_image.h"
+
 #include "log.hpp"
 
 
@@ -19,6 +21,7 @@ struct TextureImporter
     {
         int width, height, bpp; // bytes per pixel
 
+        stbi_set_flip_vertically_on_load(1);
         unsigned char* data = stbi_load(sFilepath.c_str(), &width, &height, &bpp, 0);
 
         if (!data)

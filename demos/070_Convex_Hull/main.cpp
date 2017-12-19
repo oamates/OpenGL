@@ -28,7 +28,7 @@ struct demo_window_t : public glfw_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen /*, time */),
-          camera(8.0f, 0.5f, glm::lookAt(glm::vec3(7.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
+          camera(32.0f, 0.5f, glm::lookAt(glm::vec3(7.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
@@ -103,13 +103,13 @@ int main(int argc, char *argv[])
 
     for(int i = 0; i < CLOUD_SIZE; ++i)
     {
-        glm::dvec3 v = glm::dvec3(gauss_dist(randgen), gauss_dist(randgen), gauss_dist(randgen));
+        glm::dvec3 v = glm::dvec3(2.0, 3.0, 5.0) * glm::dvec3(gauss_dist(randgen), gauss_dist(randgen), gauss_dist(randgen));
         points[i] = v;
     }
 
-    solid stone1;
-    stone1.convex_hull(points);
-    stone1.fill_buffers();
+    solid stone;
+    stone.convex_hull(points);
+    stone.fill_buffers();
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -131,13 +131,13 @@ int main(int argc, char *argv[])
         uni_hs_pv_matrix = projection_view_matrix;
         uni_hs_camera_ws = camera_ws;
         uni_hs_light_ws = light_ws;
-        stone1.render();
+        stone.render();
 
         if (window.show_normals)
         {
             normal_renderer.enable();
             uni_nr_pv_matrix = projection_view_matrix;
-            stone1.render();
+            stone.render();
         }
 
         //===============================================================================================================================================================================================================
