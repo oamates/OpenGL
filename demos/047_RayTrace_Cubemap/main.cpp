@@ -14,6 +14,7 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/ext.hpp>
 #include <glm/gtc/random.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include "log.hpp"
 #include "constants.hpp"
@@ -22,6 +23,9 @@
 #include "shader.hpp"
 #include "camera.hpp"
 #include "fbo.hpp"
+#include "brushed_metal.hpp"
+
+#include "image/stb_image.h"
 
 const int BALL_COUNT = 15;
 
@@ -77,6 +81,64 @@ struct glsl_pipeline_t
         { glDeleteProgramPipelines(1, &id); }
 };
 
+/*
+template <typename ShapeBuilder> struct Shape
+{
+    ShapeBuilder make_shape;                                    // helper object building shape vertex attributes
+    shapes::DrawingInstructions shape_instr;                    // helper object encapsulating shape drawing instructions
+    typename ShapeBuilder::IndexArray shape_indices;            // indices pointing to shape primitive elements
+
+    VertexArray vao;                                            // A vertex array object for the rendered shape
+    const GLuint nva;                                           // number of vertex attributes
+
+    // VBOs for the shape's vertex attributes
+    Array<Buffer> vbos;
+
+    Shape(const Program& prog, const ShapeBuilder& builder)
+     : make_shape(builder)
+     , shape_instr(make_shape.Instructions())
+     , shape_indices(make_shape.Indices())
+     , nva(4)
+     , vbos(nva)
+    {
+        vao.Bind();                                             // bind the VAO for the shape
+        typename ShapeBuilder::VertexAttribs vert_attr_info;
+        const GLchar* vert_attr_name[] = {"Position", "Normal", "Tangent", "TexCoord"};
+        for(GLuint va = 0; va != nva; ++va)
+        {
+            const GLchar* name = vert_attr_name[va];
+            std::vector<GLfloat> data;
+            auto getter = vert_attr_info.VertexAttribGetter(data, name);
+            if(getter != nullptr)
+            {
+                // bind the VBO for the vertex attribute
+                vbos[va].Bind(Buffer::Target::Array);
+                GLuint npv = getter(make_shape, data);
+                // upload the data
+                Buffer::Data(Buffer::Target::Array, data);
+                // setup the vertex attribs array
+                VertexArrayAttrib attr(prog, name);
+                attr.Setup<GLfloat>(npv);
+                attr.Enable();
+            }
+        }
+    }
+
+    void Draw(void)
+    {
+        vao.Bind();
+        glFrontFace(make_shape.FaceWinding());
+        shape_instr.Draw(shape_indices);
+    }
+};
+
+    void Reshape(GLuint width, GLuint height)
+    {
+        glViewport(0, 0, width, height);
+        geom_prog.projection_matrix.Set(CamMatrixf::PerspectiveX(Degrees(60), width, height, 1, 80));
+    }
+*/
+
 int main(int argc, char *argv[])
 {
     //===================================================================================================================================================================================================================
@@ -103,10 +165,10 @@ int main(int argc, char *argv[])
     uniform_t uni_dg_projection_matrix = default_gs_program["ProjectionMatrix"];
     uniform_t uni_dg_camera_matrix = default_gs_program["CameraMatrix"];
 
-    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");            // CubemapGeomShader
+    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");            // CubemapGeomShader, cmap_geom_shader
     glsl_shader_program_t cubemap_gs_program(cubemap_gs);                       // GeometryProgram, cmap_geom_prog
-    uniform_t uni_cg_projection_matrix = default_gs_program["ProjectionMatrix"];
-    uniform_t uni_cg_camera_matrix = default_gs_program["CameraMatrix"];
+    uniform_t uni_cg_projection_matrix = cubemap_gs_program["ProjectionMatrix"];
+    uniform_t uni_cg_camera_matrix = cubemap_gs_program["CameraMatrix"];
 
     glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");                // ClothFragmentShader
     glsl_shader_program_t cloth_fs_program(cloth_fs);                           // ClothProgram, cloth_prog
@@ -122,7 +184,6 @@ int main(int argc, char *argv[])
     uniform_t uni_bf_number_tex  = ball_fs_program["number_tex"];               // ProgramUniformSampler number_tex
     uniform_t uni_bf_reflect_tex = ball_fs_program["reflect_tex"];              // ProgramUniformSampler reflect_tex
     uniform_t uni_bf_ball_idx    = ball_fs_program["ball_idx"];                 // ProgramUniform<GLint> ball_idx
-
 
     glsl_program_t lightmap(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lightmap.vs"),  // LightmapProgram prog
                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lightmap.fs"));
@@ -191,12 +252,8 @@ int main(int argc, char *argv[])
         glm::vec3(-0.2f,-0.2f, 0.4f)
     };
 
-    static_assert(ball_offsets.size() == ball_count);
-    static_assert(ball_rotations.size() == ball_count);
-
-    Array<Texture> reflect_textures(ball_count);                        // The array of cube-maps storing the environment maps of the balls
-    Texture numbers_texture;                                            // The array texture storing the ball number decals
-    Texture cloth_texture;                                              // The texture used to render the cloth
+    static_assert(sizeof(ball_offsets) == ball_count * sizeof(glm::vec3));
+    static_assert(sizeof(ball_rotations) == ball_count * sizeof(glm::vec3));
 
     glUseProgram(0);
 
@@ -207,16 +264,16 @@ int main(int argc, char *argv[])
     cloth_pp.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
 
     glsl_pipeline_t ball_pp;
-    ball_pp.Bind();
+    ball_pp.bind();
     ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
     ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
     ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
 
     const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
 
-    uniform_t uni_cv_light_position = light_position;                   // vert_prog.light_position.Set(light_position);
-    uni_cf_color1 = glm::vec3f(0.1f, 0.3f, 0.1f);                       // cloth_prog.color_1.Set(Vec3f(0.1f, 0.3f, 0.1f));
-    uni_cf_color2 = glm::vec3f(0.3f, 0.4f, 0.3f);                       // cloth_prog.color_2.Set(Vec3f(0.3f, 0.4f, 0.3f));
+    uni_cv_light_position = light_position;                             // vert_prog.light_position.Set(light_position);
+    uni_cf_color_1 = glm::vec3(0.1f, 0.3f, 0.1f);                       // cloth_prog.color_1.Set(Vec3f(0.1f, 0.3f, 0.1f));
+    uni_cf_color_2 = glm::vec3(0.3f, 0.4f, 0.3f);                       // cloth_prog.color_2.Set(Vec3f(0.3f, 0.4f, 0.3f));
 
     glActiveTexture(GL_TEXTURE0);
     uni_cf_light_map = 0;                                               // cloth_prog.light_map.Set(0);
@@ -271,153 +328,162 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE1);
     uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
 
-    /* TEXTURE LOADING */
-
-        {
-            const char* tex_names[OGLPLUS_EXAMPLE_034BB_BALL_COUNT] = {
-                "pool_ball_1",
-                "pool_ball_2",
-                "pool_ball_3",
-                "pool_ball_4",
-                "pool_ball_5",
-                "pool_ball_6",
-                "pool_ball_7",
-                "pool_ball_8",
-                "pool_ball_9",
-                "pool_ball10",
-                "pool_ball11",
-                "pool_ball12",
-                "pool_ball13",
-                "pool_ball14",
-                "pool_ball15",
-            };
-
-            auto bound_tex = gl.Bound(Texture::Target::_2DArray, numbers_texture)
-                .BorderColor(Vec4f(0,0,0,0))
-                .MinFilter(TextureMinFilter::LinearMipmapLinear)
-                .MagFilter(TextureMagFilter::Linear)
-                .Wrap(TextureWrap::ClampToBorder);
-
-            for(GLuint i = 0; i != ball_count; ++i)
-            {
-                auto image = images::LoadTexture(tex_names[i]);
-                if(i == 0)
-                {
-                    bound_tex.Image3D(
-                        0,
-                        PixelDataInternalFormat::RGBA,
-                        image.Width(),
-                        image.Height(),
-                        16,
-                        0,
-                        image.Format(),
-                        image.Type(),
-                        nullptr
-                    );
-                }
-                bound_tex.SubImage3D(
-                    0,
-                    0, 0, i,
-                    image.Width(),
-                    image.Height(),
-                    1,
-                    image.Format(),
-                    image.Type(),
-                    image.RawData()
-                );
-            }
-            bound_tex.GenerateMipmap();
-        }
-
-        glActiveTexture(GL_TEXTURE2);
-        cloth_prog.cloth_tex.Set(2);
-        gl.Bound(Texture::Target::_2D, cloth_texture)
-            .MinFilter(TextureMinFilter::LinearMipmapLinear)
-            .MagFilter(TextureMagFilter::Linear)
-            .WrapS(TextureWrap::Repeat)
-            .WrapT(TextureWrap::Repeat)
-            .Image2D(
-                images::BrushedMetalUByte(512, 512, 10240, -16, +16, 8, 32)
-            ).GenerateMipmap();
-
-        glActiveTexture(GL_TEXTURE3);
-        ball_prog.reflect_tex.Set(3);
-
-        GLuint cubemap_side = 128;
-
-        Array<Texture> temp_cubemaps(ball_count);
-
-    // ========================================== prerender the cubemaps ================================================
-
-        InitializeCubemaps(reflect_textures, cubemap_side);
-        InitializeCubemaps(temp_cubemaps, cubemap_side);
-
-    void InitializeCubemaps(Array<Texture>& cubemaps, GLuint cubemap_side)
+    const char* tex_names[BALL_COUNT] =
     {
-        std::vector<GLubyte> black(cubemap_side*cubemap_side*3, 0x00);
+        "pool_ball_1",
+        "pool_ball_2",
+        "pool_ball_3",
+        "pool_ball_4",
+        "pool_ball_5",
+        "pool_ball_6",
+        "pool_ball_7",
+        "pool_ball_8",
+        "pool_ball_9",
+        "pool_ball10",
+        "pool_ball11",
+        "pool_ball12",
+        "pool_ball13",
+        "pool_ball14",
+        "pool_ball15",
+    };
 
-        for(GLuint b = 0; b != ball_count; ++b)
+    // Texture numbers_texture;                                            // The array texture storing the ball number decals
+
+    GLuint numbers_texture;
+    glGenTextures(1, &numbers_texture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, numbers_texture);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+    glm::vec4 black = glm::vec4(0.0f);
+    glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, glm::value_ptr(black));
+
+    for(GLuint i = 0; i != BALL_COUNT; ++i)
+    {
+        int width, height, bpp;
+        unsigned char* src_data = stbi_load(tex_names[i], &width, &height, &bpp, 0);
+
+        if (src_data == 0)
+            exit_msg("Cannot load texture: %s", tex_names[i]);
+
+        if (i == 0)
         {
-            gl.Bound(Texture::Target::CubeMap, cubemaps[b]).Filter(TextureFilter::Linear).Wrap(TextureWrap::ClampToEdge);
-            for(int f = 0; f != 6; ++f)
-            {
-                Texture::ImageCM(f, 0, PixelDataInternalFormat::RGB, cubemap_side, cubemap_side, 0, PixelDataFormat::RGB, PixelDataType::UnsignedByte, black.data());
-            }
+            int levels = 0;
+            int s = (width > height) ? width : height;
+            while (s != 0) { s >>= 1; ++levels; }
+            glTexStorage3D(GL_TEXTURE_2D_ARRAY, levels, GL_RGBA8, width, height, 16);
         }
+
+        GLenum format = (bpp == 1) ? GL_RED :
+                        (bpp == 2) ? GL_RG :
+                        (bpp == 3) ? GL_RGB : GL_RGBA;
+
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, width, height, 1, format, GL_UNSIGNED_BYTE, src_data);
     }
 
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    glActiveTexture(GL_TEXTURE2);
+    uni_cf_cloth_tex = 2;
+
+    GLuint cloth_texture;                                           // Texture cloth_texture --- used to render the cloth
+    glGenTextures(1, &cloth_texture);
+    glBindTexture(GL_TEXTURE_2D, cloth_texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    GLubyte* rgb_data = brushed_metal_texture(512, 512, 10240, -16, +16, 8, 32);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 512, 512, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb_data);
+    free(rgb_data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glActiveTexture(GL_TEXTURE3);
+    uni_bf_reflect_tex = 3;
 
     // ========================================== prerender the cubemaps ================================================
-    PrerenderCubemaps(temp_cubemaps, reflect_textures, cubemap_side);
-    void PrerenderCubemaps(Array<Texture>& src_texs, Array<Texture>& dst_texs, GLuint tex_side)
+    GLuint cubemap_side = 128;
+    GLuint reflect_textures[ball_count];
+    GLuint temp_cubemaps[ball_count];
+
+    glGenTextures(ball_count, reflect_textures);
+    glGenTextures(ball_count, temp_cubemaps);
+
+    for(GLuint b = 0; b != ball_count; ++b)
     {
-        glActiveTexture(GL_TEXTURE4);
-        Texture z_buffer;
-        gl.Bound(Texture::Target::CubeMap, z_buffer).Filter(TextureFilter::Nearest).Wrap(TextureWrap::ClampToEdge);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[b]);
+        glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGB, cubemap_side, cubemap_side);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glm::vec3 black_rgb = glm::vec3(0.0);
+        glClearTexImage(reflect_textures[b], 0, GL_RGB, GL_FLOAT, glm::value_ptr(black_rgb));
 
-        for(int i = 0; i != 6; ++i)
-        {
-            Texture::Image2D( Texture::CubeMapFace(i), 0, PixelDataInternalFormat::DepthComponent, tex_side, tex_side, 0, PixelDataFormat::DepthComponent, PixelDataType::Float, nullptr);
-        }
-
-        glActiveTexture(GL_TEXTURE3);
-
-        Framebuffer fbo;
-        gl.Bound(Framebuffer::Target::Draw, fbo).AttachTexture(FramebufferAttachment::Depth, z_buffer, 0);
-
-        CubemapGeomShader cmap_geom_shader;
-        GeometryProgram cmap_geom_prog(cmap_geom_shader);
-
-        ProgramPipeline cmap_cloth_pp, cmap_ball_pp;
-
-        glUseProgram(0);
-
-        cmap_cloth_pp.Bind();
-        cmap_cloth_pp.UseStages(vert_prog).Vertex();
-        cmap_cloth_pp.UseStages(cmap_geom_prog).Geometry();
-        cmap_cloth_pp.UseStages(cloth_prog).Fragment();
-
-        cmap_ball_pp.Bind();
-        cmap_ball_pp.UseStages(vert_prog).Vertex();
-        cmap_ball_pp.UseStages(cmap_geom_prog).Geometry();
-        cmap_ball_pp.UseStages(ball_prog).Fragment();
-
-        cmap_geom_prog.projection_matrix.Set(CamMatrixf::PerspectiveX(Degrees(90), 1.0, 1, 80));
-        gl.Viewport(tex_side, tex_side);
-
-        for(GLuint b = 0; b != ball_count; ++b)
-        {
-            Framebuffer::AttachTexture(Framebuffer::Target::Draw, FramebufferAttachment::Color, dst_texs[b], 0);
-
-            vert_prog.camera_position.Set(ball_offsets[b]);
-            cmap_geom_prog.camera_matrix.Set(ModelMatrixf::Translation(-ball_offsets[b]));
-
-            RenderScene(src_texs, cmap_cloth_pp, cmap_ball_pp, b);
-        }
+        glBindTexture(GL_TEXTURE_CUBE_MAP, temp_cubemaps[b]);
+        glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGB, cubemap_side, cubemap_side);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glClearTexImage(temp_cubemaps[b], 0, GL_RGB, GL_FLOAT, glm::value_ptr(black_rgb));
     }
 
-
     // ========================================== prerender the cubemaps ================================================
+    //PrerenderCubemaps(temp_cubemaps, reflect_textures, cubemap_side);
+    //PrerenderCubemaps(Array<Texture>& src_texs, Array<Texture>& dst_texs, GLuint tex_side)
+
+    glActiveTexture(GL_TEXTURE4);
+    GLuint z_buffer;                // Texture z_buffer;
+
+    glGenTextures(1, &z_buffer);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, z_buffer);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_DEPTH_COMPONENT, cubemap_side, cubemap_side);
+
+    /* whatta hell is it ?? */
+    glActiveTexture(GL_TEXTURE3);
+
+    GLuint fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, z_buffer, 0);
+
+    glsl_pipeline_t cmap_cloth_pp, cmap_ball_pp;
+
+    glUseProgram(0);
+
+    cmap_cloth_pp.bind();
+    cmap_cloth_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cmap_cloth_pp.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
+    cmap_cloth_pp.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
+
+    cmap_ball_pp.bind();
+    cmap_ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cmap_ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
+    cmap_ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
+
+    uni_cg_projection_matrix = glm::infinitePerspective(constants::half_pi, 1.0f, 0.25f);
+
+    glViewport(0, 0, cubemap_side, cubemap_side);
+
+    for(GLuint b = 0; b != ball_count; ++b)
+    {
+        glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, reflect_textures[b], 0);
+        uni_cv_camera_position = ball_offsets[b];
+        uni_cg_camera_matrix = glm::translate(-ball_offsets[b]);
+        RenderScene(src_texs, cmap_cloth_pp, cmap_ball_pp, b);
+    }
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
@@ -430,57 +496,44 @@ int main(int argc, char *argv[])
 
         double time = window.frame_ts;
 
-        // setup the camera
-        glm::vec3 camera_target(0.0f, 2.2f, 5.0f);
-        auto camera = CamMatrixf::Orbiting(
-            camera_target,
-            GLfloat(16.0 - SineWave(time / 15.0)*12.0),
-            FullCircles(time / 24.0),
-            Degrees(50 + SineWave(time / 20.0) * 35)
-        );
+        glm::mat4 camera = window.camera.view_matrix;
+        glm::vec3 camera_position = window.camera.position();
 
-        glm::vec3 camera_position = camera.Position();
-        vert_prog.camera_position.Set(camera_position);
-        geom_prog.camera_matrix.Set(camera);
+        uni_cv_camera_position = camera_position;
+        uni_dg_camera_matrix = camera;
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        cloth_pp.Bind();                                 // Render the plane
+        cloth_pp.bind();                                 // Render the plane
 
-        vert_prog.model_matrix = ModelMatrixf();
-        vert_prog.texture_matrix.Set(Mat3f(
-            16.0,  0.0,  0.0,
-             0.0, 16.0,  0.0,
-             0.0,  0.0,  1.0
-        ));
+        uni_cv_model_matrix = glm::mat4(1.0f);
+
+        glm::mat3 texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
+                                             glm::vec3( 0.0f, 16.0f, 0.0f),
+                                             glm::vec3( 0.0f,  0.0f, 1.0f));
+        uni_cv_texture_matrix = texture_matrix;
 
         plane.Draw();
 
-        // Render the balls
-        ball_pp.Bind();
+        ball_pp.bind();
 
-        vert_prog.texture_matrix.Set(Mat3f(
-            6.0f, 0.0f, 0.0f,
-            0.0f, 3.0f,-1.0f,
-            0.0f, 0.0f, 1.0f
-        ));
+        texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
+                                   glm::vec3(0.0f, 3.0f, -1.0f),
+                                   glm::vec3(0.0f, 0.0f,  1.0f));
+        uni_cv_texture_matrix = texture_matrix;
 
-        for(GLuint i = 0; i != ball_count; ++i)
+        for(int i = 0; i != ball_count; ++i)
         {
-            Vec3f rot = ball_rotations[i];
-            int ci = ((i / 4) % 2 == 0)?i : ((i/4)+2)*4-i-1;
+            glm::vec3 rot = ball_rotations[i];
+            int ci = ((i / 4) % 2 == 0) ? i : ((i / 4) + 2) * 4 - i - 1;
             ci %= 8;
-            Vec3f col = ball_colors[ci];
-            vert_prog.model_matrix = ModelMatrixf(
-                ModelMatrixf::Translation(ball_offsets[i]) *
-                ModelMatrixf::RotationZ(FullCircles(rot.z())) *
-                ModelMatrixf::RotationY(FullCircles(rot.y())) *
-                ModelMatrixf::RotationX(FullCircles(rot.x()))
-            );
+            glm::vec3 col = ball_colors[ci];
 
-            ball_prog.color_1 = (i > 7) ? Vec3f(1.0f, 0.9f, 0.8f) : col;
-            ball_prog.color_2 = col;
-            ball_prog.ball_idx = i;
+            uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
+            uni_bf_color_1 = (i > 7) ? glm::vec3(1.0f, 0.9f, 0.8f) : col;
+            uni_bf_color_2 = col;
+            uni_bf_ball_idx = i;
 
-            reflect_textures[i].Bind(Texture::Target::CubeMap);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[i]);
             sphere.Draw();
         }
 
@@ -496,62 +549,3 @@ int main(int argc, char *argv[])
     glfw::terminate();
     return 0;
 }
-
-/*
-
-template <typename ShapeBuilder> struct Shape
-{
-    ShapeBuilder make_shape;                                    // helper object building shape vertex attributes
-    shapes::DrawingInstructions shape_instr;                    // helper object encapsulating shape drawing instructions
-    typename ShapeBuilder::IndexArray shape_indices;            // indices pointing to shape primitive elements
-
-    VertexArray vao;                                            // A vertex array object for the rendered shape
-    const GLuint nva;                                           // number of vertex attributes
-
-    // VBOs for the shape's vertex attributes
-    Array<Buffer> vbos;
-
-    Shape(const Program& prog, const ShapeBuilder& builder)
-     : make_shape(builder)
-     , shape_instr(make_shape.Instructions())
-     , shape_indices(make_shape.Indices())
-     , nva(4)
-     , vbos(nva)
-    {
-        vao.Bind();                                             // bind the VAO for the shape
-        typename ShapeBuilder::VertexAttribs vert_attr_info;
-        const GLchar* vert_attr_name[] = {"Position", "Normal", "Tangent", "TexCoord"};
-        for(GLuint va = 0; va != nva; ++va)
-        {
-            const GLchar* name = vert_attr_name[va];
-            std::vector<GLfloat> data;
-            auto getter = vert_attr_info.VertexAttribGetter(data, name);
-            if(getter != nullptr)
-            {
-                // bind the VBO for the vertex attribute
-                vbos[va].Bind(Buffer::Target::Array);
-                GLuint npv = getter(make_shape, data);
-                // upload the data
-                Buffer::Data(Buffer::Target::Array, data);
-                // setup the vertex attribs array
-                VertexArrayAttrib attr(prog, name);
-                attr.Setup<GLfloat>(npv);
-                attr.Enable();
-            }
-        }
-    }
-
-    void Draw(void)
-    {
-        vao.Bind();
-        glFrontFace(make_shape.FaceWinding());
-        shape_instr.Draw(shape_indices);
-    }
-};
-
-    void Reshape(GLuint width, GLuint height)
-    {
-        glViewport(0, 0, width, height);
-        geom_prog.projection_matrix.Set(CamMatrixf::PerspectiveX(Degrees(60), width, height, 1, 80));
-    }
-*/
