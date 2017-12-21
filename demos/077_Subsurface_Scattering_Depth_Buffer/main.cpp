@@ -1,5 +1,5 @@
 //========================================================================================================================================================================================================================
-// DEMO 070: Convex hull
+// DEMO 077: Subsurface scattering
 //========================================================================================================================================================================================================================
 #include <random>
 #include <cstdlib>
@@ -28,7 +28,7 @@ struct demo_window_t : public glfw_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(8.0f, 0.5f, glm::lookAt(glm::vec3(4.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
+          camera(4.0f, 0.5f, glm::lookAt(glm::vec3(4.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
@@ -292,7 +292,7 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, window.res_x, window.res_y);
-        glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+        glClearColor(0.04f, 0.01f, 0.09f, 0.0f);
         glClearDepth(1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDisable(GL_POLYGON_OFFSET_FILL);
