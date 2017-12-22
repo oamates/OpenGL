@@ -1,9 +1,9 @@
 //========================================================================================================================================================================================================================
 // DEMO 059 : Physics-Based Rendering
 //========================================================================================================================================================================================================================
-#define GLM_FORCE_RADIANS 
+#define GLM_FORCE_RADIANS
 #define GLM_FORCE_NO_CTOR_INIT
- 
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/constants.hpp>
@@ -70,8 +70,6 @@ struct pbr_material_t
     GLuint roughness_map;
     GLuint ao_map;
 };
-
-void RenderQuad();
 
 struct sphere_t
 {
@@ -143,7 +141,7 @@ const int light_count = 4;
 glm::vec3 light_positions[light_count];
 
 const float luma = 96.0f;
-glm::vec3 light_colors[light_count] = 
+glm::vec3 light_colors[light_count] =
 {
     luma * glm::vec3(1.0f, 1.0f, 0.0f),
     luma * glm::vec3(0.0f, 0.0f, 1.0f),
@@ -151,7 +149,7 @@ glm::vec3 light_colors[light_count] =
     luma * glm::vec3(1.0f, 0.0f, 0.0f)
 };
 
-glm::vec2 uv0[light_count] = 
+glm::vec2 uv0[light_count] =
 {
     glm::vec2( 3.24182f,  1.23746f),
     glm::vec2( 8.01346f, -9.18265f),
@@ -159,7 +157,7 @@ glm::vec2 uv0[light_count] =
     glm::vec2(-1.87934f,  9.87124f)
 };
 
-glm::vec2 uv1[light_count] = 
+glm::vec2 uv1[light_count] =
 {
     glm::vec2(-0.12387f,  0.84136f),
     glm::vec2( 0.44121f, -0.13718f),
@@ -208,10 +206,10 @@ int main(int argc, char *argv[])
     uni_pbr_light_colors              = light_colors;
 
     //===================================================================================================================================================================================================================
-    // load PBR materials : 
+    // load PBR materials :
     // TODO :: combine metallic + roughness + ao into a single texture
     //===================================================================================================================================================================================================================
-    pbr_material_t pbr_materials[] = 
+    pbr_material_t pbr_materials[] =
     {
         {   // rusted iron material
             .albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/albedo.png"),
@@ -274,13 +272,13 @@ int main(int argc, char *argv[])
     GLuint environment_cubemap;
     glGenTextures(1, &environment_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, environment_cubemap);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, ENV_TEX_LEVELS, GL_RGBA32F, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);      
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, ENV_TEX_LEVELS, GL_RGBA32F, ENV_TEX_RESOLUTION, ENV_TEX_RESOLUTION);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  
+
 
     //===================================================================================================================================================================================================================
     // fake VAO for full viewport quad rendering
@@ -318,7 +316,7 @@ int main(int argc, char *argv[])
     GLuint irradiance_cubemap;
     glGenTextures(1, &irradiance_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_cubemap);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA32F, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);      
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA32F, IRRADIANCE_TEX_RESOLUTION, IRRADIANCE_TEX_RESOLUTION);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -326,7 +324,7 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     //===================================================================================================================================================================================================================
-    // render to irradiance cubemap by computing spherical convolution of environment map with ... kernel 
+    // render to irradiance cubemap by computing spherical convolution of environment map with ... kernel
     //===================================================================================================================================================================================================================
     glsl_program_t irradiance_conv(cubemap_vs, cubemap_gs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/irradiance_conv.fs"));
 
@@ -346,15 +344,15 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     const int PREFILTER_TEX_LEVELS = 8;
     const int PREFILTER_TEX_RESOLUTION = 1 << (PREFILTER_TEX_LEVELS - 1);
-    
+
     GLuint prefilter_cubemap;
     glGenTextures(1, &prefilter_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_cubemap);
-    glTexStorage2D(GL_TEXTURE_CUBE_MAP, PREFILTER_TEX_LEVELS, GL_RGBA32F, PREFILTER_TEX_RESOLUTION, PREFILTER_TEX_RESOLUTION);      
+    glTexStorage2D(GL_TEXTURE_CUBE_MAP, PREFILTER_TEX_LEVELS, GL_RGBA32F, PREFILTER_TEX_RESOLUTION, PREFILTER_TEX_RESOLUTION);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // be sure to set minifcation filter to mip_linear 
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // be sure to set minifcation filter to mip_linear
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     //===================================================================================================================================================================================================================
@@ -388,9 +386,9 @@ int main(int argc, char *argv[])
 
     GLuint brdfLUTTexture;
     glGenTextures(1, &brdfLUTTexture);
-    
+
     glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG32F, BRDF_TEXTURE_RESOLUTION, BRDF_TEXTURE_RESOLUTION);           // pre-allocate enough memory for the LUT texture.    
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG32F, BRDF_TEXTURE_RESOLUTION, BRDF_TEXTURE_RESOLUTION);           // pre-allocate enough memory for the LUT texture.
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);                                    // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -451,7 +449,7 @@ int main(int argc, char *argv[])
     const float cs2 = 0.80901699437f;
     const float sn2 = 0.58778525229f;
 
-    const glm::vec2 pentagon[5] = 
+    const glm::vec2 pentagon[5] =
     {
         glm::vec2(1.0f, 0.0f),
         glm::vec2( cs1,  sn1),

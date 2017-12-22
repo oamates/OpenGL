@@ -23,11 +23,14 @@
 #include "shader.hpp"
 #include "camera.hpp"
 #include "fbo.hpp"
-#include "brushed_metal.hpp"
-
+#include "vao.hpp"
+#include "vertex.hpp"
 #include "image/stb_image.h"
 
-const int BALL_COUNT = 15;
+#include "brushed_metal.hpp"
+
+
+const int BALL_COUNT = 16;
 
 struct demo_window_t : public glfw_window_t
 {
@@ -81,63 +84,141 @@ struct glsl_pipeline_t
         { glDeleteProgramPipelines(1, &id); }
 };
 
-/*
-template <typename ShapeBuilder> struct Shape
+struct sphere_pft2_t
 {
-    ShapeBuilder make_shape;                                    // helper object building shape vertex attributes
-    shapes::DrawingInstructions shape_instr;                    // helper object encapsulating shape drawing instructions
-    typename ShapeBuilder::IndexArray shape_indices;            // indices pointing to shape primitive elements
+    vao_t vao_pft2;                         // full position + frame + uv-texture vertex array object
+    GLuint vao_id;                          // minimalistic position only vao, which uses same array and index buffers
 
-    VertexArray vao;                                            // A vertex array object for the rendered shape
-    const GLuint nva;                                           // number of vertex attributes
-
-    // VBOs for the shape's vertex attributes
-    Array<Buffer> vbos;
-
-    Shape(const Program& prog, const ShapeBuilder& builder)
-     : make_shape(builder)
-     , shape_instr(make_shape.Instructions())
-     , shape_indices(make_shape.Indices())
-     , nva(4)
-     , vbos(nva)
+    sphere_pft2_t(int res_x, int res_y)
     {
-        vao.Bind();                                             // bind the VAO for the shape
-        typename ShapeBuilder::VertexAttribs vert_attr_info;
-        const GLchar* vert_attr_name[] = {"Position", "Normal", "Tangent", "TexCoord"};
-        for(GLuint va = 0; va != nva; ++va)
+        int V = (res_x + 1) * (res_y + 1);
+        int I = 2 * (res_x + 1) * res_y;
+
+        vertex_pft2_t* vertices = (vertex_pft2_t*) malloc(V * sizeof(vertex_pnt2_t));
+        GLuint* indices = (GLuint*) malloc (I * sizeof(GLuint));
+
+        float inv_res_x = 1.0f / res_x;
+        float inv_res_y = 1.0f / res_y;
+
+        int vindex = 0;
+        for (int y = 0; y <= res_y; ++y)
         {
-            const GLchar* name = vert_attr_name[va];
-            std::vector<GLfloat> data;
-            auto getter = vert_attr_info.VertexAttribGetter(data, name);
-            if(getter != nullptr)
+            for (int x = 0; x <= res_x; ++x)
             {
-                // bind the VBO for the vertex attribute
-                vbos[va].Bind(Buffer::Target::Array);
-                GLuint npv = getter(make_shape, data);
-                // upload the data
-                Buffer::Data(Buffer::Target::Array, data);
-                // setup the vertex attribs array
-                VertexArrayAttrib attr(prog, name);
-                attr.Setup<GLfloat>(npv);
-                attr.Enable();
+                glm::vec2 uv = glm::vec2(inv_res_x * x, inv_res_y * y);
+
+                float u = constants::two_pi * uv.x;
+                float v = constants::half_pi * (uv.y - 0.5f);
+
+                float cs_u = glm::cos(u);
+                float sn_u = glm::sin(u);
+                float r = glm::cos(v);
+                float z = glm::sin(v);
+
+                glm::vec3 position = glm::vec3(r * cs_u, r * sn_u, z);
+                glm::vec3 normal = position;
+                glm::vec3 tangent_u = glm::vec3(-sn_u, cs_u, 0.0f);
+                glm::vec3 tangent_v = glm::cross(normal, tangent_u);
+
+                vertices[vindex++] = vertex_pft2_t(position, normal, tangent_u, tangent_v, uv);
             }
         }
+
+        bool even_row = true;
+        int i = 0;
+        for (int y = 0; y < res_y; ++y)
+        {
+            if (even_row) // even rows: y == 0, y == 2; and so on
+            {
+                for (int x = 0; x <= res_x; ++x)
+                {
+                    indices[i++] = y * (res_x + 1) + x;
+                    indices[i++] = (y + 1) * (res_x + 1) + x;
+                }
+            }
+            else
+            {
+                for (int x = res_x; x >= 0; --x)
+                {
+                    indices[i++] = (y + 1) * (res_x + 1) + x;
+                    indices[i++] = y * (res_x + 1) + x;
+                }
+            }
+            even_row = !even_row;
+        }
+
+        vao_pft2 = vao_t(GL_TRIANGLE_STRIP, vertices, V, indices, I);
+
+        glGenVertexArrays(1, &vao_id);
+        glBindVertexArray(vao_id);
+        glBindBuffer(GL_ARRAY_BUFFER, vao_pft2.vbo.id);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft2_t), (const GLvoid*) offsetof(vertex_pft2_t, position));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vao_pft2.ibo.id);
+
+        free(vertices);
+        free(indices);
     }
 
-    void Draw(void)
+    void render_pft2()
+        { vao_pft2.render(); }
+
+    void render()
     {
-        vao.Bind();
-        glFrontFace(make_shape.FaceWinding());
-        shape_instr.Draw(shape_indices);
+        glBindVertexArray(vao_id);
+        vao_pft2.ibo.render();
     }
 };
 
-    void Reshape(GLuint width, GLuint height)
+struct plane_pft2_t
+{
+    vao_t vao_pft2;                         // full position + frame + uv-texture vertex array object
+    GLuint vao_id;                          // minimalistic position only vao, which uses same array and index buffers
+
+    plane_pft2_t (float scale)
     {
-        glViewport(0, 0, width, height);
-        geom_prog.projection_matrix.Set(CamMatrixf::PerspectiveX(Degrees(60), width, height, 1, 80));
+
+        glm::vec2 unit_square[] =
+        {
+            glm::vec2(-0.5f,  0.5f),
+            glm::vec2(-0.5f, -0.5f),
+            glm::vec2( 0.5f,  0.5f),
+            glm::vec2( 0.5f, -0.5f)
+        };
+
+        glm::vec3 normal    = glm::vec3(0.0f, 0.0f, 1.0f);
+        glm::vec3 tangent_u = glm::vec3(1.0f, 0.0f, 0.0f);
+        glm::vec3 tangent_v = glm::vec3(0.0f, 1.0f, 0.0f);
+
+        vertex_pft2_t vertices[] =
+        {
+            vertex_pft2_t(glm::vec3(scale * unit_square[0], 0.0f), normal, tangent_u, tangent_v, unit_square[0] + glm::vec2(0.5f, 0.5f)),
+            vertex_pft2_t(glm::vec3(scale * unit_square[1], 0.0f), normal, tangent_u, tangent_v, unit_square[1] + glm::vec2(0.5f, 0.5f)),
+            vertex_pft2_t(glm::vec3(scale * unit_square[2], 0.0f), normal, tangent_u, tangent_v, unit_square[2] + glm::vec2(0.5f, 0.5f)),
+            vertex_pft2_t(glm::vec3(scale * unit_square[3], 0.0f), normal, tangent_u, tangent_v, unit_square[3] + glm::vec2(0.5f, 0.5f)),
+        };
+
+        GLuint indices[] = {0, 1, 2, 3};
+
+        vao_pft2 = vao_t(GL_TRIANGLE_STRIP, vertices, 4, indices, 4);
+
+        glGenVertexArrays(1, &vao_id);
+        glBindVertexArray(vao_id);
+        glBindBuffer(GL_ARRAY_BUFFER, vao_pft2.vbo.id);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft2_t), (const GLvoid*) offsetof(vertex_pft2_t, position));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vao_pft2.ibo.id);
     }
-*/
+
+    void render_pft2()
+        { vao_pft2.render(); }
+
+    void render()
+    {
+        glBindVertexArray(vao_id);
+        vao_pft2.ibo.render();
+    }
+};
 
 int main(int argc, char *argv[])
 {
@@ -148,7 +229,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("VAO Loader", 8, 3, 3, 1920, 1080, true);
+    demo_window_t window("VAO Loader", 8, 4, 3, 1920, 1080, true);
 
     //===================================================================================================================================================================================================================
     // init shaders
@@ -194,11 +275,9 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // precompute step
     //===================================================================================================================================================================================================================
-    glm::vec3 plane_u = glm::vec3(16.0f, 0.0f,  0.0f);
-    glm::vec3 plane_v = glm::vec3( 0.0f, 0.0f,-16.0f);
-
-    Shape<shapes::Plane> plane = Shape<shapes::Plane>(vert_prog, shapes::Plane(plane_u, plane_v));
-    Shape<shapes::Sphere> sphere = Shape<shapes::Sphere>(vert_prog, shapes::Sphere(1.0, 36, 24));
+    const float scale = 16.0f;
+    sphere_pft2_t sphere(48, 24);
+    plane_pft2_t plane(scale);
 
     const GLuint ball_count = BALL_COUNT;
 
@@ -216,6 +295,7 @@ int main(int argc, char *argv[])
 
     glm::vec3 ball_offsets[] =
     {
+        glm::vec3(-1.0f, 1.0f,-6.5f),
         glm::vec3( 3.0f, 1.0f, 6.5f),
         glm::vec3( 5.0f, 1.0f, 5.0f),
         glm::vec3( 3.0f, 1.0f,-1.0f),
@@ -235,6 +315,7 @@ int main(int argc, char *argv[])
 
     glm::vec3 ball_rotations[] =
     {
+        glm::vec3(-0.4f, 0.1f,-0.7f),
         glm::vec3( 0.3f,-0.2f,-0.1f),
         glm::vec3( 0.2f, 0.3f, 0.4f),
         glm::vec3(-0.4f,-0.4f, 0.2f),
@@ -298,19 +379,21 @@ int main(int argc, char *argv[])
     glClearColor(1.0 ,1.0, 1.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    GLfloat i_u = 1.0f / glm::dot(plane_u, plane_u);
-    GLfloat i_v = 1.0f / glm::dot(plane_v, plane_v);
+    GLfloat i_u = 1.0f / (scale * scale);
+    GLfloat i_v = 1.0f / (scale * scale);
 
-    glm::mat4 transform_matrix = glm::mat4(glm::vec4( plane_u * i_u,   0.0f),
-                                           glm::vec4( plane_v * i_v,   0.0f),
-                                           glm::vec4(0.0f, 1.0f, 0.0f, 0.0f),
-                                           glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+    glm::mat4 transform_matrix = glm::mat4(glm::vec4(0.5f / scale, 0.0f,         0.0f, 0.0f),
+                                           glm::vec4(0.0f,         0.5f / scale, 0.0f, 0.0f),
+                                           glm::vec4(0.0f,         1.0f,         0.0f, 0.0f),
+                                           glm::vec4(0.0f,         0.0f,         0.0f, 1.0f));
 
     uni_lm_transform_matrix = transform_matrix;
     uni_lm_light_position = light_position;
     uni_lm_ball_positions = ball_offsets;
 
     glDisable(GL_DEPTH_TEST);
+
+    plane.render();
 
     /* !!!!!!!!!!!!!!!! */
     //Shape<shapes::Plane> tmp_plane(prog, shapes::Plane(plane_u, plane_v));
@@ -328,28 +411,49 @@ int main(int argc, char *argv[])
     glActiveTexture(GL_TEXTURE1);
     uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
 
+
+
     const char* tex_names[BALL_COUNT] =
     {
-        "pool_ball_1",
-        "pool_ball_2",
-        "pool_ball_3",
-        "pool_ball_4",
-        "pool_ball_5",
-        "pool_ball_6",
-        "pool_ball_7",
-        "pool_ball_8",
-        "pool_ball_9",
-        "pool_ball10",
-        "pool_ball11",
-        "pool_ball12",
-        "pool_ball13",
-        "pool_ball14",
-        "pool_ball15",
+        "../../../resources/tex2d/bbal_hires/bbal_0x0.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x1.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x2.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x3.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x4.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x5.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x6.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x7.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x8.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0x9.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0xA.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0xB.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0xC.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0xD.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0xE.jpg",
+        "../../../resources/tex2d/bbal_hires/bbal_0xF.jpg"
     };
 
-    // Texture numbers_texture;                                            // The array texture storing the ball number decals
+    const char* tex_names_1[BALL_COUNT] =
+    {
+        "../../../resources/tex2d/scratches/scratches_0x0.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x1.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x2.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x3.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x4.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x5.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x6.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x7.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x8.jpg",
+        "../../../resources/tex2d/scratches/scratches_0x9.jpg",
+        "../../../resources/tex2d/scratches/scratches_0xA.jpg",
+        "../../../resources/tex2d/scratches/scratches_0xB.jpg",
+        "../../../resources/tex2d/scratches/scratches_0xC.jpg",
+        "../../../resources/tex2d/scratches/scratches_0xD.jpg",
+        "../../../resources/tex2d/scratches/scratches_0xE.jpg",
+        "../../../resources/tex2d/scratches/scratches_0xF.jpg"
+    };
 
-    GLuint numbers_texture;
+    GLuint numbers_texture;                                                                 // Texture numbers_texture;
     glGenTextures(1, &numbers_texture);
     glBindTexture(GL_TEXTURE_2D_ARRAY, numbers_texture);
 
@@ -482,7 +586,9 @@ int main(int argc, char *argv[])
         glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, reflect_textures[b], 0);
         uni_cv_camera_position = ball_offsets[b];
         uni_cg_camera_matrix = glm::translate(-ball_offsets[b]);
-        RenderScene(src_texs, cmap_cloth_pp, cmap_ball_pp, b);
+
+/*        RenderScene(src_texs, cmap_cloth_pp, cmap_ball_pp, b); */
+
     }
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -512,7 +618,7 @@ int main(int argc, char *argv[])
                                              glm::vec3( 0.0f,  0.0f, 1.0f));
         uni_cv_texture_matrix = texture_matrix;
 
-        plane.Draw();
+        plane.render_pft2();
 
         ball_pp.bind();
 
@@ -534,7 +640,7 @@ int main(int argc, char *argv[])
             uni_bf_ball_idx = i;
 
             glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[i]);
-            sphere.Draw();
+            sphere.render_pft2();
         }
 
         //===============================================================================================================================================================================================================
