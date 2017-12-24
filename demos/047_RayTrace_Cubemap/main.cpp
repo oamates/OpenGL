@@ -22,9 +22,11 @@
 #include "glfw_window.hpp"
 #include "shader.hpp"
 #include "camera.hpp"
+#include "image.hpp"
 #include "fbo.hpp"
 #include "vao.hpp"
 #include "vertex.hpp"
+#include "sampler.hpp"
 #include "image/stb_image.h"
 
 #include "brushed_metal.hpp"
@@ -74,6 +76,9 @@ struct glsl_pipeline_t
     void bind()
         { glBindProgramPipeline(id); }
 
+    void activate_shader_program(const glsl_shader_program_t& shader_program)
+        { glActiveShaderProgram(id, shader_program.id); }
+
     void add_stage(GLbitfield stage_bitmask, const glsl_program_t& program)
         { glUseProgramStages(id, stage_bitmask, program.id); }
 
@@ -94,7 +99,7 @@ struct sphere_pft2_t
         int V = (res_x + 1) * (res_y + 1);
         int I = 2 * (res_x + 1) * res_y;
 
-        vertex_pft2_t* vertices = (vertex_pft2_t*) malloc(V * sizeof(vertex_pnt2_t));
+        vertex_pft2_t* vertices = (vertex_pft2_t*) malloc(V * sizeof(vertex_pft2_t));
         GLuint* indices = (GLuint*) malloc (I * sizeof(GLuint));
 
         float inv_res_x = 1.0f / res_x;
@@ -128,7 +133,7 @@ struct sphere_pft2_t
         int i = 0;
         for (int y = 0; y < res_y; ++y)
         {
-            if (even_row) // even rows: y == 0, y == 2; and so on
+            if (even_row)
             {
                 for (int x = 0; x <= res_x; ++x)
                 {
@@ -253,8 +258,8 @@ int main(int argc, char *argv[])
 
     glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");                // ClothFragmentShader
     glsl_shader_program_t cloth_fs_program(cloth_fs);                           // ClothProgram, cloth_prog
-    uniform_t uni_cf_color_1   = cloth_fs_program["Color1"];                    // ProgramUniform<Vec3f> color_1
-    uniform_t uni_cf_color_2   = cloth_fs_program["Color2"];                    // ProgramUniform<Vec3f> color_2
+    uniform_t uni_cf_color_1   = cloth_fs_program["color_1"];                    // ProgramUniform<Vec3f> color_1
+    uniform_t uni_cf_color_2   = cloth_fs_program["color_2"];                    // ProgramUniform<Vec3f> color_2
     uniform_t uni_cf_cloth_tex = cloth_fs_program["ClothTex"];                  // ProgramUniformSampler cloth_tex;
     uniform_t uni_cf_light_map = cloth_fs_program["LightMap"];                  // ProgramUniformSampler light_map;
 
@@ -271,6 +276,153 @@ int main(int argc, char *argv[])
     uniform_t uni_lm_transform_matrix = lightmap["TransformMatrix"];            // ProgramUniform<Mat4f> transform_matrix
     uniform_t uni_lm_light_position   = lightmap["LightPosition"];              // ProgramUniform<Vec3f> light_position
     uniform_t uni_lm_ball_positions   = lightmap["BallPositions"];              // ProgramUniform<Vec3f> ball_positions
+
+    //===================================================================================================================================================================================================================
+    // generate scratched billiard ball textures form albedo (numbers) and roughness textures, making spherical distortion
+    // and pack them into a single GL_TEXTURE_2D_ARRAY
+    // texture is twice wider because equator on sphere is twice longer than meridian
+    //===================================================================================================================================================================================================================
+    const int BALLS_TEXTURE_MAX_LEVEL = 10;
+    const int BALLS_TEXTURE_WIDTH = 1 << BALLS_TEXTURE_MAX_LEVEL;
+    const int BALLS_TEXTURE_HEIGHT = 1 << (BALLS_TEXTURE_MAX_LEVEL - 1);
+
+    GLuint balls_tex_id;                                                                        // GLuint numbers_texture;
+    glGenTextures(1, &balls_tex_id);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, BALLS_TEXTURE_MAX_LEVEL + 1, GL_RGB8, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT, BALL_COUNT);
+
+    glsl_program_t sphere_texgen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
+                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sphere_texgen.fs"));
+    sphere_texgen.enable();
+    sphere_texgen["albedo_tex"] = 0;
+    sphere_texgen["roughness_tex"] = 1;
+
+    sampler_t mipmap_albedo_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT);
+    mipmap_albedo_sampler.bind(0);
+    sampler_t mipmap_roughness_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT);
+    mipmap_roughness_sampler.bind(1);
+
+    GLuint texgen_fbo_id;
+    glGenFramebuffers(1, &texgen_fbo_id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, texgen_fbo_id);
+
+    GLuint albedo_tex_id, roughness_tex_id;
+    glGenTextures(1, &albedo_tex_id);
+    glGenTextures(1, &roughness_tex_id);
+
+    glViewport(0, 0, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT);
+
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
+    glBindVertexArray(vao_id);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    //===================================================================================================================================================================================================================
+    // texture generation step
+    //===================================================================================================================================================================================================================
+    const char* albedo_tex_name_pattern = "../../../resources/tex2d/bbal_hires/bbal_0x%01X.jpg";
+    const char* roughness_tex_name_pattern = "../../../resources/tex2d/scratches/scratches_0x%01X.jpg";
+
+    for (int i = 0; i != BALL_COUNT; ++i)
+    {
+        debug_msg("Render step #%d.", i); fflush(stdout);
+        glFramebufferTexture3D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_ARRAY, balls_tex_id, 0, i);
+        check_status();
+
+        int width, height, bpp;
+        unsigned char* src_data;
+        GLenum format;
+        char tex_name[64];
+
+        //===============================================================================================================================================================================================================
+        // load albedo image
+        //===============================================================================================================================================================================================================
+        sprintf(tex_name, albedo_tex_name_pattern, i);
+        src_data = stbi_load(tex_name, &width, &height, &bpp, 0);
+
+        if (!src_data)
+            exit_msg("Cannot load texture: %s", tex_name);
+
+        format = (bpp == 1) ? GL_RED : (bpp == 2) ? GL_RG : (bpp == 3) ? GL_RGB : GL_RGBA;
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, albedo_tex_id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, src_data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        free(src_data);
+
+        //===============================================================================================================================================================================================================
+        // load albedo image
+        //===============================================================================================================================================================================================================
+        sprintf(tex_name, roughness_tex_name_pattern, i);
+        src_data = stbi_load(tex_name, &width, &height, &bpp, 0);
+
+        if (!src_data)
+            exit_msg("Cannot load texture: %s", tex_name);
+
+        format = (bpp == 1) ? GL_RED : (bpp == 2) ? GL_RG : (bpp == 3) ? GL_RGB : GL_RGBA;
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, roughness_tex_id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, src_data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        free(src_data);
+
+        //===============================================================================================================================================================================================================
+        // combine images into one
+        //===============================================================================================================================================================================================================
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+
+    //===================================================================================================================================================================================================================
+    // generate mipmaps of texture array
+    //===================================================================================================================================================================================================================
+    GLuint tex_ids[] = {albedo_tex_id, roughness_tex_id};
+    glDeleteTextures(2, tex_ids);
+
+    glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    //===================================================================================================================================================================================================================
+    // store images for debug purposes
+    //===================================================================================================================================================================================================================
+    GLsizei pixel_buffer_size = 3 * BALLS_TEXTURE_WIDTH * BALLS_TEXTURE_HEIGHT;
+    unsigned char* pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
+
+    for (int layer = 0; layer != BALL_COUNT; ++layer)
+    {
+        int res_x = BALLS_TEXTURE_WIDTH;
+        int res_y = BALLS_TEXTURE_HEIGHT;
+
+        for (int level = 0; level <= BALLS_TEXTURE_MAX_LEVEL; ++level)
+        {
+            char tex_name[64];
+            sprintf(tex_name, "bbal_0x%01X_L%01X.png", layer, level);
+
+
+            GLsizei buffer_size = 3 * res_x * res_y;
+            debug_msg("Saving slice #%d level #%d of 2D-array texture into %s. Resolution = %d x %d.", layer, level, tex_name, res_x, res_y);
+
+            glGetTextureSubImage(balls_tex_id, level, 0, 0, layer, res_x, res_y, 1, GL_RGB, GL_UNSIGNED_BYTE, buffer_size, pixel_buffer);
+            image::png::write(tex_name, res_x, res_y, pixel_buffer, PNG_COLOR_TYPE_RGB);
+
+            res_x = glm::max(res_x >> 1, 1);
+            res_y = glm::max(res_y >> 1, 1);
+        }
+    }
+
+    free(pixel_buffer);
+
+    debug_msg("Done saving 2D-array texture.");
+
 
     //===================================================================================================================================================================================================================
     // precompute step
@@ -339,43 +491,52 @@ int main(int argc, char *argv[])
     glUseProgram(0);
 
     glsl_pipeline_t cloth_pp;
-    cloth_pp.bind();
     cloth_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
     cloth_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
     cloth_pp.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
-
-    glsl_pipeline_t ball_pp;
-    ball_pp.bind();
-    ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
-    ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
+    cloth_pp.bind();
 
     const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
 
+    cloth_pp.activate_shader_program(common_vs_program);
     uni_cv_light_position = light_position;                             // vert_prog.light_position.Set(light_position);
+    cloth_pp.activate_shader_program(cloth_fs_program);
     uni_cf_color_1 = glm::vec3(0.1f, 0.3f, 0.1f);                       // cloth_prog.color_1.Set(Vec3f(0.1f, 0.3f, 0.1f));
     uni_cf_color_2 = glm::vec3(0.3f, 0.4f, 0.3f);                       // cloth_prog.color_2.Set(Vec3f(0.3f, 0.4f, 0.3f));
-
-    glActiveTexture(GL_TEXTURE0);
     uni_cf_light_map = 0;                                               // cloth_prog.light_map.Set(0);
+
+    glsl_pipeline_t ball_pp;
+    ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
+    ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
+    ball_pp.bind();
+
+
+
+
+
+
+    debug_msg("Pipelines generated. Creating lightmaps ... "); fflush(stdout);
+
+    lightmap.enable();
+    glActiveTexture(GL_TEXTURE0);
 
     GLuint table_light_map;                                             // Texture table_light_map; -- table light map and the associated framebuffer
     glGenTextures(1, &table_light_map);
-    GLuint light_map_side = 512;
+    const int LIGHT_MAP_RESOLUTION = 1024;
     glBindTexture(GL_TEXTURE_2D, table_light_map);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, light_map_side, light_map_side);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    //Framebuffer table_light_fbo_id;
-    GLuint table_light_fbo_id;
+    GLuint table_light_fbo_id;                                          // Framebuffer table_light_fbo_id;
     glGenFramebuffers(1, &table_light_fbo_id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, table_light_fbo_id);
     glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, table_light_map, 0);
 
-    glViewport(0, 0, light_map_side, light_map_side);
+    glViewport(0, 0, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION);
     glClearColor(1.0 ,1.0, 1.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -392,12 +553,20 @@ int main(int argc, char *argv[])
     uni_lm_ball_positions = ball_offsets;
 
     glDisable(GL_DEPTH_TEST);
-
     plane.render();
 
-    /* !!!!!!!!!!!!!!!! */
-    //Shape<shapes::Plane> tmp_plane(prog, shapes::Plane(plane_u, plane_v));
-    //tmp_plane.Draw();
+    debug_msg("LightMap generated. Saving lightmap texture."); fflush(stdout);
+
+    //===================================================================================================================================================================================================================
+    // store images for debug purposes
+    //===================================================================================================================================================================================================================
+    pixel_buffer_size = 3 * LIGHT_MAP_RESOLUTION * LIGHT_MAP_RESOLUTION;
+    pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
+    const char* tex_name = "lightmap.png";
+    glGetTextureSubImage(table_light_map, 0, 0, 0, 0, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel_buffer_size, pixel_buffer);
+    image::png::write(tex_name, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION, pixel_buffer, PNG_COLOR_TYPE_RGB);
+    free(pixel_buffer);
+    debug_msg("Done saving lightmap texture.");
 
     glEnable(GL_DEPTH_TEST);
     glUseProgram(0);
@@ -412,136 +581,11 @@ int main(int argc, char *argv[])
     uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
 
 
-
-    const char* albedo_tex_names[BALL_COUNT] =
-    {
-        "../../../resources/tex2d/bbal_hires/bbal_0x0.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x1.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x2.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x3.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x4.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x5.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x6.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x7.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x8.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0x9.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0xA.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0xB.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0xC.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0xD.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0xE.jpg",
-        "../../../resources/tex2d/bbal_hires/bbal_0xF.jpg"
-    };
-
-    const char* roughness_tex_names[BALL_COUNT] =
-    {
-        "../../../resources/tex2d/scratches/scratches_0x0.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x1.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x2.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x3.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x4.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x5.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x6.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x7.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x8.jpg",
-        "../../../resources/tex2d/scratches/scratches_0x9.jpg",
-        "../../../resources/tex2d/scratches/scratches_0xA.jpg",
-        "../../../resources/tex2d/scratches/scratches_0xB.jpg",
-        "../../../resources/tex2d/scratches/scratches_0xC.jpg",
-        "../../../resources/tex2d/scratches/scratches_0xD.jpg",
-        "../../../resources/tex2d/scratches/scratches_0xE.jpg",
-        "../../../resources/tex2d/scratches/scratches_0xF.jpg"
-    };
-
-
-    //===================================================================================================================================================================================================================
-    // generate scratched billiard ball textures form albedo (numbers) and roughness textures, making spherical distortion
-    // and pack them into a single GL_TEXTURE_2D_ARRAY
-    // texture is twice wider because equator on sphere is twice longer than meridian
-    //===================================================================================================================================================================================================================
-    const int BALLS_TEXTURE_MAX_LEVEL = 10;
-    const int BALLS_TEXTURE_WIDTH = 1 << BALLS_TEXTURE_MAX_LEVEL;
-    const int BALLS_TEXTURE_HEIGHT = 1 << (BALLS_TEXTURE_MAX_LEVEL - 1);
-
-    GLuint balls_tex_id;                                                                        // GLuint numbers_texture;
-    glGenTextures(1, &balls_tex_id);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
-
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexStorage3D(GL_TEXTURE_2D_ARRAY, BALLS_TEXTURE_MAX_LEVEL + 1, GL_RGB, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT, BALL_COUNT);
-
-    glsl_program_t sphere_texgen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
-                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sphere_texgen.fs"));
-    sphere_texgen.enable();
-
-    GLuint texgen_fbo_id;
-    glGenFramebuffers(1, &texgen_fbo_id);
-    glBindBuffer(GL_DRAW_FRAMEBUFFER, texgen_fbo_id);
-
-    GLuint albedo_tex_id, roughness_tex_id;
-    glGenTextures(1, &albedo_tex_id);
-    glGenTextures(1, &roughness_tex_id);
-
-    glViewport(0, 0, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT);
-
-    for(GLuint i = 0; i != BALL_COUNT; ++i)
-    {
-        glFramebufferTexture3D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_ARRAY, balls_tex_id, 0, i);
-
-        int width, height, bpp;
-        unsigned char* src_data;
-
-        //===============================================================================================================================================================================================================
-        // load albedo image
-        //===============================================================================================================================================================================================================
-        src_data = stbi_load(albedo_tex_names[i], &width, &height, &bpp, 0);
-        if (!src_data)
-            exit_msg("Cannot load texture: %s", albedo_tex_names[i]);
-
-        GLenum format = (bpp == 1) ? GL_RED : (bpp == 2) ? GL_RG : (bpp == 3) ? GL_RGB : GL_RGBA;
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(albedo_tex_id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, format, GL_UNSIGNED_BYTE, src_data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        free(src_data);
-
-        //===============================================================================================================================================================================================================
-        // load albedo image
-        //===============================================================================================================================================================================================================
-        unsigned char* src_data = stbi_load(roughness_tex_names[i], &width, &height, &bpp, 0);
-
-        if (!src_data)
-            exit_msg("Cannot load texture: %s", roughness_tex_names[i]);
-
-        GLenum format = (bpp == 1) ? GL_RED : (bpp == 2) ? GL_RG : (bpp == 3) ? GL_RGB : GL_RGBA;
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(roughness_tex_id);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, format, GL_UNSIGNED_BYTE, src_data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        free(src_data);
-
-        //===============================================================================================================================================================================================================
-        // combine images into one
-        //===============================================================================================================================================================================================================
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    }
+    return 0;
 
     //===================================================================================================================================================================================================================
     // store images for debug purposes
     //===================================================================================================================================================================================================================
-
-
-
-
-    //===================================================================================================================================================================================================================
-    // generate mipmaps of texture array
-    //===================================================================================================================================================================================================================
-    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
 
 

@@ -3,7 +3,7 @@
 in vec3 vertPosition;
 
 uniform vec3 LightPosition;
-uniform vec3 BallPositions[15];
+uniform vec3 BallPositions[16];
 
 out vec4 fragColor;
 
@@ -12,7 +12,7 @@ void main()
     float d_max = 0.0;
     vec3 L = LightPosition;
     vec3 R = normalize(vertPosition - LightPosition);
-    for(int i = 0; i != 15; ++i)
+    for(int i = 0; i != 16; ++i)
     {
         vec3 S = BallPositions[i];
         float a = dot(R, R);
