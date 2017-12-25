@@ -40,7 +40,7 @@ glsl_shader_program_t::glsl_shader_program_t(const glsl_shader_t& shader)
 }
 
 uniform_t glsl_shader_program_t::operator[] (const char* name) const
-    { return uniform_t(this, name); }
+    { return uniform_t(*this, name); }
 
 glsl_shader_program_t::~glsl_shader_program_t()
     { glDeleteProgram(id); }

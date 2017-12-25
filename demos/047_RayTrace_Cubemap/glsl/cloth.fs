@@ -35,6 +35,6 @@ void main()
     float Specular = pow(clamp(dot(LightRefl, normalize(geomViewDir)) + 0.1, 0.0, 1.0) * 0.9, 16.0 + 16.0 * Amount) * (0.2 + 2.0 * Amount);
     float Diffuse = clamp(2.0 * (dot(Normal, LightDir) - 0.5), 0.0, 1.0);
     float Ambient = 0.2;
-    vec3 Color = mix(color_1, color_2, Amount);
+    vec3 Color = texture(ClothTex, geomTexCoord).rgb;
     FragmentColor = vec4(Color * Ambient + LightColor * Color * Diffuse + LightColor * Specular, 1.0);
 }

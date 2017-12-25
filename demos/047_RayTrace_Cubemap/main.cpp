@@ -73,7 +73,7 @@ struct glsl_pipeline_t
     void bind()
         { glBindProgramPipeline(id); }
 
-    void activate_shader_program(const glsl_shader_program_t& shader_program)
+    void active_shader_program(const glsl_shader_program_t& shader_program)
         { glActiveShaderProgram(id, shader_program.id); }
 
     void add_stage(GLbitfield stage_bitmask, const glsl_program_t& program)
@@ -485,9 +485,9 @@ int main(int argc, char *argv[])
 
     const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
 
-    cloth_pp.activate_shader_program(common_vs_program);
+    cloth_pp.active_shader_program(common_vs_program);
     uni_cv_light_position = light_position;                             // vert_prog.light_position.Set(light_position);
-    cloth_pp.activate_shader_program(cloth_fs_program);
+    cloth_pp.active_shader_program(cloth_fs_program);
     uni_cf_color_1 = glm::vec3(0.1f, 0.3f, 0.1f);                       // cloth_prog.color_1.Set(Vec3f(0.1f, 0.3f, 0.1f));
     uni_cf_color_2 = glm::vec3(0.3f, 0.4f, 0.3f);                       // cloth_prog.color_2.Set(Vec3f(0.3f, 0.4f, 0.3f));
     uni_cf_light_map = 0;                                               // cloth_prog.light_map.Set(0);
@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
     ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
     ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
     ball_pp.bind();
-    ball_pp.activate_shader_program(ball_fs_program);
+    ball_pp.active_shader_program(ball_fs_program);
     uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
     uni_bf_reflect_tex = 3;
 
@@ -626,11 +626,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // prerender the cubemaps
     //===================================================================================================================================================================================================================
-    //
-    // PrerenderCubemaps(temp_cubemaps, reflect_textures, cubemap_side);
-
     glActiveTexture(GL_TEXTURE4);
-    GLuint z_buffer;                // Texture z_buffer;
+    GLuint z_buffer;
 
     glGenTextures(1, &z_buffer);
     glBindTexture(GL_TEXTURE_CUBE_MAP, z_buffer);
@@ -647,15 +644,17 @@ int main(int argc, char *argv[])
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
     glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, z_buffer, 0);
 
-    glsl_pipeline_t cmap_cloth_pp, cmap_ball_pp;
+
 
     glUseProgram(0);
 
+    glsl_pipeline_t cmap_cloth_pp;
     cmap_cloth_pp.bind();
     cmap_cloth_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
     cmap_cloth_pp.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
     cmap_cloth_pp.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
 
+    glsl_pipeline_t cmap_ball_pp;
     cmap_ball_pp.bind();
     cmap_ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
     cmap_ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
@@ -672,20 +671,20 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         cmap_cloth_pp.bind();
-        cmap_cloth_pp.activate_shader_program(common_vs_program);
+        cmap_cloth_pp.active_shader_program(common_vs_program);
         uni_cv_camera_position = ball_offsets[b];
         uni_cv_texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
                                           glm::vec3( 0.0f, 16.0f, 0.0f),
                                           glm::vec3( 0.0f,  0.0f, 1.0f));
 
-        cmap_cloth_pp.activate_shader_program(cubemap_gs_program);
+        cmap_cloth_pp.active_shader_program(cubemap_gs_program);
         uni_cg_camera_matrix = glm::translate(-ball_offsets[b]);
         uni_cg_projection_matrix = glm::infinitePerspective(constants::half_pi, 1.0f, 0.25f);
 
         plane.render_pft2();
 
         cmap_ball_pp.bind();
-        cmap_ball_pp.activate_shader_program(common_vs_program);
+        cmap_ball_pp.active_shader_program(common_vs_program);
 
         uni_cv_texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
                                           glm::vec3(0.0f, 3.0f, -1.0f),
@@ -695,11 +694,11 @@ int main(int argc, char *argv[])
         {
             if (i == b) continue;
 
-            cmap_ball_pp.activate_shader_program(common_vs_program);
+            cmap_ball_pp.active_shader_program(common_vs_program);
             glm::vec3 rot = ball_rotations[i];
             uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
 
-            cmap_ball_pp.activate_shader_program(ball_fs_program);
+            cmap_ball_pp.active_shader_program(ball_fs_program);
             uni_bf_color_1 = ball_colors[i];
             uni_bf_color_2 = ball_colors[i];
             uni_bf_ball_idx = i;
@@ -712,7 +711,7 @@ int main(int argc, char *argv[])
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
-    debug_msg("Blalalalalaal");
+    debug_msg("Beginning main render loop.");
 
     //===================================================================================================================================================================================================================
     // program main loop
@@ -722,14 +721,16 @@ int main(int argc, char *argv[])
         window.new_frame();
 
         double time = window.frame_ts;
-
         glm::mat4 camera = window.camera.view_matrix;
         glm::vec3 camera_position = window.camera.position();
 
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        cloth_pp.bind();                                 // Render the plane
-        cloth_pp.activate_shader_program(common_vs_program);
+
+        //===============================================================================================================================================================================================================
+        // render billiard table
+        //===============================================================================================================================================================================================================
+        cloth_pp.bind();
+        cloth_pp.active_shader_program(common_vs_program);
         uni_cv_camera_position = camera_position;
         uni_cv_model_matrix = glm::mat4(1.0f);
         glm::mat3 texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
@@ -737,14 +738,16 @@ int main(int argc, char *argv[])
                                              glm::vec3( 0.0f,  0.0f, 1.0f));
         uni_cv_texture_matrix = texture_matrix;
 
-        cloth_pp.activate_shader_program(default_gs_program);
+        cloth_pp.active_shader_program(default_gs_program);
         uni_dg_camera_matrix = camera;
 
         plane.render_pft2();
 
+        //===============================================================================================================================================================================================================
+        // render balls
+        //===============================================================================================================================================================================================================
         ball_pp.bind();
-
-        ball_pp.activate_shader_program(common_vs_program);
+        ball_pp.active_shader_program(common_vs_program);
         texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
                                    glm::vec3(0.0f, 3.0f, -1.0f),
                                    glm::vec3(0.0f, 0.0f,  1.0f));
@@ -752,11 +755,11 @@ int main(int argc, char *argv[])
 
         for(int i = 0; i != ball_count; ++i)
         {
-            ball_pp.activate_shader_program(common_vs_program);
+            ball_pp.active_shader_program(common_vs_program);
             glm::vec3 rot = ball_rotations[i];
             uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
 
-            ball_pp.activate_shader_program(ball_fs_program);
+            ball_pp.active_shader_program(ball_fs_program);
             uni_bf_color_1 = ball_colors[i];
             uni_bf_color_2 = ball_colors[i];
             uni_bf_ball_idx = i;

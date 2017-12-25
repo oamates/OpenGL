@@ -1,14 +1,15 @@
 #version 330 core
 
+layout(location = 0) in vec3 Position;
+layout(location = 1) in vec3 Normal;
+layout(location = 2) in vec3 Tangent;
+layout(location = 3) in vec3 Bitangent;
+layout(location = 4) in vec2 TexCoord;
+
 uniform mat4 ModelMatrix;
 uniform mat3 TextureMatrix;
 uniform vec3 CameraPosition;
 uniform vec3 LightPosition;
-
-in vec4 Position;
-in vec3 Normal;
-in vec3 Tangent;
-in vec2 TexCoord;
 
 out gl_PerVertex 
 {
@@ -25,12 +26,13 @@ out vec2 vertSTCoord;
 
 void main()
 {
-    gl_Position = ModelMatrix * Position;
+    gl_Position = ModelMatrix * vec4(Position, 1.0f);
+
     vertLightDir = LightPosition - gl_Position.xyz;
     vertViewDir = CameraPosition - gl_Position.xyz;
-    vertNormal =  (ModelMatrix * vec4(Normal,  0.0)).xyz;
-    vertTangent = (ModelMatrix * vec4(Tangent, 0.0)).xyz;
-    vertBitangent = cross(vertNormal, vertTangent);
-    vertTexCoord = (TextureMatrix * vec3(TexCoord,1.0)).xy;
+    vertNormal =  (ModelMatrix * vec4(Normal,  0.0f)).xyz;
+    vertTangent = (ModelMatrix * vec4(Tangent, 0.0f)).xyz;
+    vertBitangent = (ModelMatrix * vec4(Bitangent, 0.0)).xyz;
+    vertTexCoord = (TextureMatrix * vec3(TexCoord, 1.0)).xy;
     vertSTCoord = TexCoord;
 }
