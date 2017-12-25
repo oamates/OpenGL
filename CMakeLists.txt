@@ -85,11 +85,15 @@ if (NOT "$ENV{VULKAN_SDK}" STREQUAL "")
     set(VULKAN_INCLUDE_DIR "$ENV{VULKAN_SDK}/include")
     set(VULKAN_LIBRARY_PATH "$ENV{VULKAN_SDK}/lib")
 
-    if(LINUX)
-        set(VULKAN_LAYER_PATH "$ENV{VULKAN_SDK}/etc/explicit_layer.d")
-    else()
+    if(WIN32)
         set(VULKAN_LAYER_PATH "")
+        set(VULKAN_DYNAMIC_LIBRARY vulkan-1) 
+    else()
+        set(VULKAN_LAYER_PATH "$ENV{VULKAN_SDK}/etc/explicit_layer.d")
+        set(VULKAN_DYNAMIC_LIBRARY vulkan) 
     endif()
+
+    message("Vulkan examples will be linked to ${VULKAN_DYNAMIC_LIBRARY}")
 
     message("Found Vulkan SDK installed at $ENV{VULKAN_SDK}")
 
