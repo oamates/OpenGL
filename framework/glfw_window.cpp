@@ -175,7 +175,7 @@ glfw_window_t::glfw_window_t(const char* title, int glfw_samples, int version_ma
     // Create window ...
     //===============================================================================================================================================================================================================
     window = glfwCreateWindow(res_x, res_y, title, fullscreen ? glfwGetPrimaryMonitor() : 0, 0);
-    if(!window)
+    if (!window)
     {
         glfw::terminate();
         exit_msg("Failed to open GLFW window. No open GL %d.%d support.", version_major, version_minor);
@@ -286,8 +286,7 @@ double glfw_window_t::fps()
     { return double(frame) / (frame_ts - initial_ts); };
 
 glfw_window_t::~glfw_window_t()
-    { glfwDestroyWindow(window); }
-
-
-
-
+{
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwDestroyWindow(window);
+}

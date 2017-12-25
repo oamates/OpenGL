@@ -251,8 +251,8 @@ template<typename index_t> struct he_manifold_t
                 debug_msg("face_test failed for edge e = [%u, %u]. Face = {%u, %u, %u}", edges[e].a, edges[e].b, x, y, z);
                 return false;
             }
-            return true;
         }
+        return true;
     }
 
     //================================================================================================================================================================================================================

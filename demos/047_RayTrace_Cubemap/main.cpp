@@ -224,6 +224,9 @@ struct plane_pft2_t
 
 int main(int argc, char *argv[])
 {
+    const int res_x = 1920;
+    const int res_y = 1080;
+
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
@@ -231,7 +234,7 @@ int main(int argc, char *argv[])
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("VAO Loader", 8, 4, 3, 1920, 1080, true);
+    demo_window_t window("VAO Loader", 8, 4, 3, res_x, res_y, true);
 
     //===================================================================================================================================================================================================================
     // init shaders
@@ -710,6 +713,7 @@ int main(int argc, char *argv[])
     }
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glViewport(0, 0, res_x, res_y);
 
     debug_msg("Beginning main render loop.");
 
@@ -739,6 +743,7 @@ int main(int argc, char *argv[])
         uni_cv_texture_matrix = texture_matrix;
 
         cloth_pp.active_shader_program(default_gs_program);
+        uni_dg_projection_matrix = window.camera.projection_matrix;
         uni_dg_camera_matrix = camera;
 
         plane.render_pft2();

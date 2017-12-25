@@ -471,7 +471,6 @@ void imgui_window_t::new_frame()
 
     if (imgui_active)
     {
-
         //===============================================================================================================================================================================================================
         // Setup display size (every frame to accommodate for window resizing)
         //===============================================================================================================================================================================================================
@@ -590,8 +589,11 @@ imgui_window_t::~imgui_window_t()
     glDeleteShader(ui_fs_id);
     glDeleteProgram(ui_program_id);
     glDeleteTextures(1, &ui_font_tex_id);
+
     ImGui::GetIO().Fonts->TexID = 0;
     ImGui::Shutdown();
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     glfwDestroyWindow(window);
 }
 

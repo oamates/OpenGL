@@ -11,7 +11,8 @@ struct glsl_program_t;
 struct glsl_shader_program_t;
 
 //=======================================================================================================================================================================================================================
-// structure representing OpenGL uniform variable
+// structure representing OpenGL Direct State Access uniform variable
+// glProgramUniform* family of functions is available since OpenGL 4.1
 //=======================================================================================================================================================================================================================
 
 struct dsa_uniform_t
