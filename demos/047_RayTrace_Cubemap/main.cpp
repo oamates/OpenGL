@@ -21,6 +21,7 @@
 #include "gl_aux.hpp"
 #include "glfw_window.hpp"
 #include "shader.hpp"
+#include "pipeline.hpp"
 #include "camera.hpp"
 #include "image.hpp"
 #include "fbo.hpp"
@@ -59,29 +60,6 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
-};
-
-struct glsl_pipeline_t
-{
-    GLuint id;
-
-    glsl_pipeline_t()
-        { glGenProgramPipelines(1, &id); }
-
-    void bind()
-        { glBindProgramPipeline(id); }
-
-    void active_shader_program(const glsl_shader_program_t& shader_program)
-        { glActiveShaderProgram(id, shader_program.id); }
-
-    void add_stage(GLbitfield stage_bitmask, const glsl_program_t& program)
-        { glUseProgramStages(id, stage_bitmask, program.id); }
-
-    void add_stage(GLbitfield stage_bitmask, const glsl_shader_program_t& shader_program)
-        { glUseProgramStages(id, stage_bitmask, shader_program.id); }
-
-    ~glsl_pipeline_t()
-        { glDeleteProgramPipelines(1, &id); }
 };
 
 struct sphere_pft2_t

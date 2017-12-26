@@ -12,7 +12,7 @@
 //  -- GL_NEAREST, GL_LINEAR
 //
 // *** GL_TEXTURE_WRAP_S / GL_TEXTURE_WRAP_T / GL_TEXTURE_WRAP_R ***
-//  -- GL_CLAMP_TO_EDGE, GL_MIRRORED_REPEAT, GL_REPEAT, GL_CLAMP_TO_BORDER, GL_MIRROR_CLAMP_TO_EDGE
+//  -- GL_CLAMP_TO_EDGE, GL_MIRRORED_REPEAT, GL_REPEAT, GL_CLAMP_TO_BORDER, GL_MIRROR_CLAMP_TO_EDGE ( gl >= 4.4)
 //
 // *** GL_TEXTURE_COMPARE_MODE ***
 //  -- GL_COMPARE_REF_TO_TEXTURE, GL_NONE
@@ -67,8 +67,20 @@ struct sampler_t
     void bind(GLuint unit)
         { glBindSampler(unit, id); }
 
-    void set_max_af_level(float max_af_level)
-        { glSamplerParameterf(id, GL_TEXTURE_MAX_ANISOTROPY_EXT, max_af_level); }
+    void set_parameteri(GLenum pname, GLint param)
+        { glSamplerParameteri(id, pname, param); }
+
+    void set_parameterf(GLenum pname, GLfloat param)
+        { glSamplerParameterf(id, pname, param); }
+
+    void set_parameteriv(GLenum pname, const GLint* param)
+        { glSamplerParameteriv(id, pname, param); }
+
+    void set_parameterfv(GLenum pname, const GLfloat* param)
+        { glSamplerParameterfv(id, pname, param); }
+
+    void set_max_af_level(GLfloat max_af_level)
+        { set_parameterf(GL_TEXTURE_MAX_ANISOTROPY_EXT, max_af_level); }
 
     ~sampler_t()
     {
