@@ -29,8 +29,6 @@
 #include "sampler.hpp"
 #include "image/stb_image.h"
 
-const int BALL_COUNT = 16;
-
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;
@@ -222,63 +220,108 @@ struct plane_pft2_t
     }
 };
 
+const int BALL_COUNT = 16;
+
+glm::vec3 ball_offsets[BALL_COUNT] =
+{
+    glm::vec3(-1.0f, 1.0f,-6.5f),
+    glm::vec3( 3.0f, 1.0f, 6.5f),
+    glm::vec3( 5.0f, 1.0f, 5.0f),
+    glm::vec3( 3.0f, 1.0f,-1.0f),
+    glm::vec3(-0.1f, 1.0f,-1.1f),
+    glm::vec3(-3.0f, 1.0f, 3.0f),
+    glm::vec3(-2.8f, 1.0f, 7.0f),
+    glm::vec3(-1.1f, 1.0f, 9.0f),
+    glm::vec3( 3.0f, 1.0f, 2.0f),
+    glm::vec3(-7.0f, 1.0f, 3.0f),
+    glm::vec3(-9.5f, 1.0f, 4.5f),
+    glm::vec3( 1.0f, 1.0f, 5.2f),
+    glm::vec3(-8.0f, 1.0f, 8.0f),
+    glm::vec3(-5.0f, 1.0f, 1.0f),
+    glm::vec3( 2.0f, 1.0f, 9.0f),
+    glm::vec3( 8.0f, 1.0f, 7.5f)
+};
+
+glm::vec3 ball_rotations[BALL_COUNT] =
+{
+    glm::vec3(-0.4f, 0.1f,-0.7f),
+    glm::vec3( 0.3f,-0.2f,-0.1f),
+    glm::vec3( 0.2f, 0.3f, 0.4f),
+    glm::vec3(-0.4f,-0.4f, 0.2f),
+    glm::vec3( 0.2f, 0.3f,-0.4f),
+    glm::vec3(-0.7f,-0.2f, 0.6f),
+    glm::vec3( 0.3f, 0.3f, 0.2f),
+    glm::vec3( 0.5f, 0.2f, 0.3f),
+    glm::vec3(-0.4f, 0.4f,-0.4f),
+    glm::vec3( 0.3f,-0.3f, 0.1f),
+    glm::vec3( 0.1f,-0.2f,-0.2f),
+    glm::vec3(-0.2f,-0.3f,-0.0f),
+    glm::vec3(-0.3f, 0.5f, 0.3f),
+    glm::vec3(-0.4f, 0.1f, 0.1f),
+    glm::vec3( 0.3f, 0.3f,-0.2f),
+    glm::vec3(-0.2f,-0.2f, 0.4f)
+};
+
+const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
+
+
 int main(int argc, char *argv[])
 {
     const int res_x = 1920;
     const int res_y = 1080;
 
     //===================================================================================================================================================================================================================
-    // initialize GLFW library, create GLFW window and initialize GLEW library
+    // Step 0. initialize GLFW library, create GLFW window and initialize GLEW library
     // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
     //===================================================================================================================================================================================================================
     if (!glfw::init())
         exit_msg("Failed to initialize GLFW library. Exiting ...");
 
-    demo_window_t window("VAO Loader", 8, 4, 3, res_x, res_y, true);
+    demo_window_t window("Cubemap raytrace", 8, 4, 3, res_x, res_y, true);
+
+    const float scale = 16.0f;                                                      /* generate VAO for plane and sphere */
+    sphere_pft2_t sphere(48, 24);
+    plane_pft2_t plane(scale);
 
     //===================================================================================================================================================================================================================
-    // init shaders
+    // Step 1. init shaders
     //===================================================================================================================================================================================================================
-    glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");                // CommonVertShader
-    glsl_shader_program_t common_vs_program(common_vs);                         // VertexProgram, vert_prog
-    uniform_t uni_cv_model_matrix    = common_vs_program["ModelMatrix"];        // ProgramUniform<Mat4f> model_matrix
-    uniform_t uni_cv_texture_matrix  = common_vs_program["TextureMatrix"];      // ProgramUniform<Mat3f> texture_matrix
-    uniform_t uni_cv_camera_position = common_vs_program["CameraPosition"];     // ProgramUniform<Vec3f> camera_position
-    uniform_t uni_cv_light_position  = common_vs_program["LightPosition"];      // ProgramUniform<Vec3f> light_position
+    glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");
+    glsl_shader_program_t common_vs_program(common_vs);
+    dsa_uniform_t uni_cv_model_matrix    = common_vs_program["ModelMatrix"];
+    dsa_uniform_t uni_cv_texture_matrix  = common_vs_program["TextureMatrix"];
+    dsa_uniform_t uni_cv_camera_position = common_vs_program["CameraPosition"];
+    dsa_uniform_t uni_cv_light_position  = common_vs_program["LightPosition"];
 
-    glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");            // DefaultGeomShader
-    glsl_shader_program_t default_gs_program(default_gs);                       // GeometryProgram, geom_prog
+    glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");
+    glsl_shader_program_t default_gs_program(default_gs);
     uniform_t uni_dg_projection_matrix = default_gs_program["ProjectionMatrix"];
     uniform_t uni_dg_camera_matrix = default_gs_program["CameraMatrix"];
 
-    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");            // CubemapGeomShader, cmap_geom_shader
-    glsl_shader_program_t cubemap_gs_program(cubemap_gs);                       // GeometryProgram, cmap_geom_prog
+    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");
+    glsl_shader_program_t cubemap_gs_program(cubemap_gs);
     uniform_t uni_cg_projection_matrix = cubemap_gs_program["ProjectionMatrix"];
     uniform_t uni_cg_camera_matrix = cubemap_gs_program["CameraMatrix"];
 
-    glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");                // ClothFragmentShader
-    glsl_shader_program_t cloth_fs_program(cloth_fs);                           // ClothProgram, cloth_prog
-    uniform_t uni_cf_color_1   = cloth_fs_program["color_1"];                    // ProgramUniform<Vec3f> color_1
-    uniform_t uni_cf_color_2   = cloth_fs_program["color_2"];                    // ProgramUniform<Vec3f> color_2
-    uniform_t uni_cf_cloth_tex = cloth_fs_program["ClothTex"];                  // ProgramUniformSampler cloth_tex;
-    uniform_t uni_cf_light_map = cloth_fs_program["LightMap"];                  // ProgramUniformSampler light_map;
+    glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");
+    glsl_shader_program_t cloth_fs_program(cloth_fs);
+    uniform_t uni_cf_cloth_tex = cloth_fs_program["ClothTex"];
+    uniform_t uni_cf_light_map = cloth_fs_program["LightMap"];
 
-    glsl_shader_t ball_fs(GL_FRAGMENT_SHADER, "glsl/ball.fs");                  // BallFragmentShader
-    glsl_shader_program_t ball_fs_program(ball_fs);                             // BallProgram, ball_prog
-    uniform_t uni_bf_color_1     = ball_fs_program["color_1"];                  // ProgramUniform<Vec3f> color_1
-    uniform_t uni_bf_color_2     = ball_fs_program["color_2"];                  // ProgramUniform<Vec3f> color_2
-    uniform_t uni_bf_number_tex  = ball_fs_program["number_tex"];               // ProgramUniformSampler number_tex
-    uniform_t uni_bf_reflect_tex = ball_fs_program["reflect_tex"];              // ProgramUniformSampler reflect_tex
-    uniform_t uni_bf_ball_idx    = ball_fs_program["ball_idx"];                 // ProgramUniform<GLint> ball_idx
+    glsl_shader_t ball_fs(GL_FRAGMENT_SHADER, "glsl/ball.fs");
+    glsl_shader_program_t ball_fs_program(ball_fs);
+    uniform_t uni_bf_number_tex  = ball_fs_program["number_tex"];
+    uniform_t uni_bf_reflect_tex = ball_fs_program["reflect_tex"];
+    uniform_t uni_bf_ball_idx    = ball_fs_program["ball_idx"];
 
-    glsl_program_t lightmap(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lightmap.vs"),  // LightmapProgram prog
+    glsl_program_t lightmap(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lightmap.vs"),
                             glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lightmap.fs"));
-    uniform_t uni_lm_transform_matrix = lightmap["TransformMatrix"];            // ProgramUniform<Mat4f> transform_matrix
-    uniform_t uni_lm_light_position   = lightmap["LightPosition"];              // ProgramUniform<Vec3f> light_position
-    uniform_t uni_lm_ball_positions   = lightmap["BallPositions"];              // ProgramUniform<Vec3f> ball_positions
+    uniform_t uni_lm_transform_matrix = lightmap["TransformMatrix"];
+    uniform_t uni_lm_light_position   = lightmap["LightPosition"];
+    uniform_t uni_lm_ball_positions   = lightmap["BallPositions"];
 
     //===================================================================================================================================================================================================================
-    // generate scratched billiard ball textures form albedo (numbers) and roughness textures, making spherical distortion
+    // Step 2. generate scratched billiard ball textures from albedo (numbers) and roughness textures, making spherical distortion
     // and pack them into a single GL_TEXTURE_2D_ARRAY
     // texture is twice wider because equator on sphere is twice longer than meridian
     //===================================================================================================================================================================================================================
@@ -286,14 +329,9 @@ int main(int argc, char *argv[])
     const int BALLS_TEXTURE_WIDTH = 1 << BALLS_TEXTURE_MAX_LEVEL;
     const int BALLS_TEXTURE_HEIGHT = 1 << (BALLS_TEXTURE_MAX_LEVEL - 1);
 
-    GLuint balls_tex_id;                                                                        // GLuint numbers_texture;
+    GLuint balls_tex_id;                                                            /* texture 2D array to store ball albedo textures */
     glGenTextures(1, &balls_tex_id);
     glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
-
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexStorage3D(GL_TEXTURE_2D_ARRAY, BALLS_TEXTURE_MAX_LEVEL + 1, GL_RGB8, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT, BALL_COUNT);
 
     glsl_program_t sphere_texgen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
@@ -317,85 +355,65 @@ int main(int argc, char *argv[])
 
     glViewport(0, 0, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT);
 
-    GLuint vao_id;
+    GLuint vao_id;                                                                  /* attribute-less VAO for quad rendering */
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-    //===================================================================================================================================================================================================================
-    // texture generation step
-    //===================================================================================================================================================================================================================
     const char* albedo_tex_name_pattern = "../../../resources/tex2d/bbal_hires/bbal_0x%01X.jpg";
     const char* roughness_tex_name_pattern = "../../../resources/tex2d/scratches/scratches_0x%01X.jpg";
 
     for (int i = 0; i != BALL_COUNT; ++i)
     {
-        debug_msg("Render step #%d.", i); fflush(stdout);
+        debug_msg("Render step #%d.", i);
         glFramebufferTexture3D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_ARRAY, balls_tex_id, 0, i);
-        check_status();
 
         int width, height, bpp;
         unsigned char* src_data;
         GLenum format;
         char tex_name[64];
 
-        //===============================================================================================================================================================================================================
-        // load albedo image
-        //===============================================================================================================================================================================================================
-        sprintf(tex_name, albedo_tex_name_pattern, i);
+        sprintf(tex_name, albedo_tex_name_pattern, i);                              /* load albedo image */
         src_data = stbi_load(tex_name, &width, &height, &bpp, 0);
 
         if (!src_data)
             exit_msg("Cannot load texture: %s", tex_name);
 
         format = (bpp == 1) ? GL_RED : (bpp == 2) ? GL_RG : (bpp == 3) ? GL_RGB : GL_RGBA;
-
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, albedo_tex_id);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, src_data);
         glGenerateMipmap(GL_TEXTURE_2D);
         free(src_data);
 
-        //===============================================================================================================================================================================================================
-        // load albedo image
-        //===============================================================================================================================================================================================================
-        sprintf(tex_name, roughness_tex_name_pattern, i);
+        sprintf(tex_name, roughness_tex_name_pattern, i);                           /* load roughness image */
         src_data = stbi_load(tex_name, &width, &height, &bpp, 0);
 
         if (!src_data)
             exit_msg("Cannot load texture: %s", tex_name);
 
         format = (bpp == 1) ? GL_RED : (bpp == 2) ? GL_RG : (bpp == 3) ? GL_RGB : GL_RGBA;
-
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, roughness_tex_id);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, format, GL_UNSIGNED_BYTE, src_data);
         glGenerateMipmap(GL_TEXTURE_2D);
         free(src_data);
 
-        //===============================================================================================================================================================================================================
-        // combine images into one
-        //===============================================================================================================================================================================================================
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);                                      /* combine images into one */
     }
 
-    //===================================================================================================================================================================================================================
-    // generate mipmaps of texture array
-    //===================================================================================================================================================================================================================
     GLuint tex_ids[] = {albedo_tex_id, roughness_tex_id};
     glDeleteTextures(2, tex_ids);
 
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0);                                                   /* generate mipmaps of texture array */
     glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
     glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
-    //===================================================================================================================================================================================================================
-    // store images for debug purposes
-    //===================================================================================================================================================================================================================
-    GLsizei pixel_buffer_size = 3 * BALLS_TEXTURE_WIDTH * BALLS_TEXTURE_HEIGHT;
+
+    GLsizei pixel_buffer_size = 3 * BALLS_TEXTURE_WIDTH * BALLS_TEXTURE_HEIGHT;     /* store images for debug purposes */
     unsigned char* pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
     for (int layer = 0; layer != BALL_COUNT; ++layer)
     {
@@ -415,110 +433,20 @@ int main(int argc, char *argv[])
     free(pixel_buffer);
 
     //===================================================================================================================================================================================================================
-    // precompute step
+    // Step 3. Lightmap precompute step
     //===================================================================================================================================================================================================================
-    const float scale = 16.0f;
-    sphere_pft2_t sphere(48, 24);
-    plane_pft2_t plane(scale);
-
-    const GLuint ball_count = BALL_COUNT;
-
-    glm::vec3 ball_colors[] =
-    {
-        glm::vec3(0.8f, 0.5f, 0.2f),
-        glm::vec3(0.2f, 0.2f, 0.5f),
-        glm::vec3(0.6f, 0.2f, 0.4f),
-        glm::vec3(0.1f, 0.1f, 0.3f),
-        glm::vec3(0.0f, 0.0f, 0.0f),
-        glm::vec3(0.3f, 0.1f, 0.2f),
-        glm::vec3(0.2f, 0.5f, 0.2f),
-        glm::vec3(0.6f, 0.3f, 0.2f)
-    };
-
-    glm::vec3 ball_offsets[] =
-    {
-        glm::vec3(-1.0f, 1.0f,-6.5f),
-        glm::vec3( 3.0f, 1.0f, 6.5f),
-        glm::vec3( 5.0f, 1.0f, 5.0f),
-        glm::vec3( 3.0f, 1.0f,-1.0f),
-        glm::vec3(-0.1f, 1.0f,-1.1f),
-        glm::vec3(-3.0f, 1.0f, 3.0f),
-        glm::vec3(-2.8f, 1.0f, 7.0f),
-        glm::vec3(-1.1f, 1.0f, 9.0f),
-        glm::vec3( 3.0f, 1.0f, 2.0f),
-        glm::vec3(-7.0f, 1.0f, 3.0f),
-        glm::vec3(-9.5f, 1.0f, 4.5f),
-        glm::vec3( 1.0f, 1.0f, 5.2f),
-        glm::vec3(-8.0f, 1.0f, 8.0f),
-        glm::vec3(-5.0f, 1.0f, 1.0f),
-        glm::vec3( 2.0f, 1.0f, 9.0f),
-        glm::vec3( 8.0f, 1.0f, 7.5f)
-    };
-
-    glm::vec3 ball_rotations[] =
-    {
-        glm::vec3(-0.4f, 0.1f,-0.7f),
-        glm::vec3( 0.3f,-0.2f,-0.1f),
-        glm::vec3( 0.2f, 0.3f, 0.4f),
-        glm::vec3(-0.4f,-0.4f, 0.2f),
-        glm::vec3( 0.2f, 0.3f,-0.4f),
-        glm::vec3(-0.7f,-0.2f, 0.6f),
-        glm::vec3( 0.3f, 0.3f, 0.2f),
-        glm::vec3( 0.5f, 0.2f, 0.3f),
-        glm::vec3(-0.4f, 0.4f,-0.4f),
-        glm::vec3( 0.3f,-0.3f, 0.1f),
-        glm::vec3( 0.1f,-0.2f,-0.2f),
-        glm::vec3(-0.2f,-0.3f,-0.0f),
-        glm::vec3(-0.3f, 0.5f, 0.3f),
-        glm::vec3(-0.4f, 0.1f, 0.1f),
-        glm::vec3( 0.3f, 0.3f,-0.2f),
-        glm::vec3(-0.2f,-0.2f, 0.4f)
-    };
-
-    static_assert(sizeof(ball_offsets) == ball_count * sizeof(glm::vec3));
-    static_assert(sizeof(ball_rotations) == ball_count * sizeof(glm::vec3));
-
-    glUseProgram(0);
-
-    glsl_pipeline_t cloth_pp;
-    cloth_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    cloth_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
-    cloth_pp.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
-    cloth_pp.bind();
-
-    const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
-
-    cloth_pp.active_shader_program(common_vs_program);
-    uni_cv_light_position = light_position;                             // vert_prog.light_position.Set(light_position);
-    cloth_pp.active_shader_program(cloth_fs_program);
-    uni_cf_color_1 = glm::vec3(0.1f, 0.3f, 0.1f);                       // cloth_prog.color_1.Set(Vec3f(0.1f, 0.3f, 0.1f));
-    uni_cf_color_2 = glm::vec3(0.3f, 0.4f, 0.3f);                       // cloth_prog.color_2.Set(Vec3f(0.3f, 0.4f, 0.3f));
-    uni_cf_light_map = 0;                                               // cloth_prog.light_map.Set(0);
-    uni_cf_cloth_tex = 2;
-
-    glsl_pipeline_t ball_pp;
-    ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
-    ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
-    ball_pp.bind();
-    ball_pp.active_shader_program(ball_fs_program);
-    uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
-    uni_bf_reflect_tex = 3;
+    debug_msg("Precomputing lightmap texture.");
 
     lightmap.enable();
     glActiveTexture(GL_TEXTURE0);
 
-    GLuint table_light_map;                                             // Texture table_light_map; -- table light map and the associated framebuffer
+    GLuint table_light_map;
     glGenTextures(1, &table_light_map);
     const int LIGHT_MAP_RESOLUTION = 1024;
     glBindTexture(GL_TEXTURE_2D, table_light_map);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    GLuint table_light_fbo_id;                                          // Framebuffer table_light_fbo_id;
+    GLuint table_light_fbo_id;                                                      /* framebuffer for lightmap rendering */
     glGenFramebuffers(1, &table_light_fbo_id);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, table_light_fbo_id);
     glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, table_light_map, 0);
@@ -544,17 +472,17 @@ int main(int argc, char *argv[])
 
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
 
-    //===================================================================================================================================================================================================================
-    // store lightmap image for debug purposes
-    //===================================================================================================================================================================================================================
-
-
-    pixel_buffer_size = 3 * LIGHT_MAP_RESOLUTION * LIGHT_MAP_RESOLUTION;
+    pixel_buffer_size = 3 * LIGHT_MAP_RESOLUTION * LIGHT_MAP_RESOLUTION;            /* store lightmap for debug purpose */
     pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pixel_buffer);
     image::png::write("lightmap.png", LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION, pixel_buffer, PNG_COLOR_TYPE_RGB);
     free(pixel_buffer);
-    debug_msg("Done saving lightmap texture."); fflush(stdout);
+    debug_msg("Lightmap texture saved.");
+
+
+    //===================================================================================================================================================================================================================
+    //
+    //===================================================================================================================================================================================================================
 
     glUseProgram(0);
     glClearColor(0.12f, 0.13f, 0.11f, 0.0f);
@@ -565,15 +493,17 @@ int main(int argc, char *argv[])
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
+    sampler_t balls_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_CLAMP_TO_EDGE);
+    balls_sampler.bind(1);
+
 
     //===================================================================================================================================================================================================================
-    // generate table cloth texture --> unit 2
+    // Step 4. Load store cloth texture
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE2);
     GLuint cloth_texture;
     glGenTextures(1, &cloth_texture);
     glBindTexture(GL_TEXTURE_2D, cloth_texture);
-
 
     const char* cloth_tex_name = "../../../resources/tex2d/cloth.jpg";
     int width, height, bpp;
@@ -588,14 +518,10 @@ int main(int argc, char *argv[])
     glGenerateMipmap(GL_TEXTURE_2D);
     free(src_data);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    sampler_t cloth_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_REPEAT);
 
     glGenerateMipmap(GL_TEXTURE_2D);
-
-    debug_msg("Done."); fflush(stdout);
+    debug_msg("Cloth texture loaded.");
 
     //===================================================================================================================================================================================================================
     // prerender the cubemaps --> texture unit 3
@@ -612,7 +538,6 @@ int main(int argc, char *argv[])
     mipmap_albedo_sampler.bind(3);
     sampler_t linear_cubemap_sampler(GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
     mipmap_roughness_sampler.bind(4);
-
 
     for(GLuint b = 0; b != ball_count; ++b)
     {
@@ -634,12 +559,6 @@ int main(int argc, char *argv[])
 
     glGenTextures(1, &z_buffer);
     glBindTexture(GL_TEXTURE_CUBE_MAP, z_buffer);
-
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_DEPTH_COMPONENT32, cubemap_side, cubemap_side);
 
     GLuint fbo;
@@ -647,21 +566,19 @@ int main(int argc, char *argv[])
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
     glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, z_buffer, 0);
 
-
-
     glUseProgram(0);
 
-    glsl_pipeline_t cmap_cloth_pp;
-    cmap_cloth_pp.bind();
-    cmap_cloth_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    cmap_cloth_pp.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
-    cmap_cloth_pp.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
+    glsl_pipeline_t cubemap_cloth_pipeline;
+    cubemap_cloth_pipeline.bind();
+    cubemap_cloth_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cubemap_cloth_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
+    cubemap_cloth_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
 
-    glsl_pipeline_t cmap_ball_pp;
-    cmap_ball_pp.bind();
-    cmap_ball_pp.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    cmap_ball_pp.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
-    cmap_ball_pp.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
+    glsl_pipeline_t cubemap_ball_pipeline;
+    cubemap_ball_pipeline.bind();
+    cubemap_ball_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cubemap_ball_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
+    cubemap_ball_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
 
     glViewport(0, 0, cubemap_side, cubemap_side);
 
@@ -673,21 +590,21 @@ int main(int argc, char *argv[])
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        cmap_cloth_pp.bind();
-        cmap_cloth_pp.active_shader_program(common_vs_program);
+        cubemap_cloth_pipeline.bind();
+        cubemap_cloth_pipeline.active_shader_program(common_vs_program);
         uni_cv_camera_position = ball_offsets[b];
         uni_cv_texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
                                           glm::vec3( 0.0f, 16.0f, 0.0f),
                                           glm::vec3( 0.0f,  0.0f, 1.0f));
 
-        cmap_cloth_pp.active_shader_program(cubemap_gs_program);
+        cubemap_cloth_pipeline.active_shader_program(cubemap_gs_program);
         uni_cg_camera_matrix = glm::translate(-ball_offsets[b]);
         uni_cg_projection_matrix = glm::infinitePerspective(constants::half_pi, 1.0f, 0.25f);
 
         plane.render_pft2();
 
-        cmap_ball_pp.bind();
-        cmap_ball_pp.active_shader_program(common_vs_program);
+        cubemap_ball_pipeline.bind();
+        cubemap_ball_pipeline.active_shader_program(common_vs_program);
 
         uni_cv_texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
                                           glm::vec3(0.0f, 3.0f, -1.0f),
@@ -697,13 +614,11 @@ int main(int argc, char *argv[])
         {
             if (i == b) continue;
 
-            cmap_ball_pp.active_shader_program(common_vs_program);
+            cubemap_ball_pipeline.active_shader_program(common_vs_program);
             glm::vec3 rot = ball_rotations[i];
             uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
 
-            cmap_ball_pp.active_shader_program(ball_fs_program);
-            uni_bf_color_1 = ball_colors[i];
-            uni_bf_color_2 = ball_colors[i];
+            cubemap_ball_pipeline.active_shader_program(ball_fs_program);
             uni_bf_ball_idx = i;
 
             glBindTexture(GL_TEXTURE_CUBE_MAP, temp_cubemaps[i]);
@@ -712,14 +627,41 @@ int main(int argc, char *argv[])
         }
     }
 
+    //===================================================================================================================================================================================================================
+    // creating pipeline objects for the main render loop
+    //===================================================================================================================================================================================================================
+    glUseProgram(0);
+
+    glsl_pipeline_t cloth_pipeline;
+    cloth_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cloth_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
+    cloth_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
+    cloth_pipeline.bind();
+
+    cloth_pipeline.active_shader_program(common_vs_program);
+    uni_cv_light_position = light_position;                             // vert_prog.light_position.Set(light_position);
+
+    cloth_pipeline.active_shader_program(cloth_fs_program);
+    uni_cf_light_map = 0;                                               // cloth_prog.light_map.Set(0);
+    uni_cf_cloth_tex = 2;
+
+    glsl_pipeline_t ball_pipeline;
+    ball_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    ball_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
+    ball_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
+    ball_pipeline.bind();
+
+    ball_pipeline.active_shader_program(ball_fs_program);
+    uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
+    uni_bf_reflect_tex = 3;
+
+    //===================================================================================================================================================================================================================
+    // main loop
+    //===================================================================================================================================================================================================================
+
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glViewport(0, 0, res_x, res_y);
 
-    debug_msg("Beginning main render loop.");
-
-    //===================================================================================================================================================================================================================
-    // program main loop
-    //===================================================================================================================================================================================================================
     while(!window.should_close())
     {
         window.new_frame();
@@ -733,8 +675,8 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // render billiard table
         //===============================================================================================================================================================================================================
-        cloth_pp.bind();
-        cloth_pp.active_shader_program(common_vs_program);
+        cloth_pipeline.bind();
+        cloth_pipeline.active_shader_program(common_vs_program);
         uni_cv_camera_position = camera_position;
         uni_cv_model_matrix = glm::mat4(1.0f);
         glm::mat3 texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
@@ -742,7 +684,7 @@ int main(int argc, char *argv[])
                                              glm::vec3( 0.0f,  0.0f, 1.0f));
         uni_cv_texture_matrix = texture_matrix;
 
-        cloth_pp.active_shader_program(default_gs_program);
+        cloth_pipeline.active_shader_program(default_gs_program);
         uni_dg_projection_matrix = window.camera.projection_matrix;
         uni_dg_camera_matrix = camera;
 
@@ -751,8 +693,8 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // render balls
         //===============================================================================================================================================================================================================
-        ball_pp.bind();
-        ball_pp.active_shader_program(common_vs_program);
+        ball_pipeline.bind();
+        ball_pipeline.active_shader_program(common_vs_program);
         texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
                                    glm::vec3(0.0f, 3.0f, -1.0f),
                                    glm::vec3(0.0f, 0.0f,  1.0f));
@@ -760,13 +702,11 @@ int main(int argc, char *argv[])
 
         for(int i = 0; i != ball_count; ++i)
         {
-            ball_pp.active_shader_program(common_vs_program);
+            ball_pipeline.active_shader_program(common_vs_program);
             glm::vec3 rot = ball_rotations[i];
             uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
 
-            ball_pp.active_shader_program(ball_fs_program);
-            uni_bf_color_1 = ball_colors[i];
-            uni_bf_color_2 = ball_colors[i];
+            ball_pipeline.active_shader_program(ball_fs_program);
             uni_bf_ball_idx = i;
 
             glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[i]);

@@ -8,8 +8,6 @@ in vec3 geomViewDir;
 in vec2 geomTexCoord;
 in vec2 geomSTCoord;
 
-uniform vec3 color_1;
-uniform vec3 color_2;
 uniform sampler2D ClothTex;
 uniform sampler2D LightMap;
 

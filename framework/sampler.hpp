@@ -39,10 +39,29 @@ struct sampler_t
     sampler_t(GLint mag_filter, GLint min_filter, GLint wrap_mode)
     {
         glGenSamplers(1, &id);
-        glSamplerParameteri(id, GL_TEXTURE_WRAP_S, wrap_mode);
-        glSamplerParameteri(id, GL_TEXTURE_WRAP_T, wrap_mode);
         glSamplerParameteri(id, GL_TEXTURE_MAG_FILTER, mag_filter);
         glSamplerParameteri(id, GL_TEXTURE_MIN_FILTER, min_filter);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_S, wrap_mode);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_T, wrap_mode);
+    }
+
+    sampler_t(GLint mag_filter, GLint min_filter, GLint wrap_mode_s, GLint wrap_mode_t)
+    {
+        glGenSamplers(1, &id);
+        glSamplerParameteri(id, GL_TEXTURE_MAG_FILTER, mag_filter);
+        glSamplerParameteri(id, GL_TEXTURE_MIN_FILTER, min_filter);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_S, wrap_mode_s);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_T, wrap_mode_t);
+    }
+
+    sampler_t(GLint mag_filter, GLint min_filter, GLint wrap_mode_s, GLint wrap_mode_t, GLint wrap_mode_r)
+    {
+        glGenSamplers(1, &id);
+        glSamplerParameteri(id, GL_TEXTURE_MAG_FILTER, mag_filter);
+        glSamplerParameteri(id, GL_TEXTURE_MIN_FILTER, min_filter);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_S, wrap_mode_s);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_T, wrap_mode_t);
+        glSamplerParameteri(id, GL_TEXTURE_WRAP_R, wrap_mode_r);
     }
 
     void bind(GLuint unit)
