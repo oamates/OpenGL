@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "uniform.hpp"
+#include "dsa_uniform.hpp"
 
 struct uniform_t;
 
@@ -71,6 +72,8 @@ struct glsl_program_t
     ~glsl_program_t();
 
     uniform_t operator[] (const char* name) const;
+    dsa_uniform_t operator() (const char* name) const;
+
     GLint uniform_id(const char * name) const;
 
     GLuint subroutine_index(GLenum shader_type, const char* name) const;

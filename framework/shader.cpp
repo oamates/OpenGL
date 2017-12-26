@@ -163,6 +163,9 @@ glsl_program_t::~glsl_program_t()
 uniform_t glsl_program_t::operator[] (const char* name) const
     { return uniform_t(*this, name); }
 
+dsa_uniform_t glsl_program_t::operator() (const char* name) const
+    { return dsa_uniform_t(*this, name); }
+
 GLint glsl_program_t::uniform_id(const char * name) const
     { return glGetUniformLocation(id, name); }
 

@@ -288,10 +288,10 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");
     glsl_shader_program_t common_vs_program(common_vs);
-    dsa_uniform_t uni_cv_model_matrix    = common_vs_program["ModelMatrix"];
-    dsa_uniform_t uni_cv_texture_matrix  = common_vs_program["TextureMatrix"];
-    dsa_uniform_t uni_cv_camera_position = common_vs_program["CameraPosition"];
-    dsa_uniform_t uni_cv_light_position  = common_vs_program["LightPosition"];
+    dsa_uniform_t uni_cv_model_matrix    = common_vs_program("ModelMatrix");
+    dsa_uniform_t uni_cv_texture_matrix  = common_vs_program("TextureMatrix");
+    dsa_uniform_t uni_cv_camera_position = common_vs_program("CameraPosition");
+    dsa_uniform_t uni_cv_light_position  = common_vs_program("LightPosition");
 
     glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");
     glsl_shader_program_t default_gs_program(default_gs);
@@ -528,18 +528,18 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE3);
     GLuint cubemap_side = 128;
-    GLuint reflect_textures[ball_count];
-    GLuint temp_cubemaps[ball_count];
+    GLuint reflect_textures[BALL_COUNT];
+    GLuint temp_cubemaps[BALL_COUNT];
 
-    glGenTextures(ball_count, reflect_textures);
-    glGenTextures(ball_count, temp_cubemaps);
+    glGenTextures(BALL_COUNT, reflect_textures);
+    glGenTextures(BALL_COUNT, temp_cubemaps);
 
     sampler_t linear_reflect_sampler(GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
     mipmap_albedo_sampler.bind(3);
     sampler_t linear_cubemap_sampler(GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
     mipmap_roughness_sampler.bind(4);
 
-    for(GLuint b = 0; b != ball_count; ++b)
+    for(GLuint b = 0; b != BALL_COUNT; ++b)
     {
         glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[b]);
         glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA8, cubemap_side, cubemap_side);
@@ -584,7 +584,7 @@ int main(int argc, char *argv[])
 
     glActiveTexture(GL_TEXTURE3);
 
-    for(int b = 0; b != ball_count; ++b)
+    for(int b = 0; b != BALL_COUNT; ++b)
     {
         glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, reflect_textures[b], 0);
 
@@ -610,7 +610,7 @@ int main(int argc, char *argv[])
                                           glm::vec3(0.0f, 3.0f, -1.0f),
                                           glm::vec3(0.0f, 0.0f,  1.0f));
 
-        for(int i = 0; i != ball_count; ++i)
+        for(int i = 0; i != BALL_COUNT; ++i)
         {
             if (i == b) continue;
 
@@ -700,7 +700,7 @@ int main(int argc, char *argv[])
                                    glm::vec3(0.0f, 0.0f,  1.0f));
         uni_cv_texture_matrix = texture_matrix;
 
-        for(int i = 0; i != ball_count; ++i)
+        for(int i = 0; i != BALL_COUNT; ++i)
         {
             ball_pipeline.active_shader_program(common_vs_program);
             glm::vec3 rot = ball_rotations[i];
