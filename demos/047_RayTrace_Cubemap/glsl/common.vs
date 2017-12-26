@@ -7,7 +7,6 @@ layout(location = 3) in vec3 Bitangent;
 layout(location = 4) in vec2 TexCoord;
 
 uniform mat4 ModelMatrix;
-uniform mat3 TextureMatrix;
 uniform vec3 CameraPosition;
 uniform vec3 LightPosition;
 
@@ -33,6 +32,6 @@ void main()
     vertNormal =  (ModelMatrix * vec4(Normal,  0.0f)).xyz;
     vertTangent = (ModelMatrix * vec4(Tangent, 0.0f)).xyz;
     vertBitangent = (ModelMatrix * vec4(Bitangent, 0.0)).xyz;
-    vertTexCoord = (TextureMatrix * vec3(TexCoord, 1.0)).xy;
+    vertTexCoord = TexCoord;
     vertSTCoord = TexCoord;
 }

@@ -36,7 +36,7 @@ struct demo_window_t : public glfw_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(8.0f, 0.5f, glm::lookAt(glm::vec3(4.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
+          camera(64.0f, 0.5f, glm::lookAt(glm::vec3(8.0f, 0.0f, 0.0f), glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)))
     {
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
@@ -64,13 +64,13 @@ struct demo_window_t : public glfw_window_t
 
 struct sphere_pft2_t
 {
-    vao_t vao_pft2;                         // full position + frame + uv-texture vertex array object
+    vao_t vao;                              // full position + frame + uv-texture vertex array object
     GLuint vao_id;                          // minimalistic position only vao, which uses same array and index buffers
 
     sphere_pft2_t(int res_x, int res_y)
     {
         int V = (res_x + 1) * (res_y + 1);
-        int I = 2 * (res_x + 1) * res_y;
+        int I = (2 * res_x + 3) * res_y;
 
         vertex_pft2_t* vertices = (vertex_pft2_t*) malloc(V * sizeof(vertex_pft2_t));
         GLuint* indices = (GLuint*) malloc (I * sizeof(GLuint));
@@ -86,7 +86,7 @@ struct sphere_pft2_t
                 glm::vec2 uv = glm::vec2(inv_res_x * x, inv_res_y * y);
 
                 float u = constants::two_pi * uv.x;
-                float v = constants::half_pi * (uv.y - 0.5f);
+                float v = constants::pi * (uv.y - 0.5f);
 
                 float cs_u = glm::cos(u);
                 float sn_u = glm::sin(u);
@@ -102,58 +102,35 @@ struct sphere_pft2_t
             }
         }
 
-        bool even_row = true;
         int i = 0;
         for (int y = 0; y < res_y; ++y)
         {
-            if (even_row)
+            for (int x = 0; x <= res_x; ++x)
             {
-                for (int x = 0; x <= res_x; ++x)
-                {
-                    indices[i++] = y * (res_x + 1) + x;
-                    indices[i++] = (y + 1) * (res_x + 1) + x;
-                }
+                indices[i++] = (y + 1) * (res_x + 1) + x;
+                indices[i++] = y * (res_x + 1) + x;
             }
-            else
-            {
-                for (int x = res_x; x >= 0; --x)
-                {
-                    indices[i++] = (y + 1) * (res_x + 1) + x;
-                    indices[i++] = y * (res_x + 1) + x;
-                }
-            }
-            even_row = !even_row;
+            indices[i++] = -1;
         }
 
-        vao_pft2 = vao_t(GL_TRIANGLE_STRIP, vertices, V, indices, I);
-
-        glGenVertexArrays(1, &vao_id);
-        glBindVertexArray(vao_id);
-        glBindBuffer(GL_ARRAY_BUFFER, vao_pft2.vbo.id);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(vertex_pft2_t), (const GLvoid*) offsetof(vertex_pft2_t, position));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vao_pft2.ibo.id);
-
+        vao = vao_t(GL_TRIANGLE_STRIP, vertices, V, indices, I);
         free(vertices);
         free(indices);
     }
 
-    void render_pft2()
-        { vao_pft2.render(); }
-
     void render()
-    {
-        glBindVertexArray(vao_id);
-        vao_pft2.ibo.render();
-    }
+        { vao.render(); }
 };
 
 struct plane_pft2_t
 {
     vao_t vao_pft2;                         // full position + frame + uv-texture vertex array object
     GLuint vao_id;                          // minimalistic position only vao, which uses same array and index buffers
+    glm::vec2 scale;
+    glm::vec2 tex_scale;
 
-    plane_pft2_t (float scale)
+    plane_pft2_t (const glm::vec2& scale, const glm::vec2& tex_scale)
+        : scale(scale), tex_scale(tex_scale)
     {
 
         glm::vec2 unit_square[] =
@@ -170,10 +147,10 @@ struct plane_pft2_t
 
         vertex_pft2_t vertices[] =
         {
-            vertex_pft2_t(glm::vec3(scale * unit_square[0], 0.0f), normal, tangent_u, tangent_v, unit_square[0] + glm::vec2(0.5f, 0.5f)),
-            vertex_pft2_t(glm::vec3(scale * unit_square[1], 0.0f), normal, tangent_u, tangent_v, unit_square[1] + glm::vec2(0.5f, 0.5f)),
-            vertex_pft2_t(glm::vec3(scale * unit_square[2], 0.0f), normal, tangent_u, tangent_v, unit_square[2] + glm::vec2(0.5f, 0.5f)),
-            vertex_pft2_t(glm::vec3(scale * unit_square[3], 0.0f), normal, tangent_u, tangent_v, unit_square[3] + glm::vec2(0.5f, 0.5f)),
+            vertex_pft2_t(glm::vec3(scale * unit_square[0], 0.0f), normal, tangent_u, tangent_v, tex_scale * unit_square[0]),
+            vertex_pft2_t(glm::vec3(scale * unit_square[1], 0.0f), normal, tangent_u, tangent_v, tex_scale * unit_square[1]),
+            vertex_pft2_t(glm::vec3(scale * unit_square[2], 0.0f), normal, tangent_u, tangent_v, tex_scale * unit_square[2]),
+            vertex_pft2_t(glm::vec3(scale * unit_square[3], 0.0f), normal, tangent_u, tangent_v, tex_scale * unit_square[3]),
         };
 
         GLuint indices[] = {0, 1, 2, 3};
@@ -196,31 +173,36 @@ struct plane_pft2_t
         glBindVertexArray(vao_id);
         vao_pft2.ibo.render();
     }
+
+    glm::vec2 inv_scale()
+    {
+        return 2.0f / scale;
+    }
 };
 
-const int BALL_COUNT = 16;
+const int SPHERE_COUNT = 16;
 
-glm::vec3 ball_offsets[BALL_COUNT] =
+glm::vec3 sphere_positions[SPHERE_COUNT] =
 {
-    glm::vec3(-1.0f, 1.0f,-6.5f),
-    glm::vec3( 3.0f, 1.0f, 6.5f),
-    glm::vec3( 5.0f, 1.0f, 5.0f),
-    glm::vec3( 3.0f, 1.0f,-1.0f),
-    glm::vec3(-0.1f, 1.0f,-1.1f),
-    glm::vec3(-3.0f, 1.0f, 3.0f),
-    glm::vec3(-2.8f, 1.0f, 7.0f),
-    glm::vec3(-1.1f, 1.0f, 9.0f),
-    glm::vec3( 3.0f, 1.0f, 2.0f),
-    glm::vec3(-7.0f, 1.0f, 3.0f),
-    glm::vec3(-9.5f, 1.0f, 4.5f),
-    glm::vec3( 1.0f, 1.0f, 5.2f),
-    glm::vec3(-8.0f, 1.0f, 8.0f),
+    glm::vec3(-1.0f,-6.5f, 1.0f),
+    glm::vec3( 3.0f, 6.5f, 1.0f),
+    glm::vec3( 5.0f, 5.0f, 1.0f),
+    glm::vec3( 3.0f,-1.0f, 1.0f),
+    glm::vec3(-0.1f,-1.1f, 1.0f),
+    glm::vec3(-3.0f, 3.0f, 1.0f),
+    glm::vec3(-2.8f, 7.0f, 1.0f),
+    glm::vec3(-1.1f, 9.0f, 1.0f),
+    glm::vec3( 3.0f, 2.0f, 1.0f),
+    glm::vec3(-7.0f, 3.0f, 1.0f),
+    glm::vec3(-9.5f, 4.5f, 1.0f),
+    glm::vec3( 1.0f, 5.2f, 1.0f),
+    glm::vec3(-8.0f, 8.0f, 1.0f),
     glm::vec3(-5.0f, 1.0f, 1.0f),
-    glm::vec3( 2.0f, 1.0f, 9.0f),
-    glm::vec3( 8.0f, 1.0f, 7.5f)
+    glm::vec3( 2.0f, 9.0f, 1.0f),
+    glm::vec3( 8.0f, 7.5f, 1.0f)
 };
 
-glm::vec3 ball_rotations[BALL_COUNT] =
+glm::vec3 sphere_rotations[SPHERE_COUNT] =
 {
     glm::vec3(-0.4f, 0.1f,-0.7f),
     glm::vec3( 0.3f,-0.2f,-0.1f),
@@ -240,77 +222,16 @@ glm::vec3 ball_rotations[BALL_COUNT] =
     glm::vec3(-0.2f,-0.2f, 0.4f)
 };
 
-const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
-
-
-int main(int argc, char *argv[])
+GLuint generate_sphere_texture_array(GLenum texture_unit, int max_level)
 {
-    const int res_x = 1920;
-    const int res_y = 1080;
-
-    //===================================================================================================================================================================================================================
-    // Step 0. initialize GLFW library, create GLFW window and initialize GLEW library
-    // 8AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
-    //===================================================================================================================================================================================================================
-    if (!glfw::init())
-        exit_msg("Failed to initialize GLFW library. Exiting ...");
-
-    demo_window_t window("Cubemap raytrace", 8, 4, 3, res_x, res_y, true);
-
-    const float scale = 16.0f;                                                      /* generate VAO for plane and sphere */
-    sphere_pft2_t sphere(48, 24);
-    plane_pft2_t plane(scale);
-
-    //===================================================================================================================================================================================================================
-    // Step 1. init shaders
-    //===================================================================================================================================================================================================================
-    glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");
-    glsl_shader_program_t common_vs_program(common_vs);
-    dsa_uniform_t uni_cv_model_matrix    = common_vs_program("ModelMatrix");
-    dsa_uniform_t uni_cv_texture_matrix  = common_vs_program("TextureMatrix");
-    dsa_uniform_t uni_cv_camera_position = common_vs_program("CameraPosition");
-    dsa_uniform_t uni_cv_light_position  = common_vs_program("LightPosition");
-
-    glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");
-    glsl_shader_program_t default_gs_program(default_gs);
-    uniform_t uni_dg_projection_matrix = default_gs_program["ProjectionMatrix"];
-    uniform_t uni_dg_camera_matrix = default_gs_program["CameraMatrix"];
-
-    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");
-    glsl_shader_program_t cubemap_gs_program(cubemap_gs);
-    uniform_t uni_cg_projection_matrix = cubemap_gs_program["ProjectionMatrix"];
-    uniform_t uni_cg_camera_matrix = cubemap_gs_program["CameraMatrix"];
-
-    glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");
-    glsl_shader_program_t cloth_fs_program(cloth_fs);
-    uniform_t uni_cf_cloth_tex = cloth_fs_program["ClothTex"];
-    uniform_t uni_cf_light_map = cloth_fs_program["LightMap"];
-
-    glsl_shader_t ball_fs(GL_FRAGMENT_SHADER, "glsl/ball.fs");
-    glsl_shader_program_t ball_fs_program(ball_fs);
-    uniform_t uni_bf_number_tex  = ball_fs_program["number_tex"];
-    uniform_t uni_bf_reflect_tex = ball_fs_program["reflect_tex"];
-    uniform_t uni_bf_ball_idx    = ball_fs_program["ball_idx"];
-
-    glsl_program_t lightmap(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lightmap.vs"),
-                            glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lightmap.fs"));
-    uniform_t uni_lm_transform_matrix = lightmap["TransformMatrix"];
-    uniform_t uni_lm_light_position   = lightmap["LightPosition"];
-    uniform_t uni_lm_ball_positions   = lightmap["BallPositions"];
-
-    //===================================================================================================================================================================================================================
-    // Step 2. generate scratched billiard ball textures from albedo (numbers) and roughness textures, making spherical distortion
-    // and pack them into a single GL_TEXTURE_2D_ARRAY
-    // texture is twice wider because equator on sphere is twice longer than meridian
-    //===================================================================================================================================================================================================================
-    const int BALLS_TEXTURE_MAX_LEVEL = 10;
-    const int BALLS_TEXTURE_WIDTH = 1 << BALLS_TEXTURE_MAX_LEVEL;
-    const int BALLS_TEXTURE_HEIGHT = 1 << (BALLS_TEXTURE_MAX_LEVEL - 1);
+    int tex_res_x = 1 << max_level;
+    int tex_res_y = 1 << (max_level - 1);
 
     GLuint balls_tex_id;                                                            /* texture 2D array to store ball albedo textures */
+    glActiveTexture(texture_unit);
     glGenTextures(1, &balls_tex_id);
     glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
-    glTexStorage3D(GL_TEXTURE_2D_ARRAY, BALLS_TEXTURE_MAX_LEVEL + 1, GL_RGB8, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT, BALL_COUNT);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, max_level + 1, GL_RGB8, tex_res_x, tex_res_y, SPHERE_COUNT);
 
     glsl_program_t sphere_texgen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sphere_texgen.fs"));
@@ -323,29 +244,26 @@ int main(int argc, char *argv[])
     sampler_t mipmap_roughness_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT);
     mipmap_roughness_sampler.bind(1);
 
-    GLuint texgen_fbo_id;
-    glGenFramebuffers(1, &texgen_fbo_id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, texgen_fbo_id);
+    GLuint fbo_id;
+    glGenFramebuffers(1, &fbo_id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_id);
 
     GLuint albedo_tex_id, roughness_tex_id;
     glGenTextures(1, &albedo_tex_id);
     glGenTextures(1, &roughness_tex_id);
 
-    glViewport(0, 0, BALLS_TEXTURE_WIDTH, BALLS_TEXTURE_HEIGHT);
+    glViewport(0, 0, tex_res_x, tex_res_y);
 
     GLuint vao_id;                                                                  /* attribute-less VAO for quad rendering */
     glGenVertexArrays(1, &vao_id);
     glBindVertexArray(vao_id);
 
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-
     const char* albedo_tex_name_pattern = "../../../resources/tex2d/bbal_hires/bbal_0x%01X.jpg";
     const char* roughness_tex_name_pattern = "../../../resources/tex2d/scratches/scratches_0x%01X.jpg";
 
-    for (int i = 0; i != BALL_COUNT; ++i)
+    for (int i = 0; i != SPHERE_COUNT; ++i)
     {
-        debug_msg("Render step #%d.", i);
+        debug_msg("Generating sphere albedo texture #%d ... ", i);
         glFramebufferTexture3D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_ARRAY, balls_tex_id, 0, i);
 
         int width, height, bpp;
@@ -380,24 +298,25 @@ int main(int argc, char *argv[])
         free(src_data);
 
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);                                      /* combine images into one */
+        debug_msg(" ... done.");
     }
 
     GLuint tex_ids[] = {albedo_tex_id, roughness_tex_id};
     glDeleteTextures(2, tex_ids);
+    glDeleteFramebuffers(1, &fbo_id);
+    glDeleteVertexArrays(1, &vao_id);
 
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
-    glActiveTexture(GL_TEXTURE0);                                                   /* generate mipmaps of texture array */
-    glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
+    glActiveTexture(texture_unit);                                                  /* generate mipmaps of texture array */
     glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
-
-    GLsizei pixel_buffer_size = 3 * BALLS_TEXTURE_WIDTH * BALLS_TEXTURE_HEIGHT;     /* store images for debug purposes */
+    GLsizei pixel_buffer_size = 3 * tex_res_x * tex_res_y;                          /* store images for debug purposes */
     unsigned char* pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
-    for (int layer = 0; layer != BALL_COUNT; ++layer)
+    for (int layer = 0; layer != SPHERE_COUNT; ++layer)
     {
-        int res_x = BALLS_TEXTURE_WIDTH;
-        int res_y = BALLS_TEXTURE_HEIGHT;
-        for (int level = 0; level <= BALLS_TEXTURE_MAX_LEVEL; ++level)
+        int res_x = tex_res_x;
+        int res_y = tex_res_y;
+        for (int level = 0; level <= max_level; ++level)
         {
             char tex_name[64];
             sprintf(tex_name, "bbal_0x%01X_L%01X.png", layer, level);
@@ -409,79 +328,132 @@ int main(int argc, char *argv[])
         }
     }
     free(pixel_buffer);
+}
+
+const glm::vec3 light_position = glm::vec3(0.0f, 20.0f, -2.0f);
+
+//=======================================================================================================================================================================================================================
+// Texture unit usage:
+//   unit 0, unit 1 -- working auxiliary units
+//   unit 2         -- lightmap texture
+//   unit 3         -- plane albedo texture
+//   unit 4         -- sphere albedo texture (GL_TEXTURE_2D_ARRAY)
+//   unit 5         -- reflection cubemap texture
+//=======================================================================================================================================================================================================================
+int main(int argc, char *argv[])
+{
+    const int res_x = 1920;
+    const int res_y = 1080;
 
     //===================================================================================================================================================================================================================
-    // Step 3. Lightmap precompute step
+    // Step 0. initialize GLFW library, create GLFW window and initialize GLEW library
+    // 8AA samples, OpenGL 4.3 context, screen resolution : 1920 x 1080, fullscreen
+    //===================================================================================================================================================================================================================
+    if (!glfw::init())
+        exit_msg("Failed to initialize GLFW library. Exiting ...");
+
+    demo_window_t window("Cubemap raytrace", 8, 4, 3, res_x, res_y, true);
+
+    const float scale = 16.0f;                                                      /* generate VAO for plane and sphere */
+    sphere_pft2_t sphere(48, 24);
+    plane_pft2_t plane(glm::vec2(48.0f, 32.0f), glm::vec2(24.0f, 16.0f));
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);                                          /* necessary for glTexImage2D/glGetTexImage2D */
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(-1);
+
+    //===================================================================================================================================================================================================================
+    // Step 1: init shaders and separable shader programs
+    //===================================================================================================================================================================================================================
+    glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");
+    glsl_shader_program_t common_vs_program(common_vs);
+    dsa_uniform_t uni_cv_model_matrix    = common_vs_program("ModelMatrix");
+    dsa_uniform_t uni_cv_camera_position = common_vs_program("CameraPosition");
+    dsa_uniform_t uni_cv_light_position  = common_vs_program("LightPosition");
+    uni_cv_light_position = light_position;
+
+    glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");
+    glsl_shader_program_t default_gs_program(default_gs);
+    dsa_uniform_t uni_dg_projection_matrix = default_gs_program("ProjectionMatrix");
+    dsa_uniform_t uni_dg_camera_matrix = default_gs_program("CameraMatrix");
+
+    glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");
+    glsl_shader_program_t cubemap_gs_program(cubemap_gs);
+    dsa_uniform_t uni_cg_projection_matrix = cubemap_gs_program("ProjectionMatrix");
+    dsa_uniform_t uni_cg_camera_matrix = cubemap_gs_program("CameraMatrix");
+
+    glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");
+    glsl_shader_program_t cloth_fs_program(cloth_fs);
+    dsa_uniform_t uni_cf_light_map = cloth_fs_program("LightMap");
+    dsa_uniform_t uni_cf_cloth_tex = cloth_fs_program("ClothTex");
+    uni_cf_light_map = 2;
+    uni_cf_cloth_tex = 3;
+
+    glsl_shader_t ball_simple_fs(GL_FRAGMENT_SHADER, "glsl/ball_simple.fs");
+    glsl_shader_program_t ball_simple_fs_program(ball_simple_fs);
+    dsa_uniform_t uni_bsf_albedo_tex  = ball_simple_fs_program("albedo_tex");
+    dsa_uniform_t uni_bsf_ball_idx    = ball_simple_fs_program("ball_idx");
+    uni_bsf_albedo_tex = 4;
+
+    glsl_shader_t ball_reflect_fs(GL_FRAGMENT_SHADER, "glsl/ball_reflect.fs");
+    glsl_shader_program_t ball_reflect_fs_program(ball_reflect_fs);
+    dsa_uniform_t uni_brf_albedo_tex  = ball_reflect_fs_program("albedo_tex");
+    dsa_uniform_t uni_brf_reflect_tex = ball_reflect_fs_program("reflect_tex");
+    dsa_uniform_t uni_brf_ball_idx    = ball_reflect_fs_program("ball_idx");
+    uni_brf_albedo_tex = 4;
+    uni_brf_reflect_tex = 5;
+
+    //===================================================================================================================================================================================================================
+    // Step 2: pre-generate lightmap texture
     //===================================================================================================================================================================================================================
     debug_msg("Precomputing lightmap texture.");
 
-    lightmap.enable();
-    glActiveTexture(GL_TEXTURE0);
-
-    GLuint table_light_map;
-    glGenTextures(1, &table_light_map);
     const int LIGHT_MAP_RESOLUTION = 1024;
-    glBindTexture(GL_TEXTURE_2D, table_light_map);
+
+    GLuint light_map_tex_id;
+    glActiveTexture(GL_TEXTURE2);
+    glGenTextures(1, &light_map_tex_id);
+    glBindTexture(GL_TEXTURE_2D, light_map_tex_id);
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION);
 
-    GLuint table_light_fbo_id;                                                      /* framebuffer for lightmap rendering */
-    glGenFramebuffers(1, &table_light_fbo_id);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, table_light_fbo_id);
-    glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, table_light_map, 0);
+    GLuint lightmap_fbo_id;                                                         /* framebuffer for lightmap rendering */
+    glGenFramebuffers(1, &lightmap_fbo_id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, lightmap_fbo_id);
+    glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, light_map_tex_id, 0);
 
     glViewport(0, 0, LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION);
     glClearColor(1.0 ,1.0, 1.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    GLfloat i_u = 1.0f / (scale * scale);
-    GLfloat i_v = 1.0f / (scale * scale);
-
-    glm::mat4 transform_matrix = glm::mat4(glm::vec4(0.5f / scale, 0.0f,         0.0f, 0.0f),
-                                           glm::vec4(0.0f,         0.5f / scale, 0.0f, 0.0f),
-                                           glm::vec4(0.0f,         1.0f,         0.0f, 0.0f),
-                                           glm::vec4(0.0f,         0.0f,         0.0f, 1.0f));
-
-    uni_lm_transform_matrix = transform_matrix;
-    uni_lm_light_position = light_position;
-    uni_lm_ball_positions = ball_offsets;
+    glsl_program_t lightmap(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/lightmap.vs"),
+                            glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/lightmap.fs"));
+    lightmap.enable();
+    lightmap["light_ws"]         = light_position;
+    lightmap["sphere_positions"] = sphere_positions;
+    lightmap["inv_scale"]        = plane.inv_scale();
 
     glDisable(GL_DEPTH_TEST);
     plane.render();
 
     glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
 
-    pixel_buffer_size = 3 * LIGHT_MAP_RESOLUTION * LIGHT_MAP_RESOLUTION;            /* store lightmap for debug purpose */
-    pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
+    GLsizei pixel_buffer_size = 3 * LIGHT_MAP_RESOLUTION * LIGHT_MAP_RESOLUTION;            /* store lightmap for debug purpose */
+    unsigned char* pixel_buffer = (unsigned char*) malloc(pixel_buffer_size);
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pixel_buffer);
     image::png::write("lightmap.png", LIGHT_MAP_RESOLUTION, LIGHT_MAP_RESOLUTION, pixel_buffer, PNG_COLOR_TYPE_RGB);
     free(pixel_buffer);
     debug_msg("Lightmap texture saved.");
 
 
-    //===================================================================================================================================================================================================================
-    //
-    //===================================================================================================================================================================================================================
-
-    glUseProgram(0);
-    glClearColor(0.12f, 0.13f, 0.11f, 0.0f);
-    glClearDepth(1.0f);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glCullFace(GL_BACK);
-
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
-    sampler_t balls_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_CLAMP_TO_EDGE);
-    balls_sampler.bind(1);
-
 
     //===================================================================================================================================================================================================================
-    // Step 4. Load store cloth texture
+    // Step 3: load plain texture and create a mipmap sampler for it
     //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE2);
-    GLuint cloth_texture;
-    glGenTextures(1, &cloth_texture);
-    glBindTexture(GL_TEXTURE_2D, cloth_texture);
+    GLuint plane_albedo_tex_id;
+    glActiveTexture(GL_TEXTURE3);
+    glGenTextures(1, &plane_albedo_tex_id);
+    glBindTexture(GL_TEXTURE_2D, plane_albedo_tex_id);
 
     const char* cloth_tex_name = "../../../resources/tex2d/cloth.jpg";
     int width, height, bpp;
@@ -496,145 +468,112 @@ int main(int argc, char *argv[])
     glGenerateMipmap(GL_TEXTURE_2D);
     free(src_data);
 
-    sampler_t cloth_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_REPEAT);
+    sampler_t plane_albedo_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_REPEAT);
+    plane_albedo_sampler.bind(3);
 
-    glGenerateMipmap(GL_TEXTURE_2D);
-    debug_msg("Cloth texture loaded.");
+    debug_msg("Plane albedo texture loaded.");
 
-    //===================================================================================================================================================================================================================
-    // prerender the cubemaps --> texture unit 3
-    //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE3);
-    GLuint cubemap_side = 128;
-    GLuint reflect_textures[BALL_COUNT];
-    GLuint temp_cubemaps[BALL_COUNT];
-
-    glGenTextures(BALL_COUNT, reflect_textures);
-    glGenTextures(BALL_COUNT, temp_cubemaps);
-
-    sampler_t linear_reflect_sampler(GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    mipmap_albedo_sampler.bind(3);
-    sampler_t linear_cubemap_sampler(GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    mipmap_roughness_sampler.bind(4);
-
-    for(GLuint b = 0; b != BALL_COUNT; ++b)
-    {
-        glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[b]);
-        glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA8, cubemap_side, cubemap_side);
-        glm::vec4 black_rgb = glm::vec4(0.0);
-        glClearTexImage(reflect_textures[b], 0, GL_RGBA, GL_FLOAT, glm::value_ptr(black_rgb));
-
-        glBindTexture(GL_TEXTURE_CUBE_MAP, temp_cubemaps[b]);
-        glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA8, cubemap_side, cubemap_side);
-        glClearTexImage(temp_cubemaps[b], 0, GL_RGBA, GL_FLOAT, glm::value_ptr(black_rgb));
-    }
 
     //===================================================================================================================================================================================================================
-    // prerender the cubemaps
+    // Step 4: generate scratched billiard ball textures from albedo (numbers) and roughness textures, making spherical distortion
+    // and pack them into a single GL_TEXTURE_2D_ARRAY
+    // texture is twice wider because equator on sphere is twice longer than meridian
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE4);
-    GLuint z_buffer;
+    GLuint sphere_albedo_tex_id = generate_sphere_texture_array(GL_TEXTURE4, 10);
+    sampler_t sphere_albedo_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_CLAMP_TO_EDGE);
+    sphere_albedo_sampler.bind(4);
 
-    glGenTextures(1, &z_buffer);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, z_buffer);
+    //===================================================================================================================================================================================================================
+    // Step 5: create and prerender reflection cubemaps texture (unit 5)
+    //===================================================================================================================================================================================================================
+    GLuint cubemap_side = 256;
+    GLuint reflect_tex_id[SPHERE_COUNT];
+    glActiveTexture(GL_TEXTURE5);
+    glGenTextures(SPHERE_COUNT, reflect_tex_id);
+
+    sampler_t reflection_tex_sampler(GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    reflection_tex_sampler.bind(5);
+
+    for(GLuint b = 0; b != SPHERE_COUNT; ++b)
+    {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_tex_id[b]);
+        glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_RGBA8, cubemap_side, cubemap_side);
+    }
+
+    GLuint depth_tex_id;                                                                    /* auxiliary depth texture */
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &depth_tex_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, depth_tex_id);
     glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, GL_DEPTH_COMPONENT32, cubemap_side, cubemap_side);
 
-    GLuint fbo;
-    glGenFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-    glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, z_buffer, 0);
-
-    glUseProgram(0);
-
-    glsl_pipeline_t cubemap_cloth_pipeline;
-    cubemap_cloth_pipeline.bind();
-    cubemap_cloth_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    cubemap_cloth_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
-    cubemap_cloth_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
-
-    glsl_pipeline_t cubemap_ball_pipeline;
-    cubemap_ball_pipeline.bind();
-    cubemap_ball_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    cubemap_ball_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
-    cubemap_ball_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
+    GLuint cubemap_fbo_id;
+    glGenFramebuffers(1, &cubemap_fbo_id);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, cubemap_fbo_id);
+    glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_tex_id, 0);
 
     glViewport(0, 0, cubemap_side, cubemap_side);
 
-    glActiveTexture(GL_TEXTURE3);
+    glUseProgram(0);
 
-    for(int b = 0; b != BALL_COUNT; ++b)
+    glsl_pipeline_t cubemap_plane_pipeline;
+    cubemap_plane_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cubemap_plane_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
+    cubemap_plane_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
+
+    glsl_pipeline_t cubemap_sphere_pipeline;
+    cubemap_sphere_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    cubemap_sphere_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, cubemap_gs_program);
+    cubemap_sphere_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, ball_simple_fs_program);
+
+    glClearColor(0.04f, 0.01f, 0.09f, 0.0f);
+    glClearDepth(1.0f);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    for(int b = 0; b != SPHERE_COUNT; ++b)
     {
-        glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, reflect_textures[b], 0);
+        glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, reflect_tex_id[b], 0);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        cubemap_cloth_pipeline.bind();
-        cubemap_cloth_pipeline.active_shader_program(common_vs_program);
-        uni_cv_camera_position = ball_offsets[b];
-        uni_cv_texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
-                                          glm::vec3( 0.0f, 16.0f, 0.0f),
-                                          glm::vec3( 0.0f,  0.0f, 1.0f));
-
-        cubemap_cloth_pipeline.active_shader_program(cubemap_gs_program);
-        uni_cg_camera_matrix = glm::translate(-ball_offsets[b]);
+        cubemap_plane_pipeline.bind();
+        uni_cv_model_matrix = glm::mat4(1.0f);
+        uni_cv_camera_position = sphere_positions[b];
+        uni_cg_camera_matrix = glm::translate(-sphere_positions[b]);
         uni_cg_projection_matrix = glm::infinitePerspective(constants::half_pi, 1.0f, 0.25f);
 
         plane.render_pft2();
 
-        cubemap_ball_pipeline.bind();
-        cubemap_ball_pipeline.active_shader_program(common_vs_program);
+        cubemap_sphere_pipeline.bind();
 
-        uni_cv_texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
-                                          glm::vec3(0.0f, 3.0f, -1.0f),
-                                          glm::vec3(0.0f, 0.0f,  1.0f));
-
-        for(int i = 0; i != BALL_COUNT; ++i)
+        for(int i = 0; i != SPHERE_COUNT; ++i)
         {
             if (i == b) continue;
 
-            cubemap_ball_pipeline.active_shader_program(common_vs_program);
-            glm::vec3 rot = ball_rotations[i];
-            uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
-
-            cubemap_ball_pipeline.active_shader_program(ball_fs_program);
-            uni_bf_ball_idx = i;
-
-            glBindTexture(GL_TEXTURE_CUBE_MAP, temp_cubemaps[i]);
-
-            sphere.render_pft2();
+            glm::vec3 rot = sphere_rotations[i];
+            uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), sphere_positions[i]);
+            uni_bsf_ball_idx = float(i);
+            sphere.render();
         }
     }
 
     //===================================================================================================================================================================================================================
-    // creating pipeline objects for the main render loop
+    // Step 6: create pipeline objects for the main render loop
     //===================================================================================================================================================================================================================
-    glUseProgram(0);
-
-    glsl_pipeline_t cloth_pipeline;
-    cloth_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
-    cloth_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
-    cloth_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
-    cloth_pipeline.bind();
-
-    cloth_pipeline.active_shader_program(common_vs_program);
-    uni_cv_light_position = light_position;                             // vert_prog.light_position.Set(light_position);
-
-    cloth_pipeline.active_shader_program(cloth_fs_program);
-    uni_cf_light_map = 0;                                               // cloth_prog.light_map.Set(0);
-    uni_cf_cloth_tex = 2;
+    glsl_pipeline_t plane_pipeline;
+    plane_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
+    plane_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
+    plane_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, cloth_fs_program);
 
     glsl_pipeline_t ball_pipeline;
     ball_pipeline.add_stage(GL_VERTEX_SHADER_BIT,   common_vs_program);
     ball_pipeline.add_stage(GL_GEOMETRY_SHADER_BIT, default_gs_program);
-    ball_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, ball_fs_program);
-    ball_pipeline.bind();
-
-    ball_pipeline.active_shader_program(ball_fs_program);
-    uni_bf_number_tex = 1;                                              // ball_prog.number_tex.Set(1)
-    uni_bf_reflect_tex = 3;
+    ball_pipeline.add_stage(GL_FRAGMENT_SHADER_BIT, ball_reflect_fs_program);
 
     //===================================================================================================================================================================================================================
-    // main loop
+    // Step 7: main loop
     //===================================================================================================================================================================================================================
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
@@ -653,16 +592,9 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         // render billiard table
         //===============================================================================================================================================================================================================
-        cloth_pipeline.bind();
-        cloth_pipeline.active_shader_program(common_vs_program);
+        plane_pipeline.bind();
         uni_cv_camera_position = camera_position;
         uni_cv_model_matrix = glm::mat4(1.0f);
-        glm::mat3 texture_matrix = glm::mat3(glm::vec3(16.0f,  0.0f, 0.0f),
-                                             glm::vec3( 0.0f, 16.0f, 0.0f),
-                                             glm::vec3( 0.0f,  0.0f, 1.0f));
-        uni_cv_texture_matrix = texture_matrix;
-
-        cloth_pipeline.active_shader_program(default_gs_program);
         uni_dg_projection_matrix = window.camera.projection_matrix;
         uni_dg_camera_matrix = camera;
 
@@ -672,23 +604,14 @@ int main(int argc, char *argv[])
         // render balls
         //===============================================================================================================================================================================================================
         ball_pipeline.bind();
-        ball_pipeline.active_shader_program(common_vs_program);
-        texture_matrix = glm::mat3(glm::vec3(6.0f, 0.0f,  0.0f),
-                                   glm::vec3(0.0f, 3.0f, -1.0f),
-                                   glm::vec3(0.0f, 0.0f,  1.0f));
-        uni_cv_texture_matrix = texture_matrix;
 
-        for(int i = 0; i != BALL_COUNT; ++i)
+        for(int i = 0; i != SPHERE_COUNT; ++i)
         {
-            ball_pipeline.active_shader_program(common_vs_program);
-            glm::vec3 rot = ball_rotations[i];
-            uni_cv_model_matrix = glm::translate(glm::eulerAngleYXZ (rot.y, rot.x, rot.z), ball_offsets[i]);
-
-            ball_pipeline.active_shader_program(ball_fs_program);
-            uni_bf_ball_idx = i;
-
-            glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_textures[i]);
-            sphere.render_pft2();
+            glm::vec3 rot = sphere_rotations[i];
+            uni_cv_model_matrix = glm::translate(sphere_positions[i]) * glm::eulerAngleYXZ (rot.y, rot.x, rot.z);
+            uni_brf_ball_idx = float(i);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, reflect_tex_id[i]);
+            sphere.render();
         }
 
         //===============================================================================================================================================================================================================

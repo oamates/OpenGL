@@ -1,20 +1,21 @@
 #version 330 core
 
-in vec3 vertPosition;
+in vec3 position_ws;
 
-uniform vec3 LightPosition;
-uniform vec3 BallPositions[16];
+uniform vec3 light_ws;
+uniform vec3 sphere_positions[16];
 
-out vec4 fragColor;
+out vec4 FragmentColor;
 
 void main()
 {
     float d_max = 0.0;
-    vec3 L = LightPosition;
-    vec3 R = normalize(vertPosition - LightPosition);
+    vec3 L = light_ws;
+    vec3 R = normalize(position_ws - light_ws);
+
     for(int i = 0; i != 16; ++i)
     {
-        vec3 S = BallPositions[i];
+        vec3 S = sphere_positions[i];
         float a = dot(R, R);
         float b = 2 * dot(L - S, R);
         float c = dot(L - S, L - S) - 1.0;
@@ -22,6 +23,7 @@ void main()
         if (d_max < d)
             d_max = d;
     }
+
     float lt = exp(-d_max * 0.8);
-    fragColor = vec4(lt, lt, lt, 1.0);
+    FragmentColor = vec4(lt, lt, lt, 1.0);
 }

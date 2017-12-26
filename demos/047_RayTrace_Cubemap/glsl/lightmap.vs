@@ -1,12 +1,13 @@
 #version 330 core
 
-uniform mat4 TransformMatrix;
+layout(location = 0) in vec3 position_in;
 
-in vec4 Position;
-out vec3 vertPosition;
+uniform vec2 inv_scale;
+
+out vec3 position_ws;
 
 void main()
 {
-    vertPosition = Position.xyz;
-    gl_Position = TransformMatrix * Position;
+    position_ws = position_in;
+    gl_Position = vec4(inv_scale * position_in.xy, 0.0f, 1.0f);
 }

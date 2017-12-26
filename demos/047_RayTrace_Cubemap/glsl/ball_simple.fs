@@ -9,7 +9,6 @@ in vec2 geomTexCoord;
 in vec2 geomSTCoord;
 
 uniform sampler2DArray albedo_tex;
-uniform samplerCube reflect_tex;
 uniform float ball_idx;
 
 out vec4 FragmentColor;
@@ -23,13 +22,11 @@ void main()
     vec3 ViewDir = normalize(geomViewDir);
     vec3 LightRefl = reflect(-LightDir, Normal);
     vec3 ViewRefl = reflect(-ViewDir, Normal);
-    vec3 ReflSample = texture(reflect_tex, ViewRefl).rgb;
     float Specular = pow(max(dot(LightRefl, normalize(geomViewDir)) + 0.1, 0.0), 64.0);
     float Diffuse = max(dot(Normal, LightDir) + 0.1, 0.0);
 
-    const float Reflectivity = 0.2;
     const float Ambient = 0.2;
-
     vec3 Color = texture(albedo_tex, TexCoord).rgb;
-    FragmentColor = vec4(ReflSample * Reflectivity + Color * Ambient + LightColor * Color * Diffuse + LightColor * Specular, 1.0);
+
+    FragmentColor = vec4(Color * Ambient + LightColor * Color * Diffuse + LightColor * Specular, 1.0);
 }
