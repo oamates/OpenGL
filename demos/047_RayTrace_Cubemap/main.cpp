@@ -368,39 +368,39 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");
     glsl_shader_program_t common_vs_program(common_vs);
-    dsa_uniform_t uni_cv_model_matrix    = common_vs_program("ModelMatrix");
-    dsa_uniform_t uni_cv_camera_position = common_vs_program("CameraPosition");
-    dsa_uniform_t uni_cv_light_position  = common_vs_program("LightPosition");
+    dsa_uniform_t uni_cv_model_matrix    = common_vs_program["ModelMatrix"];
+    dsa_uniform_t uni_cv_camera_position = common_vs_program["CameraPosition"];
+    dsa_uniform_t uni_cv_light_position  = common_vs_program["LightPosition"];
     uni_cv_light_position = light_position;
 
     glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");
     glsl_shader_program_t default_gs_program(default_gs);
-    dsa_uniform_t uni_dg_projection_matrix = default_gs_program("ProjectionMatrix");
-    dsa_uniform_t uni_dg_camera_matrix = default_gs_program("CameraMatrix");
+    dsa_uniform_t uni_dg_projection_matrix = default_gs_program["ProjectionMatrix"];
+    dsa_uniform_t uni_dg_camera_matrix = default_gs_program["CameraMatrix"];
 
     glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");
     glsl_shader_program_t cubemap_gs_program(cubemap_gs);
-    dsa_uniform_t uni_cg_projection_matrix = cubemap_gs_program("ProjectionMatrix");
-    dsa_uniform_t uni_cg_camera_matrix = cubemap_gs_program("CameraMatrix");
+    dsa_uniform_t uni_cg_projection_matrix = cubemap_gs_program["ProjectionMatrix"];
+    dsa_uniform_t uni_cg_camera_matrix = cubemap_gs_program["CameraMatrix"];
 
     glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");
     glsl_shader_program_t cloth_fs_program(cloth_fs);
-    dsa_uniform_t uni_cf_light_map = cloth_fs_program("LightMap");
-    dsa_uniform_t uni_cf_cloth_tex = cloth_fs_program("ClothTex");
+    dsa_uniform_t uni_cf_light_map = cloth_fs_program["LightMap"];
+    dsa_uniform_t uni_cf_cloth_tex = cloth_fs_program["ClothTex"];
     uni_cf_light_map = 2;
     uni_cf_cloth_tex = 3;
 
     glsl_shader_t ball_simple_fs(GL_FRAGMENT_SHADER, "glsl/ball_simple.fs");
     glsl_shader_program_t ball_simple_fs_program(ball_simple_fs);
-    dsa_uniform_t uni_bsf_albedo_tex  = ball_simple_fs_program("albedo_tex");
-    dsa_uniform_t uni_bsf_ball_idx    = ball_simple_fs_program("ball_idx");
+    dsa_uniform_t uni_bsf_albedo_tex  = ball_simple_fs_program["albedo_tex"];
+    dsa_uniform_t uni_bsf_ball_idx    = ball_simple_fs_program["ball_idx"];
     uni_bsf_albedo_tex = 4;
 
     glsl_shader_t ball_reflect_fs(GL_FRAGMENT_SHADER, "glsl/ball_reflect.fs");
     glsl_shader_program_t ball_reflect_fs_program(ball_reflect_fs);
-    dsa_uniform_t uni_brf_albedo_tex  = ball_reflect_fs_program("albedo_tex");
-    dsa_uniform_t uni_brf_reflect_tex = ball_reflect_fs_program("reflect_tex");
-    dsa_uniform_t uni_brf_ball_idx    = ball_reflect_fs_program("ball_idx");
+    dsa_uniform_t uni_brf_albedo_tex  = ball_reflect_fs_program["albedo_tex"];
+    dsa_uniform_t uni_brf_reflect_tex = ball_reflect_fs_program["reflect_tex"];
+    dsa_uniform_t uni_brf_ball_idx    = ball_reflect_fs_program["ball_idx"];
     uni_brf_albedo_tex = 4;
     uni_brf_reflect_tex = 5;
 
@@ -445,8 +445,6 @@ int main(int argc, char *argv[])
     free(pixel_buffer);
     debug_msg("Lightmap texture saved.");
 
-
-
     //===================================================================================================================================================================================================================
     // Step 3: load plain texture and create a mipmap sampler for it
     //===================================================================================================================================================================================================================
@@ -455,7 +453,7 @@ int main(int argc, char *argv[])
     glGenTextures(1, &plane_albedo_tex_id);
     glBindTexture(GL_TEXTURE_2D, plane_albedo_tex_id);
 
-    const char* cloth_tex_name = "../../../resources/tex2d/cloth.jpg";
+    const char* cloth_tex_name = "../../../resources/tex2d/cloth_seamless.png";
     int width, height, bpp;
     unsigned char* src_data = stbi_load(cloth_tex_name, &width, &height, &bpp, 0);
 

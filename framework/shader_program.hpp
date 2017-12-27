@@ -10,7 +10,6 @@
 
 struct glsl_shader_t;
 struct uniform_t;
-struct dsa_uniform_t;
 
 struct glsl_shader_program_t
 {
@@ -20,8 +19,6 @@ struct glsl_shader_program_t
     ~glsl_shader_program_t();
 
     uniform_t operator[] (const char* name) const;
-    dsa_uniform_t operator() (const char* name) const;
-
 };
 
 #endif // _shader_program_included_8346058632056932586403986192836419826589234542

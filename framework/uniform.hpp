@@ -7,6 +7,7 @@
 #include "shader.hpp"
 #include "shader_program.hpp"
 
+struct dsa_uniform_t;
 struct glsl_program_t;
 struct glsl_shader_program_t;
 
@@ -16,7 +17,7 @@ struct glsl_shader_program_t;
 
 struct uniform_t
 {
-    const char* name;
+    GLuint program_id;
     GLint location;
 
     uniform_t() {}
@@ -27,6 +28,9 @@ struct uniform_t
 
     void init(const glsl_program_t& program, const char* name);
     void init(const glsl_shader_program_t& shader_program, const char* name);
+
+    uniform_t& operator = (const uniform_t& rhs);
+    uniform_t& operator = (const dsa_uniform_t& rhs);
 
     operator GLint() const
         { return location; }

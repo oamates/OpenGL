@@ -72,7 +72,6 @@ struct glsl_program_t
     ~glsl_program_t();
 
     uniform_t operator[] (const char* name) const;
-    dsa_uniform_t operator() (const char* name) const;
 
     GLint uniform_id(const char * name) const;
 
