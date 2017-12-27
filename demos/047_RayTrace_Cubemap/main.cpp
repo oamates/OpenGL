@@ -368,20 +368,20 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     glsl_shader_t common_vs(GL_VERTEX_SHADER, "glsl/common.vs");
     glsl_shader_program_t common_vs_program(common_vs);
-    dsa_uniform_t uni_cv_model_matrix    = common_vs_program["ModelMatrix"];
-    dsa_uniform_t uni_cv_camera_position = common_vs_program["CameraPosition"];
-    dsa_uniform_t uni_cv_light_position  = common_vs_program["LightPosition"];
+    dsa_uniform_t uni_cv_model_matrix    = common_vs_program["model_matrix"];
+    dsa_uniform_t uni_cv_camera_position = common_vs_program["camera_ws"];
+    dsa_uniform_t uni_cv_light_position  = common_vs_program["light_ws"];
     uni_cv_light_position = light_position;
 
     glsl_shader_t default_gs(GL_GEOMETRY_SHADER, "glsl/default.gs");
     glsl_shader_program_t default_gs_program(default_gs);
-    dsa_uniform_t uni_dg_projection_matrix = default_gs_program["ProjectionMatrix"];
-    dsa_uniform_t uni_dg_camera_matrix = default_gs_program["CameraMatrix"];
+    dsa_uniform_t uni_dg_projection_matrix = default_gs_program["projection_matrix"];
+    dsa_uniform_t uni_dg_camera_matrix = default_gs_program["view_matrix"];
 
     glsl_shader_t cubemap_gs(GL_GEOMETRY_SHADER, "glsl/cubemap.gs");
     glsl_shader_program_t cubemap_gs_program(cubemap_gs);
-    dsa_uniform_t uni_cg_projection_matrix = cubemap_gs_program["ProjectionMatrix"];
-    dsa_uniform_t uni_cg_camera_matrix = cubemap_gs_program["CameraMatrix"];
+    dsa_uniform_t uni_cg_projection_matrix = cubemap_gs_program["projection_matrix"];
+    dsa_uniform_t uni_cg_camera_matrix = cubemap_gs_program["view_matrix"];
 
     glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");
     glsl_shader_program_t cloth_fs_program(cloth_fs);
@@ -470,7 +470,6 @@ int main(int argc, char *argv[])
     plane_albedo_sampler.bind(3);
 
     debug_msg("Plane albedo texture loaded.");
-
 
     //===================================================================================================================================================================================================================
     // Step 4: generate scratched billiard ball textures from albedo (numbers) and roughness textures, making spherical distortion
@@ -573,7 +572,6 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Step 7: main loop
     //===================================================================================================================================================================================================================
-
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glViewport(0, 0, res_x, res_y);
 
