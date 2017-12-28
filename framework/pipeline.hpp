@@ -29,6 +29,9 @@ struct glsl_pipeline_t
     void add_stage(GLbitfield stage_bitmask, const glsl_shader_program_t& shader_program)
         { glUseProgramStages(id, stage_bitmask, shader_program.id); }
 
+    void validate()
+        { glValidateProgramPipeline(id); }
+
     ~glsl_pipeline_t()
         { glDeleteProgramPipelines(1, &id); }
 };
