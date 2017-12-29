@@ -1,27 +1,26 @@
 #version 330 core
 
-in vec3 geomNormal;
-in vec3 geomTangent;
-in vec3 geomBitangent;
-in vec3 geomLightDir;
-in vec3 geomViewDir;
-in vec2 geomTexCoord;
-in vec2 geomSTCoord;
+in vec3 g_normal_ws;
+in vec3 g_tangent_x_ws;
+in vec3 g_tangent_y_ws;
+in vec3 g_light;
+in vec3 g_view;
+in vec2 g_uv;
 
-uniform sampler2D ClothTex;
-uniform sampler2D LightMap;
+uniform sampler2D cloth_tex;
+uniform sampler2D light_map;
 
 out vec4 FragmentColor;
 
 void main()
 {
-    vec3 LightColor = texture(LightMap, geomSTCoord).rgb;
-    vec3 Normal = normalize(geomNormal);
-    vec3 LightDir = normalize(geomLightDir);
-    vec3 LightRefl = reflect(-LightDir, Normal);
-    float Specular = pow(clamp(dot(LightRefl, normalize(geomViewDir)) + 0.1, 0.0, 1.0), 16.0);
-    float Diffuse = clamp(2.0 * (dot(Normal, LightDir) - 0.5), 0.0, 1.0);
-    float Ambient = 0.275;
-    vec3 Color = texture(ClothTex, geomTexCoord).rgb;
-    FragmentColor = vec4(Color * Ambient + LightColor * Color * Diffuse + LightColor * Specular, 1.0);
+    vec3 light_color = texture(light_map, g_uv).rgb;
+    vec3 n = normalize(g_normal_ws);
+    vec3 l = normalize(g_light);
+    vec3 r = reflect(-l, n);
+    float specular = pow(clamp(dot(r, normalize(g_view)) + 0.1, 0.0, 1.0), 16.0);
+    float diffuse = clamp(2.0 * (dot(n, l) - 0.5), 0.0, 1.0);
+    float ambient = 0.275;
+    vec3 color = texture(cloth_tex, g_uv).rgb;
+    FragmentColor = vec4(color * ambient + light_color * color * diffuse + light_color * specular, 1.0);
 }

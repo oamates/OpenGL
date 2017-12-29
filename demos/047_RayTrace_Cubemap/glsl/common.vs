@@ -15,21 +15,21 @@ out gl_PerVertex
    vec4 gl_Position;
 };
 
-out vec3 vertNormal;
-out vec3 vertTangent;
-out vec3 vertBitangent;
-out vec3 vertLightDir;
-out vec3 vertViewDir;
-out vec2 vertTexCoord;
+out vec3 normal_ws;
+out vec3 tangent_x_ws;
+out vec3 tangent_y_ws;
+out vec3 light;
+out vec3 view;
+out vec2 uv;
 
 void main()
 {
-    gl_Position = model_matrix * vec4(position_in, 1.0f);
+	gl_Position = model_matrix * vec4(position_in, 1.0f);
 
-    vertLightDir = light_ws - gl_Position.xyz;
-    vertViewDir = camera_ws - gl_Position.xyz;
-    vertNormal =    (model_matrix * vec4(normal_in,  0.0f)).xyz;
-    vertTangent =   (model_matrix * vec4(tangent_x_in, 0.0f)).xyz;
-    vertBitangent = (model_matrix * vec4(tangent_y_in, 0.0f)).xyz;
-    vertTexCoord = uv_in;
+    light = light_ws - gl_Position.xyz;
+    view = camera_ws - gl_Position.xyz;
+    normal_ws = mat3(model_matrix) * normal_in;
+    tangent_x_ws = mat3(model_matrix) * tangent_x_in;
+    tangent_y_ws = mat3(model_matrix) * tangent_y_in;
+    uv = uv_in;
 }

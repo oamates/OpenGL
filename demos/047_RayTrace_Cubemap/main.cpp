@@ -385,8 +385,8 @@ int main(int argc, char *argv[])
 
     glsl_shader_t cloth_fs(GL_FRAGMENT_SHADER, "glsl/cloth.fs");
     glsl_shader_program_t cloth_fs_program(cloth_fs);
-    dsa_uniform_t uni_cf_light_map = cloth_fs_program["LightMap"];
-    dsa_uniform_t uni_cf_cloth_tex = cloth_fs_program["ClothTex"];
+    dsa_uniform_t uni_cf_light_map = cloth_fs_program["light_map"];
+    dsa_uniform_t uni_cf_cloth_tex = cloth_fs_program["cloth_tex"];
     uni_cf_light_map = 2;
     uni_cf_cloth_tex = 3;
 
