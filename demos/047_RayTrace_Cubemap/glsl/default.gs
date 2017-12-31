@@ -37,8 +37,8 @@ void main()
     {
         gl_Position = projection_matrix * view_matrix * gl_in[i].gl_Position;
         g_normal_ws = normal_ws[i];
-        g_tangent_x = tangent_x[i];
-        g_tangent_y = tangent_y[i];
+        g_tangent_x_ws = tangent_x_ws[i];
+        g_tangent_y_ws = tangent_y_ws[i];
         g_light = light[i];
         g_view = view[i];
         g_uv = uv[i];

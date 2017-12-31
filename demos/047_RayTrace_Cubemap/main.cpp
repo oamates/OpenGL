@@ -231,7 +231,7 @@ GLuint generate_sphere_texture_array(GLenum texture_unit, int max_level)
     glActiveTexture(texture_unit);
     glGenTextures(1, &balls_tex_id);
     glBindTexture(GL_TEXTURE_2D_ARRAY, balls_tex_id);
-    glTexStorage3D(GL_TEXTURE_2D_ARRAY, max_level + 1, GL_RGB8, tex_res_x, tex_res_y, SPHERE_COUNT);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, max_level + 1, GL_RGBA8, tex_res_x, tex_res_y, SPHERE_COUNT);
 
     glsl_program_t sphere_texgen(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
                                  glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sphere_texgen.fs"));
@@ -476,7 +476,6 @@ int main(int argc, char *argv[])
     // and pack them into a single GL_TEXTURE_2D_ARRAY
     // texture is twice wider because equator on sphere is twice longer than meridian
     //===================================================================================================================================================================================================================
-    glActiveTexture(GL_TEXTURE4);
     GLuint sphere_albedo_tex_id = generate_sphere_texture_array(GL_TEXTURE4, 10);
     sampler_t sphere_albedo_sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_CLAMP_TO_EDGE);
     sphere_albedo_sampler.bind(4);
