@@ -203,61 +203,6 @@ void glsl_program_t::dump_param(GLint param_name, const char* description)
 {
     debug_msg("%s : %d", description, get_param(param_name));
 }
-
-void glsl_program_t::dump_info()
-{
-    dump_param(GL_DELETE_STATUS,                         "Program flagged for deletion");
-    dump_param(GL_LINK_STATUS,                           "Last link operation");
-    dump_param(GL_VALIDATE_STATUS,                       "Last validation operation");
-    dump_param(GL_INFO_LOG_LENGTH,                       "Length of the log information");
-    dump_param(GL_ATTACHED_SHADERS,                      "The number of shader objects attached to program");
-    dump_param(GL_ACTIVE_ATOMIC_COUNTER_BUFFERS,         "The number of active attribute atomic counter buffers used by program");
-    dump_param(GL_ACTIVE_ATTRIBUTES,                     "The number of active attribute variables for program");
-    dump_param(GL_ACTIVE_ATTRIBUTE_MAX_LENGTH,           "The longest active attribute name for program");
-    dump_param(GL_ACTIVE_UNIFORMS,                       "The number of active uniform variables for program");
-    dump_param(GL_ACTIVE_UNIFORM_MAX_LENGTH,             "The length of the longest active uniform variable name for program");
-    dump_param(GL_PROGRAM_BINARY_LENGTH,                 "The length of the program binary, in bytes");
-    dump_param(GL_TRANSFORM_FEEDBACK_BUFFER_MODE,        "The buffer mode used when transform feedback is active (GL_SEPARATE_ATTRIBS or GL_INTERLEAVED_ATTRIBS)");
-    dump_param(GL_TRANSFORM_FEEDBACK_VARYINGS,           "The number of varying variables to capture in transform feedback mode for the program");
-    dump_param(GL_TRANSFORM_FEEDBACK_VARYING_MAX_LENGTH, "The longest variable name to be used for transform feedback");
-    dump_param(GL_GEOMETRY_VERTICES_OUT,                 "The maximum number of vertices that the geometry shader in program will output");
-    dump_param(GL_GEOMETRY_INPUT_TYPE,                   "Geometry shader input primitive type");
-    dump_param(GL_GEOMETRY_OUTPUT_TYPE,                  "Geometry shader output primitive type");
-    // GL_COMPUTE_WORK_GROUP_SIZE "The local work group size (x, y, z) of the compute program"
-}
-
-/*
-
-// Create a simple program containing only a vertex shader
-static const GLchar source[] = { ... };
-
-// First create and compile the shader
-GLuint shader;
-shader = glCreateShader(GL_VERTEX_SHADER);
-glShaderSource(shader, 1, suorce, NULL);
-glCompileShader(shader);
-
-// Create the program and attach the shader to it
-GLuint program;
-program = glCreateProgram();
-glAttachShader(program, shader);
-
-// Set the binary retrievable hint and link the program
-glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
-glLinkProgram(program);
-
-// Get the expected size of the program binary
-GLint binary_size = 0;
-glGetProgramiv(program, GL_PROGRAM_BINARY_SIZE, &binary_size);
-
-// Allocate some memory to store the program binary
-unsigned char * program_binary = new unsigned char [binary_size];
-
-// Now retrieve the binary from the program object
-GLenum binary_format = GL_NONE;
-glGetProgramBinary(program, binary_size, NULL, &binary_format, program_binary);
-
-*/
 /*
 void glsl_program_t::dump_interface()
 {
@@ -328,4 +273,60 @@ void glsl_program_t::dump_interface()
     }
 
 }
+
+void glsl_program_t::dump_info()
+{
+    dump_param(GL_DELETE_STATUS,                         "Program flagged for deletion");
+    dump_param(GL_LINK_STATUS,                           "Last link operation");
+    dump_param(GL_VALIDATE_STATUS,                       "Last validation operation");
+    dump_param(GL_INFO_LOG_LENGTH,                       "Length of the log information");
+    dump_param(GL_ATTACHED_SHADERS,                      "The number of shader objects attached to program");
+    dump_param(GL_ACTIVE_ATOMIC_COUNTER_BUFFERS,         "The number of active attribute atomic counter buffers used by program");
+    dump_param(GL_ACTIVE_ATTRIBUTES,                     "The number of active attribute variables for program");
+    dump_param(GL_ACTIVE_ATTRIBUTE_MAX_LENGTH,           "The longest active attribute name for program");
+    dump_param(GL_ACTIVE_UNIFORMS,                       "The number of active uniform variables for program");
+    dump_param(GL_ACTIVE_UNIFORM_MAX_LENGTH,             "The length of the longest active uniform variable name for program");
+    dump_param(GL_PROGRAM_BINARY_LENGTH,                 "The length of the program binary, in bytes");
+    dump_param(GL_TRANSFORM_FEEDBACK_BUFFER_MODE,        "The buffer mode used when transform feedback is active (GL_SEPARATE_ATTRIBS or GL_INTERLEAVED_ATTRIBS)");
+    dump_param(GL_TRANSFORM_FEEDBACK_VARYINGS,           "The number of varying variables to capture in transform feedback mode for the program");
+    dump_param(GL_TRANSFORM_FEEDBACK_VARYING_MAX_LENGTH, "The longest variable name to be used for transform feedback");
+    dump_param(GL_GEOMETRY_VERTICES_OUT,                 "The maximum number of vertices that the geometry shader in program will output");
+    dump_param(GL_GEOMETRY_INPUT_TYPE,                   "Geometry shader input primitive type");
+    dump_param(GL_GEOMETRY_OUTPUT_TYPE,                  "Geometry shader output primitive type");
+    // GL_COMPUTE_WORK_GROUP_SIZE "The local work group size (x, y, z) of the compute program"
+}
+*/
+/*
+
+// Create a simple program containing only a vertex shader
+static const GLchar source[] = { ... };
+
+// First create and compile the shader
+GLuint shader;
+shader = glCreateShader(GL_VERTEX_SHADER);
+glShaderSource(shader, 1, suorce, NULL);
+glCompileShader(shader);
+
+// Create the program and attach the shader to it
+GLuint program;
+program = glCreateProgram();
+glAttachShader(program, shader);
+
+// Set the binary retrievable hint and link the program
+glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+glLinkProgram(program);
+
+// Get the expected size of the program binary
+GLint binary_size = 0;
+glGetProgramiv(program, GL_PROGRAM_BINARY_SIZE, &binary_size);
+
+// Allocate some memory to store the program binary
+unsigned char * program_binary = new unsigned char [binary_size];
+
+// Now retrieve the binary from the program object
+GLenum binary_format = GL_NONE;
+glGetProgramBinary(program, binary_size, NULL, &binary_format, program_binary);
+
+*/
+/*
 */
