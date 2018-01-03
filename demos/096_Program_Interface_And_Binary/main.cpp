@@ -138,6 +138,9 @@ struct demo_window_t : public glfw_window_t
 
 namespace glsl_interface {
 
+//=======================================================================================================================================================================================================================
+// Auxiliary structures
+//=======================================================================================================================================================================================================================
 struct stages_info_t
 {
     GLint vertex;
@@ -147,12 +150,19 @@ struct stages_info_t
     GLint fragment;
     GLint compute;
 
-    static constexpr GLenum tokens[] = { GL_REFERENCED_BY_VERTEX_SHADER,
-                                     GL_REFERENCED_BY_TESS_CONTROL_SHADER,
-                                     GL_REFERENCED_BY_TESS_EVALUATION_SHADER,
-                                     GL_REFERENCED_BY_GEOMETRY_SHADER,
-                                     GL_REFERENCED_BY_FRAGMENT_SHADER,
-                                     GL_REFERENCED_BY_COMPUTE_SHADER };
+    void print()
+    {
+        printf("\t\tShader stages : ");
+        if (vertex) printf("%s", "VERTEX");
+        if (tess_control) printf("%s", "TESS_CONTROL");
+        if (tess_evaluation) printf("%s", "TESS_EVALUATION");
+        if (geometry) printf("%s", "GEOMETRY");
+        if (fragment) printf("%s", "FRAGMENT");
+        if (compute) printf("%s", "COMPUTE");
+        printf("\n");
+    }
+
+    // static constexpr GLenum tokens[] = { GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER };
 };
 
 struct buffer_info_t
@@ -161,12 +171,12 @@ struct buffer_info_t
     GLint buffer_binding;
     GLint num_active_variables;
 
-    static constexpr GLenum tokens[] =
+    void print()
     {
-        GL_ACTIVE_VARIABLES,
-        GL_BUFFER_BINDING,
-        GL_NUM_ACTIVE_VARIABLES
-    };
+        printf("\t\tBuffer info : binding = %d, number of active variables = %d\n", buffer_binding, num_active_variables);
+    }
+
+    // static GLenum tokens[] = { GL_ACTIVE_VARIABLES, GL_BUFFER_BINDING, GL_NUM_ACTIVE_VARIABLES };
 };
 
 struct io_attribute_info_t
@@ -176,13 +186,13 @@ struct io_attribute_info_t
     GLint location_component;
     GLint array_size;
 
-    static constexpr GLenum tokens[] =
+
+    void print()
     {
-        GL_TYPE,
-        GL_LOCATION,
-        GL_LOCATION_COMPONENT,
-        GL_ARRAY_SIZE
-    };
+        printf("\t\tAttribute info : type = %d, location = %d, location component = %d, array_size = %d\n", type, location, location_component, array_size);
+    }
+
+    // static GLenum tokens[] = { GL_TYPE, GL_LOCATION, GL_LOCATION_COMPONENT, GL_ARRAY_SIZE };
 };
 
 struct variable_info_t
@@ -191,12 +201,12 @@ struct variable_info_t
     GLint offset;
     GLint array_size;
 
-    static constexpr GLenum tokens[] =
+    void print()
     {
-        GL_TYPE,
-        GL_OFFSET,
-        GL_ARRAY_SIZE
-    };
+        printf("\t\tVariable info : type = %d, offset = %d, array_size = %d\n", type, offset, array_size);
+    }
+
+    // static GLenum tokens[] = { GL_TYPE, GL_OFFSET, GL_ARRAY_SIZE };
 };
 
 struct variable_layout_info_t
@@ -206,22 +216,12 @@ struct variable_layout_info_t
     GLint is_row_major;
     GLint matrix_stride;
 
-    static constexpr GLenum tokens[] =
+    void print()
     {
-        GL_ARRAY_STRIDE,
-        GL_BLOCK_INDEX,
-        GL_IS_ROW_MAJOR,
-        GL_MATRIX_STRIDE
-    };
+        printf("\t\tVariable layout info : array_stride = %d, block_index = %d, is_row_major = %d, matrix_stride = %d\n", array_stride, block_index, is_row_major, matrix_stride);
+    }
 
-    static constexpr std::array<GLenum, 4> tokens1 =
-    {
-        GL_ARRAY_STRIDE,
-        GL_BLOCK_INDEX,
-        GL_IS_ROW_MAJOR,
-        GL_MATRIX_STRIDE
-    };
-
+    // static GLenum tokens[] = { GL_ARRAY_STRIDE, GL_BLOCK_INDEX, GL_IS_ROW_MAJOR, GL_MATRIX_STRIDE };
 };
 
 
@@ -230,14 +230,19 @@ struct top_level_array_info_t
     GLint size;
     GLint stride;
 
-    static constexpr GLenum tokens[] =
+    void print()
     {
-        GL_TOP_LEVEL_ARRAY_SIZE,
-        GL_TOP_LEVEL_ARRAY_STRIDE
-    };
+        printf("\t\tTop level array info : size = %d, stride = %d\n", size, stride);
+    }
+
+    // static GLenum tokens[] = { GL_TOP_LEVEL_ARRAY_SIZE, GL_TOP_LEVEL_ARRAY_STRIDE };
 };
 
-//----------------------------------------------------------------------------
+
+//=======================================================================================================================================================================================================================
+// Interface info structures
+//=======================================================================================================================================================================================================================
+
 struct uniform_t                            /* GL_UNIFORM */
 {
     GLint name_length;
@@ -247,15 +252,29 @@ struct uniform_t                            /* GL_UNIFORM */
     GLint atomic_counter_buffer_index;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    static GLenum tokens[];
+
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        variable_info_t::tokens,
-        variable_layout_info_t::tokens,
-        GL_LOCATION,
-        GL_ATOMIC_COUNTER_BUFFER_INDEX,
-        stages_info_t::tokens
-    };
+        variable_info.print();
+        variable_layout_info.print();
+        printf("\t\tLocation = %d", location);
+        printf("\t\tAtomic counter buffer index = %d", atomic_counter_buffer_index);
+        stages_info.print();
+    }
+};
+
+GLenum uniform_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_TYPE, GL_OFFSET, GL_ARRAY_SIZE,
+    GL_ARRAY_STRIDE, GL_BLOCK_INDEX, GL_IS_ROW_MAJOR, GL_MATRIX_STRIDE,
+    GL_LOCATION,
+    GL_ATOMIC_COUNTER_BUFFER_INDEX,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
 };
 
 struct uniform_block_t                      /* GL_UNIFORM_BLOCK */
@@ -265,13 +284,25 @@ struct uniform_block_t                      /* GL_UNIFORM_BLOCK */
     GLint buffer_data_size;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        buffer_info_t::tokens,
-        GL_BUFFER_DATA_SIZE,
-        stages_info_t::tokens
-    };
+        buffer_info.print();
+        printf("\t\tBuffer data size = %d", buffer_data_size);
+        stages_info.print();
+    }
+
+    static GLenum tokens[];
+};
+
+GLenum uniform_block_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_ACTIVE_VARIABLES, GL_BUFFER_BINDING, GL_NUM_ACTIVE_VARIABLES,
+    GL_BUFFER_DATA_SIZE,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
 };
 
 
@@ -281,12 +312,25 @@ struct atomic_counter_buffer_t              /* GL_ATOMIC_COUNTER_BUFFER */
     GLint buffer_data_size;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return 0; }
+
+
+    void print()
     {
-        buffer_info_t::tokens,
-        GL_BUFFER_DATA_SIZE,
-        stages_info_t::tokens
-    };
+        buffer_info.print();
+        printf("\t\tBuffer data size = %d", buffer_data_size);
+        stages_info.print();
+    }
+
+    static GLenum tokens[];
+};
+
+GLenum atomic_counter_buffer_t::tokens[] =
+{
+    GL_ACTIVE_VARIABLES, GL_BUFFER_BINDING, GL_NUM_ACTIVE_VARIABLES,
+    GL_BUFFER_DATA_SIZE,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
 };
 
 struct program_input_t                      /* GL_PROGRAM_INPUT */
@@ -296,13 +340,25 @@ struct program_input_t                      /* GL_PROGRAM_INPUT */
     GLint is_per_patch;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        io_attribute_info_t::tokens,
-        GL_IS_PER_PATCH,
-        stages_info_t::tokens
-    };
+        io_attribute_info.print();
+        printf("\t\tPer patch input = %d", is_per_patch);
+        stages_info.print();
+    }
+
+    static GLenum tokens[];
+};
+
+GLenum program_input_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_TYPE, GL_LOCATION, GL_LOCATION_COMPONENT, GL_ARRAY_SIZE,
+    GL_IS_PER_PATCH,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
 };
 
 struct program_output_t                     /* GL_PROGRAM_OUTPUT */
@@ -313,24 +369,49 @@ struct program_output_t                     /* GL_PROGRAM_OUTPUT */
     GLint is_per_patch;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        io_attribute_info_t::tokens,
-        GL_LOCATION_INDEX,
-        GL_IS_PER_PATCH,
-        stages_info_t::tokens
-    };
+        io_attribute_info.print();
+        printf("\t\tLocation index = %d", location_index);
+        printf("\t\tPer patch input = %d", is_per_patch);
+        stages_info.print();
+    }
+
+    static GLenum tokens[];
 };
+
+GLenum program_output_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_TYPE, GL_LOCATION, GL_LOCATION_COMPONENT, GL_ARRAY_SIZE,
+    GL_LOCATION_INDEX,
+    GL_IS_PER_PATCH,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
+};
+
 
 struct subroutine_t                         /* GL_VERTEX_SUBROUTINE, GL_TESS_CONTROL_SUBROUTINE, GL_TESS_EVALUATION_SUBROUTINE, GL_GEOMETRY_SUBROUTINE, GL_FRAGMENT_SUBROUTINE, GL_COMPUTE_SUBROUTINE */
 {
     GLint name_length;
-    static constexpr GLenum tokens[] =
+
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH
-    };
+    }
+
+    static GLenum tokens[];
 };
+
+GLenum subroutine_t::tokens[] =
+{
+    GL_NAME_LENGTH
+};
+
 
 struct subroutine_uniform_t                 /* GL_VERTEX_SUBROUTINE_UNIFORM, GL_TESS_CONTROL_SUBROUTINE_UNIFORM, GL_TESS_EVALUATION_SUBROUTINE_UNIFORM, GL_GEOMETRY_SUBROUTINE_UNIFORM, GL_FRAGMENT_SUBROUTINE_UNIFORM, GL_COMPUTE_SUBROUTINE_UNIFORM */
 {
@@ -340,15 +421,29 @@ struct subroutine_uniform_t                 /* GL_VERTEX_SUBROUTINE_UNIFORM, GL_
     GLint num_compatible_subroutines;
     GLint array_size;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        GL_LOCATION,
-        GL_COMPATIBLE_SUBROUTINES,
-        GL_NUM_COMPATIBLE_SUBROUTINES,
-        GL_ARRAY_SIZE
-    };
+        printf("\t\tLocation = %d", location);
+        printf("\t\tCompatible subroutines = %d", compatible_subroutines);
+        printf("\t\tNumber of compatible subroutines = %d", num_compatible_subroutines);
+        printf("\t\tArray size = %d", array_size);
+    }
+
+    static GLenum tokens[];
 };
+
+GLenum subroutine_uniform_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_LOCATION,
+    GL_COMPATIBLE_SUBROUTINES,
+    GL_NUM_COMPATIBLE_SUBROUTINES,
+    GL_ARRAY_SIZE
+};
+
 
 struct transform_feedback_varying_t         /* GL_TRANSFORM_FEEDBACK_VARYING */
 {
@@ -357,13 +452,23 @@ struct transform_feedback_varying_t         /* GL_TRANSFORM_FEEDBACK_VARYING */
 
     GLint transform_feedback_buffer_index;
 
-    static constexpr GLenum tokens[] =
-    {
-        GL_NAME_LENGTH,
-        variable_info_t::tokens,
-        GL_TRANSFORM_FEEDBACK_BUFFER_INDEX
-    };
+    int name_len()
+        { return name_length; }
 
+
+    void print()
+    {
+        variable_info.print();
+    }
+
+    static GLenum tokens[];
+};
+
+GLenum transform_feedback_varying_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_TYPE, GL_OFFSET, GL_ARRAY_SIZE,
+    GL_TRANSFORM_FEEDBACK_BUFFER_INDEX
 };
 
 struct transform_feedback_buffer_t          /* GL_TRANSFORM_FEEDBACK_BUFFER */
@@ -371,11 +476,22 @@ struct transform_feedback_buffer_t          /* GL_TRANSFORM_FEEDBACK_BUFFER */
     buffer_info_t buffer_info;
     GLint transform_feedback_buffer_stride;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return 0; }
+
+    void print()
     {
-        buffer_info_t::tokens,
-        GL_TRANSFORM_FEEDBACK_BUFFER_STRIDE
-    };
+        buffer_info.print();
+        printf("Transform feedback buffer stride = %d", transform_feedback_buffer_stride);
+    }
+
+    static GLenum tokens[];
+};
+
+GLenum transform_feedback_buffer_t::tokens[] =
+{
+    GL_ACTIVE_VARIABLES, GL_BUFFER_BINDING, GL_NUM_ACTIVE_VARIABLES,
+    GL_TRANSFORM_FEEDBACK_BUFFER_STRIDE
 };
 
 struct buffer_variable_t                    /* GL_BUFFER_VARIABLE */
@@ -386,15 +502,29 @@ struct buffer_variable_t                    /* GL_BUFFER_VARIABLE */
     top_level_array_info_t top_level_array_info;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        variable_info_t::tokens,
-        variable_layout_info_t::tokens,
-        top_level_array_info_t::tokens,
-        stages_info_t::tokens
-    };
+        variable_info.print();
+        variable_layout_info.print();
+        top_level_array_info.print();
+        stages_info.print();
+    }
+
+    static GLenum tokens[];
 };
+
+GLenum buffer_variable_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_TYPE, GL_OFFSET, GL_ARRAY_SIZE,
+    GL_ARRAY_STRIDE, GL_BLOCK_INDEX, GL_IS_ROW_MAJOR, GL_MATRIX_STRIDE,
+    GL_TOP_LEVEL_ARRAY_SIZE, GL_TOP_LEVEL_ARRAY_STRIDE,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
+};
+
 
 struct shader_storage_block_t               /* GL_SHADER_STORAGE_BLOCK -- identical to GL_UNIFORM_BLOCK */
 {
@@ -403,14 +533,93 @@ struct shader_storage_block_t               /* GL_SHADER_STORAGE_BLOCK -- identi
     GLint buffer_data_size;
     stages_info_t stages_info;
 
-    static constexpr GLenum tokens[] =
+    int name_len()
+        { return name_length; }
+
+    void print()
     {
-        GL_NAME_LENGTH,
-        buffer_info_t::tokens,
-        GL_BUFFER_DATA_SIZE,
-        stages_info_t::tokens
-    };
+        buffer_info.print();
+        printf("Buffer data size = %d", buffer_data_size);
+        stages_info.print();
+    }
+
+    static GLenum tokens[];
 };
+
+GLenum shader_storage_block_t::tokens[] =
+{
+    GL_NAME_LENGTH,
+    GL_ACTIVE_VARIABLES, GL_BUFFER_BINDING, GL_NUM_ACTIVE_VARIABLES,
+    GL_BUFFER_DATA_SIZE,
+    GL_REFERENCED_BY_VERTEX_SHADER, GL_REFERENCED_BY_TESS_CONTROL_SHADER, GL_REFERENCED_BY_TESS_EVALUATION_SHADER, GL_REFERENCED_BY_GEOMETRY_SHADER, GL_REFERENCED_BY_FRAGMENT_SHADER, GL_REFERENCED_BY_COMPUTE_SHADER
+};
+
+template<GLenum token, typename interface_t> void print_interface_info(const char* interface_name, const glsl_program_t& program)
+{
+    const int MAX_SHADER_RESOURCE_NAME_LENGTH = 256;
+    char name[MAX_SHADER_RESOURCE_NAME_LENGTH];
+
+    GLuint id = program.id;
+
+    GLint resource_count;
+    glGetProgramInterfaceiv(id, token, GL_ACTIVE_RESOURCES, &resource_count);
+
+    printf("\n\t%s :: %u\n", interface_name, resource_count);
+
+    if (resource_count == 0)
+        return;
+
+    GLsizei prop_count = sizeof(interface_t) / sizeof(GLint);
+
+    for (GLint i = 0; i != resource_count; ++i)
+    {
+        GLsizei length;
+        interface_t interface;
+        glGetProgramResourceiv(id, token, i, prop_count, interface_t::tokens, sizeof(interface_t), &length, (GLint *) &interface);
+
+        int name_length = interface.name_len();
+        if (name_length > 0)
+        {
+            GLsizei bufSize = std::min(name_length + 1, MAX_SHADER_RESOURCE_NAME_LENGTH);
+            glGetProgramResourceName(id, token, i, bufSize, 0, name);
+            printf("%s : ", name);
+        }
+        else
+            printf("#%u : ", i);
+
+        interface.print();
+    }
+}
+
+void program_interfaces_info(const glsl_program_t& program)
+{
+    printf("Shader program %u interface :: \n\n", program.id);
+
+    print_interface_info<GL_UNIFORM, uniform_t>("Uniform variables", program);
+    print_interface_info<GL_UNIFORM_BLOCK, uniform_block_t>("Uniform blocks", program);
+    print_interface_info<GL_ATOMIC_COUNTER_BUFFER, atomic_counter_buffer_t>("Atomic counter buffers", program);
+    print_interface_info<GL_PROGRAM_INPUT, program_input_t>("Program inputs", program);
+    print_interface_info<GL_PROGRAM_OUTPUT, program_output_t>("Program outputs", program);
+
+    print_interface_info<GL_VERTEX_SUBROUTINE, subroutine_t>("Vertex shader subroutines", program);
+    print_interface_info<GL_TESS_CONTROL_SUBROUTINE, subroutine_t>("Tesselation control shader subroutines", program);
+    print_interface_info<GL_TESS_EVALUATION_SUBROUTINE, subroutine_t>("Tesselation evaluation shader subroutines", program);
+    print_interface_info<GL_GEOMETRY_SUBROUTINE, subroutine_t>("Geometry shader subroutines", program);
+    print_interface_info<GL_FRAGMENT_SUBROUTINE, subroutine_t>("Fragment shader subroutines", program);
+    print_interface_info<GL_COMPUTE_SUBROUTINE, subroutine_t>("Compute shader subroutines", program);
+
+    print_interface_info<GL_VERTEX_SUBROUTINE_UNIFORM, subroutine_uniform_t>("Vertex shader subroutine uniforms", program);
+    print_interface_info<GL_TESS_CONTROL_SUBROUTINE_UNIFORM, subroutine_uniform_t>("Tesselation control shader subroutine uniforms", program);
+    print_interface_info<GL_TESS_EVALUATION_SUBROUTINE_UNIFORM, subroutine_uniform_t>("Tesselation evaluation shader subroutine uniforms", program);
+    print_interface_info<GL_GEOMETRY_SUBROUTINE_UNIFORM, subroutine_uniform_t>("Geometry shader subroutine uniforms", program);
+    print_interface_info<GL_FRAGMENT_SUBROUTINE_UNIFORM, subroutine_uniform_t>("Fragment shader subroutine uniforms", program);
+    print_interface_info<GL_COMPUTE_SUBROUTINE_UNIFORM, subroutine_uniform_t>("Compute shader subroutine uniforms", program);
+
+    print_interface_info<GL_TRANSFORM_FEEDBACK_VARYING, transform_feedback_varying_t>("Transform feedback varyings", program);
+    print_interface_info<GL_TRANSFORM_FEEDBACK_BUFFER, transform_feedback_buffer_t>("Transform feedback buffers", program);
+    print_interface_info<GL_BUFFER_VARIABLE, buffer_variable_t>("Buffer variables", program);
+    print_interface_info<GL_SHADER_STORAGE_BLOCK, shader_storage_block_t>("Shader storage blocks", program);
+}
 
 
 } // namespace glsl_interface
@@ -510,6 +719,8 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // Shader program interface query step
     //===================================================================================================================================================================================================================
+
+    glsl_interface::program_interfaces_info(point_sphere);
 
     //===================================================================================================================================================================================================================
     // OpenGL rendering parameters setup :
