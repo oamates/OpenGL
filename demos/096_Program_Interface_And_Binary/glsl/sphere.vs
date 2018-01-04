@@ -7,6 +7,11 @@ uniform vec4 spheres[128];
 uniform mat4 projection_view_matrix;
 uniform float time;
 
+out gl_PerVertex
+{
+    vec4 gl_Position;
+};
+
 out vec3 color;
 
 vec2 hash(vec2 n)

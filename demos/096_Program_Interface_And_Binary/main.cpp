@@ -252,8 +252,6 @@ struct uniform_t                            /* GL_UNIFORM */
     GLint atomic_counter_buffer_index;
     stages_info_t stages_info;
 
-    static GLenum tokens[];
-
     int name_len()
         { return name_length; }
 
@@ -265,6 +263,8 @@ struct uniform_t                            /* GL_UNIFORM */
         printf("\t\tAtomic counter buffer index = %d", atomic_counter_buffer_index);
         stages_info.print();
     }
+
+    static GLenum tokens[];
 };
 
 GLenum uniform_t::tokens[] =
@@ -624,68 +624,6 @@ void program_interfaces_info(const glsl_program_t& program)
 
 } // namespace glsl_interface
 
-/*
-
-struct glsl_program_interface_t
-{
-    std::vector<> input;
-    std::vector<> output;
-
-    glsl_program_interface_t(const glsl_program_t& program)
-    {
-        GLuint id = program.id;
-
-        // GL_UNIFORM :: The query is targeted at the set of active uniforms within program.
-
-        GLint uniform_count;
-        glGetProgramInterfaceiv(id, GL_UNIFORM, GL_ACTIVE_RESOURCES, &uniform_count);
-
-        const GLenum uniform_props[] = {
-            GL_NAME_LENGTH,
-            GL_TYPE,
-            GL_ARRAY_SIZE,
-            GL_OFFSET,
-            GL_BLOCK_INDEX,
-            GL_ARRAY_STRIDE,
-            GL_MATRIX_STRIDE,
-            GL_IS_ROW_MAJOR,
-            GL_ATOMIC_COUNTER_BUFFER_INDEX,
-            GL_REFERENCED_BY_VERTEX_SHADER,
-            GL_REFERENCED_BY_TESS_CONTROL_SHADER,
-            GL_REFERENCED_BY_TESS_EVALUATION_SHADER,
-            GL_REFERENCED_BY_GEOMETRY_SHADER,
-            GL_REFERENCED_BY_FRAGMENT_SHADER,
-            GL_REFERENCED_BY_COMPUTE_SHADER,
-            GL_LOCATION
-        }
-
-
-
-
-              GL_LOCATION};
-
-
-        const int MAX_SHADER_RESOURCE_NAME_LENGTH = 128;
-        GLchar name[MAX_SHADER_RESOURCE_NAME_LENGTH];
-
-        for (GLint u = 0; u != uniform_count; ++u)
-        {
-            glGetProgramResourceiv(id, GL_UNIFORM, u, )
-            glGetProgramResourceName(program, GL_UNIFORM, i, MAX_SHADER_RESOURCE_NAME_LENGTH, 0, name);
-            glGetProgramResourceiv(program, GL_UNIFORM, i, 2, props, 2, NULL, params);
-        type_name = name;
-        //std::cout << "Index " << i << std::endl;
-        std::cout <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
-    }
-
-
-        glGetProgramResourceiv(program)
-
-    }
-}
-
- */
-
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
@@ -716,6 +654,48 @@ int main(int argc, char *argv[])
     // Shader program binary retrieval step
     //===================================================================================================================================================================================================================
 
+    glsl_shader_t vs(GL_VERTEX_SHADER, "glsl/sphere.vs");
+
+    GLuint program_id = glCreateProgram();
+    glAttachShader(program_id, vs.id);
+
+    glProgramParameteri(program_id, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);                   // Set the binary retrievable hint and link the program
+    glProgramParameteri(program_id, GL_PROGRAM_SEPARABLE, GL_TRUE);
+    glLinkProgram(program_id);
+
+    GLint binary_size = 0;                                                                          // Get the expected size of the program binary
+    glGetProgramiv(program_id, GL_PROGRAM_BINARY_LENGTH, &binary_size);
+
+    void* program_binary = malloc(binary_size);                                                     // Allocate some memory to store the program binary
+
+    GLenum binary_format = GL_NONE;                                                                 // Now retrieve the binary from the program object
+    glGetProgramBinary(program_id, binary_size, 0, &binary_format, program_binary);
+
+    printf("\n\nGot program binary :: size = %u, format = %u", binary_size, binary_format);
+
+    FILE* f = fopen("program.bin", "wb");
+    fwrite(program_binary, binary_size, 1, f);
+    fclose(f);
+
+
+    GLint num_shader_binary_formats;
+    GLint num_program_binary_formats;
+
+    glGetIntegerv(GL_NUM_SHADER_BINARY_FORMATS, &num_shader_binary_formats);
+    glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &num_program_binary_formats);
+
+    printf("\t\t# supported shader binary formats : %u\n", num_shader_binary_formats);
+    printf("\t\t# supported program binary formats : %u\n", num_program_binary_formats);
+
+    GLint* binary_formats = (GLint*) malloc(num_program_binary_formats * sizeof(GLint));
+    glGetIntegerv(GL_PROGRAM_BINARY_FORMATS, binary_formats);
+
+    for (GLint f = 0; f < num_program_binary_formats; ++f)
+    {
+        printf("\t\t\t%d\n", binary_formats[f]);
+    }
+
+
     //===================================================================================================================================================================================================================
     // Shader program interface query step
     //===================================================================================================================================================================================================================
@@ -731,6 +711,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // main program loop
     //===================================================================================================================================================================================================================
+/*
     while(!window.should_close())
     {
         //===============================================================================================================================================================================================================
@@ -744,118 +725,10 @@ int main(int argc, char *argv[])
         //===============================================================================================================================================================================================================
         window.end_frame();
     }
-
+*/
     //===================================================================================================================================================================================================================
     // terminate the program and exit
     //===================================================================================================================================================================================================================
     glfw::terminate();
     return 0;
 }
-
-/*
-
-
-void glsl_program_t::dump_interface()
-{
-    debug_msg()std::cout << "--------------------" << name << " Interface------------------------" << std::endl;
-    GLint outputs = 0;
-    glGetProgramInterfaceiv(program, GL_PROGRAM_INPUT,  GL_ACTIVE_RESOURCES, &outputs);
-    static const GLenum props[] = {GL_TYPE, GL_LOCATION};
-    GLint params[2];
-    const char *type_name;
-
-    if (outputs > 0)
-       std::cout << "----------Input-----------" << std::endl;
-    std::cout << std::endl;
-    for (int i = 0; i != outputs; ++i)
-    {
-        glGetProgramResourceName(program, GL_PROGRAM_INPUT, i, sizeof(name), NULL, name);
-        glGetProgramResourceiv(program, GL_PROGRAM_INPUT, i, 2, props, 2, NULL, params);
-        type_name = name;
-        //std::cout << "Index " << i << std::endl;
-        std::cout <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
-    }
-
-    glGetProgramInterfaceiv(program, GL_PROGRAM_OUTPUT,  GL_ACTIVE_RESOURCES, &outputs);
-    if (outputs > 0)
-       std::cout << "----------Onput-----------" << std::endl;
-    std::cout << std::endl;
-
-    for (int i = 0; i != outputs; ++i)
-    {
-        glGetProgramResourceName(program, GL_PROGRAM_OUTPUT, i, sizeof(name), NULL, name);
-        glGetProgramResourceiv(program, GL_PROGRAM_OUTPUT, i, 2, props, 2, NULL, params);
-
-        type_name = name;
-        //std::cout << "Index " << i << std::endl;
-        std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
-    }
-
-    glGetProgramInterfaceiv(program, GL_UNIFORM_BLOCK,  GL_ACTIVE_RESOURCES, &outputs);
-    if (outputs > 0)
-      std::cout << "------Uniform Block-------" << std::endl;
-    std::cout << std::endl;
-    for (int i = 0; i != outputs; ++i)
-    {
-        glGetProgramResourceName(program, GL_UNIFORM_BLOCK, i, sizeof(name), NULL, name);
-        glGetProgramResourceiv(program, GL_UNIFORM_BLOCK, i, 2, props, 2, NULL, params);
-
-        type_name = name;
-        //std::cout << "Index " << i << std::endl;
-        std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
-    }
-
-
-    glGetProgramInterfaceiv(program, GL_UNIFORM,  GL_ACTIVE_RESOURCES, &outputs);
-    if (outputs > 0)
-        std::cout << "----------Uniform---------" << std::endl;
-
-    if (outputs > 10)
-        return ;
-    for (int i = 0; i != outputs; ++i)
-    {
-        glGetProgramResourceName(program, GL_UNIFORM, i, sizeof(name), NULL, name);
-        glGetProgramResourceiv(program, GL_UNIFORM, i, 2, props, 2, NULL, params);
-
-        type_name = name;
-        //std::cout << "Index " << i << std::endl;
-        std::cout  <<  "(" <<  type_name  << ")" << " locatoin: " << params[1] << std::endl;
-    }
-
-}
-*/
-
-/*
-
-// Create a simple program containing only a vertex shader
-static const GLchar source[] = { ... };
-
-// First create and compile the shader
-GLuint shader;
-shader = glCreateShader(GL_VERTEX_SHADER);
-glShaderSource(shader, 1, suorce, NULL);
-glCompileShader(shader);
-
-// Create the program and attach the shader to it
-GLuint program;
-program = glCreateProgram();
-glAttachShader(program, shader);
-
-// Set the binary retrievable hint and link the program
-glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
-glLinkProgram(program);
-
-// Get the expected size of the program binary
-GLint binary_size = 0;
-glGetProgramiv(program, GL_PROGRAM_BINARY_SIZE, &binary_size);
-
-// Allocate some memory to store the program binary
-unsigned char * program_binary = new unsigned char [binary_size];
-
-// Now retrieve the binary from the program object
-GLenum binary_format = GL_NONE;
-glGetProgramBinary(program, binary_size, NULL, &binary_format, program_binary);
-
-*/
-/*
-*/
