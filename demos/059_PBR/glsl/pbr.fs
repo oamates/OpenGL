@@ -36,8 +36,8 @@ const float pi = 3.14159265359f;
 
 //==============================================================================================================================================================
 // Easy trick to get tangent-normals to world-space to keep PBR code simplified.
-// Don't worry if you don't get what's going on; you generally want to do normal 
-// mapping the usual way for performance anways; I do plan make a note of this 
+// Don't worry if you don't get what's going on; you generally want to do normal
+// mapping the usual way for performance anways; I do plan make a note of this
 // technique somewhere later in the normal mapping tutorial.
 //==============================================================================================================================================================
 vec3 getNormalFromMap()
@@ -58,92 +58,90 @@ vec3 getNormalFromMap()
 }
 
 //==============================================================================================================================================================
-// DistributionGGX
+// Trowbridge-Reitz model of Normal Distribution Function depending on roughness parameter
+// -- approximates the amount of surface microfacets aligned to halfway vector
 //==============================================================================================================================================================
-float DistributionGGX(vec3 N, vec3 H, float roughness)
+float NDF(vec3 n, vec3 h, float roughness)
 {
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH * NdotH;
-
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
-    denom = pi * denom * denom;
-
-    return nom / denom;
+    float alpha = roughness * roughness;
+    float alpha2 = alpha * alpha;
+    float dp = max(dot(n, h), 0.0);
+    float q = 1.0f + (alpha2 - 1.0f) * dp * dp;
+    float s = pi * q * q;
+    return alpha2 / s;
 }
 
 //==============================================================================================================================================================
 // GeometrySchlickGGX
 //==============================================================================================================================================================
-float GeometrySchlickGGX(float NdotV, float roughness)
+float GeometrySchlickGGX(float dp, float roughness)
 {
     float r = 1.0 + roughness;
     float k = 0.125f * r * r;
-    return NdotV / (NdotV * (1.0 - k) + k);
+    return dp / (dp * (1.0 - k) + k);
 }
 
 //==============================================================================================================================================================
-// GeometrySmith
+// Geometry Function
+// -- describes self-shadowing properties of the surface
 //==============================================================================================================================================================
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+float GF(vec3 n, vec3 v, vec3 l, float roughness)
 {
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-    return ggx1 * ggx2;
+    float nv = max(dot(n, v), 0.0);
+    float nl = max(dot(n, l), 0.0);
+    float ggx_v = GeometrySchlickGGX(nv, roughness);
+    float ggx_l = GeometrySchlickGGX(nl, roughness);
+    return ggx_v * ggx_l;
 }
 
 //==============================================================================================================================================================
-// fresnelSchlick
+// Schlick approximation of the Fresnel coefficient
 //==============================================================================================================================================================
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
+vec3 fresnel_schlick(float cos_theta, vec3 F0)
 {
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+    return F0 + (1.0 - F0) * pow(1.0 - cos_theta, 5.0);
 }
 
 //==============================================================================================================================================================
-// fresnelSchlickRoughness
+// Fresnel-Schlick roughness
 //==============================================================================================================================================================
-vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+vec3 fresnel_schlick_roughness(float cos_theta, vec3 F0, float roughness)
 {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
-}   
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cos_theta, 5.0);
+}
 
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
 void main()
-{		
+{
     //==========================================================================================================================================================
     // material properties
     //==========================================================================================================================================================
     vec3 albedo = pow(texture(albedo_map, uv).rgb, vec3(2.2));
-    float metallic = texture(metallic_map, uv).r;
+    float metallness = texture(metallic_map, uv).r;
     float roughness = texture(roughness_map, uv).r;
     float ao = texture(ao_map, uv).r;
-    
+
     //==========================================================================================================================================================
     // input lighting data
     //==========================================================================================================================================================
     vec3 N = getNormalFromMap();
     vec3 V = normalize(camera_ws - position_ws);
-    vec3 R = reflect(-V, N); 
+    vec3 R = reflect(-V, N);
 
     //==========================================================================================================================================================
-    // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
-    // 0.04 and if it's a metal, use their albedo color as F0 (metallic workflow)    
+    // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
+    // 0.04 and if it's a metal, use their albedo color as F0 (metallic workflow)
     //==========================================================================================================================================================
-    vec3 F0 = vec3(0.04); 
-    F0 = mix(F0, albedo, metallic);
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, albedo, metallness);
 
     //==========================================================================================================================================================
     // reflectance equation
     //==========================================================================================================================================================
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < light_count; ++i) 
+    for(int i = 0; i < light_count; ++i)
     {
         //======================================================================================================================================================
         // calculate per-light radiance
@@ -158,14 +156,14 @@ void main()
         //======================================================================================================================================================
         // Cook-Torrance BRDF
         //======================================================================================================================================================
-        float NDF = DistributionGGX(N, H, roughness);   
-        float G = GeometrySmith(N, V, L, roughness);    
-        vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
-        
-        vec3 nominator = NDF * G * F;
-        float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001;  // to avoid division by zero.
+        float ndf = NDF(N, H, roughness);
+        float G = GF(N, V, L, roughness);
+        vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+
+        vec3 nominator = ndf * G * F;
+        float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001;
         vec3 brdf = nominator / denominator;
-        
+
         //======================================================================================================================================================
         // kS is equal to Fresnel
         //======================================================================================================================================================
@@ -179,39 +177,39 @@ void main()
         vec3 kD = vec3(1.0) - kS;
 
         //======================================================================================================================================================
-        // multiply kD by the inverse metalness such that only non-metals 
+        // multiply kD by the inverse metalness such that only non-metals
         // have diffuse lighting, or a linear blend if partly metal (pure metals have no diffuse light).
         //======================================================================================================================================================
-        kD *= 1.0 - metallic;	                
-            
+        kD *= 1.0 - metallness;
+
         //======================================================================================================================================================
         // scale light by NdotL
         //======================================================================================================================================================
-        float NdotL = max(dot(N, L), 0.0);        
+        float NdotL = max(dot(N, L), 0.0);
 
         //======================================================================================================================================================
         // add to outgoing radiance Lo
         //======================================================================================================================================================
         Lo += (kD * albedo / pi + brdf) * radiance * NdotL; // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
-    }   
-    
+    }
+
     //==========================================================================================================================================================
     // ambient lighting (we now use IBL as the ambient term)
     //==========================================================================================================================================================
-    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-    
+    vec3 F = fresnel_schlick_roughness(max(dot(N, V), 0.0), F0, roughness);
+
     vec3 kS = F;
     vec3 kD = 1.0 - kS;
-    kD *= 1.0 - metallic;	  
-    
+    kD *= 1.0 - metallness;
+
     vec3 irradiance = texture(irradiance_map, N).rgb;
     vec3 diffuse = irradiance * albedo;
-    
+
     //==========================================================================================================================================================
     // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
     //==========================================================================================================================================================
     const float MAX_REFLECTION_LOD = 4.0;
-    vec3 prefilteredColor = textureLod(prefilter_map, R,  roughness * MAX_REFLECTION_LOD).rgb;    
+    vec3 prefilteredColor = textureLod(prefilter_map, R,  roughness * MAX_REFLECTION_LOD).rgb;
     vec2 brdf = texture(brdf, vec2(max(dot(N, V), 0.0), roughness)).rg;
     vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
     vec3 ambient = (kD * diffuse + specular) * ao;
@@ -222,6 +220,6 @@ void main()
     //==========================================================================================================================================================
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0 / 2.2));
-    
+
     FragmentColor = vec4(color, 1.0f);
 }
