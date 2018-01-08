@@ -19,6 +19,7 @@
 #include "vao.hpp"
 #include "vertex.hpp"
 
+
 struct demo_window_t : public glfw_window_t
 {
     camera_t camera;

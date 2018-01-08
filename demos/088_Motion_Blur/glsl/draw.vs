@@ -1,34 +1,29 @@
 #version 330 core
 
-uniform mat4 ProjectionMatrix, CameraMatrix, SingleModelMatrix;
+layout(location = 0) in vec3 position_in;
+layout(location = 0) in vec3 normal_in;
+layout(location = 0) in vec2 uv_in;
 
-uniform int SingleModel;
+uniform mat4 projection_view_matrix;
 
-layout (std140) uniform ModelBlock {
-   mat4 ModelMatrices[512];
+layout (std140) uniform model_matrices {
+   mat4 model_matrix[512];
 };
 
-const vec3 LightPos = vec3(0.0, 0.0, 0.0);
+const vec3 light_ws = vec3(0.0, 0.0, 0.0);
 
-in vec4 Position;
-in vec3 Normal;
-in vec2 TexCoord;
-
-out vec3 vertLightDir;
-out vec3 vertNormal;
-out vec3 vertColor;
-out vec2 vertTexCoord;
+out vec3 normal_ws;
+out vec3 light;
+out vec3 color;
+out vec2 uv;
 
 void main()
 {
-    mat4 ModelMatrix =
-       SingleModel != 0 ? SingleModelMatrix : ModelMatrices[gl_InstanceID];
-    gl_Position = ModelMatrix * Position;
-
-    vertLightDir = normalize(LightPos - gl_Position.xyz);
-    vertNormal = mat3(ModelMatrix) * Normal;
-    vertTexCoord = SingleModel != 0 ? Position.xz : TexCoord;
-    vertColor = abs(normalize((ModelMatrix * Position).yxz));
-
-    gl_Position = ProjectionMatrix * CameraMatrix * gl_Position;
+    mat4 model_matrix0 = model_matrix[gl_InstanceID];
+    vec4 position_ws4 = model_matrix0 * vec4(position_in, 1.0f);
+    normal_ws = mat3(model_matrix0) * normal_in;
+    light = light_ws - position_ws4.xyz;
+    uv = uv_in;
+    color = abs(normalize(position_ws4.yxz));
+    gl_Position = projection_view_matrix * position_ws4;
 }

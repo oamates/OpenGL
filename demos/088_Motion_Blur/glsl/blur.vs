@@ -1,14 +1,20 @@
 #version 330 core
 
-uniform vec2 ScreenSize;
+uniform vec2 screen_size;
 
-in vec4 Position;
-in vec2 TexCoord;
+out vec2 uv;
 
-out vec2 vertTexCoord;
+const vec2 ndcs[4] = vec2[4]
+(
+    vec2(-1.0f,  1.0f),
+    vec2(-1.0f, -1.0f),
+    vec2( 1.0f,  1.0f),
+    vec2( 1.0f, -1.0f)
+);
 
 void main()
 {
-    gl_Position = Position;
-    vertTexCoord = ScreenSize * TexCoord;
+    vec2 ndc = ndcs[gl_VertexID];
+    gl_Position = vec4(ndc, 0.0f, 1.0f);
+    uv = (0.5f + 0.5f * ndc) * screen_size;
 }

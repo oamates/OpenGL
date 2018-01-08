@@ -22,6 +22,10 @@
 #include "fbo.hpp"
 #include "vertex.hpp"
 #include "sampler.hpp"
+#include "image/stb_image.h"
+#include "plato.hpp"
+#include "polyhedron.hpp"
+
 
 struct demo_window_t : public glfw_window_t
 {
@@ -489,8 +493,8 @@ struct instances_t
         return nml_data;
     }
 
-    CubicBezierLoop<glm::vec3, double> path_pos;
-    CubicBezierLoop<glm::vec3, double> path_nml;
+    CubicBezierLoop<glm::vec3, float> path_pos;
+    CubicBezierLoop<glm::vec3, float> path_nml;
     GLuint count;
 
     instances_t(GLuint ubo_id, GLuint n = 256)
@@ -606,10 +610,10 @@ struct blur_fbo_t
 
     void accumulate()
     {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo_id);
         glActiveTexture(GL_TEXTURE1);
-        glCopyTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA8, 0, 0, res_x, res_y, 0);
+        glCopyTexSubImage2D(GL_TEXTURE_RECTANGLE, 0, 0, 0, 0, 0, res_x, res_y);        
     }
-
 };
 
 //=======================================================================================================================================================================================================================
@@ -635,32 +639,25 @@ int main(int argc, char *argv[])
     glsl_program_t draw_prog(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/draw.vs"),
                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/draw.fs"));
 
-    uniform_t projection_matrix = draw_prog["ProjectionMatrix"];
-    uniform_t camera_matrix     = draw_prog["CameraMatrix"];
-    uniform_t model_matrix      = draw_prog["SingleModelMatrix"];
-    uniform_t single_model      = draw_prog["SingleModel"];                                     // int
-    uniform_t checker_tex       = draw_prog["CheckerTex"];                                      // UniformSampler
-    //uniform_t model_block = draw_prog["ModelBlock"];                                          // UniformSampler
-    //uniform_t UniformBlock model_block;
+    uniform_t uni_dp_pv_matrix   = draw_prog["projection_view_matrix"];
+    uniform_t uni_dp_diffuse_tex = draw_prog["diffuse_tex"];
+
     draw_prog.enable();
-    projection_matrix = window.camera.projection_matrix;
-    checker_tex = 2;
+    uni_dp_diffuse_tex = 2;
 
     glsl_program_t blur_prog(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/blur.vs"),
                              glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/blur.fs"));
 
-    uniform_t screen_size     = blur_prog["ScreenSize"];                                        // Uniform<Vec2f>
-    uniform_t current_frame   = blur_prog["CurrentFrame"];
-    uniform_t previous_frames = blur_prog["PreviousFrames"];                                    // UniformSampler
-    uniform_t splitter        = blur_prog["Splitter"];                                          // Uniform<GLfloat>
+    uniform_t uni_bp_screen_size     = blur_prog["screen_size"];
+    uniform_t uni_bp_current_frame   = blur_prog["current_frame"];
+    uniform_t uni_bp_previous_frames = blur_prog["previous_frames"];
+    uniform_t uni_bp_splitter        = blur_prog["splitter"];
 
     blur_prog.enable();
-    screen_size = glm::vec2(res_x, res_y);
-    current_frame = 0;
-    previous_frames = 1;
-
-
-
+    uni_bp_screen_size = glm::vec2(res_x, res_y);
+    uni_bp_current_frame = 0;
+    uni_bp_previous_frames = 1;
+    uni_bp_splitter = float(0.25f * res_x);
 
     //===================================================================================================================================================================================================================
     // load cube texture --> unit 2
@@ -681,21 +678,20 @@ int main(int argc, char *argv[])
     glGenerateMipmap(GL_TEXTURE_2D);
     free(src_data);
 
-    sampler_t sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_REPEAT)
+    sampler_t sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_REPEAT);
     sampler.bind(2);
 
-
-
+    const float cube_size = 1.0f;
+    polyhedron cube;
+    cube.regular_pnt2_vao(8, 6, plato::cube::vertices, plato::cube::normals, plato::cube::faces, cube_size, true);
 
     glClearColor(0.04f, 0.01f, 0.09f, 0.0f);
     glClearDepth(1.0f);
 
-    shapes::ShapeWrapper cube;
-    shapes::ShapeWrapper arrow;
+    GLuint vao_id;
+    glGenVertexArrays(1, &vao_id);
 
-    shapes::ShapeWrapper screen;
-    blur_fbo_t blur_fbo;
-
+    blur_fbo_t blur_fbo(res_x, res_y);
 
     //===================================================================================================================================================================================================================
     // model matrices uniform block setup
@@ -703,22 +699,10 @@ int main(int argc, char *argv[])
     GLuint ubo_id;
     glGenBuffers(1, &ubo_id);
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_id);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(matrices), 0, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_id);
-    draw_prog.bind_ubo("ModelBlock", 0);
+    draw_prog.bind_ubo("model_matrices", 0);
 
     instances_t instances(ubo_id);
-
-/*
-    MotionBlurExample()
-        , instances()
-        , cube(List("Position")("Normal")("TexCoord").Get(), shapes::Cube(), draw_prog)
-        , arrow(List("Position")("Normal").Get(), ArrowShape(), draw_prog)
-        , screen(List("Position")("TexCoord").Get(), shapes::Screen(), blur_prog)
-    {
-    }
-*/
-
 
     //===================================================================================================================================================================================================================
     // main program loop
@@ -731,55 +715,37 @@ int main(int argc, char *argv[])
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         window.new_frame();
 
-        float time = window.frame_ts;
-        glm::mat4 view_matrix = window.camera.view_matrix;
+        glm::mat4 projection_view_matrix = window.camera.projection_view_matrix();
 
         int samples = 8;
-        double frame_time = clock.Now().Seconds();
-        double interval = clock.Interval().Seconds();
+        double frame_time = window.frame_ts;
+        double interval = window.frame_dt;
         double step = interval / samples;
 
         for(int s = 0; s != samples; ++s)
         {
-            double time = frame_time + s * step;
+            double t = frame_time + s * step;
 
-
-            blur_fbo.bind();                                            // draw objects off-screen
+            blur_fbo.bind();
 
             glEnable(GL_DEPTH_TEST);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            double pos = time / 20.0;
-
             draw_prog.enable();
-            camera_matrix = view_matrix;
-            single_model = 0;
+            uni_dp_pv_matrix = projection_view_matrix;
 
-            cube_vao.bind();
-            cube_vao.instanced_render(instances.count);
-
-            single_model = 1;
-
-            arrow.Use();
-            model_matrix = instances.MakeMatrix(pos - 0.007 + glm::sin(time / 13.0) * 0.007, 0.001);
-            arrow.Draw();
-
-            model_matrix = instances.MakeMatrix(pos + 0.013 + glm::sin(time / 7.0) * 0.007, 0.001);
-            arrow.Draw();
+            cube.instanced_render(instances.count);
 
             // motion blur
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
             glDisable(GL_DEPTH_TEST);
 
-            blur_prog.Use();
-
-            screen.Use();
-            screen.Draw();
+            blur_prog.enable();
+            glBindVertexArray(vao_id);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
             blur_fbo.accumulate();
         }
-
-        splitter = (glm::sin(frame_time / 20.0) * 0.5 + 0.5) * res_x;
 
         //===============================================================================================================================================================================================================
         // done : increment frame counter and show back buffer
@@ -793,16 +759,3 @@ int main(int argc, char *argv[])
     glfw::terminate();
     return 0;
 }
-
-
-
-class ArrowShape
- : public ResourceFile
- , public shapes::ObjMesh
-{
-    ArrowShape()
-        : ResourceFile("models", "arrow_z", ".obj")
-        , shapes::ObjMesh(stream(), LoadingOptions(false).Normals())
-    { }
-};
-

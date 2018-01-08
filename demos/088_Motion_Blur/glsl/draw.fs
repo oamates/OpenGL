@@ -1,17 +1,21 @@
 #version 330 core
 
-uniform sampler2D CheckerTex;
+in vec3 normal_ws;
+in vec3 light;
+in vec3 color;
+in vec2 uv;
 
-in vec3 vertLightDir;
-in vec3 vertNormal;
-in vec3 vertColor;
-in vec2 vertTexCoord;
+uniform sampler2D diffuse_tex;
 
-out vec3 fragColor;
+out vec4 FragmentColor;
 
 void main()
 {
-    float c = texture(CheckerTex, vertTexCoord).r;
-    float l = pow(max(dot(vertLightDir, vertNormal) + 0.1, 0.0) * 1.6, 2.0);
-    fragColor = mix(vec3(0, 0, 0), vertColor, mix(c, 1.0, 0.2) * (l + 0.3));
+    vec3 n = normalize(normal_ws);
+    vec3 l = normalize(light);
+    vec3 c = texture(diffuse_tex, uv).rgb;
+    float q = 0.3f + pow(max(dot(n, l) + 0.1f, 0.0) * 1.6f, 2.0f);
+
+    vec3 color = q * (0.8f * c + 0.2f);
+    FragmentColor = vec4(color, 1.0f);
 }
