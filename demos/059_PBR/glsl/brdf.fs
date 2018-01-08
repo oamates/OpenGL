@@ -9,7 +9,7 @@ out vec2 FragmentColor;
 //==============================================================================================================================================================
 // http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html --- efficient VanDerCorpus calculation.
 //==============================================================================================================================================================
-float RadicalInverse_VdC(uint bits) 
+float RadicalInverse_VdC(uint bits)
 {
     bits = (bits << 16u) | (bits >> 16u);
     bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
@@ -32,12 +32,12 @@ vec2 Hammersley(uint i, uint N)
 //==============================================================================================================================================================
 vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 {
-	float a = roughness*roughness;
-	
+	float a = roughness * roughness;
+
 	float phi = 2.0f * pi * Xi.x;
 	float cosTheta = sqrt((1.0f - Xi.y) / (1.0f + (a * a - 1.0f) * Xi.y));
 	float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
-	
+
     //==========================================================================================================================================================
 	// from spherical coordinates to cartesian coordinates - halfway vector
     //==========================================================================================================================================================
@@ -45,14 +45,14 @@ vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness)
 	H.x = cos(phi) * sinTheta;
 	H.y = sin(phi) * sinTheta;
 	H.z = cosTheta;
-	
+
     //==========================================================================================================================================================
 	// from tangent-space H vector to world-space sample vector
     //==========================================================================================================================================================
 	vec3 up = abs(N.z) < 0.999 ? vec3(0.0f, 0.0f, 1.0f) : vec3(1.0f, 0.0f, 0.0f);
 	vec3 tangent = normalize(cross(up, N));
 	vec3 bitangent = cross(N, tangent);
-	
+
 	vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
 	return normalize(sampleVec);
 }
@@ -92,15 +92,16 @@ vec2 IntegrateBRDF(float NdotV, float roughness)
     V.z = NdotV;
 
     float A = 0.0f;
-    float B = 0.0f; 
+    float B = 0.0f;
 
     vec3 N = vec3(0.0f, 0.0f, 1.0f);
-    
+
     const uint SAMPLE_COUNT = 1024u;
     for(uint i = 0u; i < SAMPLE_COUNT; ++i)
     {
-        // NOTE(Joey): generates a sample vector that's biased towards the
-        // preferred alignment direction (importance sampling).
+        //======================================================================================================================================================
+        // generates a sample vector that's biased towards the preferred alignment direction (importance sampling)
+        //======================================================================================================================================================
         vec2 Xi = Hammersley(i, SAMPLE_COUNT);
         vec3 H = ImportanceSampleGGX(Xi, N, roughness);
         vec3 L = normalize(2.0f * dot(V, H) * H - V);
@@ -127,7 +128,7 @@ vec2 IntegrateBRDF(float NdotV, float roughness)
 //==============================================================================================================================================================
 // shader entry point
 //==============================================================================================================================================================
-void main() 
+void main()
 {
     FragmentColor = IntegrateBRDF(uv.x, uv.y);
 }

@@ -380,8 +380,8 @@ int main(int argc, char *argv[])
     // pbr: generate a 2D LUT from the BRDF equations used.
     //===================================================================================================================================================================================================================
     const int BRDF_TEXTURE_RESOLUTION = 512;
-    glsl_program_t brdf_shader(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/brdf.vs"),
-                               glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/brdf.fs"));
+    glsl_shader_t quad_vs(GL_VERTEX_SHADER, "glsl/quad.vs");
+    glsl_program_t brdf_shader(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/brdf.fs"));
 
     GLuint brdfLUTTexture;
     glGenTextures(1, &brdfLUTTexture);
@@ -413,8 +413,7 @@ int main(int argc, char *argv[])
     //===================================================================================================================================================================================================================
     // helper shader program: renders texture onto screen
     //===================================================================================================================================================================================================================
-    glsl_program_t quad_renderer(glsl_shader_t(GL_VERTEX_SHADER,   "glsl/quad.vs"),
-                                 glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
+    glsl_program_t quad_renderer(quad_vs, glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/quad.fs"));
     quad_renderer.enable();
     quad_renderer["tex2d"] = 0;
 

@@ -126,13 +126,13 @@ void main()
     //==========================================================================================================================================================
     // input lighting data
     //==========================================================================================================================================================
-    vec3 N = getNormalFromMap();
-    vec3 V = normalize(camera_ws - position_ws);
-    vec3 R = reflect(-V, N);
+    vec3 n = getNormalFromMap();                        /* world-space normal */
+    vec3 v = normalize(camera_ws - position_ws);        /* view direction, from fragment to eye */
+    vec3 r = reflect(-v, n);                            /* reflected view direction */
 
     //==========================================================================================================================================================
-    // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0
-    // 0.04 and if it's a metal, use their albedo color as F0 (metallic workflow)
+    // calculate reflectance at normal incidence;
+    // for di-electric (like plastic) use F0 = 0.04 and if it's a metal, use their albedo color as F0 (metallic workflow)
     //==========================================================================================================================================================
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallness);
@@ -141,27 +141,30 @@ void main()
     // reflectance equation
     //==========================================================================================================================================================
     vec3 Lo = vec3(0.0);
+
     for(int i = 0; i < light_count; ++i)
     {
         //======================================================================================================================================================
         // calculate per-light radiance
         //======================================================================================================================================================
-        vec3 LL = light_positions[i] - position_ws;
-        float distance = length(LL);
-        vec3 L = LL / distance;
-        vec3 H = normalize(V + L);
+        vec3 light = light_positions[i] - position_ws;
+        float distance = length(light);
+        vec3 l = light / distance;
+        vec3 h = normalize(v + l);                      /* half-view vector */
         float attenuation = 1.0 / (distance * distance);
         vec3 radiance = light_colors[i] * attenuation;
 
         //======================================================================================================================================================
         // Cook-Torrance BRDF
         //======================================================================================================================================================
-        float ndf = NDF(N, H, roughness);
-        float G = GF(N, V, L, roughness);
-        vec3 F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+        float ndf = NDF(n, h, roughness);                       /* normal distribution function */
+        float G = GF(n, v, l, roughness);                       /* geometry self-shadowing distribution */
+        vec3 F = fresnel_schlick(max(dot(h, v), 0.0), F0);      /* Fresnel coefficient */
 
         vec3 nominator = ndf * G * F;
-        float denominator = 4 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001;
+        float NdotV = max(dot(n, v), 0.0);
+        float NdotL = max(dot(n, l), 0.0);
+        float denominator = 4 * NdotV * NdotL + 0.001;
         vec3 brdf = nominator / denominator;
 
         //======================================================================================================================================================
@@ -170,48 +173,44 @@ void main()
         vec3 kS = F;
 
         //======================================================================================================================================================
-        // for energy conservation, the diffuse and specular light can't
-        // be above 1.0 (unless the surface emits light); to preserve this
-        // relationship the diffuse component (kD) should equal 1.0 - kS.
+        // for energy conservation, the diffuse and specular light can't be above 1.0 (unless the surface emits light);
+        // to preserve this relationship the diffuse component (kD) should equal 1.0 - kS.
         //======================================================================================================================================================
         vec3 kD = vec3(1.0) - kS;
 
         //======================================================================================================================================================
-        // multiply kD by the inverse metalness such that only non-metals
-        // have diffuse lighting, or a linear blend if partly metal (pure metals have no diffuse light).
+        // multiply kD by the inverse metalness such that only non-metals have diffuse lighting,
+        // or a linear blend if partly metal (pure metals have no diffuse light)
+        // the rest of unused energy will heat the metal
         //======================================================================================================================================================
         kD *= 1.0 - metallness;
 
         //======================================================================================================================================================
-        // scale light by NdotL
+        // scale light by NdotL and add to outgoing radiance Lo,
+        // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
         //======================================================================================================================================================
-        float NdotL = max(dot(N, L), 0.0);
-
-        //======================================================================================================================================================
-        // add to outgoing radiance Lo
-        //======================================================================================================================================================
-        Lo += (kD * albedo / pi + brdf) * radiance * NdotL; // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
+        Lo += (kD * albedo / pi + brdf) * radiance * NdotL; //
     }
 
     //==========================================================================================================================================================
     // ambient lighting (we now use IBL as the ambient term)
     //==========================================================================================================================================================
-    vec3 F = fresnel_schlick_roughness(max(dot(N, V), 0.0), F0, roughness);
+    vec3 F = fresnel_schlick_roughness(max(dot(n, v), 0.0), F0, roughness);
 
     vec3 kS = F;
     vec3 kD = 1.0 - kS;
     kD *= 1.0 - metallness;
 
-    vec3 irradiance = texture(irradiance_map, N).rgb;
+    vec3 irradiance = texture(irradiance_map, n).rgb;
     vec3 diffuse = irradiance * albedo;
 
     //==========================================================================================================================================================
     // sample both the pre-filter map and the BRDF lut and combine them together as per the Split-Sum approximation to get the IBL specular part.
     //==========================================================================================================================================================
     const float MAX_REFLECTION_LOD = 4.0;
-    vec3 prefilteredColor = textureLod(prefilter_map, R,  roughness * MAX_REFLECTION_LOD).rgb;
-    vec2 brdf = texture(brdf, vec2(max(dot(N, V), 0.0), roughness)).rg;
-    vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
+    vec3 prefiltered_color = textureLod(prefilter_map, r,  roughness * MAX_REFLECTION_LOD).rgb;
+    vec2 brdf = texture(brdf, vec2(max(dot(n, v), 0.0), roughness)).rg;
+    vec3 specular = prefiltered_color * (F * brdf.x + brdf.y);
     vec3 ambient = (kD * diffuse + specular) * ao;
     vec3 color = ambient + Lo;
 
