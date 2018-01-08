@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
 
     demo_window_t window("Physics-Based Rendering", 4, 3, 3, 1920, 1080);
 
-    //glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     //===================================================================================================================================================================================================================
     // main PBR shader initialization
@@ -203,7 +203,6 @@ int main(int argc, char *argv[])
     uniform_t uni_pbr_camera_ws       = pbr_shader["camera_ws"];
     uniform_t uni_pbr_light_positions = pbr_shader["light_positions"];
     uniform_t uni_pbr_light_colors    = pbr_shader["light_colors"];
-    uni_pbr_light_positions           = light_positions;
     uni_pbr_light_colors              = light_colors;
 
     //===================================================================================================================================================================================================================
@@ -259,8 +258,8 @@ int main(int argc, char *argv[])
 //    stbi_set_flip_vertically_on_load(true);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/kiara_8_sunset_4k.hdr", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_CLAMP_TO_EDGE);
-//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     //===================================================================================================================================================================================================================
@@ -509,7 +508,6 @@ int main(int argc, char *argv[])
         // render scene, supplying the convoluted irradiance map to the final shader
         //===============================================================================================================================================================================================================
         pbr_shader.enable();
-        glm::mat4 view = window.camera.view_matrix;
         uni_pbr_pv_matrix = projection_view_matrix;
         uni_pbr_camera_ws = camera_ws;
         uni_pbr_light_positions = light_positions;
