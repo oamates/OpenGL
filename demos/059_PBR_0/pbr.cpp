@@ -197,13 +197,15 @@ int main(int argc, char *argv[])
     pbr_shader["roughness_map"]  = 3;
     pbr_shader["ao_map"]         = 4;
 
-    uniform_t uni_pbr_pv_matrix       = pbr_shader["projection_view_matrix"];
-    uniform_t uni_pbr_model_matrix    = pbr_shader["model_matrix"];
-    uniform_t uni_pbr_camera_ws       = pbr_shader["camera_ws"];
-    uniform_t uni_pbr_light_positions = pbr_shader["light_positions"];
-    uniform_t uni_pbr_light_colors    = pbr_shader["light_colors"];
+    uniform_t uni_pbr_pv_matrix        = pbr_shader["projection_view_matrix"];
+    uniform_t uni_pbr_model_matrix     = pbr_shader["model_matrix"];
+    uniform_t uni_pbr_camera_ws        = pbr_shader["camera_ws"];
+    uniform_t uni_pbr_light_positions  = pbr_shader["light_positions"];
+    uniform_t uni_pbr_light_colors     = pbr_shader["light_colors"];
+    uniform_t uni_pbr_metallic_factor  = pbr_shader["metallic_factor"];
+    uniform_t uni_pbr_roughness_factor = pbr_shader["roughness_factor"];
 
-    uni_pbr_light_colors              = light_colors;
+    uni_pbr_light_colors               = light_colors;
 
     //===================================================================================================================================================================================================================
     // rusted iron PBR material
@@ -282,14 +284,17 @@ int main(int argc, char *argv[])
         uni_pbr_camera_ws = camera_ws;
         uni_pbr_light_positions = light_positions;
 
-        int nrRows = 7;
-        int nrColumns = 7;
+        int nrRows = 9;
+        int nrColumns = 9;
         float spacing = 2.5f;
 
         for (int row = 0; row < nrRows; ++row)
         {
             for (int col = 0; col < nrColumns; ++col)
             {
+                uni_pbr_metallic_factor  = float(row + 1) / 10.0f;
+                uni_pbr_roughness_factor = float(col + 1) / 10.0f;
+
                 glm::vec3 shift = spacing * glm::vec3(col - 0.5f * nrColumns, row - 0.5f * nrRows, 0.0f);
                 glm::mat4 model_matrix = glm::translate(glm::mat4(1.0f), shift);
                 uni_pbr_model_matrix = model_matrix;

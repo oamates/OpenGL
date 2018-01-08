@@ -13,6 +13,9 @@ uniform sampler2D metallic_map;
 uniform sampler2D roughness_map;
 uniform sampler2D ao_map;
 
+uniform float metallic_factor;
+uniform float roughness_factor;
+
 //==============================================================================================================================================================
 // camera and lights
 //==============================================================================================================================================================
@@ -60,8 +63,8 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
+    float r = 1.0f + roughness;
+    float k = 0.125f * r * r;
 
     float nom   = NdotV;
     float denom = NdotV * (1.0 - k) + k;
@@ -90,8 +93,8 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 void main()
 {
     vec3 albedo     = pow(texture(albedo_map, uv).rgb, vec3(2.2));
-    float metallic  = texture(metallic_map, uv).r;
-    float roughness = texture(roughness_map, uv).r;
+    float metallic  = metallic_factor * texture(metallic_map, uv).r;
+    float roughness = roughness_factor * texture(roughness_map, uv).r;
     float ao        = texture(ao_map, uv).r;
 
     vec3 N = getNormalFromMap();
