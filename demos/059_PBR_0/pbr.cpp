@@ -23,6 +23,7 @@
 #include "vao.hpp"
 #include "vertex.hpp"
 #include "image.hpp"
+#include "sampler.hpp"
 
 struct demo_window_t : public glfw_window_t
 {
@@ -30,7 +31,7 @@ struct demo_window_t : public glfw_window_t
 
     demo_window_t(const char* title, int glfw_samples, int version_major, int version_minor, int res_x, int res_y, bool fullscreen = true)
         : glfw_window_t(title, glfw_samples, version_major, version_minor, res_x, res_y, fullscreen, true),
-          camera(16.0f, 0.5f, glm::mat4(1.0f))
+          camera(128.0f, 0.5f, glm::mat4(1.0f))
     {
         camera.infinite_perspective(constants::two_pi / 6.0f, aspect(), 0.1f);
         gl_aux::dump_info(OPENGL_BASIC_INFO | OPENGL_EXTENSIONS_INFO);
@@ -61,16 +62,6 @@ struct demo_window_t : public glfw_window_t
         if (norm > 0.01)
             camera.rotateXY(mouse_delta / norm, norm * frame_dt);
     }
-};
-
-
-struct pbr_material_t
-{
-    GLuint albedo_map;
-    GLuint normal_map;
-    GLuint metallic_map;
-    GLuint roughness_map;
-    GLuint ao_map;
 };
 
 struct sphere_t
@@ -143,7 +134,7 @@ const int light_count = 4;
 
 glm::vec3 light_positions[light_count];
 
-const float luma = 96.0f;
+const float luma = 128.0f;
 glm::vec3 light_colors[light_count] =
 {
     luma * glm::vec3(1.0f, 1.0f, 0.0f),
@@ -169,12 +160,54 @@ glm::vec2 uv1[light_count] =
 };
 
 
+struct spherical_texture_generator_t
+{
+    int res_x, res_y;
+    int unit;
+    glsl_program_t generator;
+    sampler_t sampler;
+
+    GLuint fbo_id;                                                                  /*  Framebuffer for offscreen rendering  */
+    GLuint vao_id;                                                                  /* attribute-less VAO for quad rendering */
+
+    spherical_texture_generator_t(int unit, int res_x, int res_y)
+        : res_x(res_x), res_y(res_y),
+          unit(unit),
+          generator(glsl_shader_t(GL_VERTEX_SHADER, "glsl/quad.vs"), glsl_shader_t(GL_FRAGMENT_SHADER, "glsl/sphere_texgen.fs")),
+          sampler(GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_REPEAT, GL_CLAMP_TO_EDGE)
+    {
+        glGenFramebuffers(1, &fbo_id);
+        sampler.set_max_af_level(16.0);
+        glGenVertexArrays(1, &vao_id);
+    }
+
+    void enable()
+    {
+        sampler.bind(unit);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_id);
+        glViewport(0, 0, res_x, res_y);
+        generator.enable();
+        generator["texture_in"] = unit;
+        glBindVertexArray(vao_id);
+    }
+
+    GLuint process(GLuint tex_in, GLuint tex_out)
+    {
+        glActiveTexture(GL_TEXTURE0 + unit);
+        glBindTexture(GL_TEXTURE_2D, tex_in);
+        glFramebufferTexture(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex_out, 0);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);                                      /* combine images into one */
+    }
+};
 
 //=======================================================================================================================================================================================================================
 // program entry point
 //=======================================================================================================================================================================================================================
 int main(int argc, char *argv[])
 {
+    const int res_x = 1920;
+    const int res_y = 1080;
+
     //===================================================================================================================================================================================================================
     // initialize GLFW library, create GLFW window and initialize GLEW library
     // 4AA samples, OpenGL 3.3 context, screen resolution : 1920 x 1080, fullscreen
@@ -209,14 +242,59 @@ int main(int argc, char *argv[])
 
     //===================================================================================================================================================================================================================
     // rusted iron PBR material
+    //
+    // texture unit 0 :: albedo_map;
+    // texture unit 1 :: normal_map;
+    // texture unit 2 :: metallic_map;
+    // texture unit 3 :: roughness_map;
+    // texture unit 4 :: ao_map;
+    //
+    // shader that converts square x-periodic texture into spherical texture
     //===================================================================================================================================================================================================================
-    pbr_material_t rusted_iron;
+    const char* tex_names[5] = 
+    {
+        "../../../resources/tex2d/pbr/rusted_iron/albedo.png",
+        "../../../resources/tex2d/pbr/rusted_iron/normal.png",
+        "../../../resources/tex2d/pbr/rusted_iron/metallic.png",
+        "../../../resources/tex2d/pbr/rusted_iron/roughness.png",
+        "../../../resources/tex2d/pbr/rusted_iron/ao.png"
+    };
 
-    glActiveTexture(GL_TEXTURE0); rusted_iron.albedo_map    = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/albedo.png");
-    glActiveTexture(GL_TEXTURE1); rusted_iron.normal_map    = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/normal.png");
-    glActiveTexture(GL_TEXTURE2); rusted_iron.metallic_map  = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/metallic.png");
-    glActiveTexture(GL_TEXTURE3); rusted_iron.roughness_map = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/roughness.png");
-    glActiveTexture(GL_TEXTURE4); rusted_iron.ao_map        = image::png::texture2d("../../../resources/tex2d/pbr/rusted_iron/ao.png");
+    const int TEXTURE_MAX_LEVEL = 11;
+    const int TEXTURE_RES_X = 1 << TEXTURE_MAX_LEVEL;
+    const int TEXTURE_RES_Y = 1 << (TEXTURE_MAX_LEVEL - 1);
+
+    spherical_texture_generator_t texgen(5, TEXTURE_RES_X, TEXTURE_RES_Y);
+    texgen.enable();
+
+    GLsizei BUFFER_SIZE = 3 * TEXTURE_RES_X * TEXTURE_RES_Y;                          /* store images for debug purposes */
+    unsigned char* pixel_buffer = (unsigned char*) malloc(BUFFER_SIZE);
+
+    for (int i = 0; i < 5; ++i)
+    {
+        glActiveTexture(GL_TEXTURE0 + i);
+        GLuint tex_in = image::png::texture2d(tex_names[i]);
+        GLuint tex_out;
+        glGenTextures(1, &tex_out);
+        glBindTexture(GL_TEXTURE_2D, tex_out);
+        glTexStorage2D(GL_TEXTURE_2D, TEXTURE_MAX_LEVEL + 1, GL_RGB8, TEXTURE_RES_X, TEXTURE_RES_Y);
+
+        texgen.process(tex_in, tex_out);
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, tex_out);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        char tex_name[32];
+        sprintf(tex_name, "tex%u.png", i);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pixel_buffer);        
+        image::png::write(tex_name, TEXTURE_RES_X, TEXTURE_RES_Y, pixel_buffer, PNG_COLOR_TYPE_RGB);
+    }
+
+    free(pixel_buffer);
+    debug_msg("Done generating images");
+
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glViewport(0, 0, res_x, res_y);
 
     //===================================================================================================================================================================================================================
     // light source rendering program
@@ -256,10 +334,10 @@ int main(int argc, char *argv[])
         uni_lr_camera_ws = camera_ws;
         uni_lr_pv_matrix = projection_view_matrix;
 
-        const float R = 6.0f;
-        const float r = 3.5f;
+        const float R = 12.0f;
+        const float r = 7.0f;
 
-        for (GLuint i = 0; i < light_count; ++i)
+        for (int i = 0; i < light_count; ++i)
         {
             float t = 1.75f * window.frame_ts;
             glm::vec2 uv = uv0[i] + t * uv1[i];
@@ -284,18 +362,18 @@ int main(int argc, char *argv[])
         uni_pbr_camera_ws = camera_ws;
         uni_pbr_light_positions = light_positions;
 
-        int nrRows = 9;
-        int nrColumns = 9;
+        int nrRows = 16;
+        int nrColumns = 16;
         float spacing = 2.5f;
 
         for (int row = 0; row < nrRows; ++row)
         {
             for (int col = 0; col < nrColumns; ++col)
             {
-                uni_pbr_metallic_factor  = float(row + 1) / 10.0f;
-                uni_pbr_roughness_factor = float(col + 1) / 10.0f;
+                uni_pbr_metallic_factor  = 0.0625f * float(row);
+                uni_pbr_roughness_factor = 0.0625f * float(col);
 
-                glm::vec3 shift = spacing * glm::vec3(col - 0.5f * nrColumns, row - 0.5f * nrRows, 0.0f);
+                glm::vec3 shift = spacing * glm::vec3(col - 0.5f * (nrColumns - 1.0f), row - 0.5f * (nrRows - 1.0f), 0.0f);
                 glm::mat4 model_matrix = glm::translate(glm::mat4(1.0f), shift);
                 uni_pbr_model_matrix = model_matrix;
                 sphere.render();
