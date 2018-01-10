@@ -13,9 +13,9 @@ uniform mat4 model_matrix;
 
 void main()
 {
-    vec4 position_ws4 = model_matrix * vec4(position_in, 1.0f);
-    position_ws = position_ws4.xyz;
-    normal_ws = mat3(model_matrix) * normal_in;
     uv = uv_in;
+    vec4 position_ws4 = model_matrix * vec4(position_in, 1.0f);
+    position_ws = vec3(position_ws4);
+    normal_ws = mat3(model_matrix) * normal_in;
     gl_Position =  projection_view_matrix * position_ws4;
 }

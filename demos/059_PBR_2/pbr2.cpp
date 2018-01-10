@@ -255,10 +255,10 @@ int main(int argc, char *argv[])
     // load the HDR environment map to unit 0
     //===================================================================================================================================================================================================================
     glActiveTexture(GL_TEXTURE0);
-//    stbi_set_flip_vertically_on_load(true);
-//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    stbi_set_flip_vertically_on_load(true);
+    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/hansaplatz_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/kiara_8_sunset_4k.hdr", 0, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_CLAMP_TO_EDGE);
-    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
+//    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/newport_loft.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/park_bench_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 //    GLuint hdr_texture_id = image::stbi::hdr2d("../../../resources/hdr/rathaus_4k.hdr", 0, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE);
 

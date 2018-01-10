@@ -14,7 +14,7 @@ const float pi = 3.14159265359f;
 
 void main()
 {
-    vec3 white = vec3(1.0);
+    vec3 white = vec3(1.0);		
     vec3 v = normalize(camera_ws - position_ws);
     vec3 n = normalize(normal_ws);
     float q = 0.5 + 0.5 * dot(v, n);

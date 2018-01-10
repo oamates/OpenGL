@@ -4,17 +4,15 @@ in vec3 position_ws;
 in vec3 normal_ws;
 in vec2 uv;
 
+uniform sampler2D normal_map;
+
 //==============================================================================================================================================================
 // material parameters
 //==============================================================================================================================================================
-uniform sampler2D albedo_map;
-uniform sampler2D normal_map;
-uniform sampler2D metallic_map;
-uniform sampler2D roughness_map;
-uniform sampler2D ao_map;
-
-uniform float metallic_factor;
-uniform float roughness_factor;
+uniform vec3 albedo;
+uniform float metalness;
+uniform float roughness;
+uniform float ao;
 
 //==============================================================================================================================================================
 // camera and lights
@@ -92,11 +90,6 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 //==============================================================================================================================================================
 void main()
 {
-    vec3 albedo     = pow(texture(albedo_map, uv).rgb, vec3(2.2));
-    float metallic  = metallic_factor * texture(metallic_map, uv).r;
-    float roughness = roughness_factor * texture(roughness_map, uv).r;
-    float ao        = texture(ao_map, uv).r;
-
     vec3 N = getNormalFromMap();
     vec3 V = normalize(camera_ws - position_ws);
 
@@ -105,7 +98,7 @@ void main()
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
     //==========================================================================================================================================================
     vec3 F0 = vec3(0.04);
-    F0 = mix(F0, albedo, metallic);
+    F0 = mix(F0, albedo, metalness);
 
     //==========================================================================================================================================================
     // reflectance equation
@@ -147,19 +140,14 @@ void main()
 
         //======================================================================================================================================================
         // multiply kD by the inverse metalness such that only non-metals
-        // have diffuse lighting, or a linear blend if partly metal (pure metals
-        // have no diffuse light).
+        // have diffuse lighting, or a linear blend if partly metal (pure metals have no diffuse light)
         //======================================================================================================================================================
-        kD *= 1.0 - metallic;
+        kD *= 1.0 - metalness;
 
         //======================================================================================================================================================
-        // scale light by NdotL
+        // scale light by NdotL and add to outgoing radiance Lo
         //======================================================================================================================================================
         float NdotL = max(dot(N, L), 0.0);
-
-        //======================================================================================================================================================
-        // add to outgoing radiance Lo
-        //======================================================================================================================================================
         Lo += (kD * albedo / pi + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
     }
 
@@ -168,7 +156,6 @@ void main()
     // this ambient lighting with environment lighting).
     //==========================================================================================================================================================
     vec3 ambient = vec3(0.03) * albedo * ao;
-
     vec3 color = ambient + Lo;
 
     //==========================================================================================================================================================

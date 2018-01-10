@@ -11,7 +11,7 @@ const float half_pi = 1.57079632679f;
 const float pi      = 3.14159265359f;
 const float two_pi  = 6.28318530718f;
 
-const int Q = 40;                               // must be even
+const int Q = 64;                               // must be even
 const float delta = half_pi / Q;
 
 
