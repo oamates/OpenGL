@@ -44,7 +44,9 @@ vec3 m_xy_yz_zx = value * n * n.yzx;
 vec3 m_xx_yy_zz = value * n * n;
 
 
-
+//==============================================================================================================================================================
+// Function to calculate irradiance spherical harmonic coefficients from cubemap texture Real spherical harmonics for levels 0,1,2,3
+//==============================================================================================================================================================
 void accumulate (vec3 n, float dA)
 {
     float v;
